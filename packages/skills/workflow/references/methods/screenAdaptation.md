@@ -1,178 +1,178 @@
-# 剧本改编：让故事在画面与声音中发生
+# Screen Adaptation: Making the Story Happen in Picture and Sound
 
-用于小说、梗概到剧本的转化，以及已授权的剧本修改。故事尚缺主要行动或结尾时，按需要使用[故事开发](storyDevelopment.md)，不要求补齐整套上游文档。
-已定稿剧本默认保留剧情与完整对白。以下检查用于解释制作需求和发现冲突；改变事件、信息揭示、人物动机或台词属于改编提案，按[输入与剧本](../sourceAndScript.md)处理。
-各方法是内部写作工具，不是逐项交稿或审批清单。例子只展示写法，不能当作本项目已有事实。
+Use this to turn a novel or synopsis into a screenplay, and for authorized screenplay revisions. When the story still lacks its main action or ending, use [Story Development](storyDevelopment.md) as needed; a full set of upstream documents is not required.
+A finalized screenplay keeps its plot and complete dialogue by default. The checks below serve to explain production needs and spot conflicts; changing events, information reveals, character motivations or lines counts as an adaptation proposal and is handled per [Input and Script](../sourceAndScript.md).
+Each method is an internal writing tool, not an itemized deliverable or approval checklist. Examples only illustrate the technique and must not be treated as existing facts of this project.
 
-## 1. 把原文依据映射到视听表达
+## 1. Map source grounds to audiovisual expression
 
-什么时候用：小说有大量叙述、背景或心理，或压缩改编容易漏掉必要信息时。
+When to use: the novel has heavy narration, backstory or interior thought, or compressing the adaptation risks dropping necessary information.
 
-先提取本次人物目标、阻碍、失败代价与关键变化，再逐项判断它在原文中怎样成立、观众在剧本中怎样得知。
-记录事件事实与讲述顺序两层：改成倒叙可能不改事件，但会改观众的判断和期待，需要检验揭示时机。
-每一项可选择直接演出、用现有行动中的证据表达、保留必要旁白，或提议合并压缩；不默认所有文学表达都该删掉。
+First extract this installment's character goal, obstacle, cost of failure and key change, then judge item by item how each is established in the source and how the audience learns it in the screenplay.
+Record two layers, the facts of events and the order of telling: switching to a flashback may not change the events, but it changes the audience's judgments and expectations, so test the timing of reveals.
+For each item, choose to dramatize it directly, express it through evidence within existing action, keep necessary voice-over, or propose merging and compressing; do not assume all literary expression should be cut.
 
-| 原文内容 | 选择表达方式时检查 | 交给剧本的结果 |
+| Source content | What to check when choosing how to express it | What goes to the screenplay |
 |---|---|---|
-| 正在发生的事件 | 谁在何处做了什么，改变了什么 | 有起止状态的动作 |
-| 人物心理或关系判断 | 当前什么触发它，怎样影响选择，能看到什么后果 | 可见的反应与策略变化 |
-| 过去经历或世界规则 | 本次哪次选择必须依赖这条信息，原文有什么证据 | 按需出现的对白、物件、声音或简短旁白 |
-| 未解信息 | 本次是否允许揭晓，角色与观众分别知道多少 | 保留未知或有明确依据的揭示 |
+| Events happening now | Who did what, where, and what it changed | Action with a start and end state |
+| Character psychology or relationship judgments | What triggers it now, how it affects choices, what visible consequences it has | Visible reactions and shifts in strategy |
+| Past experiences or world rules | Which choice in this installment must rely on this information, and what evidence the source provides | Dialogue, objects, sounds or brief voice-over appearing as needed |
+| Unresolved information | Whether this installment may reveal it, and how much the characters and the audience each know | Keep it unknown, or reveal it with clear grounding |
 
-### 从开场实际发生的事建立期待
+### Build expectation from what actually happens at the opening
 
-先写观众进入作品时能看见或听见的一次具体事件，并核对理解它需要什么最低限度的信息。声音、文字或物件可以先出现，但它们应让观众辨认正在发生的事情，不能只留下不知所云的刺激。
-接着说明观众会等待什么变化：一个动作能否完成、两人是否会继续交谈、异常会带来什么后果，都可以形成期待，不一定要隐瞒答案。最后接到人物的下一次行动，检查这个开头是否确实启动或改变本片任务；删掉开头仍毫无影响时，要检查它是否只是额外噱头。
-教学例：洗衣店快关门时，店员发现待取外套和取衣单数量对不上，门铃随即响起。观众已知有人来取衣，会关心店员怎样处理缺件；后续若转去讲无关的约会，开场建立的等待便没有承接。
-把开场需要的辨认、反应与行动时间纳入估时，不套固定秒数。对定稿的检查用于说明表达需求；重排开头或提前透露信息仍属于改编提案。
+First write one concrete event the audience can see or hear as they enter the work, and check the minimum information needed to understand it. Sound, text or objects can come first, but they should let the audience recognize what is happening, not just leave a baffling stimulus.
+Then state what change the audience will wait for: whether an action can be completed, whether two people will keep talking, what consequences an anomaly will bring; any of these can create expectation, and the answer need not be hidden. Finally connect to the character's next action and check whether this opening truly starts or changes the film's task; if cutting the opening changes nothing, check whether it is just an extra gimmick.
+Teaching example: as a dry cleaner is about to close, the clerk finds that the coats awaiting pickup don't match the number of claim tickets, and the door chime rings right then. The audience knows someone has come to pick up and will care how the clerk handles the missing item; if what follows turns to an unrelated date, the waiting set up by the opening has nothing to pay it off.
+Factor the recognition, reaction and action time the opening needs into the time estimate, rather than applying fixed seconds. Checks on a finalized screenplay serve to explain expressive needs; rearranging the opening or revealing information earlier remains an adaptation proposal.
 
-交给下一步：必要事实在各场的承载位置，以及新增、删并、重排内容的简明清单。
-常见误用：背景只写进角色卡，成片却没有表达渠道；或为了替代一句旁白，新造一段改变剧情的回忆。
+Hand off to the next step: where each necessary fact is carried in each scene, plus a concise list of added, cut/merged and reordered content.
+Common misuse: backstory written only into the character card, with no channel for expression in the finished film; or inventing a flashback that changes the plot just to replace one line of voice-over.
 
-## 2. 区分场景任务与人物目标
+## 2. Distinguish the scene's task from the character's goal
 
-什么时候用：场景只是见面、解释和离开，或台词很多却没有变化时。
+When to use: a scene is just meeting, explaining and leaving, or has lots of dialogue but no change.
 
-先确定本场结束后哪件事会不同，再写角色眼下实际要完成的动作。场景可以让两人开始配合，人物自己只是在设法把书架搬进房间；剧情作用应通过这项任务的过程发生。
-先用动词写目标：让对方留下、取回记录、阻止签字、确认身份；尽量能判断当场成败，避免只写“获得理解”。
-再写阻力及其反应：对手也有当下目的，环境或规则也会对行动形成具体限制。
-按“目标 → 阻碍 → 行动 → 反应 → 策略调整 → 结果”整理本场，先成立行动再写对白。
-结尾标明局势、关系、资源、信息或选择中哪一项改变，结果如何造成下一场；变化可以渐进，不要求每场翻转。
+First decide what will be different once the scene ends, then write the action the character actually needs to accomplish right now. The scene may get two people to start cooperating while the character is only trying to move a bookshelf into the room; the dramatic function should happen through the process of this task.
+Write goals with verbs first: get the other person to stay, retrieve the record, stop the signing, confirm an identity; make success or failure judgeable on the spot where possible, and avoid writing only "gain understanding".
+Then write the resistance and the reactions to it: the opponent has an immediate purpose too, and the environment or rules also put concrete limits on action.
+Organize the scene as "goal → obstacle → action → reaction → strategy adjustment → outcome"; establish the action before writing dialogue.
+At the end, mark which of situation, relationship, resources, information or choice has changed, and how the outcome causes the next scene; change may be gradual, and not every scene needs a reversal.
 
-教学例：两名室友搬书架，一人坚持整架抬过门槛，却因重量无法转向；另一人提出卸下书，再把脚轮垫到同一高度。前者放下自己一直抓着的上沿，按对方指引推底座，两人才把书架移进去。
-任务的障碍让人物有机会放弃独自指挥，配合由实际行动建立；若后续需要这种信任，便已有可回溯的依据。
-交给下一步：每场的一条行动链、主要变化和结束状态，作为对白、资产状态与后续分镜的依据。
-常见误用：让每场承担解释设定、发展关系、埋多条伏笔和大反转，所有任务都没有足够展开；必要的停顿或观察场也不必硬加争吵。
+Teaching example: two roommates are moving a bookshelf. One insists on carrying the whole unit over the threshold but can't turn it because of the weight; the other suggests unloading the books and then propping the casters up to the same height. The first lets go of the top edge he has been gripping the whole time and pushes the base as the other directs, and only then do the two get the bookshelf in.
+The task's obstacle gives the character a chance to give up directing alone, and cooperation is built through actual action; if later scenes need this trust, there is already grounding to trace back to.
+Hand off to the next step: one action chain per scene, its main change and end state, as the basis for dialogue, asset states and later storyboards.
+Common misuse: making every scene explain the setting, develop relationships, plant several setups and deliver a big reversal, so no task gets enough development; necessary pause or observation scenes don't need forced arguments either.
 
-## 3. 从后续行为反查心理变化的证据
+## 3. Trace evidence for psychological change backward from later behavior
 
-什么时候用：出现“他终于明白”“她失去信任”“他被欲望驱使”等承担关键推进的结论句时。
+When to use: when conclusion sentences that carry key progress appear, such as "he finally understood", "she lost trust" or "he was driven by desire".
 
-先看后文哪次行动依赖这项心理判断。例如要让人物共同执行计划，就需要让观众相信他已经接受对方参与。只在脸上添一个笑容，未必能解释这个变化。
+First see which later action depends on this psychological judgment. For example, to have characters carry out a plan together, the audience needs to believe he has accepted the other person's involvement. Merely adding a smile to his face may not explain this change.
 
-1. 找出变化前仍在起作用的限制：人物不愿交出某项决定权、不相信某条消息，或坚持某种做法。依据来自已写出的行为；原文没有的习惯不能反过来当作改编事实。
-2. 写清变化后多了哪一种可能：对方能够参与、某物开始被使用、原来回避的事情终于被处理。先确定实际差异，再从场景已有的人物和物件中选择足以表现它的动作，不按情绪名称套手势。
-3. 回到发生转变的时刻，检查人物得到了什么新证据、遭遇了什么后果。若这些经历不足以使他改变，应修补理由或放缓转变；不能让一个动作凭空证明他已经想通。
-4. 把过程写回连续表演。对方能否察觉并回应，原有互动是否随之改变，后场是否沿用了结果，都应读得出来。停顿可以表达犹豫，空间和物品的使用可以落实选择，但只有服务当前因果时才需要加入。
+1. Find the constraint still in force before the change: the character won't hand over a certain decision, doesn't believe a certain piece of news, or insists on a certain way of doing things. The grounding comes from behavior already written; habits absent from the source cannot be turned around and treated as facts of the adaptation.
+2. State what new possibility exists after the change: the other person can take part, something starts being used, a matter previously avoided finally gets dealt with. Settle the actual difference first, then choose an action from the people and objects already in the scene that is enough to show it; do not map emotion names onto stock gestures.
+3. Return to the moment the change happens and check what new evidence the character received and what consequences they suffered. If these experiences aren't enough to change them, repair the reasons or slow the change down; a single action must not prove out of nowhere that they have come around.
+4. Write the process back into continuous performance. Whether the other person notices and responds, whether the existing interaction changes accordingly, and whether later scenes carry the result forward should all be readable. A pause can express hesitation, and the use of space and objects can make a choice concrete, but add them only when they serve the current causality.
 
-教学例：原句是“她开始信任新同事”。前场她一直独自核对发货；新同事发现尺寸错误后主动退回重测。再次装箱时，她把待核对的半叠订单交给对方，自己继续处理另一半；两人随后的分工使信任成为实际决定。
-这段成立的依据是此前的检查行为及当前分工，新增动作用于真实改编时应标作提案。阅读时若只能从“信任”这个词知道变化，就继续检查缺的是经历、可见决定还是后续承接，不靠增加表情形容词解决。
+Teaching example: the original line is "She began to trust her new coworker." In earlier scenes she has always checked shipments alone; the new coworker spots a size error and, on his own initiative, sends it back for remeasurement. When packing again, she hands him half of the stack of orders to be checked and keeps handling the other half herself; the division of labor that follows turns trust into an actual decision.
+This works because of the earlier checking behavior and the current division of labor; when added actions are used in a real adaptation, mark them as proposals. If, when reading, you can only tell the change from the word "trust", keep checking whether what's missing is experience, a visible decision or later follow-through; don't solve it by adding facial-expression adjectives.
 
-交给下一步：可以表演的关键行为、必要反应时间、道具和空间的前后状态。
-常见误用：把每句情绪都兑换成一个无后果的小动作；或删掉原作有叙述功能的旁白，只剩难以读懂的沉默。
+Hand off to the next step: performable key behaviors, necessary reaction time, and the before and after states of props and space.
+Common misuse: converting every emotional line into a small gesture without consequences; or deleting voice-over that has a narrative function in the source, leaving only hard-to-read silence.
 
-## 4. 安排信息差与揭示时机
+## 4. Arrange information gaps and reveal timing
 
-什么时候用：悬疑、误会、身份或关系揭晓依赖“谁知道什么”，或观众感到混乱时。
+When to use: suspense, misunderstandings, or identity or relationship reveals depend on "who knows what", or the audience feels confused.
 
-先写该信息的真实内容和依据，再记角色甲、角色乙、观众此刻各自知道、误信或不知道什么；未知答案不能由这张表自动补全。
-选择信息关系时看希望产生的体验，不要求观众始终比角色多一点或少一点。
+First write the true content of the information and its grounding, then record what Character A, Character B and the audience each know, wrongly believe or don't know at this moment; unknown answers must not be filled in automatically by this table.
+Choose the information relationship by the experience you want to produce; the audience need not always know a bit more or a bit less than the characters.
 
-| 信息关系 | 适合效果 | 执行要点 |
+| Information relationship | Suitable effect | Execution points |
 |---|---|---|
-| 观众先知道 | 担心、期待人物发现 | 给观众清楚证据，让人物未知有合理原因，后续行动逼近后果 |
-| 角色先知道 | 好奇、重新理解人物 | 观众至少知道值得追问的问题，人物的隐瞒符合目的，不靠故意不给必要画面拖延 |
-| 同时得知 | 冲击、共情、选择压力 | 给信息辨认与反应时间，随后改变行动，不止停在解释谜底 |
+| Audience knows first | Worry, waiting for the character to find out | Give the audience clear evidence, give the character a plausible reason not to know, and have later actions close in on the consequences |
+| Character knows first | Curiosity, re-understanding the character | The audience at least knows a question worth pursuing, the character's concealment fits their purpose, and the delay doesn't come from deliberately withholding necessary images |
+| Learned at the same time | Shock, empathy, pressure to choose | Give time to recognize and react to the information, then change actions, rather than stopping at explaining the answer |
 
-把重要信息安排在会影响下一次判断或选择的位置；也可提前展示结果制造悬念，但须核对是否破坏原有视角或谜底。
-反转应重新解释已有线索。误导可以来自人物误判、证据不完整或合理的双重解释，不能让已客观展示的事实无故失效。
-每次揭示后问：接下来谁因此改变策略、信任或风险判断；若无人受影响，可能只是额外说明。
-交给下一步：各段的观众问题、信息来源、揭示位置和行动后果，可直接注入场景而不单独交表。
-常见误用：隐藏所有信息使观众连主角在做什么都不知道；或为延长悬念让人物拒绝明显能完成任务的交流。
+Place important information where it will affect the next judgment or choice; you can also show the outcome early to create suspense, but check whether it breaks the original point of view or the mystery's answer.
+A twist should reinterpret existing clues. Misdirection can come from a character's misjudgment, incomplete evidence or a plausible double reading, but facts already shown objectively must not be invalidated without cause.
+After each reveal, ask: who changes their strategy, trust or risk assessment because of it; if no one is affected, it may just be extra exposition.
+Hand off to the next step: the audience question, information source, reveal position and action consequence for each section, which can be injected directly into scenes without delivering a separate table.
+Common misuse: hiding everything so the audience doesn't even know what the protagonist is doing; or, to prolong suspense, having characters refuse conversations that could obviously complete the task.
 
-## 5. 用潜台词写有目的的对白
+## 5. Write purposeful dialogue with subtext
 
-什么时候用：人物总在直说感受、对白复述画面，或不同角色说话可互换时。
+When to use: characters keep stating their feelings outright, dialogue restates the picture, or different characters' lines are interchangeable.
 
-从这段交流希望造成的实际后果开始：人物说完之后，对方要不要留下、交代实情或接受某个安排。可以先在内部写出直接请求，检验它是否符合当前关系；若直说没有代价，就没有必要绕开。
-确实不能直说时，再找受阻的原因怎样进入语言。例如怕遭拒绝的人可能借一项尚未完成的事情延长相处，想夺回主动的人可能只回答对方问题中的一部分。采用的说法必须依靠场内事实，让观众能从措辞与行动的不一致中推断意图；不要靠新编身世解释一句含糊台词。
-继续写对方如何理解并回应，再让说话者根据这次回应坚持、改口或停止。回避、错位、打断和沉默由这次交锋产生，不能机械插入；需要明确传达的任务信息照常说清。措辞、语速和停顿沿用已知性格与声音要求。
+Start from the actual consequence this exchange aims to produce: after the character speaks, will the other person stay, tell the truth or accept an arrangement. You can first write the direct request internally and test whether it fits the current relationship; if saying it outright costs nothing, there is no need to talk around it.
+Only when it truly can't be said outright, find how the reason it is blocked enters the language. For example, someone afraid of rejection may use an unfinished task to prolong time together, and someone trying to regain the upper hand may answer only part of the other person's question. The phrasing used must rely on facts within the scene so the audience can infer intent from the mismatch between wording and action; do not explain one vague line with newly invented backstory.
+Continue by writing how the other person understands and responds, then have the speaker persist, change tack or stop based on that response. Evasion, crossed purposes, interruption and silence arise from this exchange and must not be inserted mechanically; task information that needs to be conveyed clearly is still said clearly. Wording, pace and pauses follow the known personality and voice requirements.
 
-教学例：父亲正在记第二天早餐需要的分量，女儿的行李停在门边。
+Teaching example: the father is noting how much breakfast is needed for the next day, and the daughter's luggage sits by the door.
 
 ```text
-父亲指着便签：明早还做两份？
-女儿把做法贴上冰箱：这些够你吃三天。
-父亲等了一会儿，把便签上的“二”改成“一”。
+Father, pointing at the sticky note: Two portions again tomorrow morning?
+Daughter, sticking the instructions on the fridge: These will last you three days.
+Father waits a moment, then changes the "two" on the note to "one".
 ```
 
-父亲借准备早餐探问她是否留下，女儿把回应落在他独自生活的安排上；父亲修改分量，说明他已经接收到这个回答。行李及正在做的事给交流提供了解读依据。
-对白检查依次问：是否改变行动或判断、是否重复画面、对方是否本来就知道、能否由更准确的行动承担。
-交给下一步：完整对白、说话人、必要动作和停顿；OS、VO、画内声音保持区别，不能把文字声线描述当成真实音频资产。
-常见误用：机械删短每句话破坏人物节奏，或擅自改写定稿对白来追求“更有潜台词”。
+The father uses preparing breakfast to probe whether she is staying, and the daughter lands her answer on arrangements for him living alone; the father changing the portion shows he has received that answer. The luggage and the task in progress give the exchange its basis for interpretation.
+Dialogue check, in order: does it change an action or judgment, does it repeat the picture, does the other person already know it, could a more precise action carry it.
+Hand off to the next step: complete dialogue, speakers, necessary actions and pauses; keep OS, VO and on-screen sound distinct, and do not treat a textual description of a voice as a real audio asset.
+Common misuse: mechanically shortening every line and breaking the character's rhythm, or rewriting finalized dialogue without authorization to make it "more subtextual".
 
-## 6. 让道具与空间成为行动资源
+## 6. Make props and space resources for action
 
-什么时候用：关系全靠解释、场景像任意背景，或物件在场间忽隐忽现时。
+When to use: relationships rely entirely on explanation, the scene feels like an arbitrary backdrop, or objects appear and disappear between scenes.
 
-从本场动作反查哪些物件确实不可替代：拿走它，谁会无法完成下一步，观众又会失去哪条理解依据。需要被争取的东西应有取得条件；承载关系或消息的东西应有已建立的来历，不能靠编剧在说明里宣称其意义。
-随后追踪使用过程，包括谁持有、是否可用、何时暴露、怎样转交或损坏。如果后文会改变它的用途或重新解释它，前面须留有可辨认的依据。不用给所有陈设附象征意义。
-空间先写功能关系：谁能进入、出口由谁控制、声音是否互通、两人之间有什么阻挡，再决定行动如何改变这些关系。
-例如两人隔着柜台争取同一张收据，店员撤走中间的挡板让双方核对签名；空间变化让对抗转为合作，比旁白宣布和解更可见。
+Work backward from this scene's action to find which objects are truly irreplaceable: take one away, and who can't complete the next step, and which basis for understanding does the audience lose? Something that must be fought over should have conditions for obtaining it; something that carries a relationship or message should have an established history, and its meaning can't be declared by the writer in a note.
+Then track its use: who holds it, whether it's usable, when it's exposed, and how it's handed over or damaged. If it later changes purpose or is reinterpreted, earlier scenes must leave recognizable grounding. Don't attach symbolic meaning to every piece of set dressing.
+For space, first write the functional relationships: who can enter, who controls the exits, whether sound carries between areas, what stands between two people; then decide how action changes these relationships.
+For example, two people across a counter compete for the same receipt, and the clerk removes the barrier between them so both can check the signature; the spatial change turns confrontation into cooperation, more visibly than voice-over announcing a reconciliation.
 
-交给下一步：资产的必要用途、起止状态、持有人及重要空间关系；只提取实际出现的需求，不为一个比喻新增资产。
-常见误用：物件只用于好看却被当成关键线索；或用“她靠近了”表示信任，却没有说明是否影响正在发生的互动。
+Hand off to the next step: each asset's necessary use, start and end states, holder, and important spatial relationships; extract only needs that actually appear, and don't add assets for a metaphor.
+Common misuse: an object used only for looks is treated as a key clue; or "she moved closer" is used to signal trust without stating whether it affects the ongoing interaction.
 
-## 7. 以行动与反应组织场景节奏
+## 7. Organize scene rhythm through action and reaction
 
-什么时候用：冲突开始太晚、结果已经明确却继续解释，或事件密集到来不及感受时。
+When to use: conflict starts too late, explanation continues after the outcome is already clear, or events are so dense there's no time to feel them.
 
-尝试晚进早出：从足以理解冲突的时刻进入，在关键结果与必要反应成立后离开，压缩无功能的入场、寒暄和重复收尾。
-前场的决定可以直接接后场的执行；省略交通和等待前，先确认不会丢失地点、时间、道具或人物知情状态的必要变化。
-重要揭示可落在反应上；若后果尚未让观众理解，就保留反应与结果，不为追求快节奏立刻切走。
-检查每个段落承担的主推进，以及其在行动、关系、信息、必要体验中的作用；可以合并重复作用，不以“必须满足两项”机械删戏。
-慢节奏段落也应有观察方向，例如同一动作的重复逐渐暴露变化。恐惧等待、悲伤停留和喜剧停顿都有自己的时间需求。
+Try arriving late and leaving early: enter at the moment that is enough to understand the conflict, leave once the key outcome and necessary reaction are established, and compress functionless entrances, small talk and repeated wrap-ups.
+A decision in one scene can cut directly to its execution in the next; before omitting travel and waiting, confirm you won't lose necessary changes in location, time, props or what characters know.
+An important reveal can land on a reaction; if the consequence isn't yet clear to the audience, keep the reaction and the outcome rather than cutting away at once for the sake of a fast pace.
+Check the main forward push each section carries and its role in action, relationship, information and necessary experience; repeated functions can be merged, but don't mechanically cut scenes by a "must satisfy two" rule.
+Slow sections also need a direction of observation, such as repetitions of the same action gradually exposing a change. Fearful waiting, lingering in grief and comic pauses each have their own time needs.
 
-交给下一步：明确的场景进入点、结束结果、必要停顿和转场依据。若后续目标是 Seedance，剧本确认后直接交给主 `SKILL.md` PART A，镜头与分段不在本方法中继续设计。
-常见误用：把每场剪到只剩结果，观众看不见人物怎样选择；或靠频繁切镜头掩盖行动原地重复。
+Hand off to the next step: a clear scene entry point, ending outcome, necessary pauses and transition grounding. If the downstream target is Seedance, once the screenplay is confirmed, hand it directly to PART A of the main `SKILL.md`; shots and segmentation are not designed any further in this method.
+Common misuse: trimming every scene down to just the outcome, so the audience can't see how characters choose; or using frequent cuts to mask action that repeats in place.
 
-## 8. 按实际展开估时
+## 8. Estimate time by actual development
 
-什么时候用：形成梗概后的初估、完成对白动作后的校准，以及硬时长与内容疑似冲突时。
+When to use: the initial estimate after forming a synopsis, calibration after dialogue and action are written, and when a hard duration seems to conflict with the content.
 
-1. 列本次不能丢的因果、关系信息、关键选择、结果与必要体验，先判断需要哪些叙事段落。
-2. 分别估自然说完对白、完成动作、辨认画内信息、反应停顿和转场所需时间。早期没有细节时给区间并说明假设。
-3. 标出同时发生与先后发生的部分：能边说边做的同一段可重叠；必须看完文字再反应的部分应依次累计。
-4. 用读演或实际表演校准复杂对白与动作；语速、字数、场数只能辅助，不是固定换算公式。
-5. 合计当前范围，并与已知硬限制核对；没有用户时长要求也可主动估算，不让用户承担技术估时。
+1. List the causality, relationship information, key choices, outcomes and necessary experiences this installment can't lose, and first judge which narrative sections are needed.
+2. Separately estimate the time needed to finish the dialogue naturally, complete actions, recognize on-screen information, react and pause, and transition. When there's no detail yet early on, give a range and state your assumptions.
+3. Mark what happens simultaneously and what happens in sequence: within one section, talking while doing can overlap; parts where text must be read before reacting must be added up in sequence.
+4. Calibrate complex dialogue and action with a read-through or actual performance; speech rate, word count and scene count only help and are not fixed conversion formulas.
+5. Total the current range and check it against known hard limits; even without a duration requirement from the user, estimate proactively, and don't make the user carry the technical estimation.
 
-例如暂估一段对白需 12 秒，人物全程边说边封箱需 8 秒，可重叠的这段计约 12 秒；随后读封条 4 秒、反应 2 秒、转场 2 秒，总计约 20 秒。
-若封箱必须等对白结束后才开始，就不能取较大值，需改成顺序累计。这个例子只说明计时方法，不代表固定表演速度。
-估时要区分剧情所需时间、模型单次支持时间、生成素材总时长和最终剪辑时长；素材可以重叠，模型上限不证明剧情塞得下。
+For example, if a passage of dialogue is tentatively estimated at 12 seconds and the character seals boxes the whole time while talking, which takes 8 seconds, this overlapping section counts as about 12 seconds; then reading the seal label takes 4 seconds, the reaction 2 seconds and the transition 2 seconds, for a total of about 20 seconds.
+If the sealing must wait until the dialogue ends, you can't take the larger value; switch to adding them up in sequence. This example only shows the timing method and does not represent a fixed performance speed.
+Time estimates must distinguish the time the story needs, the time the model supports in a single generation, the total duration of generated material, and the duration of the final edit; material can overlap, and the model's upper limit doesn't prove the story fits.
 
-交给下一步：总时长区间、主要耗时段与假设。若后续目标是 Seedance，这只是剧本层估时输入；实际生成分段、单段时长与 Batch 只由主 `SKILL.md` PART A A2/A3 决定。
-常见误用：把一段概述“二人修好机器”按几个字估成几秒，或把并行对白和动作全部相加导致虚高。
+Hand off to the next step: the total duration range, the main time-consuming sections and the assumptions. If the downstream target is Seedance, this is only a screenplay-level estimate input; actual generation segmentation, per-segment duration and Batch are decided solely by PART A A2/A3 of the main `SKILL.md`.
+Common misuse: estimating a summary like "the two fix the machine" at a few seconds because it is only a few words, or adding up parallel dialogue and action in full, inflating the estimate.
 
-## 9. 压缩时保住选择的依据与后果
+## 9. Preserve the grounds and consequences of choices when compressing
 
-什么时候用：估时超出约束、段落重复，或用户明确要求更紧凑时；已定稿内容仅提出具体压缩方案，不擅自执行改剧情。
+When to use: the estimate exceeds constraints, sections repeat, or the user explicitly asks for something tighter; for finalized content, only propose specific compression plans and do not change the plot on your own.
 
-按影响从小到大检查：无功能的进出场与等待 → 重复说明和相同冲突 → 可合并的场景任务 → 支线展开 → 重要事件与结局。
-前几项也要检查是否承载必要情绪、线索或空间连续性；“合并场景”不是无代价操作，可能改变谁听到了秘密。
-每个压缩点写清删并什么、节省来自哪里、失去什么体验、如何保留因果；不能只写“节奏加快”。
-核心动机、规则建立、关键选择、信息揭示及后果不能只靠吞字、快放或删反应压进去。若已紧凑，应明确没有安全压缩空间。
-只有存在实质取舍时比较较完整展开与压缩展开，并推荐适合当前内容的一版；不强制每次交两套时间或两套创意。
-若硬限制无法容纳，给具体的延长、分段或调整范围方案及影响，沿用现有确认流程，不悄悄改结局或拆集。
+Check in order of increasing impact: functionless entrances, exits and waiting → repeated explanation and identical conflict → scene tasks that can be merged → subplot development → important events and the ending.
+The earlier items must also be checked for whether they carry necessary emotion, clues or spatial continuity; "merging scenes" is not cost-free and may change who overhears a secret.
+For each compression point, state what is cut or merged, where the savings come from, what experience is lost and how causality is preserved; don't just write "faster pacing".
+Core motivation, rule setup, key choices, information reveals and their consequences must not be squeezed in by swallowing words, speeding up or cutting reactions. If it's already tight, state clearly that there's no safe room to compress.
+Compare a fuller development with a compressed one only when there is a substantive trade-off, and recommend the version that suits the current content; don't force two sets of timings or two creative versions every time.
+If the hard limit can't accommodate the content, give concrete options for extending, splitting into parts or adjusting scope, with their impacts, and follow the existing confirmation flow; do not quietly change the ending or split it into episodes.
 
-交给下一步：采用的执行范围、估时与保留边界；后续不得把不同版本的事件和时间混用。
-常见误用：保留所有事件名称却删掉它们之间的选择和反应，看似“内容全在”，实际只剩剧情摘要。
+Hand off to the next step: the adopted execution scope, time estimate and preserved boundaries; later steps must not mix events and timings from different versions.
+Common misuse: keeping the names of all events while deleting the choices and reactions between them; it looks like "all the content is there", but only a plot summary remains.
 
-## 10. 写清可制作的事件与连续性
+## 10. Write producible events and continuity clearly
 
-什么时候用：剧本将进入资产、分镜和媒体阶段，或涉及多人动作、频繁换装、多地点与大规模变化时。
+When to use: the screenplay is about to enter the asset, storyboard and media stages, or involves multi-person action, frequent costume changes, multiple locations or large-scale changes.
 
-每个关键段落先识别主要可见事件，再写其起因、关键行动、结果，避免一行塞满多个同时变化的角色、物件和空间。
-复杂场面是否保留取决于其戏剧价值与实际制作条件。能力限制要核实，不把“特写一定容易生成”或“群像不能做”当固定事实。
-未获改剧情授权时，不在本方法中擅改事件。若后续目标是 Seedance，如何承载动作、拆镜或分段由主 `SKILL.md` PART A 决定。
-状态变化发生在哪场、由谁触发、之后持续多久，都应在剧本中能找到；没有变化的角色外观与物件继续沿用。
-保留剧情必要的声音、画内文字、OS/VO和听见条件；剧本不必堆满景别、运镜或生成参数，后续据本场任务选择表达。
+For each key section, first identify the main visible event, then write its cause, key action and outcome; avoid cramming several simultaneously changing characters, objects and spaces into one line.
+Whether to keep a complex set piece depends on its dramatic value and actual production conditions. Verify capability limits; don't treat "close-ups are always easy to generate" or "ensemble scenes can't be done" as fixed facts.
+Without authorization to change the plot, don't alter events in this method. If the downstream target is Seedance, how to carry the action, break it into shots or segment it is decided by PART A of the main `SKILL.md`.
+Which scene a state change happens in, who triggers it and how long it lasts afterward should all be findable in the screenplay; character appearances and objects that don't change carry over.
+Keep the sound, on-screen text, OS/VO and audibility conditions the plot needs; the screenplay need not be packed with shot sizes, camera moves or generation parameters, as later steps choose the expression based on each scene's task.
 
-交给下一步：有场次、地点与时段、人物、完整动作和对白、必要声音、起止状态的当前剧本；资产需求能回溯到这些内容。
-常见误用：为了生成方便擅删关键群众或改场景，或者把未采用的外观提案当作剧本已经发生的状态变化。
+Hand off to the next step: the current screenplay with scene numbers, location and time of day, characters, complete action and dialogue, necessary sound, and start and end states; asset needs can be traced back to this content.
+Common misuse: deleting key crowd members or changing scenes without authorization to make generation easier, or treating an unadopted appearance proposal as a state change that has already happened in the screenplay.
 
-## 11. 交付前做一次连续阅读
+## 11. Do one continuous read before delivery
 
-沿人物经历读一遍，确认他现在要什么、怎样行动、得到什么结果、为何进入下一步；再沿观众视角读一遍，检查理解依据与揭示时机。
-核对关键心理变化已有视听证据，重要道具与规则已建立，完整对白和必要停顿能容纳于估时，结尾符合当前范围。
-只把实质未决项与改编补充带入交付，不把所有内部检查另写成报告。用户仅要求制作时，保留原稿并说明具体执行问题。
-当前有效剧本若进入 Seedance 制作，直接交由主 `SKILL.md` 内嵌 PART A 落实镜头、片段、声音与最终提示词；不自动继承本篇示例或未确认改编分支。
+Read through once along the character's experience, confirming what they want now, how they act, what result they get and why they move on to the next step; then read through once from the audience's perspective, checking the grounds for understanding and the timing of reveals.
+Verify that key psychological changes have audiovisual evidence, important props and rules are established, the complete dialogue and necessary pauses fit within the time estimate, and the ending matches the current scope.
+Bring only substantively unresolved items and adaptation additions into the delivery; don't write up all internal checks as a separate report. When the user only asks for production, keep the original draft and state the specific execution issues.
+If the currently valid screenplay goes into Seedance production, hand it directly to the PART A embedded in the main `SKILL.md` to work out shots, segments, sound and the final prompts; it does not automatically inherit this document's examples or unconfirmed adaptation branches.

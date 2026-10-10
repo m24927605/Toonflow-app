@@ -16,4 +16,4 @@ Generates video from a prompt and reference assets, supporting the text-to-video
 5. Click "Generate video", or click "Stop generation" to abort.
 6. When it finishes, you can play, seek, and adjust the volume, or download and preview full screen from the toolbar above.
 
-Frame capture requires the Image node plugin (`图片`) to be enabled. Duration and resolution options vary by model, and the provider decides which of the common aspect ratios are actually supported.
+Frame capture requires the Image node plugin to be enabled. Duration and resolution options vary by model, and the provider decides which of the common aspect ratios are actually supported.

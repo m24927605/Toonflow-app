@@ -10,4 +10,4 @@ Generates audio from a prompt, text, and an optional reference image or audio cl
 4. Click generate, or click stop to abort; a failure or cancellation keeps the existing output.
 5. After generation you can play, download, trim, change the speed of, or replace the audio, just like in a regular audio node.
 
-Trimming and speed changes create a new regular audio node to the right and require the Audio node plugin (`音频`) to be enabled. Formats the browser cannot play, such as PCM, can still be downloaded.
+Trimming and speed changes create a new regular audio node to the right and require the Audio node plugin to be enabled. Formats the browser cannot play, such as PCM, can still be downloaded.

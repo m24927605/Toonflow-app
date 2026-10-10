@@ -1,151 +1,151 @@
-# 从剧情事实推导视觉设计
+# Deriving Visual Design from Story Facts
 
-在角色外观尚不完整、空间难以用于行动、关键道具结构不清或续作需要核对状态时使用。
-已有资产足以完成本次拍摄时，直接复用；本方法不要求补人物生平、独立概念册或未使用的视角。
-把结论写入[资产制作](../assets.md)的对应条目。进入 Seedance PART A 后，本方法只在 A1.2/A4 明确需要设计提案时提供资产/空间锚点，不定义镜头、表演或提示词结构。
-色彩、材质受光和最终观感的推导见[色彩与用光](colorAndLight.md)。
+Use when a character's appearance is still incomplete, a space is hard to use for action, a key prop's structure is unclear, or a sequel needs its states checked.
+When existing assets are enough to complete this shoot, reuse them directly; this method does not require filling in character biographies, a standalone concept book or unused views.
+Write conclusions into the corresponding entries in [Asset Production](../assets.md). After entering Seedance PART A, this method supplies asset/spatial anchors only when A1.2/A4 explicitly needs a design proposal, and does not define shots, performance or prompt structure.
+For deriving color, how materials take light and the final look, see [Color and Light](colorAndLight.md).
 
-## 1. 先分清事实、约束与提案
+## 1. Separate facts, constraints and proposals first
 
-设计的入口是本次剧情需要观众认出什么、人物实际要做什么，不是先给每个人填满外貌字段。
-按“已有事实 → 当前行动约束 → 必要可见提案”逐项推导，已确认内容不因审美偏好被覆盖。
+The entry point for design is what this story needs the audience to recognize and what characters actually need to do, not filling in every person's appearance fields first.
+Derive item by item following "existing facts → current action constraints → necessary visible proposals"; confirmed content is not overridden by aesthetic preference.
 
-| 层次 | 从材料中找什么 | 如何使用 |
+| Layer | What to look for in the material | How to use it |
 | --- | --- | --- |
-| 事实 | 已写明的年龄或生长阶段、外貌、服装、物件、伤势、空间与事件 | 直接继承，保留出处与适用状态 |
-| 约束 | 时代、地域、媒介、身份关系、行动方式、能力边界 | 排除不相容方案，不把约束扩写成新经历 |
-| 提案 | 为辨认、行动或制作必须补足的轮廓、结构、配色与材质 | 标明设计提案及理由，不能新增能力、秘密或剧情线索 |
+| Facts | Stated age or growth stage, appearance, clothing, objects, injuries, spaces and events | Inherit directly, keeping the source and the state it applies to |
+| Constraints | Era, region, medium, identity relationships, mode of action, limits of ability | Rule out incompatible options; don't expand constraints into new backstory |
+| Proposals | Silhouette, structure, color scheme and materials that must be added for recognition, action or production | Mark them as design proposals with reasons; they must not add abilities, secrets or plot clues |
 
-先摘出确定项，再列会影响本次画面的缺项，只为后者设计。
-一句“她守在站台”不能推出职业、籍贯和身世；可以在允许设计的范围内补能适应当场天气的服装。
-必要身份、人数或关键功能相互冲突时，保留差异；普通纽扣样式无需升级成剧情澄清。
-每项设计保留一句短依据即可，例如“短衣摆：便于已写明的攀爬，设计提案”。
-输出去向：资产条目的外观或结构锚点、保持项与允许变化；不把推导过程全部塞进生成提示词。
+First pull out the definite items, then list the gaps that will affect this installment's images, and design only for the latter.
+A line like "she keeps watch on the platform" can't yield her occupation, hometown or backstory; within the allowed design scope you can add clothing suited to the weather in that scene.
+When necessary identities, headcounts or key functions conflict, preserve the discrepancy; an ordinary button style doesn't need escalating into a plot clarification.
+A short one-line rationale per design item is enough, for example "short hem: allows the climbing already written; design proposal".
+Output destination: appearance or structural anchors, items to keep and allowed variation in the asset entry; don't stuff the whole derivation into the generation prompt.
 
-## 2. 角色功能怎样变成造型
+## 2. How a character's function becomes their look
 
-适用：新角色缺少可见形态，或现有造型妨碍剧情动作、身份辨认和同场区分。
-先用一句话描述角色在当前戏里的功能，例如“负责带路，却不肯交出钥匙”；不以好人、坏人决定长相。
-再按以下顺序设计，后一步必须能够解释前一步的需要。
+Applies: a new character lacks a visible form, or an existing look hinders plot action, identity recognition or telling characters apart within a scene.
+First describe the character's function in the current story in one sentence, for example "leads the way, but refuses to hand over the key"; don't decide looks by good guy versus bad guy.
+Then design in the following order; each later step must account for the needs of the step before it.
 
-1. **行为需求**：角色需要奔跑、攀爬、隐蔽、久坐还是精细操作；检查衣摆、袖口、鞋履与携带位置是否允许。
-2. **远处辨认**：先定身体比例、轮廓、发型或头部特征，确保常用景别下仍能认出角色。
-3. **近处辨认**：选择少量稳定面部、表皮或毛发特征；不靠堆叠首饰、伤疤来制造身份。
-4. **身份与环境**：服装层次、制作工艺和使用痕迹符合已知时代、生活方式及当地环境。
-5. **同场关系**：并看经常同框的人物，检查轮廓、体量、明度或色块是否互相混淆。
-6. **媒介适配**：二维保留清晰轮廓与色块；风格化三维强调体积与材质差异；真人方向考虑可信剪裁与佩戴。
+1. **Behavioral needs**: does the character need to run, climb, hide, sit for long periods or do fine manual work; check whether hems, cuffs, footwear and carrying positions allow it.
+2. **Recognition at a distance**: first set body proportions, silhouette, hairstyle or head features, so the character is still recognizable at common shot sizes.
+3. **Recognition up close**: choose a few stable facial, skin or hair/fur features; don't build identity by piling on jewelry or scars.
+4. **Identity and environment**: clothing layers, craftsmanship and signs of wear match the known era, way of life and local environment.
+5. **Relationships within a scene**: look at characters who often share the frame, and check whether silhouettes, mass, value or color blocks get confused.
+6. **Medium fit**: 2D keeps clear silhouettes and color blocks; stylized 3D emphasizes volume and material differences; a live-action direction considers believable cut and fit.
 
-不必每次同时扩大轮廓、拉高饱和度、增加饰物；通常先改善最影响识别的一项。
-人物性格用于约束选择和行为，不直接等于身体特征；谨慎不必瘦削，强硬不必方脸。
-职业相同也可共享衣料和工艺，再通过身形、穿着方式或磨损位置区分，避免人人一套无关风格。
-行动习惯中稳定且有材料支持的部分可留在角色说明；当场紧张、怒视或弯腰归入镜头表演。
-输出去向：角色基础态中的身份锚点、服装结构和固定携带物；简洁的可见描述进入资产提示词。
+You don't need to enlarge the silhouette, raise saturation and add accessories all at once every time; usually improve the one item that most affects recognition first.
+Personality constrains choices and behavior and doesn't directly equal physical features; cautious doesn't have to mean thin, tough doesn't have to mean square-jawed.
+People in the same occupation can share fabrics and craft, then be distinguished by build, how they wear things or where the wear shows, avoiding everyone getting an unrelated style.
+Stable parts of habitual behavior that the material supports can stay in the character description; momentary tension, glaring or bending over belong to shot performance.
+Output destination: identity anchors, clothing structure and fixed carried items in the character's base state; a concise visible description goes into the asset prompt.
 
-**教学例**：剧本只确认“年长修钟师、要钻入钟楼狭窄检修口、腰间有工具袋”。
-可提案短而合体的外衣、收紧袖口、贴身工具袋；工具袋仍在原定位置，不凭职业新增机械义手。
-辨认锚点可选较宽的鼻梁与梳向后侧的灰发，但均标作提案；不补“战场受伤”的虚构经历。
-误用是先写“神秘大师”再堆披风、发光纹章和大武器，导致动作做不了、身份也被擅改。
+**Teaching example**: the screenplay only confirms "an elderly clockmaker who has to squeeze into the clock tower's narrow access hatch, with a tool pouch at the waist".
+You can propose a short, well-fitted outer coat, cinched cuffs and a close-fitting tool pouch; the tool pouch stays in its specified position, and you don't add a mechanical prosthetic hand on account of the occupation.
+Recognition anchors could be a broad nose bridge and gray hair combed back, but both are marked as proposals; don't fill in a fictional "wounded on the battlefield" backstory.
+The misuse is writing "mysterious master" first and then piling on a cape, a glowing crest and a big weapon, so the action can't be performed and the identity has been changed without authorization.
 
-## 3. 基础态与累积变体
+## 3. Base state and cumulative variants
 
-适用：换装、持续伤势、明显污损、身体变化或固定物件遗失会影响后续辨认。
-基础态取本次剧情实际入场状态，不等于健康、整洁或完整；旧角色可以从上次已采用的变体入场。
-沿剧情顺序追踪“原状态 → 触发事件 → 新状态 → 持续区间”，只有事件或明确设定允许变化。
+Applies: costume changes, ongoing injuries, visible soiling, body changes or the loss of a fixed carried item will affect later recognition.
+The base state is the state the character actually enters this story in; it is not necessarily healthy, clean or intact. A returning character can enter from the variant adopted last time.
+Track "original state → triggering event → new state → duration" in story order; only events or explicit settings permit change.
 
-| 检查项 | 需要说清的差异 | 通常仍归镜头的内容 |
+| Check item | Differences to spell out | Usually still belongs to the shot |
 | --- | --- | --- |
-| 身体与样貌 | 哪个部位、何种变化、程度、是否延续 | 皱眉、转头、呼吸与短暂表情 |
-| 服装 | 哪件衣物、哪个部位、更换或污损结果 | 衣摆随动作摆动、落座形成的褶皱 |
-| 固定携带物 | 哪件物品新增、失去、破损及可见结果 | 同一物件换手、举起、短暂遮挡 |
+| Body and appearance | Which part, what change, how much, whether it persists | Frowning, turning the head, breathing and brief expressions |
+| Clothing | Which garment, which part, the result of changing or soiling | Hems swinging with movement, creases from sitting down |
+| Fixed carried items | Which item is added, lost or damaged, and the visible result | The same item changing hands, being raised, briefly blocked |
 
-每个变体先确定真实参考图所处的状态，再写相对该参考的完整有效差异。
-引用基础态时，要包含此前仍有效的伤势和损坏；引用最近变体时，要明确继承哪些变化。
-写差异后再列少量不变量，不能用“服装不变”抵消本次明确换装，也不能借污损重画面孔。
-同一资产图只表示一个状态，不能将受伤前后、两套衣服混成一张基础板。
-状态区间相邻但外观完全相同可合并复用；不用每一场都生成一张。
-输出去向：资产表状态与适用场次、变体提示词；触发动作和状态切换点写入片段起止状态。
+For each variant, first determine which state the actual reference image is in, then write the complete set of differences in effect relative to that reference.
+When referencing the base state, include injuries and damage from before that are still in effect; when referencing the latest variant, state explicitly which changes are inherited.
+After writing the differences, list a few invariants; "clothing unchanged" can't cancel an explicit costume change in this installment, and soiling can't be used as a pretext to redraw the face.
+One asset image represents only one state; don't mix before and after an injury, or two outfits, into one base sheet.
+Adjacent state intervals with completely identical appearance can be merged and reused; you don't need to generate one image per scene.
+Output destination: the state and applicable scenes in the asset table, and variant prompts; the triggering action and the state switch point go into the segment's start and end states.
 
-**教学例**：第 2 场左袖撕裂，第 4 场徽章掉落，第 6 场才更衣。
-第 4—5 场若引用基础图，写“左袖裂口保留，胸前徽章已缺失”；不能只去徽章而把袖子复原。
-第 6 场更衣能解除衣物破损，却不能自动治愈同时存在的手背伤口。
+**Teaching example**: in Scene 2 the left sleeve tears, in Scene 4 the badge falls off, and only in Scene 6 does the character change clothes.
+If Scenes 4–5 reference the base image, write "left sleeve tear kept, chest badge already missing"; don't just remove the badge while restoring the sleeve.
+The change of clothes in Scene 6 can remove the clothing damage, but it cannot automatically heal the wound on the back of the hand that exists at the same time.
 
-## 4. 群像用共同规则和必要差异
+## 4. Crowds: shared rules and necessary differences
 
-适用：多人作为群体出现、共同构成画面力量，或大量群众需要稳定的造型范围。
-先从剧本判断是一个无名人物、确定人数的小群体，还是数量较大的群体；无名不等于群像。
-先记录剧情人数或规模，再单独记录为设计采用的样本数量，两者不互相替代。
-群体设计先定共同项：所属身份、衣着年代、材质工艺、配色范围及与主体的关系。
-再挑能覆盖真实差异的样本：年龄或生长阶段、体量、职责服装等；差异不足时不硬造更多人物。
-确定小群体逐人有独立动作或需持续辨认时，给成员稳定标识与必要个人资产。
-大群体样本只定义允许出现的外观范围，不让样本中的三个人变成剧情全部人数。
-画面层次可通过相近色块与简化细节形成整体，但不能为了突出主角抹去剧情要求的关键群众动作。
-输出去向：资产条目中的群体规则、样本与剧情人数说明；视频提示词另写本段实际人数及成员行动。
-误用：把“六名护送者”统一改成“一名典型护卫”，或者为每名背景行人编造姓名和小传。
+Applies: multiple people appear as a group and together give the image its force, or a large crowd needs a stable range of looks.
+First judge from the screenplay whether it's one unnamed person, a small group of definite size, or a larger crowd; unnamed doesn't mean crowd.
+First record the story's headcount or scale, then separately record the number of samples adopted for design; neither substitutes for the other.
+For group design, set the shared items first: affiliation, era of dress, materials and craft, color range, and relationship to the main subject.
+Then pick samples that cover real differences: age or growth stage, build, role-specific clothing and so on; when differences are insufficient, don't force more characters.
+When members of a definite small group each have independent actions or need sustained recognition, give them stable identifiers and the necessary individual assets.
+Samples for a large crowd only define the allowed range of looks; the three people in the samples must not become the story's entire headcount.
+Visual layering can form a whole through similar color blocks and simplified detail, but don't erase key crowd actions the story requires just to make the protagonist stand out.
+Output destination: group rules, samples and headcount notes in the asset entry; the video prompt separately states the actual headcount and members' actions for that segment.
+Misuse: collapsing "six escorts" into "one typical guard", or inventing names and short bios for every background pedestrian.
 
-## 5. 场景先有空间母版，再有取景区域
+## 5. A scene needs a spatial master before framing areas
 
-适用：同一地点多次使用、取景变近、人物跨区域行动，或现有概念图只好看却不能支持剧情。
-空间母版固定地点的完整边界、结构与关系；子区域只选取母版中已有的一部分。
-场号、机位和构图改变都不自动产生新空间；独立房间也不能仅因同属一栋楼而强行合并。
+Applies: the same location is used multiple times, framing gets closer, characters move across areas, or existing concept art only looks good but can't support the plot.
+The spatial master fixes the complete boundaries, structure and relationships of the location; a sub-area only selects a part already present in the master.
+Changes in scene number, camera position and composition don't automatically create a new space; separate rooms also shouldn't be forcibly merged just because they're in the same building.
 
-1. 列出这场必须发生的进入、停留、交互和离开，找出空间承担的任务。
-2. 用稳定锚点确定空间：入口、窗、柜台、楼梯、地形边界；多扇门窗使用能区分的名称。
-3. 描述锚点的相邻、相对、连通和高差，再落位普通陈设，保留必要数量与尺度关系。
-4. 检查主行动路径和交互空间，不让家具把必经路线堵死，不为方便运镜凭空加门。
-5. 将同一母版中的局部命名为子区域，记录边界、父级状态、沿用陈设与独有的必要信息。
-6. 真正发生破损、陈设移动或天气影响时另记状态；取景外的物件继续存在。
+1. List the entering, staying, interacting and leaving that must happen in this scene, and find the tasks the space carries.
+2. Fix the space with stable anchors: entrance, window, counter, stairs, terrain boundary; give multiple doors and windows distinguishable names.
+3. Describe the anchors' adjacency, relative position, connectivity and height differences, then place ordinary furnishings, keeping necessary quantities and scale relationships.
+4. Check the main action path and interaction space; don't let furniture block a required route, and don't conjure up a door to make camera moves convenient.
+5. Name parts of the same master as sub-areas, recording their boundaries, parent state, inherited furnishings and necessary information unique to them.
+6. Record a separate state only when damage, moved furnishings or weather effects actually happen; objects outside the frame continue to exist.
 
-以“入口正对柜台，侧窗下有长桌，桌与柜台间可供两人错身”表达关系，少用无参照的左右。
-相对尺度足以执行时不用虚构工程尺寸；剧本已经给出的尺寸、专名和必要地理关系仍须保留。
-子区域边界不是新墙体；窗下近景不能把原长桌换成更上镜的圆桌。
-输出去向：场景条目的空间锚点、母版与子区关系、状态；完整继承关系可留文字，不自动产生新图任务。
+Express relationships as "the entrance faces the counter, there is a long table under the side window, and between the table and the counter two people can pass each other"; use left and right without a reference sparingly.
+When relative scale is enough to execute, don't invent engineering dimensions; dimensions, proper names and necessary geographic relationships already given by the screenplay must still be kept.
+A sub-area boundary is not a new wall; a close shot under the window can't swap the original long table for a more photogenic round table.
+Output destination: spatial anchors, master and sub-area relationships, and states in the scene entry; full inheritance relationships can remain as text and don't automatically create new image tasks.
 
-**教学例**：车站候车厅包含售票窗前与长椅区，两场戏分别在这两处发生。
-二者继承同一厅的入口、售票窗和长椅落位；封闭的值班室另有边界与结构，才按独立空间判断。
-“长椅区变近”只改取景；“长椅被推至侧墙”才改变空间状态，后续全景也要沿用这个结果。
+**Teaching example**: a station waiting hall contains the area in front of the ticket window and the bench area, and two scenes take place in these two areas respectively.
+Both inherit the same hall's entrance, ticket window and bench placement; the enclosed duty room has its own boundaries and structure, and only then is it judged an independent space.
+"The bench area gets closer" only changes the framing; "the benches are pushed to the side wall" changes the spatial state, and later wide shots must carry that result forward.
 
-## 6. 从行动动线推到构图里的可见空间
+## 6. From movement paths to the visible space in the composition
 
-适用：要写自足的环境主视图，或要确认一个镜头能否看见动作、出口和线索。
-把人物路径暂用文字走一遍：从哪个锚点出发、经过哪里、在哪里停留、与什么发生接触。
-再选择能交代主要活动区与稳定地标的观察位置，说明“从入口看向售票窗”等观看关系。
-前景帮助进入空间，中景承载主要动作，后景交代边界或去向；不是每张图都要塞满三层装饰。
-分清“必须存在”与“本图必须可见”：门后区域可以被遮挡，但后续使用时不能声称图中已验证其细节。
-必要隐藏区域尚未定义时补文字提案；不透视重叠墙体以求一图显示一切。
-镜头换向后画面左右会改变，锚点的物理关系保持；移动机位不能移动窗光和家具。
-默认环境素材是一张自足的纯环境主视图，提示词写齐所需空间关系，不仅写“同母版”。
-图片不夹带人物、人影或故事动物；人物占位与行为由视频引用真实角色资产实现。
-输出去向：资产主视图提示词只记录可见结构与空间锚点。若用于 Seedance，机位、遮挡、视线与银幕方向全部由主 `SKILL.md` PART A A5/A7/A9 处理，本方法不得另写。
-误用：为让两个出入口同时入画而改建筑结构，或把每次换机位都变成四向补图任务。
+Applies: when writing a self-contained environment master view, or confirming whether a shot can see the action, exits and clues.
+Walk the character's path in text first: which anchor they start from, where they pass, where they stop, and what they come into contact with.
+Then choose an observation position that shows the main activity area and stable landmarks, stating the viewing relationship, such as "from the entrance looking toward the ticket window".
+The foreground helps lead into the space, the midground carries the main action, and the background shows boundaries or exits; not every image needs all three layers stuffed with decoration.
+Distinguish "must exist" from "must be visible in this image": the area behind a door can be occluded, but later uses must not claim its details were verified in the image.
+When a necessarily hidden area isn't defined yet, add a text proposal; don't make overlapping walls see-through to show everything in one image.
+After the camera reverses direction, screen left and right change, but the anchors' physical relationships stay the same; moving the camera can't move window light or furniture.
+The default environment asset is one self-contained, environment-only master view; the prompt spells out all required spatial relationships, rather than just "same master".
+Images don't include characters, human figures or story animals; character placement and behavior are realized in video by referencing real character assets.
+Output destination: the asset master-view prompt records only visible structure and spatial anchors. If used for Seedance, camera position, occlusion, eyelines and screen direction are all handled by PART A A5/A7/A9 of the main `SKILL.md`; this method must not write them separately.
+Misuse: altering the building's structure so two entrances fit in frame at once, or turning every camera change into a four-direction supplementary image task.
 
-## 7. 关键道具从功能推到形制
+## 7. Key props: from function to form
 
-适用：剧情靠物件传递信息、触发事件或完成关键交互，现有资产又不足以清楚覆盖。
-先查它是否已属于角色固定造型或场景陈设，沿用同一设计；独立放大细节也不能另造第二版。
-普通杯子不会因为被拿起就自动成为新资产，关键性由本次剧情用途与复用需求判断。
+Applies: the plot relies on an object to convey information, trigger events or complete a key interaction, and existing assets don't cover it clearly enough.
+First check whether it already belongs to a character's fixed look or the scene's furnishings, and reuse the same design; a standalone enlarged detail must not create a second version either.
+An ordinary cup doesn't automatically become a new asset just because it's picked up; whether it's key is judged by its use in this story and the need to reuse it.
 
-1. 摘出已确定功能：观众要认出什么，人物必须如何使用，哪个状态变化会推动事件。
-2. 从使用动作倒推结构：抓握位置、开合关系、连接方式、可见信息区与必要尺度。
-3. 选择与时代、环境和操作相容的材质工艺，区分主体、连接件和表面处理。
-4. 将使用痕迹放在有理由的部位，如反复按动的按钮或经常握持的边缘；不均匀撒满划痕。
-5. 写清完整态与必要变化态，保持其余轮廓、连接和文字信息一致。
+1. Extract the confirmed functions: what the audience must recognize, how characters must use it, and which state change drives events.
+2. Work backward from the use action to the structure: grip position, opening and closing relationship, connection method, visible information area and necessary scale.
+3. Choose materials and craft compatible with the era, environment and operation, distinguishing the main body, connectors and surface finish.
+4. Put wear marks where there's reason for them, such as a repeatedly pressed button or a frequently gripped edge; don't scatter scratches evenly everywhere.
+5. Spell out the complete state and the necessary changed states, keeping the remaining silhouette, connections and text information consistent.
 
-只在剧情已经提供时写入密码、铭文、印章和符号；未知信件内容不能由美术设计补成答案。
-材质用可见响应描述：拉丝金属保留定向纹理，粗布偏哑光，磨砂玻璃透光但不清楚透视。
-避免把不明口径的反光百分比当作材质事实；无需术语即可说清高光、透明度与表面粗细。
-物件色彩可融入环境、轻微呼应或突出，但显眼程度服从揭示时机，不提前暴露本应隐藏的证据。
-输出去向：道具结构锚点和资产提示词；持有人、开合动作、传递过程与结束位置归入视频片段。
+Write passwords, inscriptions, seals and symbols only when the story already provides them; the contents of an unknown letter can't be filled in as an answer by art design.
+Describe materials by visible response: brushed metal keeps a directional grain, coarse cloth leans matte, frosted glass transmits light but can't be seen through clearly.
+Avoid treating reflectance percentages of unclear basis as material facts; highlights, transparency and surface roughness can be described clearly without jargon.
+An object's color can blend into the environment, echo it lightly or stand out, but its prominence follows the reveal timing and must not expose evidence early that should stay hidden.
+Output destination: prop structural anchors and the asset prompt; the holder, opening and closing actions, the handover process and the end position go into the video segment.
 
-**教学例**：剧情确认一只证据盒“滑开侧扣后才能取出纸条”。
-先设计可辨的侧扣、滑动方向与盒盖接缝，再配合时代选择木盒与金属扣；不添加指纹锁或神秘刻纹。
-若纸条内容未给出，只确保它能从盒内取出，不替编剧补文字；盒内外状态分别记录。
+**Teaching example**: the story confirms an evidence box that "only lets you take out the note after the side latch is slid open".
+First design a recognizable side latch, sliding direction and lid seam, then choose a wooden box with a metal latch to suit the era; don't add a fingerprint lock or mysterious carvings.
+If the note's content isn't given, only make sure it can be taken out of the box, and don't write the text for the screenwriter; record the inside and outside states separately.
 
-## 8. 把设计压缩成可使用的资产依据
+## 8. Compress the design into a usable asset basis
 
-先删不可见的赞美和重复形容词，再保留“对象身份、识别锚点、结构关系、当前状态、允许变化”。
-新角色图沿用完整头部特写、正面全身、右侧 90° 全身、背面全身；头顶、身体与脚部完整。
-同一板上的视角保持同一身份和状态；动物按真实设定适配，不因模板增添器官。
-场景沿用自足单图；道具按[资产制作](../assets.md)的默认展示方式或用户已确认版式组织。
-所需画幅由完整展示与实际能力决定，不把本方法变成固定比例或型号要求。
-最后用剧情反查：角色做得了动作，场景走得通，道具用得起来，观众能在需要时认出来。
-只将必要结论带入提示词；采用图片后再核对实际身份、结构和状态，不把设计意图当成图像已实现。
+First delete invisible praise and repeated adjectives, then keep "object identity, recognition anchors, structural relationships, current state, allowed variation".
+New character images follow the full head close-up, front full body, right-side 90° full body and back full body; the top of the head, the body and the feet are complete.
+Views on the same sheet keep the same identity and state; animals are adapted to their actual design, without adding organs because of the template.
+Scenes follow the self-contained single image; props are organized by the default presentation in [Asset Production](../assets.md) or a layout the user has confirmed.
+The required aspect ratio is determined by complete presentation and actual capability; don't turn this method into a fixed ratio or model requirement.
+Finally check backward against the story: characters can perform the action, scenes can be walked through, props can be used, and the audience can recognize them when needed.
+Bring only necessary conclusions into the prompt; after an image is adopted, check its actual identity, structure and state again, and don't treat design intent as already realized in the image.

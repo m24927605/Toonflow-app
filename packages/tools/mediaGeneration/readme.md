@@ -6,7 +6,7 @@ Lets the Agent query configured media models, generate images, videos, or audio 
 
 First add a provider in Settings → Media models, configure its API key and the models you want to use, then open a project.
 When you want the Agent to generate a file directly, you can say: "Please generate a warm-toned product poster directly and save it to the workspace."
-When you want to produce it inside a node, use it together with the Canvas Operations (`画布操作`) tool so the Agent uses the corresponding node's generation function.
+When you want to produce it inside a node, use it together with the Canvas Operations tool so the Agent uses the corresponding node's generation function.
 
 ## Features
 
@@ -20,6 +20,6 @@ Reference materials must already exist in the workspace. The features available 
 
 ## Configuration
 
-In Settings → Plugins → Installed, find Media Generation (`媒体生成`) and click "Configuration".
-"Allow AI to generate images", "Allow AI to generate videos", and "Allow AI to generate audio" (`允许 AI 生成图片`, `允许 AI 生成视频`, `允许 AI 生成音频`) are all on by default and control which generation types the Agent can call directly.
+In Settings → Plugins → Installed, find Media Generation and click "Configuration".
+"Allow AI to generate images", "Allow AI to generate videos", and "Allow AI to generate audio" are all on by default and control which generation types the Agent can call directly.
 Provider keys are configured separately in Media models and do not reuse text model keys; these switches do not replace a node's own configuration.

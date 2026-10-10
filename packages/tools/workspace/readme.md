@@ -16,8 +16,8 @@ File locations are relative to the current workspace; before modifying existing 
 
 ## Configuration
 
-In Settings → Plugins → Installed, find Workspace Files (`工作区文件`) and click "Configuration".
-"Read-only mode" (`只读模式`) is off by default. When enabled, this tool only provides file reading and directory listing, and no longer provides writing, editing, or image download.
+In Settings → Plugins → Installed, find Workspace Files and click "Configuration".
+"Read-only mode" is off by default. When enabled, this tool only provides file reading and directory listing, and no longer provides writing, editing, or image download.
 Read-only mode only restricts this tool; it does not turn off the modification capabilities of other tools such as Canvas Operations.
 
 File modifications are limited to the current workspace. This tool has no features for deleting, renaming, or running terminal commands.

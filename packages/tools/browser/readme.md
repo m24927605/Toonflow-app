@@ -4,9 +4,9 @@ Lets the Toonflow Agent operate the local Chrome or Edge and shows the page bein
 
 ## Usage
 
-1. Enable Web Browser (`网页浏览器`) in the tool settings. The tool looks for a local browser; you can also configure the absolute path of the browser executable.
+1. Enable Web Browser in the tool settings. The tool looks for a local browser; you can also configure the absolute path of the browser executable.
 2. In an Agent conversation, ask it to open a web page, search, or read information.
-3. The first time the Agent uses the browser, a small preview card appears below the toolbar of that message. The Agent keeps updating this view as it works step by step; it does not add a card for every tool call or move the view to the end of the whole message list. You can hover, click, double-click, right-click, drag, type text, use modifier keys, and scroll to operate the page directly, or click "Enlarge" (`放大`) to see details. Mouse buttons and keys held down manually are released when the view loses focus, switches pages, or stops being watched.
+3. The first time the Agent uses the browser, a small preview card appears below the toolbar of that message. The Agent keeps updating this view as it works step by step; it does not add a card for every tool call or move the view to the end of the whole message list. You can hover, click, double-click, right-click, drag, type text, use modifier keys, and scroll to operate the page directly, or click "Enlarge" to see details. Mouse buttons and keys held down manually are released when the view loses focus, switches pages, or stops being watched.
 
 The top bar of the enlarged view provides an address bar and Back, Forward, and Refresh buttons. Enter a full HTTP/HTTPS address and press Enter to visit it; Back and Forward use the current tab's real history and are disabled when there is no corresponding history. Navigation errors are shown directly in the enlarged view.
 

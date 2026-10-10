@@ -1,80 +1,80 @@
-# 状态、修订与交付
+# State, Revision, and Delivery
 
-> **Seedance 使用边界：** 本文件只记录版本、真实生成结果、采用与交付。它不能改写主 `SKILL.md` PART A 已确定的提示词规则；任何 Seedance prompt 修订必须回到 PART A。
+> **Seedance usage boundary:** This file only records versions, real generation results, adoption, and delivery. It cannot rewrite the prompt rules already set in PART A of the main `SKILL.md`; any Seedance prompt revision must return to PART A.
 
-多阶段或跨轮制作使用一个简洁状态文件和一个画布总览文本节点。优先沿用项目现有台账及确切路径，包括旧版 `production-state.md`；新项目可用 `productionState.md`，多集在项目内各自子目录保存。简单单项文字任务不强制建立整套制作状态。
+Multi-stage or multi-round production uses one concise state file and one canvas overview text node. Prefer the project's existing ledger and its exact path, including the legacy `production-state.md`; a new project may use `productionState.md`, and multiple episodes are saved in their own subdirectories within the project. Simple single-item text tasks do not require setting up a full production state.
 
-状态文件记录事实与索引，总览只展示当前范围、有效成果、进度、缺项与下一步。专业正文仍在各自文本节点，不复制进整份台账。只有存在实际成果时添加记录，不预建大量空表或空文件夹。
+The state file records facts and indexes; the overview shows only the current scope, valid results, progress, gaps, and next step. Professional body text stays in its own text nodes and is not copied into the whole ledger. Add records only when actual results exist; do not pre-build many empty tables or empty folders.
 
-## 最少需要记什么
+## The minimum to record
 
 ```markdown
-# 制作状态
+# Production state
 
-本次目标与范围：
-当前画布及状态文件路径：
-源剧本或原文版本、采用范围：
-当前阶段、已授权的连续制作范围、待处理事项：
+Goal and scope of this task:
+Current canvas and state file path:
+Source script or original text version, adopted scope:
+Current stage, authorized continuous production scope, pending items:
 
-## 成果
-| 标识 | 用途/场次 | 版本 | 画布/节点 | 当前正文或媒体路径 | 采用的固定版本 | 输入依赖 | 状态与确认依据 |
+## Results
+| ID | Purpose/scene | Version | Canvas/node | Current body text or media path | Pinned adopted version | Input dependencies | Status and basis for confirmation |
 |---|---|---|---|---|---|---|---|
 
-## 生成尝试
-| 本地尝试标识 | 资产/片段、节点 | 提示词快照 | 模型与完整有效参数 | 参考文件、版本、顺序及用途 | 调用前输出 | 授权范围与剩余次数 | 返回与实际文件 |
+## Generation attempts
+| Local attempt ID | Asset/segment, node | Prompt snapshot | Model and full effective parameters | Reference files, versions, order, and purposes | Output before the call | Authorized scope and remaining runs | Return and actual file |
 |---|---|---|---|---|---|---|---|
 
-## 片段采用
-| 片段与剧情范围 | 本次视频与生成尝试 | 采用决定与拟用区间 | 实际结束状态及来源 | Agent已检查/未检查项 | 后续依赖 |
+## Segment adoption
+| Segment and story scope | Video and generation attempt for this run | Adoption decision and intended range | Actual end state and its source | Items the Agent checked / did not check | Downstream dependencies |
 |---|---|---|---|---|---|
 
-## 交付
-实际交付文件及索引：
-已生成/已采用/已合成/已归集范围：
-缺项与继续所需输入：
+## Delivery
+Actual delivered files and index:
+Generated / adopted / composited / collected scope:
+Gaps and inputs needed to continue:
 ```
 
-按任务取用字段，不强制每次填满所有表。制作风格、声音方案与规格可放简报并在此索引。尝试标识是本地记录，不能当成宿主未返回的任务 ID。声称存在的路径必须来自真实读取、写入或节点返回。
+Use the fields the task needs; you do not have to fill every table each time. Production style, audio plan, and specifications can go in the brief and be indexed here. An attempt ID is a local record and cannot be treated as a task ID the host did not return. Any path claimed to exist must come from an actual read, write, or node return.
 
-## 确认版本不能只指向可变正文
+## A confirmed version cannot point only to mutable body text
 
-准备提交审阅时，保存该版正文的独立历史快照，并展示该具体版本；用户确认绑定这个快照。用户已明确指定定稿原文时可直接固定该原文。快照只作为历史依据，不进行双向编辑，不仅在 Agent 修改前才补存。
+When preparing to submit for review, save an independent historical snapshot of that version's body text and show that specific version; the user's confirmation binds to this snapshot. When the user has explicitly designated a finalized original text, that original may be pinned directly. A snapshot serves only as a historical basis, is never edited in both directions, and is not saved only right before the Agent makes changes.
 
-收到确认后重读当前节点。正文若在等待期间被用户改动，原确认仍对应提交的版本，不能顺便批准后来的内容；列明差异并按用户意图处理，历史快照保持不变。原有已确认文件没有快照时，先比对可获得的确认内容，无法还原的历史标记“版本依据待核实”，不把当前文件冒充旧版。
+After receiving confirmation, re-read the current node. If the user changed the body text while you were waiting, the original confirmation still corresponds to the submitted version and does not also approve the later content; list the differences and handle them according to the user's intent, keeping the historical snapshot unchanged. When an existing confirmed file has no snapshot, first compare it with whatever confirmed content is available; mark history that cannot be restored as "version basis pending verification", and never pass the current file off as the old version.
 
-已有只读历史文件可直接复用；普通读写工具不能保证用户永远无法修改快照，读取发现不一致时同样核对。没有可用文件写入但能保留独立文本节点时，保留原节点并另建候选，分别登记节点和实际路径；不能保存历史时不覆盖仍被采用的正文，并说明具体限制。
+Existing read-only history files may be reused directly. Ordinary read/write tools cannot guarantee that the user can never modify a snapshot, so check it the same way when a read reveals an inconsistency. When there is no usable file writing but an independent text node can be kept, keep the original node and create a separate candidate, recording the nodes and actual paths separately; when history cannot be saved, do not overwrite body text that is still adopted, and state the specific limitation.
 
-生成前保存实际完整提示词、参数、引用及授权快照；后续编辑不回写这次尝试。提示词版本与结果版本分开：改过文字不代表旧视频由新文字生成。具体执行前复核按[画布执行](canvasExecution.md)。
+Before generation, save a snapshot of the actual complete prompt, parameters, references, and authorization; later edits are not written back to this attempt. Keep prompt versions separate from result versions: changing the text does not mean the old video was generated from the new text. For the re-check right before execution see [Canvas Execution](canvasExecution.md).
 
-## 已采用媒体与局部修订
+## Adopted media and partial revisions
 
-已采用文件挂载到独立素材节点，记录实际路径和用途。修订图片或视频使用新候选生成节点，采用后再更新确实需要新版的下游；保留旧采用文件、节点、提示词及历史关系，不先切换还依赖旧结果的片段。
+Mount adopted files on independent material nodes, recording the actual path and purpose. To revise an image or video, use a new candidate generation node, and after adoption update only the downstream items that truly need the new version; keep the old adopted files, nodes, prompts, and historical relationships, and do not switch segments that still depend on the old result ahead of time.
 
-每次变更沿实际输入依赖查影响：人物外观影响用到该状态的片段，台词影响对应片段容量和口型，空间或动作影响相邻交界。未受影响的结果继续有效。新版兼容时只更新对应关系，需要重生成时说明受影响范围和具体方案。
+For each change, trace the impact along the actual input dependencies: character appearance affects the segments that use that state, dialogue affects the capacity and lip sync of the corresponding segment, and space or action affects adjacent boundaries. Unaffected results remain valid. When the new version is compatible, only update the correspondence; when regeneration is needed, state the affected scope and the specific plan.
 
-处理 Seedance 实际反馈时，以主 `SKILL.md` PART A 的 A8、A11.4、A12.18.1 与对应 A0–A12 条款定位引用、动作、空间、声音、表演、光色、道具和画面崩坏问题；需要改 prompt 时回到 PART A 的受影响项处理。**禁止再调用独立镜头/表演方法建立第二套修订规则。** 不要把所有问题都处理成增加形容词、重设计资产或重跑全片。
+When handling real Seedance feedback, use A8, A11.4, A12.18.1, and the corresponding A0–A12 clauses in PART A of the main `SKILL.md` to locate problems with references, action, space, audio, performance, light and color, props, and image breakdown; when the prompt needs changing, return to the affected items in PART A. **Never call a separate shot or performance method to build a second set of revision rules.** Do not handle every problem by adding adjectives, redesigning assets, or re-running the whole film.
 
-用户已经明确采用的旧资产直接复用，不要求为新模板重新做图。缺少台账时可从用户指定材料和实时画布重建已知索引；未知的确认、生成参数或来源写未知，不凭名称“最终版”、修改时间或最大版本号猜选。
+Old assets the user has explicitly adopted are reused directly; do not require new images for a new template. When there is no ledger, rebuild the known index from the materials the user specified and the live canvas; write "unknown" for unknown confirmations, generation parameters, or sources, and never guess by a name like "final", modification time, or the highest version number.
 
-## 核验与采用
+## Verification and adoption
 
-读取图片时检查身份、数量、必要视角、服装与物件、环境关系及可读文字。仅工具成功并不证明成图符合要求；用户已明确接受的适用素材不重复要求采用。
+When reading an image, check identity, quantity, necessary views, costume and objects, environmental relationships, and readable text. A tool succeeding alone does not prove the image meets the requirements; suitable material the user has explicitly accepted does not need to be adopted again.
 
-视频检查剧情、对白及说话人、OS/VO、身份和在场关系、动作接触、持物和空间连续性、声音及输出规格；同时检查实际生成穿帮：人物脸/发型/服装漂移，多余或缺失的肢体/手指、手脸融合、人物或道具穿模、关键道具闪现/消失/复制/换手、尺寸与结构突变、商品包装结构融化、镜子/玻璃/阴影出现错误复制。连续片段先按内嵌 PART A A8 判定是否真的有关联：有关联才比较人物世界位置、姿态、朝向、持物与环境状态；无关联则只验本段。检查范围取决于本轮真实能力：文件路径、播放器、文件存在或静帧都不证明 Agent 看过全片、听过音轨。用户上传视频也要确认实际模型/工具能读取，不默认附件等于完成审片。
+For video, check story, dialogue and speakers, OS/VO, identity and who is present, physical contact in actions, held objects and spatial continuity, audio, and output specifications; also check actual generation glitches: drift in a character's face, hairstyle, or costume; extra or missing limbs or fingers; hands fused with faces; characters or props clipping through each other; key props flashing, vanishing, duplicating, or switching hands; sudden changes in size or structure; melting product packaging structure; and erroneous duplicates in mirrors, glass, or shadows. For consecutive segments, first judge under A8 of the embedded PART A whether they are really connected: only when they are connected, compare characters' world positions, poses, facing, held objects, and environmental state; when they are not connected, verify only the current segment. The scope of checking depends on this round's real capability: a file path, a player, a file's existence, or a still frame does not prove the Agent watched the whole video or heard the audio track. For videos the user uploads, also confirm that the actual model or tool can read them; do not assume an attachment means review is done.
 
-没有视频读取能力时，请用户预览当前结果，报告明显问题、是否采用，以及下一段确实依赖的结束状态。记录“用户预览采用”和 Agent 未核验项，不要求无关质量问卷。采用决定、问题反馈与结束状态可在同一次回复获得。
+When there is no video reading capability, ask the user to preview the current result and report obvious problems, whether to adopt it, and the end state the next segment truly depends on. Record "adopted after user preview" and the items the Agent did not verify; do not ask for an unrelated quality questionnaire. The adoption decision, problem feedback, and end state can be obtained in the same reply.
 
-连续片段要有实际依据：人物位置和朝向、持物与动作进度、已发生事件、外观变化及持续声音。使用可查看视频、真实接戏帧或用户反馈，不用计划末态冒充实际末态。将它们写成下一段明确的初始事实；当前结果错误先处理当前段，不把穿帮升级成新剧情。
+Consecutive segments need an actual basis: character positions and facing, held objects and progress of actions, events that have happened, changes in appearance, and continuing sounds. Use a viewable video, a real continuity frame, or user feedback; do not pass the planned end state off as the actual end state. Write them as explicit initial facts for the next segment; when the current result is wrong, handle the current segment first, and do not escalate a glitch into new story.
 
-只有真实需要且工具支持时才抽帧或挂前段媒体；不要为了流程要求用户额外做无用途截图。无时空依赖的片段可按已确认计划和具体批次授权推进，结果仍分别核验与采用。
+Extract frames or attach earlier media only when truly needed and the tools support it; do not ask the user for useless extra screenshots for the sake of the process. Segments with no spatial or temporal dependency may proceed according to the confirmed plan and specific batch authorization, with results still verified and adopted separately.
 
-## 按实际完成范围交付
+## Deliver according to what was actually completed
 
-- 只要文本：交当前文字、对应节点或真实文件及必要缺项。
-- 分段视频：交已采用片段、顺序、实际生成依据、拟用区间和缺项。生成素材时长合计不等于剪辑成片的实测时长。
-- 单一成片：只有实际提供剪辑、裁切、混音或导出工具且用户已授权时执行；否则说明还需要哪些后期工作，不把两个素材链接称为完整成片。
-- 交付目录：只有具备真实二进制复制能力时才将采用素材复制到项目内目标目录并核验。普通文本 `write` 不能复制图片或视频；能力不足交源文件索引并标记待归集。
+- Text only: deliver the current text, the corresponding nodes or real files, and the necessary gaps.
+- Segmented video: deliver the adopted segments, their order, the actual generation basis, intended ranges, and gaps. The sum of generated material durations is not the measured duration of an edited final cut.
+- A single final cut: do this only when editing, trimming, mixing, or export tools are actually provided and the user has authorized it; otherwise state what post-production is still needed, and do not call two material links a complete final cut.
+- Delivery directory: copy adopted material into the target directory in the project and verify it only when real binary copying capability exists. A plain text `write` cannot copy images or videos; when capability is insufficient, deliver an index of source files and mark them as pending collection.
 
-归集保留原件，旧交付内容不同时使用新版本目录，避免混入落选素材。没有变化且已核验的交付直接复用，不反复复制。默认交付不包含发布、上传或清理源文件；这些按用户另外指定的实际范围执行。
+Collection keeps the originals; when old delivered content differs, use a new version directory to avoid mixing in rejected material. Reuse unchanged, already verified deliveries directly without copying them again and again. Default delivery does not include publishing, uploading, or cleaning up source files; do these according to the actual scope the user separately specifies.
 
-最终回复说明做成了什么、真实节点/文件在哪里、哪些内容由谁核验，以及唯一必要的下一步。全部片段采用、成片合成、目录归集分别据实登记，不因为总览或清单完成就把所有状态改成完成。
+The final reply states what was made, where the real nodes/files are, which content was verified by whom, and the single necessary next step. Record all-segments adoption, final-cut compositing, and directory collection separately and truthfully; do not mark every status complete just because the overview or list is complete.

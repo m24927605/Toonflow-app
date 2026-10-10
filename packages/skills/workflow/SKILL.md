@@ -1,858 +1,858 @@
 ---
 name: workflow
-description: 在 Toonflow 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
+description: Turns an idea, novel or finalized script into viewable text, image assets and video clips on the current Toonflow canvas, with support for reusing assets, sequels and partial revisions. Use it to actually produce or continue an existing project; do not operate the canvas when the user explicitly wants chat text only, and do not start production when discussing or editing the skill itself.
 metadata:
-  version: "2.7.0"
+  version: "2.8.0"
   displayName: 视频制作工作流
   author: Toonflow
 ---
 
-# Toonflow 画布制作工作流
+# Toonflow Canvas Production Workflow
 
-从用户已有内容接续，把成果放到当前 Toonflow 项目。以本次剧本与真实素材组织制作，不要求用户先补齐一套制片文档。这个包包含所需方法，不依赖原来的多岗位 Skill 组。
+Pick up from what the user already has and put the results in the current Toonflow project. Organize production around this run's script and real assets; do not require the user to first complete a set of production documents. This package contains the methods it needs and does not depend on the former multi-role Skill group.
 
-## 从哪里开始
+## Where to start
 
-先判断本次交付、已有资料和用户明确限制，沿用已知的时长、风格、画幅、语言与版本。只问影响结果且无法合理判断的缺项。
+First determine this run's deliverable, the existing material and the user's explicit constraints, and carry over the known duration, style, aspect ratio, language and version. Only ask about gaps that affect the result and cannot be reasonably inferred.
 
-| 已有输入 | 处理方式 |
+| Existing input | How to handle it |
 |---|---|
-| 创意或一句话 | 补齐人物目标、阻力和结果，形成可审阅的故事与本次完整剧本 |
-| 小说、故事或原著片段 | 确认改编范围，保留原文，追踪事件、人物、对白与未知信息，转成可视听剧本 |
-| 已定稿剧本 / 时间轴 + 当前目标是制作、生成、继续或修订视频 | **无论用户是否提到“Seedance”“提示词”或具体模型，都立即进入本文件内嵌的「SEEDANCE EPISODE DIRECTOR · PART A」执行。** 用户未指定模型时，立即锁存 Seedance 路由，并只用一次简短提问确认“Seedance 2.0 还是 2.5”；用户已指定 2.0/2.5 时按对应模型路由。询问模型不得转去画布配置、资产流程或其他提示词方法。 |
-| 已定稿剧本 / 时间轴 + 仅要求资产、剧本阅读、诊断或非视频任务 | 只处理用户明确要求的非视频范围；不因为存在定稿剧本就自动生成视频提示词。 |
-| Seedance 任务中用户未指定模型 | **必须先确认目标模型。** 只问一次“Seedance 2.0 还是 2.5”；这一步属于 PART A 的 A0 输入判定，不是普通配置询问。用户回答后继续同一个 Seedance 执行态；画幅、分辨率、参考模式、原生音频等执行配置不能替代、绕过或中断该路由。 |
-| Seedance 任务中用户已指定 2.0/2.5 | 直接执行 PART A；2.0 走 A9.1、2.5 走 A9.2。 |
-| 续集或已有制作 | 读取指定的历史、当前节点和采用记录，确认本次范围，从实际进度继续 |
-| 指定一个片段、资产或修改 | 只处理该范围和确实受影响的依赖，不重跑整条链 |
+| An idea or a one-liner | Fill in the character's goal, obstacle and outcome to form a reviewable story and this run's complete script |
+| A novel, story or source excerpt | Confirm the adaptation scope, keep the original text, track events, characters, dialogue and unknowns, and turn it into an audiovisual script |
+| Finalized script / timeline + the current goal is to produce, generate, continue or revise video | **Whether or not the user mentions "Seedance", "prompt" or a specific model, immediately enter the embedded "SEEDANCE EPISODE DIRECTOR · PART A" in this file and execute it.** If the user has not specified a model, immediately latch the Seedance route and confirm with one short question only: "Seedance 2.0 or 2.5?"; if the user has already specified 2.0/2.5, route to that model. Asking about the model must not divert into canvas configuration, the asset flow or any other prompt method. |
+| Finalized script / timeline + only assets, script reading, diagnosis or a non-video task is requested | Only handle the non-video scope the user explicitly asked for; do not automatically generate video prompts just because a finalized script exists. |
+| Seedance task where the user has not specified a model | **The target model must be confirmed first.** Ask "Seedance 2.0 or 2.5?" once only; this step is part of PART A's A0 input assessment, not an ordinary configuration question. After the user answers, continue in the same Seedance execution state; execution settings such as aspect ratio, resolution, reference mode and native audio cannot replace, bypass or interrupt this route. |
+| Seedance task where the user has specified 2.0/2.5 | Execute PART A directly; 2.0 uses A9.1, 2.5 uses A9.2. |
+| A sequel or existing production | Read the specified history, current nodes and adoption records, confirm this run's scope, and continue from actual progress |
+| A specific clip, asset or change | Handle only that scope and the dependencies it actually affects; do not rerun the whole chain |
 
-> **Seedance 提示词生成规则已直接嵌入本 workflow，不是外部 Skill，也不是 workflow 去调用另一个 Skill。** 当任务进入「已确认剧本 → Seedance 2.0/2.5 分段提示词」阶段时，必须直接执行本文件下方的 **「SEEDANCE EPISODE DIRECTOR · PART A」**。该内嵌规则是本 workflow 在 Seedance 提示词生成阶段的最高优先级执行规范：以用户提供的 `SKILL-seedance-episode-director.md` A0–A12 为基线，并合入用户之后明确追加的连续性、生成稳定性与穿帮校验规则；若本 workflow 其他段落、references/methods、storyboard 或旧说明与其冲突，以当前内嵌 PART A 为准。除用户后续明确修改外，不得用其他方法重写、弱化或替换其中的剧情保真锁、目标模型确认规则、分段/时长规则、Reference binding、A9 模板、A11 校验或 A12 单次优化。
+> **The Seedance prompt-generation rules are embedded directly in this workflow; they are not an external Skill, and the workflow does not call another Skill.** When the task reaches the "confirmed script → Seedance 2.0/2.5 segmented prompts" stage, you must directly execute **"SEEDANCE EPISODE DIRECTOR · PART A"** below in this file. These embedded rules are this workflow's highest-priority execution specification for the Seedance prompt-generation stage: they take A0–A12 of the user-provided `SKILL-seedance-episode-director.md` as the baseline and incorporate the continuity, generation-stability and continuity-error checking rules the user explicitly added later; if other parts of this workflow, references/methods, storyboard or old notes conflict with them, the current embedded PART A prevails. Unless the user explicitly changes them later, do not use other methods to rewrite, weaken or replace its story fidelity lock, target-model confirmation rule, segmentation/duration rules, Reference binding, A9 templates, A11 checks or A12 single-pass optimization.
 
-### Seedance 路由锁存（最高优先级入口规则）
+### Seedance route latch (highest-priority entry rule)
 
-当同时满足以下两项时，**自动视为 Seedance 任务**，不要求用户必须说出“Seedance”“2.0/2.5”“生成提示词”等触发词：
+When both of the following hold, **treat it automatically as a Seedance task**; the user does not have to say trigger words such as "Seedance", "2.0/2.5" or "generate prompts":
 
-1. 当前已有可执行的定稿剧本、时间轴、镜头剧情段、已确认片段文本，或用户明确要求继续已有视频制作；
-2. 当前意图是制作视频、生成视频、继续视频、修订视频、准备视频生成、把剧情做成视频，或对即将生成的视频进行配置。
+1. There is already an executable finalized script, timeline, shot-level story section or confirmed clip text, or the user explicitly asks to continue an existing video production;
+2. The current intent is to produce video, generate video, continue video, revise video, prepare video generation, turn the story into video, or configure a video that is about to be generated.
 
-一旦命中，立即锁存为 **Seedance 执行态**，并遵守：
+Once matched, immediately latch into the **Seedance execution state** and follow these rules:
 
-- **先进入 PART A，再处理画布执行配置。** 目标模型本身属于 A0 必要输入，不算画布配置；不得先调用画布读取工具（`getCanvas/findCanvasNodes/getCanvasNodes/getCanvasEdges/getNodeTools`）或节点的 `node:getConfig`、先问 provider/resolution/ratio/mode、先做通用分镜，或先进入其他 prompt 方法再决定是否用 Seedance。
-- 用户没有指定 2.0/2.5 时，**必须在 Seedance 路由已经锁存后，用一次简短提问确认“Seedance 2.0 还是 2.5”**。提问后保持 Seedance 执行态，不退出、不切换到普通 workflow；用户回答模型后立即从 A0 继续执行 PART A。
-- 用户已经指定 2.0/2.5 时，直接把该信息作为 A0 输入；不得再重复询问。
-- **目标模型确认与执行配置询问分开。** 未指定 2.0/2.5 时，先在 A0 内确认目标模型；确认后，若执行层还需要询问画幅、分辨率、生成音频、参考模式、供应商等配置，这些问题只能作为同一个 Seedance 任务的执行参数补充。用户回答后仍处于同一个 Seedance 执行态，不得回到通用 workflow、重新选择提示词方法或跳过 A0–A12。
-- 用户在配置问答中只回复“16:9”“1080p”“开原生音频”“2.5”等短答案时，这些答案视为**当前 Seedance 任务的配置补充**，不是新任务；不得因为这条回复本身没有再次出现“Seedance/提示词”字样而解除锁存。
-- 若用户先问“有什么配置/用什么配置”后再决定，回答配置问题不取消 Seedance 路由；一旦继续制作视频，必须回到/继续 PART A。
-- 只有用户明确把任务改成“不要生成/修订视频提示词，只做资产、剧本创作、咨询或其他非视频工作”，才解除 Seedance 路由锁存。
-- 实际媒体生成阶段若实时节点不支持 A0 已选模型，只能报告真实能力冲突并回到 PART A 的受影响项处理；**不得用配置层的默认模型静默替换 Seedance 路由。**
+- **Enter PART A first, then handle canvas execution settings.** The target model itself is a required A0 input, not a canvas setting; do not first call the canvas read tools (`getCanvas/findCanvasNodes/getCanvasNodes/getCanvasEdges/getNodeTools`) or a node's `node:getConfig`, first ask about provider/resolution/ratio/mode, first do generic storyboarding, or first enter another prompt method and only then decide whether to use Seedance.
+- When the user has not specified 2.0/2.5, **after the Seedance route is latched you must confirm with one short question: "Seedance 2.0 or 2.5?"**. After asking, stay in the Seedance execution state; do not exit or switch to the ordinary workflow. Once the user answers with a model, immediately continue PART A from A0.
+- When the user has already specified 2.0/2.5, use that directly as A0 input; do not ask again.
+- **Keep target-model confirmation separate from execution-setting questions.** When 2.0/2.5 is unspecified, confirm the target model inside A0 first; after that, if the execution layer still needs to ask about aspect ratio, resolution, audio generation, reference mode, provider or other settings, those questions can only supplement execution parameters of the same Seedance task. After the user answers, you are still in the same Seedance execution state; do not return to the generic workflow, re-select a prompt method or skip A0–A12.
+- When the user replies in a settings exchange with only a short answer such as "16:9", "1080p", "native audio on" or "2.5", treat it as **a settings supplement to the current Seedance task**, not a new task; do not release the latch just because that reply does not repeat the words "Seedance/prompt".
+- If the user first asks "what settings are there / which settings should I use" and decides afterwards, answering the settings question does not cancel the Seedance route; once video production continues, you must return to / continue PART A.
+- Only release the Seedance route latch when the user explicitly changes the task to "don't generate/revise video prompts; only do assets, script writing, consultation or other non-video work".
+- If, in the actual media-generation stage, the live node does not support the model selected in A0, only report the real capability conflict and return to the affected items in PART A; **do not silently replace the Seedance route with the configuration layer's default model.**
 
-**核心：Seedance 是视频制作阶段的导演执行内核，不是只有用户说出某个关键词才触发的可选插件。**
+**Core point: Seedance is the directing execution core of the video production stage, not an optional plug-in that triggers only when the user says a particular keyword.**
 
-### Seedance 阶段硬隔离（强制）
+### Seedance stage hard isolation (mandatory)
 
-一旦命中上方“Seedance 路由锁存”——即已有可执行剧情输入且当前目标进入视频制作/生成/修订——立即进入**硬隔离执行态**；不要求用户额外说出“Seedance”或“提示词”：
+Once the "Seedance route latch" above is hit (that is, executable story input exists and the current goal moves into video production/generation/revision), immediately enter the **hard-isolation execution state**; the user does not need to additionally say "Seedance" or "prompt":
 
-- 从进入 PART A 到最终提示词输出完成，**只执行本文件内嵌 PART A**，不得再读取或套用 `references/sourceAndScript.md`、`references/methods/*`、任何旧 storyboard/分镜规则或人类教学 references，亦不得从这些文件补第二套分段、时长、镜头、站位、表演、运镜、连续性、声音、Reference binding、模板或 QA 规则。
-- 用户已经给定的剧本、时间轴、角色/场景/道具设定、真实参考节点/资产句柄属于 PART A 的输入，不受本隔离限制。
-- **唯一例外**：PART A 的 A1.2/A4 明确需要“无参考图时补参考资产/必要设计提案”时，才可按需读取 `references/assets.md`、`references/methods/visualDesign.md`、`references/methods/colorAndLight.md`；只取外观/空间/材质/光线设计所需内容，**不得把这些文件中的时长、镜头、表演或叙事方法带回 Seedance 提示词规则**。完成资产/设计提案后立即回到 PART A。
-- Seedance 最终提示词已经按 A11/A12 定稿后，如用户明确要求实际连接参考、写入生成节点或生成/验收媒体，才退出提示词硬隔离，进入 `canvasExecution.md` / `stateAndDelivery.md` 的**执行层**。执行层只能搬运已定稿 prompt、连接真实参考、设置真实模型参数和核验结果，**不得重新改写 PART A 已确定的分段、格式、剧情、站位、表演、运镜或连续性**。
-- 若执行层发现模型真实能力与已定稿 prompt 存在硬冲突，只报告具体能力冲突并回到 PART A 受影响项处理；不得由画布规则自行另造兼容提示词。
+- From entering PART A until the final prompts are output, **execute only the embedded PART A in this file**. Do not read or apply `references/sourceAndScript.md`, `references/methods/*`, any old storyboard/shot-breakdown rules or human-teaching references, and do not take from these files a second set of rules for segmentation, duration, shots, blocking, performance, camera movement, continuity, sound, Reference binding, templates or QA.
+- The script, timeline, character/scene/prop settings and real reference nodes/asset handles the user has already provided are PART A inputs and are not restricted by this isolation.
+- **The only exception**: when PART A's A1.2/A4 explicitly needs "supplementary reference assets / necessary design proposals when there are no reference images", you may read `references/assets.md`, `references/methods/visualDesign.md` and `references/methods/colorAndLight.md` as needed. Take only what is needed for appearance/space/material/lighting design, and **do not bring the duration, shot, performance or narrative methods from these files back into the Seedance prompt rules**. Return to PART A immediately after finishing the asset/design proposal.
+- Only after the final Seedance prompts have been finalized per A11/A12, and the user explicitly asks to actually connect references, write into generation nodes, or generate/accept media, do you exit prompt hard isolation and enter the **execution layer** of `canvasExecution.md` / `stateAndDelivery.md`. The execution layer may only carry over the finalized prompts, connect real references, set real model parameters and verify results; it **must not rewrite the segmentation, format, story, blocking, performance, camera movement or continuity already fixed by PART A**.
+- If the execution layer finds a hard conflict between the model's real capabilities and a finalized prompt, only report the specific capability conflict and return to the affected items in PART A; canvas rules must not invent a compatible prompt on their own.
 
-**目的：Seedance 阶段只有一个导演规则源——本文件内嵌 PART A。优先级声明不能替代硬隔离。**
+**Purpose: the Seedance stage has only one directing rule source, the embedded PART A in this file. A priority statement cannot substitute for hard isolation.**
 
-**仅在剧本尚未定稿、确实需要创作或改编时**读取[输入与剧本](references/sourceAndScript.md)。一旦进入 Seedance 提示词硬隔离，本条停止生效。
+**Only when the script is not yet finalized and genuinely needs writing or adaptation**, read [Input and Script](references/sourceAndScript.md). Once Seedance prompt hard isolation is entered, this item stops applying.
 
 
 
-## Seedance 提示词生成的内嵌执行核心
+## Embedded execution core for Seedance prompt generation
 
-以下内容以用户提供的 `SKILL-seedance-episode-director.md` PART A 为执行基线，并已合入用户后续明确追加的连续性、生成稳定性与穿帮校验要求。**运行时直接执行本节，不再读取、不再调用任何独立 seedance-episode-director Skill。** 本节与 workflow 其他内容冲突时，本节优先。
+The following takes PART A of the user-provided `SKILL-seedance-episode-director.md` as the execution baseline and already incorporates the continuity, generation-stability and continuity-error checking requirements the user explicitly added later. **At runtime, execute this section directly; do not read or call any standalone seedance-episode-director Skill.** When this section conflicts with other workflow content, this section prevails.
 
-# PART A — 执行规则
+# PART A — Execution rules
 ═══════════════════════════════════════════
 
-## A0. 输入判定
+## A0. Input assessment
 
-拿到用户输入后，先在心里判定以下事项；能从文本推断就直接执行，除非缺失会导致成片方向根本不同，否则不要问超过 2 个问题：
+After receiving the user's input, first assess the following internally. If something can be inferred from the text, just proceed; unless a gap would lead to a fundamentally different finished film, do not ask more than 2 questions:
 
-1. **目标模型** —— 用户说 2.5 就按单段最长 30s；说 2.0 就按单段最长 15s；**如果用户没说，必须用一次简短提问确认“Seedance 2.0 还是 2.5”后再继续**。该提问属于本 Seedance 任务的 A0 输入判定，提问前后都保持 Seedance 路由锁存；不得因为需要确认模型而转去普通 workflow、画布配置或其他提示词方法。
-2. **总时长要求** —— 用户给了严格总时长（如“55s”）就按 A3 做时长预算；没给则由完整剧情的自然节奏估算总长。
-3. **叙事规模** —— 判断是单场戏、短集，还是 2–3 分钟甚至更长的一整集。
-   - 不论多长，**先规划全片，再决定分几批交付**。
-   - 分批只是交付容量管理，不等于删剧情，也不等于重新切剧情。
-4. **原始时间码** —— 若用户已给【0–10s】【10–25s】等时间块，把它们视为原剧情节奏/参考时间轴；除非用户明确说“严格锁死”，否则不能机械等同于生成段。
-5. **是否已有资产参考库**（角色图 / 场景图 / 道具图 / 命名标签）？
-   - 有 → **直接引用**（按 A1.2）
-   - 无 → 从剧情文本里抽取资产，只登记本集真实出现过的资产；若模型为 2.5 且需要锁定身份，按 A1.2「情况二补充」可先生成参考图。
-6. **画面文字来源** —— 区分“后期字幕/标题”与“场景内实体文字/产品包装文字”，按 A1.3 处理。
+1. **Target model**: if the user says 2.5, each segment is at most 30s; if 2.0, each segment is at most 15s. **If the user did not say, you must confirm with one short question, "Seedance 2.0 or 2.5?", before continuing.** That question is part of this Seedance task's A0 input assessment, and the Seedance route stays latched before and after asking; do not divert into the ordinary workflow, canvas configuration or another prompt method because the model needs confirming.
+2. **Total duration requirement**: if the user gives a strict total duration (e.g. "55s"), budget durations per A3; if not, estimate the total length from the natural pacing of the complete story.
+3. **Narrative scale**: determine whether it is a single scene, a short episode, or a full episode of 2–3 minutes or longer.
+   - Whatever the length, **plan the whole film first, then decide how many batches to deliver it in**.
+   - Batching only manages delivery capacity; it does not mean cutting story, nor re-cutting the story.
+4. **Original timecodes**: if the user has given time blocks such as 【0–10s】【10–25s】, treat them as the original story pacing / reference timeline; unless the user explicitly says "lock strictly", do not mechanically equate them with generation segments.
+5. **Is there an existing asset reference library** (character images / scene images / prop images / named tags)?
+   - Yes → **reference them directly** (per A1.2)
+   - No → extract assets from the story text and register only assets that actually appear in this episode; if the model is 2.5 and identity needs locking, you may first generate reference images per A1.2 "Case 2 supplement".
+6. **Source of on-screen text**: distinguish "post-production subtitles/titles" from "physical in-scene text / product packaging text", and handle them per A1.3.
 
-**核心约束：完整、顺序、可生成。**
-- 不丢剧情，不跳过“难拍”节拍。
-- 不重排原剧情先后顺序。
-- 不为了把段数压到理论最少而牺牲自然对白、动作过程或反应时间。
-- 长剧情先建立“全片段表”，再按单批容量切成 Batch 1 / Batch 2 / Batch 3……；每批都保留全局段号。
+**Core constraint: complete, in order, generatable.**
+- Do not lose story or skip "hard to shoot" beats.
+- Do not reorder the original story sequence.
+- Do not sacrifice natural dialogue, action process or reaction time to squeeze the segment count down to the theoretical minimum.
+- For long stories, first build a "full-film segment table", then cut it into Batch 1 / Batch 2 / Batch 3… by per-batch capacity; every batch keeps its global segment numbers.
 
-### A0.1 剧情保真锁（最高优先级 · 全流程生效）
+### A0.1 Story fidelity lock (highest priority · applies throughout)
 
-**总纲：只导演，不编剧。**
+**General principle: direct only; do not write the story.**
 
-本 Skill 可以做：**拆分、合段、计时、镜头化、站位化、把已有动作写得可见、补充不改变剧情事实的物理/摄影执行细节。**
+This Skill may: **split, merge segments, time, turn into shots, turn into blocking, make existing actions visible, and add physical/cinematographic execution details that do not change story facts.**
 
-本 Skill 不可以做：**新增剧情事件、删除剧情事件、替换剧情事件、改变事件先后、改变事件执行者/承受者、改变道具来源或用途、补写用户没有提供的前史/因果、把模糊角色擅自具体化。**
+This Skill may not: **add story events, delete story events, replace story events, change event order, change who performs or receives an event, change a prop's origin or use, write backstory/causality the user did not provide, or arbitrarily make vague characters specific.**
 
-#### A0.1.1 剧情事实来源优先级
+#### A0.1.1 Priority of story-fact sources
 
-发生冲突时，按以下顺序认定“什么才是剧情事实”：
+When there is a conflict, determine "what counts as story fact" in this order:
 
-1. **用户最新一条明确修改指令**
-2. **用户当前提供的原始剧情 / 脚本 / 时间轴**
-3. **用户明确提供的角色、场景、道具资产设定**
-4. **AI 之前生成的提示词、总结、补充说明**
+1. **The user's latest explicit change instruction**
+2. **The original story / script / timeline the user currently provides**
+3. **Character, scene and prop asset settings the user explicitly provides**
+4. **Prompts, summaries and supplementary notes the AI generated earlier**
 
-**AI 自己上一轮补出来的内容永远不能反过来升级成剧情事实。**
+**Content the AI itself added in a previous round can never be promoted back into story fact.**
 
-例如：AI 上一版自行补了“角色A先从容器中取出道具A”，但用户原剧情只写“角色A使用道具A”，下一版不得因为“连续性”继续继承这个额外取出动作。
+For example: if the AI's previous version added on its own "Character A first takes Prop A out of a container", but the user's original story only says "Character A uses Prop A", the next version must not keep that extra take-out action for the sake of "continuity".
 
-#### A0.1.2 五类绝对禁止改动
+#### A0.1.2 Five absolutely forbidden kinds of change
 
-对用户原始剧情中的每个事件，禁止：
+For each event in the user's original story, do not:
 
-1. **新增**：原文没有“开盖 / 抽纸 / 起身 / 递给 / 回头 / 拿起包装”，不得为了顺畅自行补上。
-2. **删除**：原文已有动作、对白、反应、停顿、空镜，不得为了时长或表演克制删掉。
-3. **替换**：原文是 A 动作，不得改成看起来更合理的 B 动作。
-4. **改归属**：原文写“父母 / 家长 / 成人”时，不得擅自指定为“爸爸”或“妈妈”；谁说、谁做、谁拿、谁被擦都必须保持。
-5. **改顺序 / 改因果**：不得为了产品逻辑、连续性或镜头美感，把后面的行为提前，或为后面的状态补一个原文不存在的前置动作。
+1. **Add**: if the original has no "open the lid / pull out a tissue / stand up / hand over / look back / pick up the package", do not add it to make things smoother.
+2. **Delete**: actions, dialogue, reactions, pauses and empty shots already in the original must not be deleted for duration or performance restraint.
+3. **Replace**: if the original says action A, do not change it to a more plausible-looking action B.
+4. **Reassign**: when the original says "parents / guardian / adult", do not arbitrarily specify "dad" or "mom"; who speaks, who acts, who holds and who is wiped must all stay the same.
+5. **Reorder / change causality**: do not move a later action earlier, or add a prerequisite action that does not exist in the original for a later state, for product logic, continuity or shot aesthetics.
 
-#### A0.1.3 允许的“具体化”边界
+#### A0.1.3 Limits of allowed "specification"
 
-只有满足以下条件，才允许把原文动作写得更具体：
+An original action may be written more specifically only when all of the following hold:
 
-- 具体化内容**直接包含在原动作的物理执行中**；
-- 不新增新的剧情决定、道具状态变化或角色关系；
-- 删除这条具体描述后，剧情事实完全不变；
-- 不要求观众获得一个原文没有的新信息。
+- the added detail is **directly part of the physical execution of the original action**;
+- it adds no new story decision, prop state change or character relationship;
+- removing the detail leaves the story facts completely unchanged;
+- it does not require the audience to gain new information absent from the original.
 
-例如：
-- 原文“角色A用道具A擦拭手部” → 可以写“道具A接触掌心并擦过手指”，这是已有动作的可视化。
-- 原文“角色A用道具A擦拭手部” → **不能**写“拿起容器 → 打开容器 → 取出新道具A → 再擦拭”，因为新增了多个剧情事件。
+For example:
+- Original "Character A wipes their hands with Prop A" → you may write "Prop A touches the palm and wipes across the fingers"; this visualizes an existing action.
+- Original "Character A wipes their hands with Prop A" → you **may not** write "pick up the container → open the container → take out a new Prop A → then wipe", because that adds several story events.
 
-摄影机移动、构图、景别、焦点、光线可见结果、已有碰撞对应的拟音，属于技术实现，不视为新增剧情；但它们也不得制造新的剧情事实。
+Camera movement, composition, shot size, focus, the visible results of lighting, and foley corresponding to existing collisions are technical implementation, not new story; but they also must not create new story facts.
 
-#### A0.1.4 不补前史、不追溯来源
+#### A0.1.4 No backstory, no tracing origins
 
-如果某个时间块开始时，原文已经给出一个状态，就把它当作该节拍的**既定初始状态**。
+If the original already gives a state at the start of a time block, treat it as that beat's **given initial state**.
 
-- 原文写“角色A手里已经拿着道具A进入画面” → 直接从“手里已有道具A”开始。
-- 不得因为“道具总要有来源”而自行补“拿容器 / 开盖 / 取出”。
-- 原文写“角色已经站在某位置” → 可以从该位置状态开始；除非原文明确写了起身/走过去，否则不得补完整移动过程。
+- Original says "Character A enters frame already holding Prop A" → start directly from "already holding Prop A".
+- Do not add "pick up the container / open the lid / take it out" because "the prop has to come from somewhere".
+- Original says "the character is already standing at a certain spot" → you may start from that position; unless the original explicitly says they stood up / walked over, do not add the full movement.
 
-**连续性只维护用户已经定义的状态，不负责替用户补没有写出的前史。**
+**Continuity only maintains states the user has already defined; it is not responsible for filling in unwritten backstory for the user.**
 
-#### A0.1.5 模糊信息保持模糊
+#### A0.1.5 Keep vague information vague
 
-用户没有明确的内容，默认保持原有抽象层级：
+Content the user did not specify keeps its original level of abstraction by default:
 
-- “父母 / 家长 / 成人 / 工作人员 / 某人”等泛称保持原有抽象层级，不擅自确定身份、性别或人数；
-- “一只手”不推断具体左手/右手，除非镜头执行确实需要且不会形成后续剧情事实；
-- “拿道具A”不自动推断“从容器中新取出一件”；
-- “使用道具A完成动作”不自动推断使用次数、消耗数量或第几件；
-- “在旁边”不擅自创造精确空间关系，除非为镜头生成需要给出中性坐标，且不改变剧情。
+- Generic terms such as "parents / guardian / adult / staff / someone" keep their original level of abstraction; do not arbitrarily fix identity, gender or headcount;
+- "a hand" does not imply a specific left or right hand, unless shot execution truly needs it and it creates no later story fact;
+- "takes Prop A" does not automatically imply "takes a new one out of a container";
+- "uses Prop A to complete an action" does not automatically imply the number of uses, quantity consumed or which item it is;
+- "beside" does not arbitrarily create an exact spatial relationship, unless neutral coordinates are needed for shot generation and the story does not change.
 
-#### A0.1.6 源剧情存在空缺/矛盾时
+#### A0.1.6 When the source story has gaps/contradictions
 
-- **空缺**：不自行编桥接剧情；优先用 HARD CUT / 新时间块 / 新段从下一个已知状态开始。
-- **矛盾**：不自行选择一个版本覆盖另一个；按用户最新明确修正优先，否则在全片总览标注“源文本冲突”。
-- **严格总时长与剧情冲突**：允许增加段数或标注时长冲突，不允许删改剧情解决。
-
----
-
-## A1. 输出语言与资产命名
-
-### A1.1 输出语言（强制）
-**默认全中文。** 正式提示词、资产清单、站位说明、表演层、时间轴——
-全部用中文写。
-
-**保留原文不译的部分：**
-- 对白台词（原文照抄，如「君は？」「何が？」）
-- 数值与单位：`15s` `30s` `24fps` `4K` `2–3mm` `180°` `0:00–0:06`
-- 光学角度：`29°` `47°` `84°` `107°`
-- 技术缩写：`HARD CUT`
-
-**结构标题规则：**
-- Seedance 2.0：结构标题默认中文。
-- Seedance 2.5：最终正式提示词固定使用以下英文字段标题：`Objective`、`Reference binding`、`Immutable locks`、`Target duration`、`Timeline`、`Visual direction`、`Audio direction`、`Preserve`、`Avoid`；字段内容默认仍用中文。
-
-**整段英文版例外**：只有用户明确说“给我英文版 / for an international pipeline”时，才把字段内容也改为英文。
-
-### A1.2 资产命名与参考标签
-
-**分两种情况：**
-
-**情况一 · 用户已建立参考标签库**
-用户在自己管线里用了命名标签（如 `@HERO1V2`、`@林直人_v2`、
-`#老宅客厅` 等）——
-- **直接原样引用**，用户给什么就照抄什么，包括 `@` / `#` / 任何符号
-- 这些标签是**角色/场景/道具的身份参考句柄**，
-  对应真实的参考图或已建立的资产库
-- **禁止的是：用上一段的尾帧画面作为站位参考**——
-  站位永远靠绝对坐标在文字里重建（见 A5）
-
-**情况二 · 用户没有标签库**
-- 资产名**不加 @**，只用中文名
-- 清单写：`角色｜林直人` `场景｜老宅客厅` `道具｜梅酒瓶`
-- 正文引用：直接写「林直人」「老宅客厅」「梅酒瓶」
-- 同一段多个同类资产：用中文区分「直人杯 / 佐藤杯」
-
-**情况二补充 · 无参考库但需要锁定身份时（Seedance 2.5）**
-
-当目标模型为 2.5、用户既没有标签库也没有参考图，但本段需要锁定角色 / 场景 / 道具身份时：
-- 允许先按 Toonflow 资产方法（角色四视图参考板 / 场景主视图 / 道具 2×2 板）生成参考图，再进入 A1.2.1 / A9.2 的 Reference binding；
-- 生成的参考图只锁「用户指定或可明确判断」的维度：角色脸 / 发型 / 年龄感 / 体型 / 服装，场景结构与材质，道具主色 / 形态 / 开合结构；
-- 参考图不越权控制站位、光线、镜头或额外剧情（同 A1.2.1 的参考图角色分类与冲突处理）；
-- 仍遵循 A0.1 剧情保真：生成的外观一律视为「设计提案」，不冒充原文事实；不得因此新增剧情事件、道具来源、角色关系或世界规则；参考图中出现原文未提及的人物 / 道具 / 文字，不得自动带入剧情。
+- **Gap**: do not invent bridging story; prefer starting from the next known state via HARD CUT / a new time block / a new segment.
+- **Contradiction**: do not pick one version to override the other; the user's latest explicit correction prevails, otherwise mark "source-text conflict" in the full-film overview.
+- **Strict total duration conflicts with the story**: you may add segments or mark a duration conflict; you may not resolve it by deleting or changing story.
 
 ---
 
-### A1.2.1 Seedance 2.5 参考图片绑定（强制）
+## A1. Output language and asset naming
 
-当目标模型为 **Seedance 2.5**，且用户提供了角色图、场景图、商品图、道具图、站位图或其他视觉参考时，必须把这些参考图作为正式提示词的一部分绑定到每个相关生成段。
+### A1.1 Output language (mandatory)
+**Default: all Chinese.** Formal prompts, asset lists, blocking notes, the performance layer and the timeline are all written in Chinese.
 
-**硬规则：**
-- 用户提供的真实图片节点 / 参考句柄必须**原样引用**，例如 `{{node/image-xxxx}}`、`@角色名_v2`、`#场景名`；禁止自行改名、简写或编造不存在的 Ref。
-- 每个 2.5 生成段都是**自包含**的：该段需要的参考图片必须在该段自己的 `Reference binding` 中重新列出，不能写“同上”“沿用上一段参考图”。
-- 全片反复使用的角色图 / 商品图，也要在每个实际涉及它们的段中重复绑定。
-- 只绑定本段真正相关的参考图，不把全集所有图片无差别塞进每一段。
-- 一张图片只控制它被用户指定或可明确判断的维度，禁止越权控制其他维度。
+**Keep as in the original, untranslated:**
+- Dialogue lines (copied verbatim, e.g. 「君は？」「何が？」)
+- Numbers and units: `15s` `30s` `24fps` `4K` `2–3mm` `180°` `0:00–0:06`
+- Optical angles: `29°` `47°` `84°` `107°`
+- Technical abbreviations: `HARD CUT`
 
-**参考资产提取与简单标识：**
-- 先从本段剧情、镜头、动作与画面内容中自动提取**本段实际涉及且确实需要调用**的真实参考资产；角色图、场景图、商品图、道具图、站位图、动作图等都按实际用途识别。
-- 对每个真实参考只做**简洁身份标识**，说明它对应谁 / 什么 / 哪类用途即可，例如“林直人角色参考”“老宅客厅场景参考”“梅酒瓶道具参考”“本段站位参考”。
-- 不在最终 `Reference binding` 中展开长篇“控制什么 / 不控制什么”说明；参考图的内部作用边界仍按用户明确用途与可明确判断的内容理解，禁止越权把参考图里的额外人物、道具、背景、文字或姿态带入剧情。
-- 用户明确说“仅位置参考 / 仅服装参考 / 仅产品参考”等时，简单标识中保留这个“仅”的用途限定，例如“仅站位参考”“仅服装参考”。
+**Structural heading rules:**
+- Seedance 2.0: structural headings are in Chinese by default.
+- Seedance 2.5: the final formal prompt always uses these English field headings: `Objective`, `Reference binding`, `Immutable locks`, `Target duration`, `Timeline`, `Visual direction`, `Audio direction`, `Preserve`, `Avoid`; field content is still in Chinese by default.
 
-**冲突处理：**
-- 用户文字设定与参考图冲突时，按 A0.1.1 的事实来源优先级处理；用户最新明确文字修改优先。
-- 多张参考图彼此冲突时，不自行融合成新设定；按用户明确用途分别使用。
-- 参考图中存在用户未提及的额外人物、道具、文字或装饰，不自动引入剧情。
+**Full-English exception**: only when the user explicitly says "give me an English version / for an international pipeline" do you switch the field content to English as well.
 
-**2.5 Reference binding 推荐格式：**
+> The templates, labels and examples in this document are written in English for readability only. They do not change the language rules above: in actual output, write their headings, labels and content in the language these rules set (Chinese by default; the 2.5 field headings listed above stay in English).
+
+### A1.2 Asset naming and reference tags
+
+**There are two cases:**
+
+**Case 1 · The user has an established reference tag library**
+The user uses named tags in their own pipeline (e.g. `@HERO1V2`, `@HayashiNaoto_v2`, `#OldHouseLivingRoom`):
+- **reference them exactly as given**; copy whatever the user provides, including `@` / `#` / any symbol
+- these tags are **identity reference handles for characters/scenes/props**,
+  corresponding to real reference images or an established asset library
+- **what is forbidden is using the previous segment's last frame as a blocking reference**;
+  blocking is always rebuilt in text with absolute coordinates (see A5)
+
+**Case 2 · The user has no tag library**
+- Asset names **take no @**; use only the Chinese name
+- List entries are written as: `Character｜Hayashi Naoto` `Scene｜Old House Living Room` `Prop｜Plum Wine Bottle`
+- In body text, refer to them directly: "Hayashi Naoto", "Old House Living Room", "Plum Wine Bottle"
+- Several assets of the same kind in one segment: distinguish them in Chinese, e.g. "Naoto's cup / Sato's cup"
+
+**Case 2 supplement · No reference library, but identity needs locking (Seedance 2.5)**
+
+When the target model is 2.5, the user has neither a tag library nor reference images, but this segment needs to lock a character / scene / prop identity:
+- you may first generate reference images using Toonflow's asset methods (character four-view reference sheet / scene master view / prop 2×2 sheet), then go into the Reference binding of A1.2.1 / A9.2;
+- the generated reference images lock only dimensions that are "specified by the user or clearly determinable": character face / hairstyle / apparent age / build / costume, scene structure and materials, prop main color / form / opening structure;
+- reference images do not overstep to control blocking, lighting, shots or extra story (same reference-image role classification and conflict handling as A1.2.1);
+- A0.1 story fidelity still applies: generated appearances are always treated as "design proposals" and never pass as original facts; do not use them to add story events, prop origins, character relationships or world rules; people / props / text in a reference image that the original does not mention must not be brought into the story automatically.
+
+---
+
+### A1.2.1 Seedance 2.5 reference image binding (mandatory)
+
+When the target model is **Seedance 2.5** and the user has provided character images, scene images, product images, prop images, blocking images or other visual references, these reference images must be bound, as part of the formal prompt, to every relevant generation segment.
+
+**Hard rules:**
+- Real image nodes / reference handles the user provides must be **referenced exactly as given**, e.g. `{{node/image-xxxx}}`, `@CharacterName_v2`, `#SceneName`; do not rename, abbreviate or invent nonexistent Refs.
+- Every 2.5 generation segment is **self-contained**: the reference images a segment needs must be listed again in that segment's own `Reference binding`; do not write "same as above" or "reuse the previous segment's reference images".
+- Character / product images used repeatedly across the film must also be bound again in every segment that actually involves them.
+- Bind only the reference images actually relevant to this segment; do not stuff every image of the episode into every segment indiscriminately.
+- An image controls only the dimensions the user specified or that are clearly determinable; it must not overstep to control other dimensions.
+
+**Reference asset extraction and simple labels:**
+- First automatically extract, from this segment's story, shots, actions and visual content, the real reference assets **this segment actually involves and genuinely needs to call**; identify character images, scene images, product images, prop images, blocking images, action images and so on by their actual use.
+- Give each real reference only a **concise identity label** stating whom / what / which kind of use it corresponds to, e.g. "Hayashi Naoto character reference", "Old House Living Room scene reference", "Plum Wine Bottle prop reference", "this segment's blocking reference".
+- Do not expand long "what it controls / what it doesn't control" notes in the final `Reference binding`; the internal scope of each reference image is still understood from the user's explicit purpose and what is clearly determinable, and you must not let extra people, props, backgrounds, text or poses in the reference image overstep into the story.
+- When the user explicitly says "position reference only / costume reference only / product reference only" and so on, keep that "only" restriction in the simple label, e.g. "blocking reference only", "costume reference only".
+
+**Conflict handling:**
+- When the user's text settings conflict with a reference image, apply the story-fact source priority of A0.1.1; the user's latest explicit text change prevails.
+- When multiple reference images conflict with each other, do not merge them into a new setting yourself; use each according to the user's explicit purpose.
+- Extra people, props, text or decorations in reference images that the user did not mention are not brought into the story automatically.
+
+**Recommended 2.5 Reference binding format:**
 ```text
 Reference binding:
-- {{node/image-xxxx}}：林直人角色参考
-- {{node/image-yyyy}}：老宅客厅场景参考
-- {{node/image-zzzz}}：梅酒瓶道具参考
-- {{node/image-aaaa}}：仅站位参考
+- {{node/image-xxxx}}: Hayashi Naoto character reference
+- {{node/image-yyyy}}: Old House Living Room scene reference
+- {{node/image-zzzz}}: Plum Wine Bottle prop reference
+- {{node/image-aaaa}}: blocking reference only
 ```
 
-上例中的节点形式仅表示**格式位置**；运行时必须替换为用户真实提供、且本段实际需要的完整节点 ID / 资产句柄，禁止照抄或编造示例 ID。若本段没有任何真实参考图片 / 资产句柄，则整节省略。
+The node form in the example above only indicates **format and placement**; at runtime it must be replaced with the complete node IDs / asset handles that the user actually provided and that this segment actually needs; do not copy or invent the example IDs. If this segment has no real reference image / asset handle at all, omit the whole section.
 
 
-### A1.3 画面文字：后期字幕 vs 实体资产文字
+### A1.3 On-screen text: post-production subtitles vs. physical asset text
 
-必须区分两类文字：
+Two kinds of text must be distinguished:
 
-**A. 后期型文字（默认禁止交给生成模型）**
-- 字幕、标题、说明卡、旁白卡、贴纸文案、UI 叠字、水印
-- 默认写成：**无字幕、无额外屏幕文字、无后期文字叠加**
-- 这些文字如有需要，默认留给后期剪辑添加
+**A. Post-production text (by default, never handed to the generation model)**
+- Subtitles, titles, caption cards, narration cards, sticker copy, UI overlays, watermarks
+- By default write: **no subtitles, no extra on-screen text, no post-production text overlays**
+- If such text is needed, leave it to post-production editing by default
 
-**B. 剧情内实体文字 / 产品资产文字（不是字幕）**
-- 包装袋原有印刷、招牌、信件、书页、手机界面等
-- 若用户提供了参考图/资产图：优先写“**严格保持参考资产外观，不新增、不改写、不重绘包装文字**”，不要要求模型凭空生成清晰文字
-- 若没有参考资产：除非剧情必须读到具体文字，否则不要把“文字必须清晰可读”设为生成任务
-- 用户明确要求某段必须读出文字时，才逐字锁定；同时提示这是高风险生成项
+**B. In-story physical text / product asset text (not subtitles)**
+- Existing printing on packaging bags, signboards, letters, book pages, phone screens, etc.
+- If the user provided reference images/asset images: prefer writing "**strictly keep the reference asset's appearance; do not add, rewrite or redraw the packaging text**", and do not ask the model to generate clear text from nothing
+- If there is no reference asset: unless the story must read specific text, do not make "text must be clear and legible" a generation task
+- Only lock text word for word when the user explicitly requires that a segment must read it; at the same time, note that this is a high-risk generation item
 
-**因此：**“无字幕 / 无额外屏幕文字”与“产品包装上已有文字”不冲突。禁止的是 AI 自行新增或改写文字，不是把真实包装变成无字包装。
+**Therefore:** "no subtitles / no extra on-screen text" does not conflict with "existing text on product packaging". What is forbidden is the AI adding or rewriting text on its own, not turning real packaging into text-free packaging.
 
 ---
 
-## A2. 全量节拍解析与顺序保持（不筛掉剧情）
+## A2. Full beat parsing and order preservation (no story filtered out)
 
-A2 的目标不是“挑几个关键点”，而是把原剧情拆成**完整、连续、可计时的叙事节拍**。五类关键节拍只做标记，不作为删减门槛。
+The goal of A2 is not to "pick a few key points" but to break the original story into **complete, continuous, timeable narrative beats**. The five key-beat categories are only tags, not a cut threshold.
 
-### A2.1 原子节拍：全部保留，并建立“源剧情账本”
+### A2.1 Atomic beats: keep them all and build a "source-story ledger"
 
-先按原文顺序拆出原子节拍，常见类型包括：
+First break the story into atomic beats in original order. Common types include:
 
-| 原子节拍 | 定义 | 示例 |
+| Atomic beat | Definition | Examples |
 |---|---|---|
-| **对白** | 角色实际说出的完整一句或一组连续句 | 问、答、打断、补充 |
-| **动作** | 会改变位置/物件/身体状态的动作 | 拿起、放下、起身、走到门口 |
-| **反应** | 因上一事件产生、但不一定说话的反馈 | 停杯、后躲、看手腕、沉默 |
-| **信息** | 观众/角色获得新事实 | 看见某物、认出产品、发现伤口 |
-| **过渡/留白** | 用户原文明确要求的空间、时间或情绪过渡 | 空镜、环境音、停顿、场景衔接 |
+| **Dialogue** | A complete line, or a group of consecutive lines, a character actually speaks | Question, answer, interruption, addition |
+| **Action** | An action that changes position / an object / body state | Pick up, put down, stand up, walk to the door |
+| **Reaction** | Feedback caused by the previous event, not necessarily spoken | Cup stops, flinches back, looks at wrist, silence |
+| **Information** | The audience/a character gains a new fact | Sees something, recognizes the product, discovers a wound |
+| **Transition / pause** | A spatial, temporal or emotional transition the user's original explicitly asks for | Empty shot, ambient sound, pause, scene transition |
 
-**所有原子节拍都要登记。** 不属于“高潮/转折”的普通动作也不能因此消失。
+**Register every atomic beat.** Ordinary actions that are not a "climax/turning point" must not disappear because of that.
 
-内部给每个源节拍编号 `E01 / E02 / E03 ...`，至少记录：
-- 原文事件是谁做 / 谁说；
-- 动作或对白是什么；
-- 作用对象 / 道具是什么；
-- 与前后事件的原始顺序；
-- 用户是否明确给了时间、位置、数量、左右手、道具来源等事实。
+Internally number each source beat `E01 / E02 / E03 ...`, recording at least:
+- who performs / speaks the original event;
+- what the action or dialogue is;
+- what its target / prop is;
+- its original order relative to adjacent events;
+- whether the user explicitly gave facts such as time, position, quantity, left/right hand or prop origin.
 
-后续每个 Timeline 中**会改变剧情状态的句子**都必须能映射回一个 `E##`。允许没有 `E##` 的内容仅限：摄影、构图、光线可见结果、已有动作直接对应的物理细节/拟音，以及不改变剧情事实的执行性描述。
+Every sentence in each later Timeline that **changes story state** must map back to an `E##`. Content without an `E##` is allowed only for: cinematography, composition, visible results of lighting, physical details/foley directly corresponding to existing actions, and execution descriptions that do not change story facts.
 
-**若某句话会改变人物、道具、位置、数量、关系、信息或因果，却找不到对应源节拍 → 视为 AI 新增剧情，必须删除。**
+**If a sentence changes a character, prop, position, quantity, relationship, information or causality but has no corresponding source beat → treat it as AI-added story and delete it.**
 
-### A2.2 五类关键标签：只标重要性，不改顺序
+### A2.2 Five key tags: mark importance only, never change order
 
-在原子节拍上额外打标签：
-- **转折点**：关系 / 权力 / 信息发生反转
-- **情绪峰值**：本段/本场最强情绪泄露
-- **信息增量点**：新信息改变理解
-- **决策点**：角色做出选择并承担后果
-- **沉默点**：铺垫后的有效留白
+Add tags on top of the atomic beats:
+- **Turning point**: a reversal in relationship / power / information
+- **Emotional peak**: the strongest emotional leak in this segment/scene
+- **Information gain**: new information changes understanding
+- **Decision point**: a character makes a choice and bears the consequences
+- **Silence point**: meaningful silence after build-up
 
-**硬规则：**
-- 标签可以重叠，一个节拍可同时属于多类。
-- 没有任何关键标签的节拍仍然保留。
-- **严禁“按情绪曲线排序剧情”。** 情绪曲线只能按原剧情时间顺序标注：低 → 压力 → 峰值 → 释放；它是分析图，不是重新剪辑指令。
+**Hard rules:**
+- Tags may overlap; one beat can belong to several categories.
+- Beats without any key tag are still kept.
+- **Never "sort the story by emotional curve".** The emotional curve can only be annotated in the original story's chronological order: low → pressure → peak → release; it is an analysis chart, not a re-editing instruction.
 
-### A2.3 每个节拍先做时间预算
+### A2.3 Budget time for each beat first
 
-对每个原子节拍估算最低自然时长：
+Estimate the minimum natural duration of each atomic beat:
 
-`节拍最低时长 = 自然对白时间 + 必要停顿 + 必须串行完成的动作/反应时间`
+`beat minimum duration = natural dialogue time + necessary pauses + action/reaction time that must happen in sequence`
 
-注意：
-- 能自然同时发生的“说话 + 小动作”可以重叠计时；
-- 必须先后发生的因果动作必须相加；
-- 长对白不能按“长句固定 3–3.5s”粗暴处理；要按实际文本长度、停顿、语气估算自然朗读时间；
-- 不确定时宁可留出约 10%–20% 呼吸余量，也不要靠异常快语速硬塞；
-- 关键停顿、反应、转身、走位不能被对白完全吞掉。
+Note:
+- "Talking + small actions" that can naturally happen at the same time may overlap in timing;
+- causal actions that must happen one after another must be added together;
+- long dialogue cannot be crudely treated as "a long line always takes 3–3.5s"; estimate natural reading time from actual text length, pauses and tone;
+- when unsure, leave roughly 10%–20% breathing margin rather than cramming with unnaturally fast speech;
+- key pauses, reactions, turns and movement must not be swallowed entirely by dialogue.
 
-### A2.4 节拍 → 镜头 → 生成段
+### A2.4 Beat → shot → generation segment
 
-只合并**时间上相邻**的节拍，不跨越中间剧情拼接。**合段只改变承载方式，不改变任何 `E##` 的内容、执行者、对象、顺序或数量。一个源节拍可以跨多个镜头表现，但不能被改写成另一个事件。**
+Only merge beats that are **adjacent in time**; do not splice across intervening story. **Merging segments only changes how beats are carried; it does not change any `E##`'s content, performer, target, order or quantity. One source beat may be shown across several shots, but it cannot be rewritten into a different event.**
 
-一段可以容纳多个节拍，但“1–4 个节拍”仅是经验参考，不是硬上限。是否继续合并，以以下条件为准：
-1. 合并后总时长 ≤ 模型单段上限；
-2. 所有对白都能以自然语速说完；
-3. 关键因果动作有完整过程；
-4. 至少留得下必要反应与呼吸；
-5. 不因塞得过满导致每 1–2 秒就强制切镜；
-6. 段末可以形成清晰、可在下一段重新声明的状态。
+A segment may hold several beats, but "1–4 beats" is only a rule of thumb, not a hard cap. Whether to keep merging depends on these conditions:
+1. total duration after merging ≤ the model's per-segment cap;
+2. all dialogue can be finished at a natural pace;
+3. key causal actions have their full process;
+4. there is still room for necessary reactions and breathing;
+5. it does not get so crowded that a cut is forced every 1–2 seconds;
+6. the segment can end in a clear state that the next segment can restate.
 
-出现以下任一情况，应主动开新段，即使理论上还能塞：
-- 对白已经接近时间预算上限；
-- 同段需要过多彼此竞争的动作/反应；
-- 情绪或目标发生明确阶段切换；
-- 场景/时间发生切换；
-- 继续合并会破坏段间可独立生成性；
-- 需要异常语速、瞬移动作或省略反应才能塞下。
+Start a new segment proactively if any of the following occurs, even if more could theoretically fit:
+- dialogue is already near the time-budget cap;
+- the segment would need too many competing actions/reactions;
+- there is a clear phase change in emotion or goal;
+- the scene/time changes;
+- further merging would break the independent generatability between segments;
+- fitting it in would need unnaturally fast speech, teleporting actions or omitted reactions.
 
-### A2.5 长剧情的分批方式
+### A2.5 Batching long stories
 
-**先完成全片段规划，再分批交付。**
+**Finish planning all segments of the film first, then deliver in batches.**
 
-例如一集 180s：
-- Seedance 2.0 理论最少 12 段，但实际可因对白密度变成 13、14、15……段；
-- 全片段号先固定为 G01、G02、G03……；
-- 然后按单批最多 6 段交付：Batch 1 = G01–G06，Batch 2 = G07–G12，Batch 3 = 剩余段；
-- Seedance 2.5 同理，单批最多 3 段。
+For example, a 180s episode:
+- Seedance 2.0 needs at least 12 segments in theory, but dialogue density may actually make it 13, 14, 15… segments;
+- fix the global segment numbers first as G01, G02, G03…;
+- then deliver at most 6 segments per batch: Batch 1 = G01–G06, Batch 2 = G07–G12, Batch 3 = the remaining segments;
+- likewise for Seedance 2.5, with at most 3 segments per batch.
 
-**批次边界只影响一次输出多少段，不改变全片顺序、段号和连续性。**
+**Batch boundaries only affect how many segments are output at once; they do not change the film's order, segment numbers or continuity.**
 
-### A2.6 兜底
+### A2.6 Fallback
 
-如果剧情没有明显转折/峰值，也不要强行制造五类关键点。按原文顺序，以“一个可完整执行的动作/对白/反应单元”为节拍继续规划即可。
+If the story has no obvious turning point/peak, do not force the five key-point types. Keep planning in original order, using "one fully executable action/dialogue/reaction unit" as the beat.
 
 ---
 
-## A3. 分段与时长预算
+## A3. Segmentation and duration budget
 
-### A3.0 先区分“理论最少段数”和“实际段数”
+### A3.0 First distinguish the "theoretical minimum segment count" from the "actual segment count"
 
-**单段硬上限：**
-- Seedance 2.0：每段 ≤ 15s
-- Seedance 2.5：每段 ≤ 30s
+**Per-segment hard caps:**
+- Seedance 2.0: each segment ≤ 15s
+- Seedance 2.5: each segment ≤ 30s
 
-当用户给出严格总时长时，可先算理论最少段数：
+When the user gives a strict total duration, you may first compute the theoretical minimum segment count:
 
 ```text
-理论最少段数 = ⌈总时长 / 单段上限⌉
+theoretical minimum segments = ⌈total duration / per-segment cap⌉
 ```
 
-这个公式只回答“至少需要几段”，**不等于实际必须只做这么多段**。
+This formula only answers "how many segments are needed at least"; it **does not mean you must make only that many**.
 
-示例：55s / Seedance 2.0：
-- 理论最少 = 4 段；
-- 若对白/动作很轻，可以做 15 + 15 + 15 + 10；
-- 若剧情密度高，也可以做 12 + 11 + 11 + 11 + 10 = 55s；
-- 只要每段 ≤ 15s、总和符合用户总时长、剧情完整即可。
+Example: 55s / Seedance 2.0:
+- theoretical minimum = 4 segments;
+- if the dialogue/action is light, you can do 15 + 15 + 15 + 10;
+- if the story is dense, you can also do 12 + 11 + 11 + 11 + 10 = 55s;
+- either works as long as each segment is ≤ 15s, the total matches the user's total duration and the story is complete.
 
-**原则：在“不过密”和“不碎片化”之间取平衡，而不是追求最少段数。**
+**Principle: balance "not overcrowded" against "not fragmented", rather than chasing the fewest segments.**
 
-### A3.1 实际段数的确定顺序
+### A3.1 Order for determining the actual segment count
 
-按以下顺序决定：
-1. 先完成 A2 的全量节拍与最低时长预算；
-2. 从前往后合并相邻节拍；
-3. 每接近单段上限时，检查对白、动作、反应是否仍自然；
-4. 若不自然，提前截断并开新段；
-5. 得到**全片实际段数**；
-6. 最后再按 A3.4 分 Batch。
+Decide in this order:
+1. first complete A2's full beats and minimum duration budget;
+2. merge adjacent beats from front to back;
+3. each time you approach the per-segment cap, check whether dialogue, actions and reactions are still natural;
+4. if not, cut early and start a new segment;
+5. obtain the **film's actual segment count**;
+6. only then split into Batches per A3.4.
 
-不要先决定“必须 4 段”，再倒逼剧情塞进 4 段。
+Do not decide "it must be 4 segments" first and then force the story into 4 segments.
 
-### A3.2 对白时长检查（硬门槛）
+### A3.2 Dialogue duration check (hard threshold)
 
-每句对白必须在对应镜头/时间窗内真实说得完。
+Every line of dialogue must genuinely be speakable within its shot/time window.
 
-执行方式：
-- 先按自然口语模拟朗读时间；
-- 再加入剧本明确要求的停顿、结巴、喘息、欲言又止；
-- 如果说话时还有可并行的小动作，可重叠；
-- 如果动作必须等台词前/后完成，则单独占时；
-- **禁止用异常快语速解决时长不够；**
-- **禁止因为时长不够删词、改词、吞句尾。**
+How:
+- first simulate the reading time in natural speech;
+- then add the pauses, stutters, gasps and hesitations the script explicitly calls for;
+- small actions that can run in parallel with speech may overlap;
+- actions that must finish before/after the line take their own time;
+- **do not solve a lack of time with unnaturally fast speech;**
+- **do not delete or change words or swallow line endings because time is short.**
 
-若用户给出的“严格总时长”与“全部原文台词 + 必须动作”的最低自然时长互相冲突：
-- 优先压缩**AI 自己添加的**空镜、无信息停顿、冗余运镜；用户原文明确要求的空镜、停顿、留白不得压缩或删除；
-- 仍不够时，在全片总览明确标注“时长约束冲突”；
-- 不擅自删台词或改剧情来假装满足。
+If the user's "strict total duration" conflicts with the minimum natural duration of "all original lines + required actions":
+- first compress the empty shots, information-free pauses and redundant camera moves **that the AI itself added**; empty shots, pauses and silences the user's original explicitly requires must not be compressed or deleted;
+- if it is still not enough, explicitly mark "duration constraint conflict" in the full-film overview;
+- do not delete lines or change the story on your own to pretend the constraint is met.
 
-### A3.3 时间轴写法
+### A3.3 How to write the timeline
 
-- 每段时间码从 `00:00` 重新开始，便于直接单独投喂模型；
-- 全片总览另写该段对应的**全局时间范围**；
-- 段内动作时间码不得互相矛盾；
-- 并行动作可以重叠时间窗，但要明确“同时”；
-- 串行动作必须前后衔接，不能靠同一秒完成多个不可能同时完成的动作。
+- Each segment's timecodes restart from `00:00`, so it can be fed to the model on its own;
+- the full-film overview separately records the segment's **global time range**;
+- action timecodes within a segment must not contradict each other;
+- parallel actions may overlap in time windows, but say "simultaneously" explicitly;
+- sequential actions must follow on from each other; do not finish several actions that cannot happen simultaneously in the same second.
 
-### A3.4 长剧情与单批容量
+### A3.4 Long stories and per-batch capacity
 
-**单批交付上限（容量限制，不是全片上限）：**
-- Seedance 2.0：单批最多 6 段
-- Seedance 2.5：单批最多 3 段
+**Per-batch delivery cap (a capacity limit, not a cap on the film):**
+- Seedance 2.0: at most 6 segments per batch
+- Seedance 2.5: at most 3 segments per batch
 
-超过时：
-- 全片段号保持连续；
-- 仅拆成多个 Batch；
-- 不重新计算前面段号；
-- 不把未交付内容称为“被切掉”，统一称“下一批待交付段”。
+When exceeded:
+- keep the film's segment numbers continuous;
+- only split into multiple Batches;
+- do not renumber earlier segments;
+- do not call undelivered content "cut"; consistently call it "segments pending in the next batch".
 
-2–3 分钟剧情完全允许存在 2、3、4 个甚至更多批次。
+A 2–3 minute story may well have 2, 3, 4 or even more batches.
 
-### A3.5 单段镜头密度（推荐，不是硬上限）
+### A3.5 Shot density per segment (recommended, not a hard cap)
 
-- Seedance 2.0：通常 1–2 个主要镜头；内容极轻时可 3 个，但避免碎剪
-- Seedance 2.5：通常 2–4 个主要镜头
+- Seedance 2.0: usually 1–2 main shots; 3 when the content is very light, but avoid choppy cutting
+- Seedance 2.5: usually 2–4 main shots
 
-如果一段为了装下剧情需要持续高频 HARD CUT，优先拆段，而不是继续塞镜头。
+If a segment needs constant high-frequency HARD CUTs to hold its story, prefer splitting the segment over adding more shots.
 
-### A3.6 通用禁止与文字规则
+### A3.6 General prohibitions and text rules
 
-默认禁止：
-- 不叠化、不闪白、不甩镜、不做无剧情依据的速度变化；
-- 不新增用户未提供的 VO、旁白、台词；
-- 不自动添加 BGM、情绪提示音；
-- 不增加新角色、新道具、新剧情动作；
-- **不生成后期字幕、标题、说明卡、UI 叠字、水印或其他额外屏幕文字。**
+Forbidden by default:
+- no dissolves, flash-whites or whip pans, and no speed changes without a story basis;
+- no VO, narration or lines the user did not provide;
+- no automatically added BGM or emotional cue sounds;
+- no new characters, new props or new story actions;
+- **no post-production subtitles, titles, caption cards, UI overlays, watermarks or other extra on-screen text.**
 
-但场景内已有的实体文字 / 产品包装文字按 A1.3：
-- 有参考资产时保持参考外观，不新增、不改写、不重绘；
-- 不把“包装必须出现”误写成“要求 AI 生成清晰准确文字”。
+But physical in-scene text / product packaging text follows A1.3:
+- with a reference asset, keep the reference appearance; do not add, rewrite or redraw;
+- do not misread "the packaging must appear" as "ask the AI to generate clear, accurate text".
 
 ---
 
-## A4. 资产与出镜状态规划（按时间轴写）
+## A4. Asset and on-screen status planning (written along the timeline)
 
-A4 是所有模型共用的**内部规划规则**。角色如果在同一段不同时间块/镜头里的出镜状态不同，必须按时间轴分别登记，不能只写一个模糊总状态。
+A4 is an **internal planning rule** shared by all models. If a character's on-screen status differs across time blocks/shots within the same segment, register each one along the timeline; do not write a single vague overall status.
 
-**A4 补充 · 外观与光线缺失时的设计提案**
+**A4 supplement · Design proposals when appearance or lighting is missing**
 
-当剧本 / 用户未提供某角色外观，或某场景光线与环境基调缺失，但本集画面确实需要时：
-- 允许按 Toonflow 的视觉设计 / 色彩用光方法（visualDesign / colorAndLight）推导「设计提案」，填入本段身份 + 外观锚点或场景光线；
-- 所有提案一律标注「设计提案」，不视为剧情事实；不因此新增剧情、道具来源、角色关系或世界规则；
-- 若不影响本段生成，则保持原文抽象层级，不强行补设计（遵循 A0.1.5）。
+When the script / user has not provided a character's appearance, or a scene's lighting and environmental tone are missing, but the episode's visuals genuinely need them:
+- you may derive a "design proposal" using Toonflow's visual design / color and lighting methods (visualDesign / colorAndLight) and fill it into this segment's identity + appearance anchors or scene lighting;
+- every proposal is labeled "design proposal" and is not treated as story fact; do not use it to add story, prop origins, character relationships or world rules;
+- if it does not affect this segment's generation, keep the original level of abstraction and do not force a design (per A0.1.5).
 
-**最终输出映射：**
-- Seedance 2.0：仍在每段正文前显式输出“资产标识”。
-- Seedance 2.5：不额外输出重复的“资产标识”大块；A4 信息分别映射进 `Reference binding`、`Immutable locks`、`Timeline` 与 `Preserve`。只有用户明确要求单列资产清单时才额外输出。
+**Mapping to final output:**
+- Seedance 2.0: still explicitly output "asset identification" before each segment's body.
+- Seedance 2.5: do not output a separate, repeated "asset identification" block; map A4 information into `Reference binding`, `Immutable locks`, `Timeline` and `Preserve` respectively. Output a separate asset list only when the user explicitly asks for one.
 
-内部规划可使用下列格式：
+Internal planning may use the format below:
 
 ```text
-## 资产标识
+## Asset identification
 
-### 涉及角色
+### Characters involved
 
-角色A｜出镜状态总览
-- 时间块 / 镜头 1｜00:00–00:XX｜仅手部 / 实际出镜 / 完全画外……｜说话 / 不说话
-- 时间块 / 镜头 2｜00:XX–00:XX｜……
+Character A｜On-screen status overview
+- Time block / Shot 1｜00:00–00:XX｜hands only / actually on screen / fully off-screen…｜speaking / not speaking
+- Time block / Shot 2｜00:XX–00:XX｜……
 
-身份 + 外观锚点：只引用用户已给定的信息。
-世界坐标：只写源剧情已确定或生成所必需的中性空间关系。
-画面坐标：按当前机位描述，不改变世界位置事实。
-特殊状态：只登记源剧情已有的脏污 / 伤势 / 湿度 / 持物等状态。
-本段重点表演：把已有剧情动作写得可见，不新增动作。
-同期台词严格保持原文：
+Identity + appearance anchors: cite only information the user has given.
+World coordinates: write only neutral spatial relationships already fixed by the source story or required for generation.
+Frame coordinates: describe them for the current camera position, without changing world-position facts.
+Special states: register only dirt / injuries / wetness / held items already in the source story.
+Key performance in this segment: make existing story actions visible; add no actions.
+Synchronous lines kept strictly as in the original:
 「……」
 
-角色B｜出镜状态总览
-- 时间块 / 镜头 1｜00:00–00:XX｜完全画外｜仅同期对白
-- 时间块 / 镜头 2｜00:XX–00:XX｜实际出镜｜不说话
+Character B｜On-screen status overview
+- Time block / Shot 1｜00:00–00:XX｜fully off-screen｜synchronous dialogue only
+- Time block / Shot 2｜00:XX–00:XX｜actually on screen｜not speaking
 ……
 
-### 涉及场景
-场景A｜时间
-（场景锚点 + 摄影机位置/朝向/高度 + 前中后景 + 空间关系）
+### Scenes involved
+Scene A｜time
+(scene anchors + camera position/direction/height + foreground/midground/background + spatial relationships)
 
-### 关键道具
-道具A
-（源剧情给定的段首状态 + 源剧情已有的时间轴动作 + 段末状态 + 文字/包装处理方式；不追溯未说明的来源）
+### Key props
+Prop A
+(start-of-segment state given by the source story + timeline actions already in the source story + end-of-segment state + how text/packaging is handled; do not trace unstated origins)
 ```
 
-### A4.1 角色出镜状态词表
+### A4.1 On-screen status vocabulary for characters
 
-按每个镜头实际可见范围选用：
-- 实际出镜并说话
-- 实际出镜但不说话
-- 仅面部局部出镜
-- 仅手部出镜
-- 仅肩后出镜
-- 仅背影出镜
-- 仅脚部出镜
-- 完全画外｜仅同期对白
-- 完全画外｜无声音
+Choose according to each shot's actual visible range:
+- On screen and speaking
+- On screen, not speaking
+- Partial face only
+- Hands only
+- Over-the-shoulder only
+- Back only
+- Feet only
+- Fully off-screen｜synchronous dialogue only
+- Fully off-screen｜no sound
 
-**同一角色一段内有两种以上状态 → 必须列时间轴。**
+**If a character has two or more statuses within one segment → list a timeline.**
 
-### A4.2 角色条目必含 6 类信息
-1. 身份 + 外观锚点
-2. 每镜出镜状态时间轴
-3. 世界坐标 + 画面坐标
-4. 特殊状态（本段会变化的：脏污 / 伤口 / 湿度 / 情绪外显等）
-5. 本段重点表演 + 3–5 条可见表演要求
-6. 同期台词原文（若有）
+### A4.2 Character entries must include 6 kinds of information
+1. Identity + appearance anchors
+2. Per-shot on-screen status timeline
+3. World coordinates + frame coordinates
+4. Special states (those that change in this segment: dirt / wounds / wetness / visible emotion, etc.)
+5. Key performance in this segment + 3–5 visible performance requirements
+6. Original text of synchronous lines (if any)
 
-### A4.3 场景条目必含 4 类信息
-1. 场景锚点
-2. 摄影机位置 + 朝向 + 高度
-3. 前景 / 中景 / 后景
-4. 人物/地标空间关系与轴线
+### A4.3 Scene entries must include 4 kinds of information
+1. Scene anchors
+2. Camera position + direction + height
+3. Foreground / midground / background
+4. Spatial relationships and axis between characters/landmarks
 
-### A4.4 道具条目必含 4 类信息
-1. 段首绝对位置 / 使用者 / 状态
-2. 本段时间轴动作（谁、何时、怎么动）
-3. 段末状态
-4. 禁止项；若有包装文字，注明按 A1.3“保持参考资产，不新增/改写/重绘文字”
+### A4.4 Prop entries must include 4 kinds of information
+1. Absolute position / user / state at segment start
+2. Timeline actions in this segment (who, when, how it moves)
+3. State at segment end
+4. Prohibitions; if there is packaging text, note per A1.3 "keep the reference asset; do not add/rewrite/redraw text"
 
-### A4.5 禁止
-- 不复制整套角色档案，只保留本段需要的锚点
-- 不写未出现的资产
-- 不把资产标识写成重复一遍完整剧情
-- 不用“本段实际出镜并说话（但镜头 1 又画外）”这种互相冲突的总括写法
-- 不要求 AI 凭空生成精确包装文字来替代参考资产
-
----
-
-## A5. 站位：世界坐标 + 画面坐标（双层 · 自包含）
-
-**核心前提：每一段生成时，模型看不到任何上一段画面，也不依赖上一段尾帧参考。**
-
-### A5.1 每段必须自包含的 5 块信息
-
-1. **世界坐标 · 轴线与地标**：角色相对门、桌、窗、走廊等真实位置；与机位无关。
-2. **画面坐标 · 当前镜头中的左右/前后/遮挡**：随当前机位重新声明。
-3. **光源方向 · 世界层 + 画面层**：只在同一连续光照条件下继承。
-4. **道具绝对位置与状态**：含本段移动路径。
-5. **本段结束状态**：下一段必须把它重写成“绝对初始状态”，而不是写“延续上一段”。
-
-### A5.2 连续场景的状态链
-
-同一地点、同一连续时间内：
-
-`上一段结束状态 → 下一段重新写成绝对初始状态 → 本段动作 → 本段结束状态`
-
-继承内容包括：
-- 角色实际世界位置与身体朝向
-- 道具位置、持有者、数量、液面、污渍/损耗
-- 伤势、服装、湿度、血迹、烟尘等持续状态
-- 主光方向、色温和环境条件
-
-### A5.3 人物移动只服从源剧情，不为连续性补动作
-
-禁止的是 AI 自己制造无依据的位置变化，也禁止为了“解释位置变化”反过来补剧情。
-
-- 原文明确写“起身走到门口” → 必须保留起身、行走、到达的过程，不能瞬移。
-- 原文下一节拍直接写“角色已经站在门口”，但没有写如何过去 → 把“站在门口”作为该节拍的既定初始状态，允许通过 HARD CUT / 新段进入；**不得自行补“起身、走过去”。**
-- 原文明确写两人换位 → 按原文过程执行；原文没写换位 → 不得为了构图让二人交换世界位置。
-- 画面左右可以因合法换机位而变化，但世界位置不得无源变化。
-
-### A5.4 轴线规则
-
-- 同一连续对话默认维持既有 180° 轴线；
-- 若用户明确要求反打/越轴，或剧情需要改变轴线，应通过中性机位、过轴移动或建立镜头让空间变化可理解；
-- 禁止无提示的跳轴；
-- **“不越轴”不等于摄影机永远不能换位置。**
-
-### A5.5 换场 / 时间跳跃时重新锚定
-
-当场景、时间、天气或主要光源发生明确变化：
-- 新场景重新建立世界坐标、画面坐标、轴线与光线；
-- 不强行继承上一场机位或光线方向；
-- 角色服装、伤势、随身道具等是否继承，按剧情时间连续性决定。
-
-这样可以支持 2–3 分钟甚至更长的多场景剧情，而不会把第一场的站位规则锁死到整集。
+### A4.5 Forbidden
+- Do not copy whole character profiles; keep only the anchors this segment needs
+- Do not write assets that do not appear
+- Do not turn asset identification into a retelling of the whole story
+- Do not use contradictory summaries such as "actually on screen and speaking in this segment (but off-screen in Shot 1)"
+- Do not ask the AI to generate exact packaging text from nothing in place of the reference asset
 
 ---
 
-## A6. 表演层
+## A5. Blocking: world coordinates + frame coordinates (two layers · self-contained)
 
-### A6.1 情绪 = 行为的副产品
-不写“他很难过”，写他**在做什么**。情绪从动作的微小偏差里泄露。
+**Core premise: when each segment is generated, the model cannot see any frame of the previous segment and does not rely on the previous segment's last frame as a reference.**
 
-### A6.2 目标指向对象
-只有当用户原剧情已经能明确看出角色目标时，才把它整理为可执行目标，并指向具体的人 / 物 / 任务。**不得为了表演完整性自行推断角色动机、隐藏目的或关系意图。**
+### A5.1 Five blocks of information every segment must contain on its own
 
-### A6.3 状态优先，但关键因果动作必须保留过程
-关键因果动作（拿取 / 放下 / 倒液体 / 开门 / 换手 / 坐下 / 起身 / 走位）不能瞬移。
+1. **World coordinates · axis and landmarks**: the characters' real positions relative to doors, tables, windows, corridors, etc.; independent of camera position.
+2. **Frame coordinates · left/right / front/back / occlusion in the current shot**: restated for the current camera position.
+3. **Light direction · world layer + frame layer**: inherited only under the same continuous lighting conditions.
+4. **Absolute prop positions and states**: including movement paths in this segment.
+5. **End state of this segment**: the next segment must rewrite it as an "absolute initial state", not write "continues from the previous segment".
 
-### A6.4 微表情必须有源剧情依据 + trigger
-只有源剧情已经存在对应反应/情绪外显时，才允许写微表情，并写成 `[已有反应的可见微表情] + [原文触发条件]`。**不得因为镜头近就自行添加皱眉、抿嘴、脸红、吞咽、苦笑等新反应。**
+### A5.2 State chain for continuous scenes
 
-### A6.5 mask + crack（仅源剧情支持时）
-- **mask**：只整理用户已经给出的表面状态，不自行赋予角色“伪装”。
-- **crack**：只把用户已有反应具体化为一个可见破绽，不新增反应。
-- 同一镜头不要连续堆多个 crack；源剧情没有 crack 时可以完全不用。
+Within the same location and the same continuous time:
 
-### A6.6 表演通道适配（必写）
+`previous segment's end state → rewritten as the next segment's absolute initial state → this segment's actions → this segment's end state`
 
-| 镜头可见 | 主表演通道 |
+Inherited content includes:
+- characters' actual world positions and body orientation
+- prop positions, holders, quantity, liquid level, stains/wear
+- persistent states such as injuries, costume, wetness, blood, smoke and dust
+- key light direction, color temperature and environmental conditions
+
+### A5.3 Character movement follows only the source story; never add actions for continuity
+
+What is forbidden is the AI creating unfounded position changes, and also adding story in reverse to "explain a position change".
+
+- Original explicitly says "stands up and walks to the door" → keep the standing up, walking and arriving; no teleporting.
+- The original's next beat directly says "the character is already standing at the door" without saying how they got there → treat "standing at the door" as that beat's given initial state and allow entering it via HARD CUT / a new segment; **do not add "stands up, walks over" yourself.**
+- Original explicitly says the two swap places → execute the process as the original says; original does not mention a swap → do not swap the two characters' world positions for composition.
+- Frame left/right may change through a legitimate camera change, but world positions must not change without a source.
+
+### A5.4 Axis rules
+
+- A continuous conversation keeps the established 180° axis by default;
+- if the user explicitly asks for a reverse shot / crossing the line, or the story needs the axis to change, make the spatial change readable via a neutral camera position, a move across the axis or an establishing shot;
+- unsignaled axis jumps are forbidden;
+- **"don't cross the axis" does not mean the camera can never change position.**
+
+### A5.5 Re-anchor on scene changes / time jumps
+
+When the scene, time, weather or main light source clearly changes:
+- the new scene re-establishes world coordinates, frame coordinates, axis and lighting;
+- do not force inheritance of the previous scene's camera positions or light direction;
+- whether costume, injuries, carried props, etc. are inherited depends on the story's time continuity.
+
+This supports multi-scene stories of 2–3 minutes or longer without locking the first scene's blocking rules onto the whole episode.
+
+---
+
+## A6. Performance layer
+
+### A6.1 Emotion = a by-product of behavior
+Don't write "he is sad"; write **what he is doing**. Emotion leaks through small deviations in action.
+
+### A6.2 Goals point at targets
+Only when the user's original story already makes a character's goal clear, organize it into an executable goal pointing at a specific person / object / task. **Do not infer a character's motive, hidden purpose or relationship intent yourself for the sake of a complete performance.**
+
+### A6.3 States first, but key causal actions must keep their process
+Key causal actions (taking / putting down / pouring liquid / opening a door / switching hands / sitting down / standing up / moving) cannot teleport.
+
+### A6.4 Micro-expressions need a source-story basis + trigger
+Micro-expressions are allowed only when the source story already has a corresponding reaction / visible emotion, written as `[visible micro-expression of an existing reaction] + [original trigger condition]`. **Do not add new reactions such as frowning, pursing lips, blushing, swallowing or a wry smile just because the shot is close.**
+
+### A6.5 mask + crack (only when the source story supports it)
+- **mask**: only organize the surface state the user has already given; do not assign a character a "disguise" yourself.
+- **crack**: only make a reaction the user already has concrete as one visible slip; add no reactions.
+- Do not stack several cracks in a row in the same shot; when the source story has no crack, you can skip it entirely.
+
+### A6.6 Performance channel adaptation (must be written)
+
+| Visible in shot | Main performance channel |
 |---|---|
-| 脸部可见 | 眼神 + 面部极小变化 |
-| 仅手可见 | 握力 + 动作节拍 + 触碰 |
-| 背影可见 | 重心 + 肩颈 + 呼吸 |
-| 脚部可见 | 步态 + 重量转移 |
-| 全身远景 | 姿态 + 空间占据 |
+| Face visible | Eyes + very small facial changes |
+| Hands only | Grip + action rhythm + touch |
+| Back visible | Center of gravity + shoulders and neck + breathing |
+| Feet visible | Gait + weight transfer |
+| Full-body wide shot | Posture + occupation of space |
 
-**只写本镜头实际能看见的表演通道。**
+**Write only the performance channels actually visible in this shot.**
 
-### A6.7 反应与台词的相对时机
-反应可以在对方台词结束前开始，但必须有明确触发词/触发动作；不要机械规定“所有反应都等台词说完”或“所有反应都提前”。
+### A6.7 Timing of reactions relative to lines
+A reaction may start before the other person's line ends, but it must have a clear trigger word/trigger action; do not mechanically require "all reactions wait until the line ends" or "all reactions come early".
 
-### A6.8 克制型爆发
-强情绪可以对**AI 自己添加的表演装饰**做减法，例如少一个额外皱眉、少一次多余叹气；**不得删除、替换或延后用户原剧情动作/对白/反应。** 可以用更轻的幅度、更短的表演事件表达克制，但剧情事件本身必须原样存在。
+### A6.8 Restrained outbursts
+Strong emotion may subtract from **performance embellishments the AI added itself**, e.g. one fewer extra frown, one fewer unnecessary sigh; **it must not delete, replace or delay the user's original story actions/lines/reactions.** Restraint may be expressed with lighter amplitude and shorter performance events, but the story events themselves must remain exactly as they are.
 
-### A6.9 微表情事件数（上限参考，不是最低配额）
-- ≤15s 段：通常不超过 1–2 个源剧情已有的微反应
-- 16–30s 段：通常不超过 2–3 个源剧情已有的微反应
+### A6.9 Number of micro-expression events (a reference cap, not a minimum quota)
+- ≤15s segment: usually no more than 1–2 micro-reactions already in the source story
+- 16–30s segment: usually no more than 2–3 micro-reactions already in the source story
 
-**0 个完全允许。不得为了达到数量而新增微表情。** 若镜头只见手/背影，则不要硬写面部微表情。
+**Zero is completely allowed. Do not add micro-expressions to reach a number.** If the shot only shows hands/back, do not force facial micro-expressions.
 
 ---
 
-## A7. 运镜与段间衔接
+## A7. Camera movement and transitions between segments
 
-### A7.1 情绪曲线
+### A7.1 Emotional curve
 
 ```text
-低 ──→ 中 ──→ 高 ──→ 释放
-起      压力     峰值     落地
+low ──→ mid ──→ high ──→ release
+start   pressure  peak     landing
 ```
 
-情绪曲线按原剧情时间顺序记录，不能拿来重排剧情。
+The emotional curve is recorded in the original story's chronological order and cannot be used to reorder the story.
 
-### A7.2 情绪位置 → 运镜
-峰值可分为内心、信息反转、外部动作三类；运镜必须服从用户指定风格，不能因为“峰值”自动推近或自动大特写。
+### A7.2 Emotional position → camera movement
+Peaks can be inner, information reversal or external action; camera movement must follow the user's specified style and must not automatically push in or go to an extreme close-up just because it is a "peak".
 
-### A7.3 段间衔接规则（独立生成优先）
+### A7.3 Transition rules between segments (independent generation first)
 
-**判断范围：只看“段 N 的末镜”与“段 N+1 的首镜”。**
+**Scope of judgment: only "the last shot of segment N" and "the first shot of segment N+1".**
 
-镜头属性分三类：
-- **拍摄主体**：双人 / 单人 / 局部 / 空镜 / 群体
-- **景别**：全景 / 中景 / 近景 / 特写 / 大特写
-- **角度**：正面 / 侧面 / 背面 / 过肩 / 俯视 / 仰视
+Shot attributes come in three kinds:
+- **Subject**: two-shot / single / partial / empty shot / group
+- **Shot size**: full / medium / medium close-up / close-up / extreme close-up
+- **Angle**: front / side / back / over-the-shoulder / high angle / low angle
 
-为避免两个独立生成段在剪辑点看起来像错误续帧，段间衔接默认至少满足一项：
-1. 拍摄主体类型不同；
-2. 景别差 ≥ 2 档；
-3. 拍摄角度差 ≥ 90°。
+To keep two independently generated segments from looking like a mistaken frame continuation at the edit point, a transition between segments should by default satisfy at least one of:
+1. a different subject type;
+2. shot sizes at least 2 steps apart;
+3. camera angles at least 90° apart.
 
-三项都不满足时，只允许调整下一段首镜的**摄影主体/景别/角度/构图**，不得改变该首镜对应的源剧情事件、人物位置事实、动作、道具或对白。
+When none of the three holds, you may only adjust the **subject/shot size/angle/composition** of the next segment's first shot; you must not change the source story event, character position facts, actions, props or dialogue of that first shot.
 
-**推荐：**
-- 双人中景 → 单人/局部特写
-- 双人中景 → 空镜
-- 单人中景 → 双人中景
-- 局部特写 → 双人中景
-- 空镜 → 双人中景
-- 单人侧面中景 → 单人正面特写
+**Recommended:**
+- two-shot medium → single/partial close-up
+- two-shot medium → empty shot
+- single medium → two-shot medium
+- partial close-up → two-shot medium
+- empty shot → two-shot medium
+- single side medium → single front close-up
 
-**高风险：**
-- 同一主体 + 同一景别 + 近似角度直接跨段
-- 同一手部动作在两个独立生成段之间硬接
+**High risk:**
+- same subject + same shot size + similar angle directly across segments
+- the same hand action hard-joined across two independently generated segments
 
-注意：不存在“局部 → 局部一律禁止”这类与上面三条件冲突的第二套规则。若主体/景别/角度已经形成足够差异，可用；但仍要保证连续性易读。
+Note: there is no second rule such as "partial → partial is always forbidden" that conflicts with the three conditions above. If subject/shot size/angle already differ enough, it is usable; but continuity must still be easy to read.
 
-### A7.4 动作连续剪辑
+### A7.4 Action-continuity cuts
 
-同一个未完成动作的 match-on-action **优先只放在同一生成段内**：
-- 镜头 A 尾帧动作进行中；
-- HARD CUT；
-- 镜头 B 首帧继续完成。
+A match-on-action for the same unfinished action is **preferably kept within one generation segment**:
+- shot A's last frame is mid-action;
+- HARD CUT;
+- shot B's first frame completes it.
 
-跨生成段时，优先让上一段完成动作，下一段从“动作完成后的稳定状态”重新开始，以减少模型间不连续。
+When crossing generation segments, prefer letting the previous segment complete the action and having the next segment restart from "the stable state after the action is done", to reduce discontinuity between generations.
 
-### A7.5 风格路由表
+### A7.5 Style routing table
 
-| 风格 | 运镜 | 表演 | 光线 | 声音 |
+| Style | Camera movement | Performance | Lighting | Sound |
 |---|---|---|---|---|
-| **克制型** | 固定为主 / 峰值也可不动 | 情绪从动作偏差泄露 | 自然光 / 低反差 | 环境音主导 |
-| **悬疑型** | 稳定机位为主 / 必要时突然反打 | 信息差核心 / 反应可迟半拍 | 硬阴影 / 侧逆光 | 静默可比音乐更有效 |
-| **喜剧型** | 固定机位 / 全景定格常有效 | 角色认真演、反差产生喜感 | 均匀正常光 | 环境音主导 |
+| **Restrained** | Mostly locked-off / may stay still even at the peak | Emotion leaks through deviations in action | Natural light / low contrast | Ambient sound dominates |
+| **Suspense** | Mostly stable camera / sudden reverse shot when needed | Information gap at the core / reactions may lag half a beat | Hard shadows / side-back light | Silence can be more effective than music |
+| **Comedy** | Locked-off / wide-shot freezes often work | Characters play it straight; contrast creates the humor | Even, normal light | Ambient sound dominates |
 
-用户已有明确风格时，以用户风格为最高优先级。
-
----
-
-## A8. 跨段连续性检查（先判定关联，再校验）
-
-A7.3 是**段间镜头类型切换的唯一规则来源**；A8 只负责人物、道具、环境和持续状态的连续性。**不能把所有相邻生成段都强行串成同一个连续空间。先判断两段是否真的有连续关系，再决定要继承什么。**
-
-### A8.1 先判定相邻段的连续性关系
-
-对每一个 `段 N 末态 → 段 N+1 初态`，内部只标记以下三类之一：
-
-1. **连续关联**：同一地点、同一连续时间，或源剧情明确是“继续 / 随后 / 承接 / 同一轮对话 / 同一动作链”，下一段初态依赖上一段末态。
-2. **局部状态关联**：场景或时间已变化，但源剧情明确要求某些持续状态继续存在，例如同一件随身道具、服装破损、伤势、湿度、污渍、产品剩余量等。此时只继承这些持续状态，**不强行继承上一场的人物位置、机位或画面左右**。
-3. **无连续关联 / 重新锚定**：场景、时间或叙事单元已经切换，且下一段不依赖上一段的人物位置或道具末态。此时只检查本段自身的起态、动作与末态是否合理；人物位置、机位、光线按本段重新建立。
-
-判定依据只来自用户最新明确指令、源剧本和已确认状态。**不得为了“让它连得上”自行制造关联。**若源剧情直接给出下一段新的既定状态但没有过渡过程，按 A0.1.4 把该状态当作新的初态，可用 HARD CUT / 新时间块进入，不补移动或交接前史。
-
-### A8.2 人物位置关系校验（连续关联段强制）
-
-对每个实际存在连续关联的人物，内部维护一条简洁状态链：
-
-`段首绝对位置/姿态 → 源剧情动作 → 段末绝对位置/姿态 → 下一段绝对初始位置/姿态`
-
-至少核对：
-1. **世界位置**：相对门、桌、窗、走廊、车辆、固定家具等地标的位置是否一致；
-2. **人物相对关系**：谁在谁的哪一侧、前后距离、是否隔着桌/门/柜台等关系是否无因改变；
-3. **身体状态**：站 / 坐 / 蹲 / 躺、身体朝向、面向对象是否连续；
-4. **手部占用**：若人物正在持有关键道具，哪只手/双手是否仍被该动作占用；源文未锁左右手且镜头无需时不要强行指定，但一旦为执行已经明确，就不能在相关镜头里无过程换手；
-5. **出镜与画外**：画面裁切或换机位可以让人物从画内变成画外，但这不等于人物在世界空间中消失或换位；
-6. **移动依据**：位置发生变化时，必须能对应源剧情 `E##` 中已有的移动/起身/落座/转身等事件，或源剧情直接给出的新初态；没有依据就不能靠镜头切换让人物瞬移。
-
-**画面左/右可以因合法换机位而改变，世界位置不能因此改变。**反打时先检查世界坐标，再重算画面坐标；禁止为了保持“永远画面左/右”而偷偷搬人物。
-
-### A8.3 道具状态链校验（段内 + 连续跨段强制）
-
-对剧情关键道具、商品和会参与动作的小物件，内部维护：
-
-`持有人 / 使用手（若已明确） / 绝对位置 / 可见或被遮挡 / 数量 / 开合状态 / 内容物或液面 / 污渍湿度损耗 / 本段动作 / 段末状态`
-
-硬规则：
-- 一个人在连续镜头里本来拿着一支笔，且没有源剧情中的“放下 / 递出 / 收起 / 掉落 / 离开画面”等事件，下一时刻**不能凭空没了**；
-- 若下一镜裁掉了手或道具、被身体/家具遮挡，允许“暂时不可见”，但它的世界状态仍然保持，**不可把“没拍到”理解成“道具消失”**；
-- 若持物的同一只手在下一镜仍清楚可见，而没有状态变化事件，则该道具应继续在手中；
-- 已放下的道具不能无过程回到手里，已经交给 B 的道具不能下一镜又同时出现在 A 手中；
-- 数量、大小、形态、颜色、开合方式、液面、损耗和污渍不能无因复制、恢复或改变；
-- 道具进入或离开画面边缘不等于道具状态变化，除非源剧情确实发生了移动。
-
-### A8.4 场景与物理环境连续性
-
-仅在“连续关联”或“局部状态关联”时检查：
-- 门窗开合、椅子/餐具/家具已发生的移动；
-- 地面水迹、污渍、破损、烟雾、食物剩余量等持续状态；
-- 主光方向、时间、天气以及实际光源开关；
-- 镜子、玻璃、反射面中不应出现与当前人物/道具状态矛盾的额外复制；
-- 角色与固定环境不能发生无依据穿模、穿墙或越过封闭障碍。
-
-### A8.5 跨段修正边界
-
-发现连续性问题时，只允许：
-- 修正世界坐标/画面坐标的文字冲突；
-- 修正出镜/遮挡描述；
-- 修正关键道具的持有、可见性和状态锁；
-- 调整镜头承载、景别或切点，使已有动作更容易完整呈现；
-- 必要时在**已有 `E##` 边界**重新分镜/分段。
-
-**禁止为了修连续性新增“把笔放下 / 又拿起来 / 走到另一边 / 重新拿一件”等用户没有写的桥接动作。**若冲突来自源剧情自身，按 A0.1.6 标记“源文本冲突”，不擅自修成另一个故事。
-
-**不要写“同上”“延续上一段站位”。需要继承的下一段必须把继承结果重新写成绝对初始状态；无连续关系的段则只检查本段自身。**
+When the user has a clear style, the user's style has the highest priority.
 
 ---
 
-## A9. 分段提示词模板（按模型路由）
+## A8. Cross-segment continuity check (determine the relationship first, then verify)
 
-A9 只定义**最终交付外壳**，不改变 A2–A8 的任何执行逻辑。
+A7.3 is the **only rule source for shot-type changes between segments**; A8 is responsible only for continuity of characters, props, environment and persistent states. **Do not force every pair of adjacent generation segments into one continuous space. First determine whether two segments really have a continuity relationship, then decide what to inherit.**
 
-- Seedance 2.0 → 使用 A9.1
-- Seedance 2.5 → 使用 A9.2
+### A8.1 First determine the continuity relationship of adjacent segments
 
-如果 A9 的表达方式与 A2–A8、A11–A12 的执行规则发生冲突，以执行规则为准。
+For every `segment N end state → segment N+1 initial state`, internally mark exactly one of the following three:
 
-### A9.1 Seedance 2.0 分段提示词模板（资产标识 + 正式提示词）
+1. **Continuous**: same location and same continuous time, or the source story explicitly says "continues / then / follows on / same round of conversation / same action chain"; the next segment's initial state depends on the previous segment's end state.
+2. **Partial-state link**: the scene or time has changed, but the source story explicitly requires some persistent states to continue, e.g. the same carried prop, damaged costume, injuries, wetness, stains, remaining product, etc. Inherit only these persistent states, and **do not force inheritance of the previous scene's character positions, camera positions or frame left/right**.
+3. **No continuity / re-anchor**: the scene, time or narrative unit has switched, and the next segment does not depend on the previous segment's character positions or prop end states. Only check whether this segment's own start state, actions and end state make sense; character positions, camera positions and lighting are re-established for this segment.
+
+The judgment is based only on the user's latest explicit instructions, the source script and confirmed states. **Do not invent a link yourself "so that it connects".** If the source story directly gives a new state for the next segment without a transition, treat that state as the new initial state per A0.1.4 and enter it via HARD CUT / a new time block, without adding movement or handover backstory.
+
+### A8.2 Character position check (mandatory for continuous segments)
+
+For every character that actually has a continuity link, maintain a concise internal state chain:
+
+`absolute position/pose at segment start → source story action → absolute position/pose at segment end → absolute initial position/pose in the next segment`
+
+Check at least:
+1. **World position**: whether the position relative to landmarks such as doors, tables, windows, corridors, vehicles and fixed furniture is consistent;
+2. **Relative positions of characters**: whether who is on which side of whom, front/back distance, and being separated by a table/door/counter have changed without reason;
+3. **Body state**: whether standing / sitting / crouching / lying, body orientation and whom they face are continuous;
+4. **Hand occupancy**: if a character is holding a key prop, whether that hand/both hands are still occupied by that action; when the source does not lock left/right hand and the shot does not need it, do not force one, but once it has been made explicit for execution, the hand cannot switch without process in related shots;
+5. **On-screen and off-screen**: framing or a camera change can move a character from on-screen to off-screen, but that does not mean the character disappears or moves in world space;
+6. **Basis for movement**: when a position changes, it must correspond to an existing move/stand-up/sit-down/turn event in a source-story `E##`, or to a new initial state given directly by the source story; without a basis, a cut cannot make a character teleport.
+
+**Frame left/right may change through a legitimate camera change, but world position cannot change because of it.** For a reverse shot, check world coordinates first and then recompute frame coordinates; do not secretly move characters to keep them "always frame left/right".
+
+### A8.3 Prop state chain check (mandatory within a segment + across continuous segments)
+
+For key story props, products and small objects that take part in actions, internally maintain:
+
+`holder / hand used (if specified) / absolute position / visible or occluded / quantity / open-closed state / contents or liquid level / stains, wetness, wear / actions in this segment / end-of-segment state`
+
+Hard rules:
+- If someone was holding a pen across continuous shots and the source story has no "put down / hand over / put away / drop / leave frame" event, it **cannot vanish from nowhere** a moment later;
+- if the next shot crops out the hand or prop, or it is occluded by a body/furniture, "temporarily not visible" is allowed, but its world state stays the same; **do not treat "not filmed" as "the prop disappeared"**;
+- if the same hand holding the item is still clearly visible in the next shot and there is no state-change event, the prop should still be in the hand;
+- a prop that was put down cannot return to the hand without process, and a prop already given to B cannot also appear in A's hand in the next shot;
+- quantity, size, form, color, opening mechanism, liquid level, wear and stains cannot be duplicated, restored or changed without cause;
+- a prop entering or leaving the frame edge is not a prop state change, unless the source story actually moved it.
+
+### A8.4 Scene and physical environment continuity
+
+Check only for "continuous" or "partial-state link":
+- doors and windows opened/closed, chairs/tableware/furniture already moved;
+- persistent states such as water on the floor, stains, damage, smoke and leftover food;
+- key light direction, time, weather and whether actual light sources are on;
+- mirrors, glass and reflective surfaces must not show extra copies that contradict the current character/prop state;
+- characters must not clip through the fixed environment, pass through walls or cross closed barriers without basis.
+
+### A8.5 Limits of cross-segment fixes
+
+When you find a continuity problem, you may only:
+- fix textual conflicts in world/frame coordinates;
+- fix on-screen/occlusion descriptions;
+- fix key props' holder, visibility and state locks;
+- adjust shot carrying, shot size or cut points so existing actions are shown more completely;
+- when necessary, re-break shots/segments at **existing `E##` boundaries**.
+
+**Do not add bridging actions the user did not write, such as "put the pen down / pick it up again / walk to the other side / take a new one", to fix continuity.** If the conflict comes from the source story itself, mark "source-text conflict" per A0.1.6 and do not fix it into a different story.
+
+**Do not write "same as above" or "keep the previous segment's blocking". A segment that inherits must rewrite the inherited result as an absolute initial state; segments without a continuity relationship only check themselves.**
+
+---
+
+## A9. Segment prompt templates (routed by model)
+
+A9 defines only the **final delivery shell**; it does not change any execution logic of A2–A8.
+
+- Seedance 2.0 → use A9.1
+- Seedance 2.5 → use A9.2
+
+If A9's wording conflicts with the execution rules of A2–A8 or A11–A12, the execution rules prevail.
+
+### A9.1 Seedance 2.0 segment prompt template (asset identification + formal prompt)
 
 ```text
 ═══════════════════════════════════════════
-G0N｜Batch X / 段 N ｜目标模型：Seedance 2.0 ｜本段时长：Xs ｜全局时间：MM:SS–MM:SS
+G0N｜Batch X / Segment N ｜Target model: Seedance 2.0 ｜Segment duration: Xs ｜Global time: MM:SS–MM:SS
 ═══════════════════════════════════════════
 
-## 资产标识
+## Asset identification
 
-### 涉及角色
-角色名｜出镜状态总览
-- 镜头 N-1｜00:00–00:XX｜仅手部 / 实际出镜 / 完全画外……｜说话 / 不说话
-- 镜头 N-2｜00:XX–00:XX｜……
-（身份 + 外观锚点 + 世界坐标 + 画面坐标 + 特殊状态 + 本段重点表演 + 表演要求 + 同期台词原文）
+### Characters involved
+Character name｜On-screen status overview
+- Shot N-1｜00:00–00:XX｜hands only / actually on screen / fully off-screen…｜speaking / not speaking
+- Shot N-2｜00:XX–00:XX｜……
+(identity + appearance anchors + world coordinates + frame coordinates + special states + key performance in this segment + performance requirements + original synchronous lines)
 
-### 涉及场景
-场景名｜时间
-（场景锚点 + 摄影机位置朝向高度 + 前中后景 + 空间关系）
+### Scenes involved
+Scene name｜time
+(scene anchors + camera position, direction and height + foreground/midground/background + spatial relationships)
 
-### 关键道具
-道具名
-（段首绝对位置 + 时间轴动作 + 段末状态 + 禁止项；包装文字按 A1.3）
+### Key props
+Prop name
+(absolute position at segment start + timeline actions + end-of-segment state + prohibitions; packaging text per A1.3)
 
 ─────────────────────────────────────────
-【正式提示词】
+【Formal prompt】
 
-生成一段总时长严格为 Xs 的真人电影短片。
-（画面风格 / 摄影机总述 / 光源总述）
+Generate a live-action cinematic short with a total duration of exactly Xs.
+(visual style / camera overview / light source overview)
 
-## 人物空间关系
-（世界坐标 + 画面坐标 · 双层；禁止只写“延续上一段”）
+## Character spatial relationships
+(world coordinates + frame coordinates · two layers; never write only "continues from the previous segment")
 
-## 镜头 N-1｜00:00–00:XX｜XXs｜主体 + 景别 + 角度
-摄影机与构图：……
-首帧锁定：……
-动作时间轴：……
-表演：……
-物理：……
+## Shot N-1｜00:00–00:XX｜XXs｜subject + shot size + angle
+Camera and composition: ……
+First-frame lock: ……
+Action timeline: ……
+Performance: ……
+Physics: ……
 
 ## 00:XX｜HARD CUT
 
-## 镜头 N-2｜00:XX–00:XX｜XXs｜主体 + 景别 + 角度
+## Shot N-2｜00:XX–00:XX｜XXs｜subject + shot size + angle
 ……
 
-## 光线
-（主光源世界方向 + 画面方向 + 曝光逻辑 + 与前段/前镜的连续性）
+## Lighting
+(key light world direction + frame direction + exposure logic + continuity with the previous segment/shot)
 
-## 声音
-（真实环境音 + 同期对白原文；是否有 BGM 服从用户要求）
+## Sound
+(real ambient sound + original synchronous dialogue; whether there is BGM follows the user's requirement)
 
-## 正向锁
-（人物绝对位置 / 道具持有 / 视线 / 连续状态 / 本镜不该出现的人物）
+## Positive locks
+(absolute character positions / prop holding / eyelines / continuous states / characters who must not appear in this shot)
 
-## 文字锁
-无字幕、无额外屏幕文字、无后期叠字；实体包装/招牌文字仅保持参考资产，不新增、不改写、不重绘。
+## Text lock
+No subtitles, no extra on-screen text, no post-production overlays; physical packaging/signboard text only keeps the reference asset, with nothing added, rewritten or redrawn.
 ```
 
-### A9.2 Seedance 2.5 分段提示词模板（Objective 架构）
+### A9.2 Seedance 2.5 segment prompt template (Objective structure)
 
-Seedance 2.5 的最终交付采用更紧凑、可直接投喂的结构。**不要在每段前再重复一整套 A4 资产标识。** A4 的信息必须已经被压入 `Reference binding`、`Immutable locks`、`Timeline`、`Preserve`。
+Seedance 2.5's final delivery uses a more compact structure that can be fed directly. **Do not repeat a full A4 asset identification block before each segment.** A4's information must already be packed into `Reference binding`, `Immutable locks`, `Timeline` and `Preserve`.
 
-#### A9.2.0 最终格式硬门（强制）
+#### A9.2.0 Final format hard gate (mandatory)
 
-当目标模型为 **Seedance 2.5** 时，最终交付只能使用本节 A9.2 的字段结构。除段头信息外，允许的顶层字段仅为：
+When the target model is **Seedance 2.5**, the final delivery may only use the field structure of this section, A9.2. Apart from the segment header, the only allowed top-level fields are:
 - `Objective`
-- `Reference binding`（仅存在真实参考资产时出现；没有真实参考时整节省略）
+- `Reference binding` (appears only when real reference assets exist; omit the whole section when there are none)
 - `Immutable locks`
 - `Target duration`
 - `Timeline`
@@ -861,488 +861,488 @@ Seedance 2.5 的最终交付采用更紧凑、可直接投喂的结构。**不�
 - `Preserve`
 - `Avoid`
 
-**禁止把任何中间规划稿、其他模型模板或非 A9.2 外壳直接作为 2.5 最终交付。** 除段头信息与上方白名单字段外，2.5 最终正文不得出现任何其他顶层字段、编号式分镜章节或额外分析块。
+**Do not deliver any intermediate planning draft, another model's template or a non-A9.2 shell directly as the 2.5 final delivery.** Apart from the segment header and the whitelisted fields above, the 2.5 final body must not contain any other top-level field, numbered shot-breakdown sections or extra analysis blocks.
 
-2.5 最终 `Timeline` 必须按 A9.2.1 使用 `【0:00-0:XX】` 时间块 + 连续自然语言。镜头变化如确有需要，只能嵌在对应时间块的自然语言中，不得另立镜头编号体系作为主结构。
+The 2.5 final `Timeline` must, per A9.2.1, use `【0:00-0:XX】` time blocks + continuous natural language. Shot changes, where truly needed, may only be embedded in the natural language of the corresponding time block; do not set up a separate shot-numbering system as the main structure.
 
-如果内部草稿或上游输入采用其他结构，必须只把它当作**源材料**而非最终模板：先按 A0–A8/A11 解析，再在交付前重排进 A9.2 白名单字段。只要最终正文出现白名单之外的顶层结构，即判定为格式失败，**不得交付，必须在本轮直接改写为 A9.2**。
+If the internal draft or upstream input uses another structure, treat it only as **source material**, never as the final template: first parse it per A0–A8/A11, then rearrange it into the A9.2 whitelisted fields before delivery. Whenever the final body contains top-level structure outside the whitelist, it counts as a format failure: **do not deliver; rewrite it directly into A9.2 in this round**.
 
 ```text
 ═══════════════════════════════════════════
-G0N｜Batch X / 段 N ｜目标模型：Seedance 2.5 ｜本段时长：Xs ｜全局时间：MM:SS–MM:SS
+G0N｜Batch X / Segment N ｜Target model: Seedance 2.5 ｜Segment duration: Xs ｜Global time: MM:SS–MM:SS
 ═══════════════════════════════════════════
 
 Objective:
-用 1–2 句说明：本段在整集中的位置、时长/画幅/总体质感，以及这一段要完成的核心戏剧目标。不要复述完整 Timeline。
+In 1–2 sentences, state this segment's place in the episode, its duration/aspect ratio/overall look, and the core dramatic goal this segment must achieve. Do not restate the full Timeline.
 
 Reference binding:
-- 自动读取并分析本段剧情、镜头、动作与画面内容，从中提取本段实际涉及且需要调用的参考资产，包括角色图、场景图、商品图、道具图、站位图等。
-- 对提取出的资产进行简单标识，说明该资产对应的对象或用途即可，例如：“男主角色参考”“客栈场景参考”“产品包装参考”“红绳道具参考”。
-- 凡用户已经提供、且本段实际需要使用的真实参考图片或资产句柄，必须逐一列出，并原样保留其节点 ID、资产句柄或其他引用标识，不得改写、缩写或重新编号。
-- 同一参考资产即使在上一段已经使用，只要本段仍然涉及，就必须在本段重新提取并列出；禁止写“同上”“沿用上一段参考”等省略表达。
-- 只提取本段实际涉及的资产，不要把未出现在本段剧情或画面中的资产机械加入。
-- 无需详细解释每张参考图“控制什么 / 不控制什么”，仅做简洁、明确的资产身份标识即可。
-- 如果本段没有任何真实参考图片、节点 ID 或资产句柄，则整节可省略。
-- 严禁根据剧情自行编造 {{node/image-...}}、资产编号、引用标签或不存在的参考素材。
+- Automatically read and analyze this segment's story, shots, actions and visual content, and extract from them the reference assets this segment actually involves and needs to call, including character images, scene images, product images, prop images, blocking images, etc.
+- Give each extracted asset a simple label that only states the object or use it corresponds to, e.g. "male lead character reference", "inn scene reference", "product packaging reference", "red string prop reference".
+- Every real reference image or asset handle the user has provided and this segment actually needs must be listed one by one, keeping its node ID, asset handle or other reference identifier exactly as is; do not rewrite, abbreviate or renumber it.
+- Even if a reference asset was used in the previous segment, as long as this segment still involves it, it must be extracted and listed again in this segment; do not use shorthand such as "same as above" or "reuse the previous segment's reference".
+- Extract only assets this segment actually involves; do not mechanically add assets that do not appear in this segment's story or visuals.
+- There is no need to explain in detail what each reference image "controls / doesn't control"; a concise, clear asset identity label is enough.
+- If this segment has no real reference image, node ID or asset handle at all, the whole section can be omitted.
+- Never invent {{node/image-...}}, asset numbers, reference tags or nonexistent reference material from the story.
 
 Immutable locks:
-- 只写会直接影响生成稳定性的不可变条件：角色身份/服装、关键世界位置与左右关系、连续场景的光线逻辑、关键道具状态、商品结构、对白原文与口型、必要的画外锁定等。
-- 不把整段剧情重新抄一遍。
-- 连续场景跨段时，把上一段结束状态改写成本段的绝对初始状态，不写“延续上一段”。
+- Write only immutable conditions that directly affect generation stability: character identity/costume, key world positions and left/right relationships, lighting logic of continuous scenes, key prop states, product structure, original dialogue and lip sync, necessary off-screen locks, etc.
+- Do not copy the whole segment's story again.
+- When a continuous scene crosses segments, rewrite the previous segment's end state as this segment's absolute initial state; do not write "continues from the previous segment".
 
 Target duration: X seconds
 
 Timeline:
-【0:00-0:XX】用一段连续中文自然描述这一时间块真正看见的画面：必要的场景/站位、当前出镜状态、景别或切镜、动作先后、关键表演反应、同期对白、关键道具变化与必要物理细节。像成片描述一样写，不拆成“摄影机 / 动作 / 表演 / 台词 / 物理”等子标题。
+【0:00-0:XX】Describe, in one continuous passage of natural Chinese, what is actually seen in this time block: necessary scene/blocking, current on-screen status, shot size or cuts, order of actions, key performance reactions, synchronous dialogue, key prop changes and necessary physical details. Write it like a description of the finished film; do not split it into sub-headings such as "camera / action / performance / lines / physics".
 
-【0:XX-0:XX】继续用一段连续自然语言描述后续画面。
+【0:XX-0:XX】Continue describing the following visuals in one continuous natural-language passage.
 
-【0:XX-0:XX】按剧情需要继续；时间块数量不固定。
+【0:XX-0:XX】Continue as the story requires; the number of time blocks is not fixed.
 
 Visual direction:
-用 1 个紧凑自然段概括整体摄影质感、光线、色温、景深、人物/商品视觉关系和必要物理质感。只写真正影响这一段的视觉要求。
+In 1 compact paragraph, summarize the overall cinematographic look, lighting, color temperature, depth of field, visual relationships of characters/products and necessary physical textures. Write only visual requirements that really affect this segment.
 
 Audio direction:
-- 物理拟音 / 环境音：……
-- 对白人声：……
-- 用户明确要求配乐时才写配乐；用户未要求时默认“无背景音乐，仅保留真实同期声与环境音”。
+- Physical foley / ambient sound: ……
+- Dialogue voices: ……
+- Write a score only when the user explicitly asks for one; when not asked, default to "no background music; keep only real synchronous sound and ambient sound".
 
 Preserve:
-用一行或一个短自然段列出必须保留的角色造型、场景锚点、商品结构、关键道具状态、空间关系或动作逻辑。
+In one line or a short paragraph, list the character looks, scene anchors, product structure, key prop states, spatial relationships or action logic that must be kept.
 
 Avoid:
-用一行或一个短自然段列出最容易出错且与本段直接相关的问题；不要堆一长串泛化负面词。
+In one line or a short paragraph, list the problems most likely to go wrong that are directly relevant to this segment; do not pile up a long list of generic negative terms.
 ```
 
-#### A9.2.1 Timeline 写法（强制）
+#### A9.2.1 How to write the Timeline (mandatory)
 
-`Timeline` 必须参考用户常用的 Seedance 2.5 成品提示词风格：**时间块 + 连续自然语言画面描述**。
+`Timeline` must follow the style of the user's usual finished Seedance 2.5 prompts: **time blocks + continuous natural-language visual description**.
 
-正确示意：
+Correct illustration:
 
 ```text
 Timeline:
 
 【0:00-0:06】
-在源剧情已经明确的场景中，角色A执行 E01 的原始动作。镜头按需要从建立镜头切到角色A中景；若角色B在该节拍按原文保持画外，就明确写“角色B保持画外”。只补充能直接看见的姿态、接触、物理反馈，不新增拿取、开盖、走位等源剧情没有的事件。
+In the scene the source story has already established, Character A performs E01's original action. The shot cuts as needed from an establishing shot to a medium shot of Character A; if Character B stays off-screen in this beat per the original, state explicitly "Character B stays off-screen". Add only directly visible posture, contact and physical feedback; do not add events the source story lacks, such as taking, opening a lid or moving.
 
 【0:06-0:12】
-承接 E02–E03。角色A按原文说出台词，角色B按原文做出既有反应。可以把已有反应写成具体可见动作，但不能把“反应”扩写成新的剧情行为。必要时切近景或局部特写，剧情事件顺序不变。
+Carries E02–E03. Character A says the line as in the original, and Character B gives the existing reaction as in the original. The existing reaction may be written as a concrete visible action, but the "reaction" must not be expanded into new story behavior. Cut to a medium close-up or partial close-up when necessary; the order of story events stays the same.
 
 【0:12-0:18】
-承接 E04。若本时间块首帧源剧情已经规定某道具在角色手中，就直接从该状态开始，不追溯或补写道具是如何被拿到手里的。镜头只负责呈现，不负责补前史。
+Carries E04. If the source story already sets a prop in the character's hand at this time block's first frame, start directly from that state, without tracing or writing how the prop got into the hand. The camera only presents; it does not fill in backstory.
 ```
 
-**执行要求：**
-- 每个时间块通常 1 个自然段，信息够用即可。
-- 时间块数量根据剧情自然决定，不固定为 3 或 4 块。
-- 可以直接写“切男主近景 / 切手部特写 / 回双人中景”，不必额外建立镜头编号。
-- 只写对当前时间块有实际影响的站位、左右、画外状态与连续性，不机械重复 `Immutable locks`。
-- 角色不应出现时，简短写“女主保持画外，不自动补入镜头”即可。
-- 台词直接嵌在对应动作发生的位置，不在 Timeline 后再次重复一遍。
-- 物理细节只写和当前动作直接相关的，如液体晃动、衣料接触、道具表面湿润、物体重量、碰撞反馈。
-- 每个时间块优先保持一个清晰动作链，不为追求信息完整而把每秒塞满。
-- **描述重点是“这一刻成片实际看见什么”，不是重新解释规则。**
-- Timeline 中每一个会改变人物/道具/位置/数量/关系/信息的动作，都必须来自 A2 的源节拍 `E##`。
-- 不为了“更顺”“更完整”“更有因果”补源剧情没有的拿取、开合、抽取、递交、起身、走位、回头、使用次数、道具消耗等行为。
-- 若源剧情从一个既定状态直接开始，就直接写该状态；不要追问或补拍它之前怎么发生。
-- 原文使用“父母 / 家长 / 成人 / 某人”等泛称时，Timeline 保持同样泛称，除非用户最新明确指令已经指定具体人物。
+**Execution requirements:**
+- Each time block is usually 1 paragraph; enough information is enough.
+- The number of time blocks is decided naturally by the story, not fixed at 3 or 4.
+- You can write "cut to male lead medium close-up / cut to hand close-up / back to two-shot medium" directly, without setting up shot numbers.
+- Write only the blocking, left/right, off-screen states and continuity that actually affect the current time block; do not mechanically repeat `Immutable locks`.
+- When a character should not appear, briefly writing "female lead stays off-screen; do not automatically add her into the shot" is enough.
+- Embed lines directly where the corresponding action happens; do not repeat them again after the Timeline.
+- Write only physical details directly related to the current action, such as liquid sloshing, fabric contact, wet prop surfaces, object weight and collision feedback.
+- Each time block preferably keeps one clear action chain; do not cram every second for the sake of complete information.
+- **The focus is "what the finished film actually shows at this moment", not re-explaining rules.**
+- Every action in the Timeline that changes characters/props/positions/quantities/relationships/information must come from an A2 source beat `E##`.
+- Do not add taking, opening/closing, pulling out, handing over, standing up, moving, looking back, number of uses, prop consumption or other behavior the source story lacks to make it "smoother", "more complete" or "more causal".
+- If the source story starts directly from a given state, write that state directly; do not question or add how it came about.
+- When the original uses generic terms such as "parents / guardian / adult / someone", the Timeline keeps the same generic term, unless the user's latest explicit instruction has specified a particular person.
 
-#### A9.2.2 Reference binding（2.5 真实参考资产硬规则）
+#### A9.2.2 Reference binding (2.5 hard rules for real reference assets)
 
-- 自动读取本段剧情、镜头、动作与画面内容，只提取**本段实际涉及且需要调用**的真实角色图、场景图、商品图、道具图、站位图、动作图等参考资产。
-- 只引用用户真实提供的参考节点、图片标签或资产句柄，并**原样保留完整节点 / 句柄**；禁止改名、缩写、重新编号或根据剧情编造不存在的引用。
-- 每个真实参考单独列一行，采用“**真实节点 / 句柄：简洁资产标识**”写法；标识只说明它对应的对象或用途，例如“男主角色参考”“客栈场景参考”“产品包装参考”“红绳道具参考”。
-- 不要求逐张展开“控制什么 / 不控制什么”的长说明；但内部仍须遵守用户明确用途，不得让角色图越权改变站位、让站位图覆盖人物身份、让场景图额外带入人物或道具。
-- 用户明确说“仅位置参考 / 仅服装参考 / 仅产品参考”等时，简洁标识中必须保留用途限定，例如“仅站位参考”“仅服装参考”。
-- **每段自包含**：上一段已经使用过的参考，本段仍需要时必须再次列出；禁止写“同上”“沿用上一段参考”。
-- 只列本段实际需要的资产，不把全集参考库机械塞进每一段。
-- 没有真实参考时，省略整个 `Reference binding`；禁止伪造 `{{Ref}}`、`{{node/image-...}}`、资产编号或不存在的资产名。
+- Automatically read this segment's story, shots, actions and visual content, and extract only the real character, scene, product, prop, blocking, action and other reference assets that **this segment actually involves and needs to call**.
+- Reference only reference nodes, image tags or asset handles the user actually provided, and **keep the complete node / handle exactly as is**; do not rename, abbreviate, renumber or invent nonexistent references from the story.
+- List each real reference on its own line in the form "**real node / handle: concise asset label**"; the label only states the object or use it corresponds to, e.g. "male lead character reference", "inn scene reference", "product packaging reference", "red string prop reference".
+- You are not required to expand a long "what it controls / doesn't control" note for each image; but internally you must still follow the user's explicit purpose, and must not let a character image overstep to change blocking, a blocking image override character identity, or a scene image bring in extra people or props.
+- When the user explicitly says "position reference only / costume reference only / product reference only" and so on, the concise label must keep the use restriction, e.g. "blocking reference only", "costume reference only".
+- **Each segment is self-contained**: a reference already used in the previous segment must be listed again when this segment still needs it; do not write "same as above" or "reuse the previous segment's reference".
+- List only the assets this segment actually needs; do not mechanically stuff the whole episode's reference library into every segment.
+- When there are no real references, omit the whole `Reference binding`; do not fake `{{Ref}}`, `{{node/image-...}}`, asset numbers or nonexistent asset names.
 
 #### A9.2.3 Immutable locks
 
-只保留**不可漂移**的信息，例如：
-- 男主白衣、女主红衣；
-- 女主在桌南侧/画面左，男主在桌北侧/画面右；
-- 商品蓝色翻盖结构；
-- 某角色在某时间块保持画外；
-- 原文对白不改词、不吞字；
-- 连续场景灯光方向与道具状态不重置。
+Keep only information that **must not drift**, e.g.:
+- male lead in white, female lead in red;
+- female lead on the south side of the table / frame left, male lead on the north side of the table / frame right;
+- the product's blue flip-top structure;
+- a character stays off-screen in a given time block;
+- original lines unchanged, no swallowed words;
+- lighting direction and prop states in a continuous scene do not reset.
 
-不要把所有动作都写成 lock；会在 Timeline 内发生变化的动作应留在 Timeline。
+Do not turn every action into a lock; actions that change within the Timeline belong in the Timeline.
 
 #### A9.2.4 Audio direction
 
-- 用户明确要求 BGM / 配乐 → 按用户要求写。
-- 用户未要求 → 默认无 BGM、无情绪提示音，只保留真实环境音、物理拟音与同期对白。
-- 不因示例里曾出现配乐，就把配乐变成 2.5 的默认行为。
+- User explicitly asks for BGM / a score → write it as the user asks.
+- User did not ask → by default no BGM and no emotional cue sounds; keep only real ambient sound, physical foley and synchronous dialogue.
+- Do not make a score the 2.5 default just because one appeared in an example.
 
 #### A9.2.5 Preserve / Avoid
 
-`Preserve` 与 `Avoid` 必须服务当前段执行：
-- `Preserve` 写真正不能漂移的造型、空间、商品、道具、动作逻辑；
-- `Avoid` 写当前段最可能发生的生成错误；
-- 两者都保持短，不写几十个泛化标签。
+`Preserve` and `Avoid` must serve the current segment's execution:
+- `Preserve` lists the looks, space, product, props and action logic that truly must not drift;
+- `Avoid` lists the generation errors most likely in the current segment;
+- keep both short; do not write dozens of generic tags.
 
 ---
 
-## A10. 全片输出结构
+## A10. Full-film output structure
 
-长剧情必须同时区分“全片规划”和“当前批次交付”。全片总览继续用中文；每个生成段的正文则按目标模型路由到 A9.1 或 A9.2。
+Long stories must distinguish "full-film planning" from "current batch delivery". The full-film overview stays in Chinese; each generation segment's body is routed by target model to A9.1 or A9.2.
 
 ```text
 ═══════════════════════════════════════════
-全片总览
+Full-film overview
 ═══════════════════════════════════════════
-· 目标模型：Seedance 2.X
-· 用户目标总时长：（严格 / 参考 / 未指定）
-· 单段硬上限：15s / 30s
-· 理论最少段数：⌈总时长 / 单段上限⌉（仅下限）
-· 全片实际段数：X 段（按内容密度确定）
-· 全片段表：G01 … GXX（含每段时长 + 全局时间范围 + 核心节拍）
-· 批次方案：Batch 1 = G01–G0X；Batch 2 = ……
-· 当前输出批次：Batch X
-· 下一批待交付段：GXX–GXX（如无则写“无”）
-· 资产总表
-· 参考图片总表（仅 2.5 且用户实际提供参考图时）：原样列出每个图片节点 / 资产句柄 + 用途；用于全片规划，不替代各段自己的 Reference binding
-· 场景/时间变化表
-· 各连续场景世界轴线
-· 按原时间顺序的情绪曲线
-· 关键节拍标签
-· 风格
-· 运镜节奏图谱
-· 时长约束冲突（如无写“无”）
-· 源剧情保真状态：应为“通过”；如源文本自身有空缺/冲突，只标注问题，不自行补剧情
+· Target model: Seedance 2.X
+· User's target total duration: (strict / reference / unspecified)
+· Per-segment hard cap: 15s / 30s
+· Theoretical minimum segments: ⌈total duration / per-segment cap⌉ (lower bound only)
+· Actual segments in the film: X segments (set by content density)
+· Full-film segment table: G01 … GXX (with each segment's duration + global time range + core beats)
+· Batch plan: Batch 1 = G01–G0X; Batch 2 = ……
+· Current output batch: Batch X
+· Segments pending in the next batch: GXX–GXX (write "none" if there are none)
+· Master asset table
+· Master reference image table (only for 2.5 when the user actually provided reference images): list each image node / asset handle exactly as is + its use; it serves full-film planning and does not replace each segment's own Reference binding
+· Scene/time change table
+· World axis of each continuous scene
+· Emotional curve in original chronological order
+· Key beat tags
+· Style
+· Camera rhythm map
+· Duration constraint conflicts (write "none" if there are none)
+· Source-story fidelity status: should be "pass"; if the source text itself has gaps/conflicts, only flag the problem and do not fill in story yourself
 
 ─────────────────────────────────────────
-若目标模型为 Seedance 2.0：
-[G01] 使用 A9.1“资产标识 + 正式提示词”
-[G02] 使用 A9.1
+If the target model is Seedance 2.0:
+[G01] uses A9.1 "asset identification + formal prompt"
+[G02] uses A9.1
 ……
 
-若目标模型为 Seedance 2.5：
-[G01] 直接使用 A9.2 Objective 架构，不再额外重复一整块资产标识
-[G02] 使用 A9.2
+If the target model is Seedance 2.5:
+[G01] uses the A9.2 Objective structure directly, without repeating a full asset identification block
+[G02] uses A9.2
 ……
 ─────────────────────────────────────────
 ```
 
-**长集规则：**即使当前只交付 Batch 1，也应先规划后续全局段以及当前批次在全片中的位置，避免每批重新切段导致前后逻辑漂移。
+**Long-episode rule:** even if only Batch 1 is delivered now, first plan the later global segments and the current batch's place in the film, to avoid logic drifting because each batch is re-segmented.
 
-**2.5 简洁性规则：**全片总览负责解释“为什么这样分”；单段提示词负责“这一段具体怎么生成”。不要把总览内容重复塞进每一个 2.5 `Objective` 或 `Timeline`。
-
----
-
-## A11. 结构校验（A12 前的唯一结构修正阶段）
-
-A11 负责“能不能生成、剧情有没有被挤坏”的结构问题；A12 只做文字和表现层抛光。
-
-### A11.1 校验清单
-- [ ] 已建立 `E01 / E02 / E03...` 源剧情账本，并以用户最新明确指令 / 原始剧情为事实源？
-- [ ] 最终 Timeline 中每个改变剧情状态的事件都能映射到某个 `E##`，没有无来源的新动作？
-- [ ] 没有新增、删除、替换、改归属或改顺序任何用户剧情事件？
-- [ ] 没有把“父母 / 家长 / 成人”等模糊角色擅自具体化为爸爸/妈妈/第二人？
-- [ ] 没有为了连续性追溯道具来源、补开盖/抽取/拿取/走位等前史？
-- [ ] 已按原文顺序登记全部原子节拍，没有只保留五类关键点？
-- [ ] 情绪曲线没有被用于重排剧情？
-- [ ] 理论最少段数只作为下限，没有强迫实际段数等于它？
-- [ ] 每段 ≤ 模型单段硬上限？
-- [ ] 全片各段时长总和符合用户严格总时长；若无法同时满足，是否显式标注冲突？
-- [ ] 所有对白在所属时间窗内可按自然语速完整说完？
-- [ ] 串行动作、反应与必要停顿有真实时间，不靠瞬移或异常快语速？
-- [ ] 长剧情是否先有完整全片段表，再按 Batch 容量交付？
-- [ ] A4 角色出镜状态是否按时间轴规划，且与最终正文一致？
-- [ ] 是否已对每一个相邻生成段判定“连续关联 / 局部状态关联 / 无连续关联”，没有把无关段强行继承？
-- [ ] 所有连续关联段的人物世界位置、相对关系、姿态、朝向和手部占用是否能从上一段末态无矛盾地进入下一段初态？
-- [ ] 所有关键道具是否完成“持有人 / 位置 / 数量 / 状态 / 可见性”链条检查，没有无来源的消失、复制、换手、恢复或瞬移？
-- [ ] 场景内已改变的门窗、家具、污渍、液面、破损、天气和光源状态是否在相关段中合理继承？
-- [ ] 是否已做生成稳定性预检，避免把高风险人体/手部/道具交互、复杂运镜、遮挡和多重参考冲突同时塞进一个镜头？
-- [ ] 若目标模型为 2.0，是否使用 A9.1“资产标识 + 正式提示词”？
-- [ ] 若目标模型为 2.5，是否使用 A9.2 的 `Objective / Reference binding / Immutable locks / Target duration / Timeline / Visual direction / Audio direction / Preserve / Avoid` 架构？
-- [ ] 若目标模型为 2.5，最终正文是否通过 A9.2.0 格式硬门：除段头与 A9.2 白名单字段外，没有任何其他顶层结构或额外分析块？
-- [ ] 若目标模型为 2.5，`Timeline` 是否只用时间块 + 连续自然语言，没有另立镜头编号体系作为主组织结构？
-- [ ] 若用户提供了参考图片，2.5 每个相关段是否都在自己的 `Reference binding` 中原样列出了需要的真实图片节点 / 资产句柄？
-- [ ] `Reference binding` 是否只列本段真实需要的参考资产，并采用“真实节点 / 句柄 + 简洁资产标识”；用户明确的“仅站位 / 仅服装 / 仅产品”等用途限定是否保留？
-- [ ] 是否避免用“同上 / 沿用上一段参考图”代替本段重新绑定？
-- [ ] 2.5 `Timeline` 是否为“时间块 + 连续自然语言”，没有退化成一堆摄影机/动作/表演小标题？
-- [ ] 2.5 是否避免把 A4 资产清单整块重复输出，而是把必要信息压进对应字段？
-- [ ] 每段都是自包含世界坐标 + 画面坐标，而非“同上/延续上一段”？
-- [ ] 连续场景状态继承、换场重新锚定是否正确？
-- [ ] 段间衔接满足 A7.3？
-- [ ] 动作连续剪辑是否尽量留在同一生成段？
-- [ ] 对白原文照抄？
-- [ ] 后期字幕/叠字是否没有交给生成模型？实体资产文字是否按 A1.3 处理？
-- [ ] 无参考库时若生成参考图，是否只作 Reference binding 使用、外观标为设计提案、且未越权控制站位/光线/剧情？（A1.2 情况二补充）
-
-### A11.2 有限修正机制（防止死循环）
-
-第一次检查后若发现问题：
-1. 把所有失败项一次性汇总；
-2. **只做一轮集中结构修正**；结构修正只允许调整分段边界、镜头承载、时间预算、摄影表达和锁定信息，**不得修改任何 `E##` 的事件内容、执行者、对象、数量、顺序或台词**；
-3. 修正后只重新核对受影响项和它们的直接连续性；
-4. 然后进入 A11.3 剧情保真审计与 A11.4 生成稳定性预检；全部通过后进入 A12。
-
-**禁止 A11 ↔ A12 来回递归。**
-
-若一轮集中修正后仍存在“用户要求彼此不可同时满足”的硬冲突（例如严格 30s 但原文对白自然朗读已超过 30s），保留用户原文并在“全片总览｜时长约束冲突”中明确说明，不继续无限重算。
-
-### A11.3 剧情保真审计（进入 A12 前必做）
-
-做一次单向比对，不向用户展示内部账本：
-
-1. 从源剧情账本按顺序读取 `E01 → E02 → ...`；
-2. 确认每个 `E##` 都在最终某个生成段中出现，且执行者 / 对象 / 台词 / 顺序没有变化；
-3. 反向扫描最终 Timeline 中所有会改变世界状态的动作；若找不到源 `E##`，删除该 AI 新增动作；
-4. 摄影、构图、景别、对焦、已有动作的直接物理结果与拟音可以无 `E##`，但不得产生新的剧情事实；
-5. 若删除 AI 新增动作后出现“状态从哪里来的”疑问，按 A0.1.4 处理：直接把用户给出的状态作为该节拍初始状态，不补前史；
-6. 若源文本自身存在缺口或矛盾，保留缺口/矛盾并在全片总览标注，不自行编桥。
-
-**审计目标不是让剧情更顺，而是确认最终提示词与用户剧情是同一件事。**
-
-### A11.4 生成稳定性预检（降低画面崩坏概率 · 强制）
-
-本节只降低生成风险，**不能承诺模型输出绝对不崩**。目标是提前消除最容易导致人物变形、手部错误、道具消失/复制、画面结构融化和身份漂移的提示词负担；不得以“稳定”为理由删剧情或改事件。
-
-#### A11.4.1 高风险触发项
-
-任一镜头出现以下情况时，标记为高风险并主动降复杂度：
-- 3 个及以上主体同时大幅移动、互相遮挡或发生接触；
-- 双手/多人同时操作小道具、交接、系扣、倒液体、擦拭等精细接触，同时还要求复杂运镜；
-- 人物快速转身、蹲起、落地、穿脱、多人换位等大幅身体动作与近景手部细节同时发生；
-- 镜子、玻璃、强反射、透明容器、多个影子等容易复制人物/肢体/道具的构图；
-- 产品包装、小字、手指、液体或机械结构既要近距离准确，又要高速移动/旋转；
-- 同一镜头同时要求极浅景深、强遮挡、快速运镜、精细接触和多角色表演；
-- 本段引用过多参考图，且多张图对同一角色、服装、场景结构或产品形态存在潜在冲突；
-- 提示词自身存在互斥要求，例如“人物完全固定”同时“快速换位”，“手始终握笔”同时“同镜空手完成另一动作”。
-
-#### A11.4.2 降风险顺序
-
-遇到高风险时，按以下顺序处理，直到提示词不再过载：
-1. **删掉无关控制，不删剧情。** 删除不影响本镜的镜头术语、泛化负面词、无关材质细节和无用参考；只保留当前镜真正需要的锁。
-2. **摄影机先简化。** 精细手部/道具接触时优先固定或单一平稳运动；不在同一时刻叠加推拉、环绕、快摇、强移焦。
-3. **让关键接触完整可见。** 交接、拿取、擦拭、开合等动作，选择能同时看见相关手部和道具的景别，避免在最关键接触点被画框边缘、身体或前景完全遮住。
-4. **降低景深冲突。** 关键手部、道具与接触面必须都可辨时，不使用会把其中一方完全虚化的极浅景深。
-5. **复杂动作与复杂摄影不要抢同一时刻。** 若源剧情允许拆镜，就在已有 `E##` 边界把不同复杂交互分镜承载；若源剧情明确要求同时发生，则保持同时，但降低摄影机运动、背景动态与无关表演复杂度。
-6. **参考图只留本段真正需要的。** 同一对象多张参考若用途不同，明确各自范围；互相冲突时按 A1.2.1 处理，不让模型自行融合。
-7. **对高风险段增加定向 Avoid，而不是全片堆负面词。** 可按本镜实际风险加入：不出现额外手臂/手指、肢体融合、脸部身份漂移、道具复制/消失、物件穿手/穿桌、人体穿模、几何融化、镜像多出人物等；无此风险则不机械添加。
-8. **仍然过载时才重分镜/重分段。** 只能使用已有源节拍边界，不删、不新增、不改顺序、不改变同时发生关系。
-
-#### A11.4.3 稳定性通过标准
-
-进入 A12 前确认：
-- 每镜有清楚的主要观看任务；
-- 人物数量、肢体接触、道具数量和动作因果可被当前景别完整看清；
-- 摄影机没有互相矛盾的运动命令；
-- 不存在会诱发重复主体的无必要镜像/反射要求；
-- Reference binding 不互相争夺同一维度；
-- 关键人物身份、服装、商品结构和关键道具都已在适当字段锁定；
-- 高风险段的 `Avoid` 只针对真实风险，不是几十项泛化负面词。
+**2.5 conciseness rule:** the full-film overview explains "why it is split this way"; each segment prompt handles "how exactly this segment is generated". Do not stuff overview content into every 2.5 `Objective` or `Timeline`.
 
 ---
 
-## A12. 交付前优化（最终抛光 · 单次执行）
+## A11. Structural check (the only structural-fix stage before A12)
 
-**A12 只执行一次。** 它不是第二轮分镜，也不负责重新算段数、重切节拍或回滚 A11。
+A11 handles the structural questions "can it be generated, and has the story been squeezed out of shape"; A12 only polishes wording and presentation.
 
-优化不是重写，而是在既有结构上检查 A12.1–A12.18 的表现与可执行性。发现普通表达问题直接修；发现结构级硬冲突按 A12.19 处理，不递归返回。
+### A11.1 Checklist
+- [ ] Has the `E01 / E02 / E03...` source-story ledger been built, with the user's latest explicit instructions / original story as the fact source?
+- [ ] Can every event in the final Timeline that changes story state be mapped to some `E##`, with no unsourced new actions?
+- [ ] Were no user story events added, deleted, replaced, reassigned or reordered?
+- [ ] Were vague roles such as "parents / guardian / adult" not arbitrarily made specific as dad/mom/a second person?
+- [ ] Was no backstory traced or added for continuity (prop origins, opening lids/pulling out/taking/moving)?
+- [ ] Have all atomic beats been registered in original order, rather than keeping only the five key types?
+- [ ] Was the emotional curve not used to reorder the story?
+- [ ] Is the theoretical minimum segment count used only as a lower bound, without forcing the actual count to equal it?
+- [ ] Is every segment ≤ the model's per-segment hard cap?
+- [ ] Does the sum of all segment durations match the user's strict total duration; if both cannot be met, is the conflict explicitly marked?
+- [ ] Can all dialogue be spoken completely at a natural pace within its time window?
+- [ ] Do sequential actions, reactions and necessary pauses have real time, without teleporting or unnaturally fast speech?
+- [ ] For long stories, is there a complete full-film segment table first, with delivery by Batch capacity?
+- [ ] Is A4's character on-screen status planned along the timeline and consistent with the final body?
+- [ ] Has every pair of adjacent generation segments been classified as "continuous / partial-state link / no continuity", without forcing inheritance onto unrelated segments?
+- [ ] For all continuous segments, can characters' world positions, relative relationships, poses, orientation and hand occupancy go from the previous end state into the next initial state without contradiction?
+- [ ] Have all key props passed the "holder / position / quantity / state / visibility" chain check, with no unsourced disappearance, duplication, hand switch, restoration or teleport?
+- [ ] Are changed doors/windows, furniture, stains, liquid levels, damage, weather and light-source states in the scene reasonably inherited in the relevant segments?
+- [ ] Has the generation-stability pre-check been done, avoiding cramming high-risk body/hand/prop interaction, complex camera movement, occlusion and conflicting multiple references into one shot at the same time?
+- [ ] If the target model is 2.0, is A9.1 "asset identification + formal prompt" used?
+- [ ] If the target model is 2.5, is A9.2's `Objective / Reference binding / Immutable locks / Target duration / Timeline / Visual direction / Audio direction / Preserve / Avoid` structure used?
+- [ ] If the target model is 2.5, does the final body pass the A9.2.0 format hard gate, with no top-level structure or extra analysis blocks other than the segment header and the A9.2 whitelisted fields?
+- [ ] If the target model is 2.5, does the `Timeline` use only time blocks + continuous natural language, without a separate shot-numbering system as the main organizing structure?
+- [ ] If the user provided reference images, does every relevant 2.5 segment list the needed real image nodes / asset handles exactly as is in its own `Reference binding`?
+- [ ] Does `Reference binding` list only the reference assets this segment really needs, in the form "real node / handle + concise asset label"; are the user's explicit use restrictions such as "blocking only / costume only / product only" kept?
+- [ ] Is "same as above / reuse the previous segment's reference images" avoided in place of rebinding in this segment?
+- [ ] Is the 2.5 `Timeline` "time blocks + continuous natural language", not degraded into a pile of camera/action/performance sub-headings?
+- [ ] Does 2.5 avoid outputting the A4 asset list as a whole block, instead packing the necessary information into the corresponding fields?
+- [ ] Does every segment have self-contained world coordinates + frame coordinates rather than "same as above / continues from the previous segment"?
+- [ ] Are state inheritance in continuous scenes and re-anchoring on scene changes correct?
+- [ ] Do transitions between segments satisfy A7.3?
+- [ ] Are action-continuity cuts kept within the same generation segment where possible?
+- [ ] Is the dialogue copied verbatim?
+- [ ] Are post-production subtitles/overlays kept away from the generation model? Is physical asset text handled per A1.3?
+- [ ] If reference images were generated without a reference library, are they used only for Reference binding, with appearances labeled as design proposals, and without overstepping to control blocking/lighting/story? (A1.2 Case 2 supplement)
 
-### A12.1 首帧锁定
-对每个镜头的首帧，按“适用项”写清：
-- 本镜是否有人物；若无人，明确“空镜，无人物”
-- 人物站 / 坐 / 蹲 / 躺
-- 角色画面左右
-- 人物相对距离
-- 身体朝向
-- 视线初始落点（源剧情有明确关注对象时照写；没有时只用不承载新信息的中性落点，不推断新兴趣/敌意/暧昧）
-- 手里拿什么
-- 关键道具摆在哪里
-- 摄影机距离和高度
-- 前景 / 中景 / 后景
+### A11.2 Bounded fix mechanism (prevents infinite loops)
 
-不适用的项不要硬编。
+If problems are found after the first check:
+1. collect all failed items at once;
+2. **do only one round of consolidated structural fixes**; structural fixes may only adjust segment boundaries, shot carrying, time budget, cinematographic expression and lock information, and **must not change any `E##`'s event content, performer, target, quantity, order or lines**;
+3. after fixing, recheck only the affected items and their direct continuity;
+4. then go to the A11.3 story fidelity audit and the A11.4 generation-stability pre-check; once all pass, go to A12.
 
-### A12.2 出镜锁定按镜头执行
-以 A4 的内部时间轴状态规划为准；2.5 即使不单列资产标识，也必须在 Timeline / Immutable locks 中体现同样的出镜约束。
+**No recursion back and forth between A11 ↔ A12.**
 
-本镜不该出现的角色，显式写：
-- 完全不出镜；
-- 不出现脸 / 身体 / 肩膀 / 手 / 倒影 / 影子 / 焦外人形（按需要选择）；
-- 若仅画外同期对白，要明确“只有声音”。
+If after one round of consolidated fixes there is still a hard conflict where "the user's requirements cannot all be met at once" (e.g. strictly 30s, but the original dialogue's natural reading time already exceeds 30s), keep the user's original and state it clearly under "Full-film overview｜Duration constraint conflicts", without endless recalculation.
 
-特别是主观镜头、局部镜头、肩后镜头、单人镜头，避免模型自动补出另一个角色。
+### A11.3 Story fidelity audit (required before A12)
 
-### A12.3 光学：写可见结果，不依赖镜头型号
-- ❌ “85mm f/1.4”
-- ✅ “短焦肖像感视角，面部透视自然，背景轻度虚化”
+Do a one-way comparison, without showing the internal ledger to the user:
 
-镜头型号可以辅助，但重点是最终画面结果。
+1. read `E01 → E02 → ...` in order from the source-story ledger;
+2. confirm every `E##` appears in some final generation segment, with performer / target / lines / order unchanged;
+3. scan the final Timeline in reverse for every action that changes world state; if no source `E##` can be found, delete that AI-added action;
+4. cinematography, composition, shot size, focus, direct physical results of existing actions and foley may lack an `E##`, but must not create new story facts;
+5. if deleting an AI-added action raises the question "where did this state come from", handle it per A0.1.4: take the state the user gave directly as that beat's initial state, without adding backstory;
+6. if the source text itself has gaps or contradictions, keep the gaps/contradictions and flag them in the full-film overview, without inventing bridges.
 
-### A12.4 摄影机矛盾检查
-每镜只保留一个主要摄影机运动逻辑。
-- ❌ “镜头完全固定，同时缓慢横移”
-- ✅ “摄影机固定，仅做一次极慢移焦”
+**The goal of the audit is not to make the story smoother but to confirm that the final prompts and the user's story are the same thing.**
 
-### A12.5 回避摄影（仅适用于克制/含蓄风格）
-用户风格属于克制、含蓄时，可优先：
-- 手部特写 / 杯子 / 红绳 / 地板边缘
-- 肩后 / 柱子遮挡 / 虚焦前景
-- 双人中景 / 固定远景
+### A11.4 Generation-stability pre-check (reduces the chance of broken visuals · mandatory)
 
-不要把这条强行应用到动作片、强喜剧、产品实验等其他风格。
+This section only reduces generation risk and **cannot promise that the model output will never break**. The goal is to remove in advance the prompt burdens most likely to cause character deformation, hand errors, props disappearing/duplicating, melting image structure and identity drift; do not delete story or change events in the name of "stability".
 
-### A12.6 表演：行为而非抽象情绪
-- ❌ “他很难过”
-- ✅ “他原本正在举杯，动作停约 0.4 秒，随后继续喝”
+#### A11.4.1 High-risk triggers
 
-优先把**源剧情已经存在的反应**写成可见动作。视线停顿 / 手指收紧 / 杯子停顿 / 嘴唇张开又合上 / 呼吸变化 / 重心变化只能在与源剧情反应一致时使用，不能作为 AI 自行添加的新表演事件。
+When any of the following appears in a shot, mark it high risk and proactively reduce complexity:
+- 3 or more subjects moving substantially at the same time, occluding each other or making contact;
+- two hands / several people simultaneously handling small props, handing over, buttoning, pouring liquid, wiping or other fine contact, while complex camera movement is also required;
+- large body movements such as quick turns, crouching and rising, landing, dressing/undressing or several people swapping places happening together with close-up hand details;
+- compositions that easily duplicate people/limbs/props, such as mirrors, glass, strong reflections, transparent containers and multiple shadows;
+- product packaging, small text, fingers, liquids or mechanical structures that must be accurate up close while also moving/rotating fast;
+- one shot requiring extremely shallow depth of field, heavy occlusion, fast camera movement, fine contact and multi-character performance at once;
+- too many reference images in this segment, with potential conflicts among several images about the same character, costume, scene structure or product form;
+- mutually exclusive requirements within the prompt itself, e.g. "the character stays completely still" while "quickly swapping places", or "the hand always holds the pen" while "completing another action empty-handed in the same shot".
 
-### A12.7 微表情密度
-每角色每镜通常 0–2 个明确微表情事件。镜头看不到脸时，不写脸部反应。
+#### A11.4.2 Risk-reduction order
 
-### A12.8 眼神目标具体化
-只有源剧情已经写明角色在看某人/某物/某方向，才把目标写具体。若原文没有关注对象，不得自行选择一个具有剧情含义的目标。
+When there is high risk, handle it in this order until the prompt is no longer overloaded:
+1. **Remove irrelevant controls, not story.** Delete camera jargon, generic negative terms, irrelevant material details and useless references that do not affect this shot; keep only the locks the current shot really needs.
+2. **Simplify the camera first.** For fine hand/prop contact, prefer a locked-off camera or a single smooth movement; do not stack push/pull, orbit, fast pan and strong rack focus at the same moment.
+3. **Keep key contact fully visible.** For handovers, taking, wiping, opening/closing and similar actions, choose a shot size where the relevant hands and props are visible together, and avoid the most critical contact point being fully blocked by the frame edge, a body or the foreground.
+4. **Reduce depth-of-field conflicts.** When the key hand, prop and contact surface must all be readable, do not use an extremely shallow depth of field that fully blurs any of them.
+5. **Don't let complex action and complex camera compete for the same moment.** If the source story allows splitting shots, carry different complex interactions in separate shots at existing `E##` boundaries; if the source story explicitly requires them to happen simultaneously, keep them simultaneous but reduce camera movement, background motion and irrelevant performance complexity.
+6. **Keep only the reference images this segment really needs.** When several references of the same object serve different purposes, state the scope of each; handle conflicts per A1.2.1 and do not let the model merge them itself.
+7. **Add targeted Avoid items to high-risk segments instead of piling negative terms on the whole film.** Based on the shot's actual risks you may add: no extra arms/fingers, limb fusion, facial identity drift, prop duplication/disappearance, objects passing through hands/tables, body clipping, geometry melting, extra people in mirrors, etc.; do not add them mechanically when there is no such risk.
+8. **Re-break shots/segments only if still overloaded.** Use only existing source-beat boundaries; do not delete, add, reorder or change what happens simultaneously.
 
-自然行为顺序可写成“眼睛先动 → 头部后跟”，但只用于表现原文已有的看向动作，不新增一次看向。
+#### A11.4.3 Stability pass criteria
 
-### A12.9 双人动作避免机械同步
-若源剧情本身包含两个可并行、但未锁定精确同步的已有动作，可以在不改变事件顺序与因果的前提下做轻微节奏错开。**不得为了“自然”给任一角色新增动作、延后关键事件或改变原本明确的同时发生关系。**
+Before going to A12, confirm:
+- each shot has a clear main viewing task;
+- the number of characters, limb contact, number of props and action causality can be fully seen at the current shot size;
+- the camera has no contradictory movement commands;
+- there are no unnecessary mirror/reflection requirements that could induce duplicated subjects;
+- Reference bindings do not compete for the same dimension;
+- key character identity, costume, product structure and key props are locked in the appropriate fields;
+- the `Avoid` of high-risk segments targets only real risks, not dozens of generic negative terms.
 
-### A12.10 动作因果链
-优先把**已有源节拍**组织成清楚的因果链；如果用户原文确实包含多个动作，就全部保留，只在镜头承载上分配，不得为了“每镜一个核心动作”删掉任何源事件。AI 自己添加的装饰动作应删除。
+---
 
-### A12.11 道具连续性（段内 + 相关跨段）
+## A12. Pre-delivery optimization (final polish · single pass)
 
-对每个关键道具至少检查：**持有人、使用手（若已明确）、绝对位置、可见/遮挡状态、数量、朝向、开合、液面/内容物、损耗、污渍/湿度、段末去向**。
+**A12 runs only once.** It is not a second round of shot breakdown, and it is not responsible for recomputing segment counts, re-cutting beats or rolling back A11.
 
-- 段内按“初态 → 源剧情动作 → 末态”逐时间块扫描；连续关联段再按 A8.3 比较上一段末态与下一段初态。
-- 一支笔若仍由人物握持，且没有源 `E##` 对应的放下、递交、收起或掉落，下一时刻不能凭空消失。
-- 下一镜因裁切或遮挡没有拍到道具，不等于道具已经消失；世界状态继续保留。
-- 若同一只手仍清楚可见而道具无来源地没了，视为连续性失败；若手和道具都在画外，只记录“仍由该人物持有/仍处于原位置”，不要凭空改变状态。
-- 已放下的道具不能无过程回手；已经交给 B 的物件不能同时又出现在 A 手里；数量不能无因增减。
-- 源文未指定左右手且镜头不需要时不强行锁手；一旦提示词为执行明确了某只手，则相关连续镜头中不得无过程换手。
+Optimization is not rewriting; it checks presentation and executability per A12.1–A12.18 on the existing structure. Fix ordinary wording problems directly; handle structural hard conflicts per A12.19 without recursing back.
 
-禁止无因恢复或重置：喝过的杯子突然满、擦开的污渍突然复原、打开的门无动作闭合、破损道具自动完好、已消耗物件恢复数量。
+### A12.1 First-frame lock
+For each shot's first frame, spell out the "applicable items":
+- whether the shot has characters; if none, state explicitly "empty shot, no characters"
+- characters standing / sitting / crouching / lying
+- characters' frame left/right
+- relative distance between characters
+- body orientation
+- initial eyeline target (copy it when the source story has a clear object of attention; when it doesn't, use only a neutral target that carries no new information, and do not infer new interest/hostility/attraction)
+- what is in their hands
+- where key props are placed
+- camera distance and height
+- foreground / midground / background
 
-### A12.12 物理真实性
-重点检查液体惯性、衣料褶皱、手与道具接触、物体重量、桌面震动、碰撞反馈、玻璃折射/反射等。
+Do not invent items that do not apply.
 
-### A12.13 光线一致性
-同一连续场景保持主光方向、色温与曝光逻辑。换场/时间跳跃则按 A5.5 重新建立，不强行继承。
+### A12.2 On-screen locks are applied per shot
+Follow A4's internal timeline status plan; even without a separate asset identification block, 2.5 must express the same on-screen constraints in Timeline / Immutable locks.
 
-禁止仅因剧情重要就突然加轮廓光、增强眼神光或改变曝光，除非用户风格明确要求。
+For characters who must not appear in a shot, write explicitly:
+- not on screen at all;
+- no face / body / shoulder / hand / reflection / shadow / out-of-focus figure (choose as needed);
+- if there is only off-screen synchronous dialogue, state clearly "voice only".
 
-### A12.14 声音
-默认只保留真实同期对白和环境/动作声。BGM、配乐、情绪音效是否存在，以用户要求为准；用户未要求则不自动添加，默认无背景音乐。
+Especially for POV shots, partial shots, over-the-shoulder shots and single shots, prevent the model from automatically adding another character.
 
-### A12.15 对白原文 + 时长
-用户提供对白必须：
-- 原文照抄
-- 不改词 / 不换句式 / 不加语气词 / 不重复 / 不即兴
+### A12.3 Optics: write visible results, don't rely on lens models
+- ❌ "85mm f/1.4"
+- ✅ "portrait-feel short-telephoto view, natural facial perspective, lightly blurred background"
 
-A12 **不得**通过“加快语速”解决对白塞不下的问题；这类问题应已在 A11 处理。A12 只微调不改变结构的停顿措辞说明。
+Lens models may help, but the focus is the final visual result.
 
-### A12.16 正向锁优先
-优先写可执行状态：
-- “角色 A 本镜始终位于画面左侧”
-- “杯子由角色 A 右手持有”
-- “角色 B 本镜完全画外”
+### A12.4 Camera contradiction check
+Keep only one main camera movement logic per shot.
+- ❌ "camera completely fixed while slowly trucking sideways"
+- ✅ "camera fixed, with only one very slow rack focus"
 
-再补必要禁止项。
+### A12.5 Avoidant cinematography (only for restrained/understated styles)
+When the user's style is restrained or understated, you may prefer:
+- hand close-ups / cups / red string / floor edges
+- over-the-shoulder / blocked by a pillar / out-of-focus foreground
+- two-shot medium / fixed wide shot
 
-### A12.17 文字锁
-默认写：
-- 无字幕
-- 无额外屏幕文字
-- 无后期标题/说明卡/UI 叠字/水印
+Do not force this onto other styles such as action, broad comedy or product experiments.
 
-若镜头含产品包装、招牌、书信等实体资产文字：
-- 有参考图 → 保持参考资产，不新增、不改写、不重绘文字；
-- 不要求模型额外生成“清晰准确的新文字”；
-- 用户明确要求可读文字时才逐字锁定。
+### A12.6 Performance: behavior, not abstract emotion
+- ❌ "he is sad"
+- ✅ "he was raising his cup; the motion stops for about 0.4 seconds, then he keeps drinking"
 
-### A12.17.1 参考图片绑定完整性（Seedance 2.5）
-当用户提供参考图片时，A12 只检查绑定是否完整、用途是否清楚，不得在优化阶段更换、删除、合并或自行新增参考图。
+Prefer writing **reactions already in the source story** as visible actions. A pause in the gaze / fingers tightening / the cup pausing / lips parting and closing again / breathing changes / weight shifts may only be used when consistent with a source-story reaction, never as a new performance event added by the AI.
 
-- 每个相关段都必须保留该段需要的真实参考节点 / 资产句柄；
-- 不得因“上一段已经绑定”而从下一段删除；
-- 不得把“仅站位参考”扩大为人物外观参考；
-- 不得把角色参考图中的背景、陌生人物或额外道具带入剧情；
-- 不得把商品参考图里的复杂文字改写成新的包装文案。
+### A12.7 Micro-expression density
+Usually 0–2 clear micro-expression events per character per shot. When the shot can't see the face, don't write facial reactions.
 
-### A12.18 统一限制按需添加
-可按当前项目选用：
-- 不增加人物 / 道具 / 对白 / 剧情动作
-- 不无故越轴 / 不无过程交换人物位置
-- 不做 MV 式快剪
-- 不做无风格依据的广告式补光 / 磨皮
-- 不夸张景深 / 不使用不自然慢动作
+### A12.8 Make eyeline targets specific
+Only when the source story already states that a character looks at someone/something/somewhere, make the target specific. If the original has no object of attention, do not pick a target that carries story meaning yourself.
 
-**不要机械粘贴与当前镜头无关的限制。**
+The natural order of behavior can be written as "eyes move first → head follows", but only to present a look that already exists in the original, not to add a new look.
 
-### A12.18.1 最终连续性与穿帮风险审计（交付前强制）
+### A12.9 Avoid mechanical sync in two-person actions
+If the source story itself contains two existing actions that can run in parallel but whose exact sync is not locked, you may offset their rhythm slightly without changing event order and causality. **Do not add actions for either character, delay key events, or change a clearly simultaneous relationship for the sake of "naturalness".**
 
-A12 完成文字抛光后、最终输出前，再做一次**单向审计**，不返回 A11、不触发第二轮 A12：
+### A12.10 Action causal chains
+Prefer organizing **existing source beats** into a clear causal chain; if the user's original really contains several actions, keep them all and only distribute them across shots; do not delete any source event for the sake of "one core action per shot". Decorative actions the AI added itself should be deleted.
 
-1. **建立每段起态 / 末态快照**：人物世界位置、姿态、朝向、出镜状态、手部占用；关键道具持有人/位置/数量/状态；场景门窗/家具/污渍/光源等持续状态。
-2. **只比较 A8 判定为“连续关联 / 局部状态关联”的段对**。无连续关系的相邻段不强行比较人物位置，只检查本段自身是否合理。
-3. **人物穿帮检查**：无来源瞬移、无来源换边、无过程站↔坐、同一人物在同一世界位置被重复成两人、画内/画外与机位描述互相矛盾。
-4. **道具穿帮检查**：无来源消失、复制、换手、回手、数量变化、开合重置、液面/污渍/破损恢复；特别检查“上一秒还拿着，下一秒同一只手清楚可见却空了”的情况。
-5. **空间穿帮检查**：固定家具移位、门窗状态跳变、人物穿墙/穿桌、物件穿手、角色与桌椅尺度突变、反射/镜像中多出不存在的人物或道具。
-6. **生成崩坏风险检查**：高风险镜头是否已经按 A11.4 降低运镜、遮挡、景深、并发接触与参考冲突；是否针对本镜真实风险加入必要的定向 Avoid。
-7. **剧情保真复核**：所有修正只能改变摄影表达、锁定信息、遮挡/可见性描述和镜头承载；不能新增“放下笔”“重新拿笔”“走回原位”等桥接动作来掩盖穿帮。
+### A12.11 Prop continuity (within a segment + related cross-segment)
 
-若发现的是 AI 草稿自身矛盾，直接在本次 A12 中修正成与已确认状态一致；若发现源剧情本身矛盾，保留原文并在全片总览标注“源文本冲突”。
+For each key prop, check at least: **holder, hand used (if specified), absolute position, visible/occluded state, quantity, orientation, open/closed, liquid level/contents, wear, stains/wetness, where it ends up at segment end**.
 
-**本节是提示词侧的穿帮风险审计，不等于真实生成视频已经无穿帮。真实视频是否出现多手多指、肢体融合、人物变脸、道具闪现/消失、穿模、镜像错误等，必须在媒体实际可读取时另做结果验收。**
+- Within a segment, scan time block by time block as "initial state → source story action → end state"; for continuous segments, also compare the previous end state with the next initial state per A8.3.
+- If a pen is still held by a character and there is no put-down, handover, put-away or drop corresponding to a source `E##`, it cannot vanish from nowhere the next moment.
+- If the next shot does not show the prop because of cropping or occlusion, that does not mean the prop has disappeared; the world state continues.
+- If the same hand is still clearly visible and the prop is gone without a source, it is a continuity failure; if both hand and prop are off-screen, record only "still held by that character / still in its original position" and do not change the state from nothing.
+- A prop that was put down cannot return to the hand without process; an object already given to B cannot also be in A's hand at the same time; quantity cannot increase or decrease without cause.
+- When the source does not specify left/right hand and the shot does not need it, do not force a hand lock; once the prompt has specified a hand for execution, that hand cannot switch without process in related continuous shots.
 
-### A12.19 优化边界与终止条件（防死循环）
+No unjustified restoring or resetting: a cup that was drunk from suddenly full, a stain that was wiped away suddenly back, an open door closing without action, a broken prop automatically whole, consumed items restored in number.
 
-A12 不允许改变：
-- 用户原文台词
-- **任何源剧情 `E##` 的动作、反应、事件数量、执行者、承受者、道具、信息与因果关系**
-- **用户原文中的模糊身份层级（如“父母/家长/成人”不得擅自具体化）**
-- 剧情核心意图
-- 已在 A11 确认的节拍顺序
-- 全片实际段数 / 各段时长
-- 全局段号 / Batch 规划
-- 关键资产身份
-- 已确认的世界坐标逻辑
+### A12.12 Physical realism
+Focus on liquid inertia, fabric folds, hand–prop contact, object weight, table vibration, collision feedback, glass refraction/reflection, etc.
 
-A12 只允许：
-- 把描述写得更具体可执行
-- 补齐首帧/出镜锁
-- 减少过度表演
-- 补物理、光线、声音与连续性表述
-- 清理互相矛盾的措辞
+### A12.13 Lighting consistency
+Keep the key light direction, color temperature and exposure logic within the same continuous scene. On scene changes/time jumps, re-establish them per A5.5 without forcing inheritance.
 
-**冲突来源区分：**
-- 若冲突是 AI 草稿自己造成的表述错误（如同一镜同时写左手/右手持杯）→ 在 A12 直接修成与 A11 已确认状态一致；
-- 若冲突来自用户源剧本本身（如同一时刻明确写了两个互斥位置）→ 不擅自改剧情，在全片总览标注“源文本冲突”。
+Do not suddenly add rim light, strengthen catchlights or change exposure just because the story moment is important, unless the user's style explicitly asks for it.
 
-**终止规则：**A12 完成一次后只做最终勾选，不再返回 A11，不再触发第二次 A12。
+### A12.14 Sound
+By default keep only real synchronous dialogue and ambient/action sound. Whether BGM, a score or emotional sound effects exist follows the user's requirement; if not requested, do not add them automatically, and default to no background music.
 
-最终勾选：
-- [ ] 所有源剧情 `E##` 均出现且顺序、执行者、对象、台词未改变
-- [ ] Timeline 中不存在无源 `E##` 的新增剧情动作
-- [ ] 没有补前史、补道具来源、擅自具体化模糊角色
-- [ ] 首帧适用项齐全
-- [ ] 每镜出镜状态与 A4 一致
-- [ ] 无摄影机矛盾
-- [ ] 表演可见且不过载
-- [ ] 眼神目标具体
-- [ ] 道具 / 物理 / 光线连续
-- [ ] 所有相邻段已按 A8 判定关联类型；有连续关系的段人物位置/姿态/朝向一致，无关系的段没有被错误强锁
-- [ ] 关键道具不存在无来源的消失、复制、换手、回手、数量变化或状态重置；画面裁切/遮挡没有被误判成世界状态变化
-- [ ] 已完成空间/门窗/家具/反射/镜像/穿模等穿帮风险审计
-- [ ] 高风险镜头已通过 A11.4 生成稳定性预检并做定向降复杂度
-- [ ] 对白原文无改动
-- [ ] 无 AI 新增字幕/叠字
-- [ ] 实体文字按参考资产处理
-- [ ] 无结构回滚 / 无循环
-- [ ] 若目标模型为 2.5，最终交付只包含 A9.2 允许字段，且不存在任何旧式三段壳、2.0 外壳或镜头编号主结构
-- [ ] 生成参考图（若有）只用于 Reference binding，外观标为设计提案，未越权引入站位/光线/剧情（A1.2 情况二补充）
+### A12.15 Original dialogue + duration
+Dialogue the user provides must be:
+- copied verbatim
+- with no changed words / changed sentence patterns / added interjections / repetition / improvisation
 
-**勾选完成 → 输出最终版。**
+A12 **must not** solve dialogue not fitting by "speeding up speech"; such problems should already have been handled in A11. A12 only fine-tunes pause wording notes, without changing structure.
+
+### A12.16 Positive locks first
+Prefer writing executable states:
+- "Character A stays on frame left throughout this shot"
+- "The cup is held in Character A's right hand"
+- "Character B is fully off-screen in this shot"
+
+Then add the necessary prohibitions.
+
+### A12.17 Text lock
+By default write:
+- no subtitles
+- no extra on-screen text
+- no post-production titles/caption cards/UI overlays/watermarks
+
+If the shot contains physical asset text such as product packaging, signboards or letters:
+- with a reference image → keep the reference asset; do not add, rewrite or redraw the text;
+- do not ask the model to additionally generate "clear, accurate new text";
+- lock text word for word only when the user explicitly asks for readable text.
+
+### A12.17.1 Reference image binding completeness (Seedance 2.5)
+When the user provides reference images, A12 only checks whether the binding is complete and its use clear; in the optimization stage, do not replace, delete, merge or add reference images on your own.
+
+- Every relevant segment must keep the real reference nodes / asset handles it needs;
+- do not remove them from the next segment because "the previous segment already bound them";
+- do not expand a "blocking reference only" into a character-appearance reference;
+- do not bring the background, unknown people or extra props of a character reference image into the story;
+- do not rewrite complex text in a product reference image into new packaging copy.
+
+### A12.18 Add general restrictions as needed
+Choose for the current project:
+- no added characters / props / dialogue / story actions
+- no crossing the axis without reason / no swapping character positions without process
+- no MV-style fast cutting
+- no advertising-style fill light / skin smoothing without a style basis
+- no exaggerated depth of field / no unnatural slow motion
+
+**Do not mechanically paste restrictions unrelated to the current shot.**
+
+### A12.18.1 Final continuity and continuity-error risk audit (mandatory before delivery)
+
+After A12 finishes polishing the wording and before final output, do one more **one-way audit**, without returning to A11 or triggering a second A12:
+
+1. **Build start / end snapshots for each segment**: characters' world positions, poses, orientation, on-screen status and hand occupancy; key props' holder/position/quantity/state; persistent scene states such as doors/windows/furniture/stains/light sources.
+2. **Compare only the segment pairs A8 classified as "continuous / partial-state link"**. For adjacent segments without a continuity relationship, do not force a comparison of character positions; only check whether each segment makes sense on its own.
+3. **Character continuity-error check**: unsourced teleporting, unsourced side switches, standing↔sitting without process, the same character duplicated as two people at the same world position, on-screen/off-screen contradicting the camera description.
+4. **Prop continuity-error check**: unsourced disappearance, duplication, hand switch, return to hand, quantity change, open/closed reset, liquid level/stain/damage restored; especially check for "holding it one second, and the next second the same hand is clearly visible but empty".
+5. **Spatial continuity-error check**: fixed furniture shifting, door/window states jumping, characters passing through walls/tables, objects passing through hands, sudden scale changes between characters and furniture, extra nonexistent people or props in reflections/mirrors.
+6. **Generation-breakdown risk check**: whether high-risk shots have already reduced camera movement, occlusion, depth of field, concurrent contact and reference conflicts per A11.4; whether the necessary targeted Avoid items were added for this shot's real risks.
+7. **Story fidelity recheck**: all fixes may only change cinematographic expression, lock information, occlusion/visibility descriptions and shot carrying; do not add bridging actions such as "put the pen down", "pick the pen up again" or "walk back to the original spot" to cover up continuity errors.
+
+If the problem is a contradiction within the AI draft itself, fix it directly in this A12 pass to match the confirmed state; if the source story itself is contradictory, keep the original and flag "source-text conflict" in the full-film overview.
+
+**This section is a prompt-side audit of continuity-error risk; it does not mean the actually generated video is free of such errors. Whether the real video shows extra hands/fingers, limb fusion, face changes, props flickering/disappearing, clipping, mirror errors, etc. must be checked separately as result acceptance once the media can actually be read.**
+
+### A12.19 Optimization limits and termination conditions (prevents infinite loops)
+
+A12 may not change:
+- the user's original lines
+- **the actions, reactions, number of events, performers, recipients, props, information or causality of any source-story `E##`**
+- **vague identity levels in the user's original (e.g. "parents/guardian/adult" must not be arbitrarily made specific)**
+- the core intent of the story
+- the beat order confirmed in A11
+- the film's actual segment count / each segment's duration
+- global segment numbers / Batch plan
+- key asset identities
+- the confirmed world-coordinate logic
+
+A12 may only:
+- make descriptions more concrete and executable
+- complete first-frame/on-screen locks
+- reduce over-acting
+- add physics, lighting, sound and continuity wording
+- clean up contradictory wording
+
+**Distinguish conflict sources:**
+- if the conflict is a wording error the AI draft created itself (e.g. the same shot says the cup is held in both the left and the right hand) → fix it directly in A12 to match the state confirmed in A11;
+- if the conflict comes from the user's source script itself (e.g. two mutually exclusive positions explicitly written for the same moment) → do not change the story yourself; flag "source-text conflict" in the full-film overview.
+
+**Termination rule:** after A12 runs once, only do the final checklist; do not return to A11 and do not trigger a second A12.
+
+Final checklist:
+- [ ] All source-story `E##` appear, with order, performers, targets and lines unchanged
+- [ ] No added story actions without a source `E##` in the Timeline
+- [ ] No backstory or prop origins added, no vague roles made specific
+- [ ] Applicable first-frame items complete
+- [ ] Each shot's on-screen status consistent with A4
+- [ ] No camera contradictions
+- [ ] Performance visible and not overloaded
+- [ ] Eyeline targets specific
+- [ ] Props / physics / lighting continuous
+- [ ] All adjacent segments classified per A8; segments with a continuity relationship have consistent character positions/poses/orientation, and unrelated segments are not wrongly hard-locked
+- [ ] No unsourced disappearance, duplication, hand switch, return to hand, quantity change or state reset of key props; framing/occlusion not mistaken for a world-state change
+- [ ] Continuity-error risk audit of space/doors and windows/furniture/reflections/mirrors/clipping completed
+- [ ] High-risk shots passed the A11.4 generation-stability pre-check with targeted complexity reduction
+- [ ] Original dialogue unchanged
+- [ ] No AI-added subtitles/overlays
+- [ ] Physical text handled per the reference asset
+- [ ] No structural rollback / no loops
+- [ ] If the target model is 2.5, the final delivery contains only A9.2-allowed fields, with no old three-part shell, 2.0 shell or shot-numbered main structure
+- [ ] Generated reference images (if any) used only for Reference binding, appearance labeled as a design proposal, without overstepping into blocking/lighting/story (A1.2 Case 2 supplement)
+
+**Checklist complete → output the final version.**
 
 ---
 
@@ -1350,56 +1350,56 @@ A12 只允许：
 
 ---
 
-## 在画布上推进
+## Working on the canvas
 
-实际制作默认在当前画布呈现，但**Seedance 路由优先于画布发现与配置**：若已有可执行剧本/时间轴且当前目标是视频制作、生成、继续或修订，必须先按本文件 PART A 完成对应 Seedance 提示词规划/定稿，再进入[画布执行](references/canvasExecution.md)按需读取画布概览、目标节点、局部连接、模型配置、端口和节点函数。不得因为需要 `getConfig`、选择分辨率/画幅/模式或宿主弹出配置询问而跳过 PART A。只有尚未进入视频制作阶段时，才按普通流程先发现画布。“先完成剧本和资产方案”只限制阶段，仍使用文本节点，不触发媒体生成；仅当用户明确要对话文字、咨询或不要操作画布时省略节点操作。工作区采用宿主当前项目；未打开画布时说明具体条件，继续可完成的文字部分。
+Actual production is presented on the current canvas by default, but **the Seedance route takes precedence over canvas discovery and configuration**: if an executable script/timeline exists and the current goal is video production, generation, continuation or revision, you must first complete the corresponding Seedance prompt planning/finalization per PART A of this file, then enter [Canvas Execution](references/canvasExecution.md) to read the canvas overview, target nodes, local connections, model configuration, ports and node functions as needed. Do not skip PART A because you need `getConfig`, need to choose resolution/aspect ratio/mode, or the host pops up a configuration question. Only when the video production stage has not yet been reached do you discover the canvas first, per the ordinary flow. "Finish the script and asset plan first" only limits the stage; it still uses text nodes and does not trigger media generation. Omit node operations only when the user explicitly wants chat text, consultation or no canvas operations. The workspace is the host's current project; when no canvas is open, state the specific condition and continue with the text parts that can be completed.
 
-| 到达阶段 | 当前成果 | 需要读取 |
+| Stage reached | Current result | What to read |
 |---|---|---|
-| 1. 内容与范围 | 原文或剧本文本节点；必要的制作简报 | [输入与剧本](references/sourceAndScript.md) |
-| 2. 资产 | 当前范围的角色、场景、道具清单及实际采用图片 | [资产制作](references/assets.md) |
-| 3. Seedance 提示词 | 覆盖本次剧情的全片规划、分段与正式提示词；**只执行本文件内嵌 PART A**（2.0 走 A9.1、2.5 走 A9.2），本阶段不读取 storyboard 或 methods | **仅本文件内嵌 PART A** |
-| 4. 生成与采用 | 当前片段生成节点、真实输出、反馈与采用记录 | [画布执行](references/canvasExecution.md)、[状态与交付](references/stateAndDelivery.md) |
-| 5. 交付或继续 | 有效剧本、素材和片段索引，实际完成范围与下一步 | [状态与交付](references/stateAndDelivery.md) |
+| 1. Content and scope | Original text or script text node; a production brief if needed | [Input and Script](references/sourceAndScript.md) |
+| 2. Assets | The character, scene and prop list for the current scope and the images actually adopted | [Asset Production](references/assets.md) |
+| 3. Seedance prompts | The full-film plan, segmentation and formal prompts covering this run's story; **execute only the embedded PART A in this file** (2.0 uses A9.1, 2.5 uses A9.2); do not read storyboard or methods in this stage | **Only the embedded PART A in this file** |
+| 4. Generation and adoption | Current clip generation nodes, real outputs, feedback and adoption records | [Canvas Execution](references/canvasExecution.md), [State and Delivery](references/stateAndDelivery.md) |
+| 5. Delivery or continuation | Index of the valid script, assets and clips, the actually completed scope and the next step | [State and Delivery](references/stateAndDelivery.md) |
 
-只创建当前已到达阶段需要的节点。一个剧情片段可以有多个镜头，默认对应一份完整提示词、一个视频生成节点；不默认给每个镜头先生成关键帧。连线传递实际素材，不代表审批或自动调度。
+Create only the nodes needed for the stage reached so far. One story clip may have several shots and by default corresponds to one complete prompt and one video generation node; do not generate keyframes for every shot first by default. Edges carry actual material; they do not mean approval or automatic scheduling.
 
-剧情制作中的正式资产依据本次已确认的完整剧本；单独设计角色、场景或道具时，以用户确认的设计需求和已有素材为依据，不要求补写剧本。用户同时要求剧本与资产方案时，可同轮提取资产清单和设计草案，标明所依赖的待确认剧本，不把草案当作生成授权。角色不必先有完整生平，只有声音的角色不生成无用途肖像。风格、表演、动作和连续性直接落实到制作资料与镜头，不强制各写独立报告；没有打斗、特殊道具等需求时不造空文档。
+Formal assets in story production are based on this run's confirmed complete script; when designing a character, scene or prop on its own, base it on the design requirements the user confirmed and existing material, without requiring a script to be written. When the user asks for both a script and an asset plan, you may extract the asset list and design drafts in the same round, noting the pending script they depend on, and not treating the drafts as authorization to generate. Characters don't need a full life story first, and voice-only characters don't get a useless portrait. Style, performance, action and continuity go directly into production materials and shots, with no mandatory separate report for each; when there is no need for fights, special props and the like, do not create empty documents.
 
-## 按当前创作问题读取方法
+## Read methods for the current creative problem
 
-执行规则决定怎样在 Toonflow 保存、生成和继续；以下方法**只用于 Seedance 提示词阶段之前的创作/改编/资产设计，或 Seedance 成品之后的媒体执行**。进入 Seedance 提示词硬隔离后，不读取本节任何创作方法；提示词定稿前后不得让这些方法覆盖 PART A。
+Execution rules determine how to save, generate and continue in Toonflow; the methods below are **only for creation/adaptation/asset design before the Seedance prompt stage, or for media execution after the finished Seedance prompts**. Once Seedance prompt hard isolation is entered, do not read any creative method in this section; before and after prompt finalization, these methods must not override PART A.
 
-| 正在解决的问题 | 阅读方法 | 将判断落实到哪里 |
+| Problem being solved | Method to read | Where the judgment goes |
 |---|---|---|
-| 把已确认剧本拆成 Seedance 2.0/2.5 分段提示词（节拍、时长、站位、表演、运镜、连续性、模板） | **本文件内嵌「SEEDANCE EPISODE DIRECTOR · PART A」** | 分段规划、每段正式提示词（A9.1/A9.2）、剧情保真锁 |
-| 创意、人物驱动、因果、大纲或续作 | [故事开发](references/methods/storyDevelopment.md) | 行动命题、事件链、选择与结果 |
-| 小说视听化、场景、心理、对白与时长 | [剧本改编](references/methods/screenAdaptation.md) | 场次、完整行动和声音、改编提案与估时 |
-| 外观、空间、道具结构及持续状态 | [视觉设计](references/methods/visualDesign.md) | 资产锚点、空间母版与变体 |
-| 风格、材质本色、受光与调色 | [色彩与用光](references/methods/colorAndLight.md) | 共享视觉依据、场景光线和片段约束 |
-| 非定稿阶段的剧情创作/改编 | 仅使用上面的故事开发与剧本改编方法 | 形成可确认的剧本；一旦定稿并进入 Seedance，立即停止使用这些方法 |
-| Seedance 成品提示词之后的媒体执行与验收 | [画布执行](references/canvasExecution.md)、[状态与交付](references/stateAndDelivery.md) | 只执行已定稿 prompt、连接真实参考、核验真实结果；不得另写提示词规则 |
+| Breaking a confirmed script into Seedance 2.0/2.5 segment prompts (beats, duration, blocking, performance, camera movement, continuity, templates) | **The embedded "SEEDANCE EPISODE DIRECTOR · PART A" in this file** | Segment plan, each segment's formal prompt (A9.1/A9.2), story fidelity lock |
+| Ideas, character drive, causality, outlines or sequels | [Story Development](references/methods/storyDevelopment.md) | Action premise, event chain, choices and outcomes |
+| Turning a novel into picture and sound: scenes, inner thoughts, dialogue and duration | [Screen Adaptation](references/methods/screenAdaptation.md) | Scenes, complete actions and sound, adaptation proposals and time estimates |
+| Appearance, space, prop structure and persistent states | [Visual Design](references/methods/visualDesign.md) | Asset anchors, spatial masters and variants |
+| Style, inherent material color, how light falls, and grading | [Color and Light](references/methods/colorAndLight.md) | Shared visual basis, scene lighting and clip constraints |
+| Story writing/adaptation before finalization | Use only the story development and screen adaptation methods above | Produce a script that can be confirmed; once it is finalized and Seedance begins, stop using these methods immediately |
+| Media execution and acceptance after the finished Seedance prompts | [Canvas Execution](references/canvasExecution.md), [State and Delivery](references/stateAndDelivery.md) | Only execute the finalized prompts, connect real references and verify real results; do not write separate prompt rules |
 
-这些方法的结论只进入**Seedance 之前**的剧本/资产设计成果；进入 Seedance 提示词硬隔离后，任何方法结论都不能直接写入或改写最终 prompt，必须由 PART A 从已确认输入重新处理。方法示例、类型节奏和风格候选不能自动变成本项目事实。
+The conclusions of these methods go only into script/asset design results **before Seedance**; once Seedance prompt hard isolation is entered, no method conclusion may be written into or rewrite the final prompts directly, and PART A must reprocess them from the confirmed inputs. Method examples, genre rhythms and style candidates do not automatically become facts of this project.
 
-仅当交接与合并的成本低于独立分析工作量时，可用 `subAgent` 分担**Seedance 之前**的长篇原文事实提取或资料整理。**Seedance 提示词硬隔离阶段禁止让 subAgent 独立起草、重写或优化分段 prompt**；A0–A12 必须由同一主执行链统一完成，避免子任务带入第二套镜头/表演/连续性规则。
+Only when the cost of handover and merging is lower than the independent analysis work may `subAgent` share fact extraction or material organization from long source texts **before Seedance**. **In the Seedance prompt hard-isolation stage, do not let a subAgent independently draft, rewrite or optimize segment prompts**; A0–A12 must be completed together by the same main execution chain, so that subtasks don't bring in a second set of shot/performance/continuity rules.
 
-少量文字、资产盘点、连线和布局直接完成，不安排固定岗位或额外审查轮次。分工限于独立的内容处理，不改变后续确认、生成和采用流程；依赖前段真实结果的后段生成仍等待该结果。
+Do small amounts of text, asset inventory, connections and layout directly, without assigning fixed roles or extra review rounds. Division of work is limited to independent content processing and does not change the later confirmation, generation and adoption flow; later generations that depend on the real results of earlier ones still wait for those results.
 
-## 确认与执行
+## Confirmation and execution
 
-- 展示实质阶段成果并确认是否调整；用户已经明确批准的内容和连续制作范围直接沿用。不把每个工具调用、内部分析或无需求的子步骤变成提问。
-- 内容确认、消耗算力授权、结果采用分别记录。生成前展示可审阅的具体方案：对象与数量、模型、完整提示词、实际参考、规格及执行次数。对用户统一称“消耗算力”，无法查询时写“算力消耗未知”。
-- 通过宿主 `askUser` 或明确回复取得授权。已批准的同一具体方案或批次不逐节点重复问；新增数量、改变实际方案或额外重试时核对授权是否覆盖。普通“继续”、沉默和表单失败不构成新生成授权。
-- Seedance 目标模型只按 PART A A0 判定；**未指定时必须先用一次简短提问确认 2.0 或 2.5。** 这个问题属于 Seedance A0，不属于画布配置，且不得解除路由锁存。画布层仅在目标模型确认并进入 PART A 后，通过实时配置核实该模型/模式是否实际可执行。节点默认值、宿主默认值、配置表单、历史配置或用户对分辨率/画幅等配置的回答，都不得反向覆盖或解除 A0 的模型路由；配置问答结束后继续当前 Seedance 执行态。
-- 有对白不等于必须有外部音色样本。提示词内的声音写法只服从 PART A；实际执行时仅通过[画布执行](references/canvasExecution.md)核对模型是否支持原生声音与真实音频输入，不得据此改写 PART A 的对白/声音规则。
+- Show substantive stage results and confirm whether to adjust; content the user has already explicitly approved and continuous production scope carry over directly. Don't turn every tool call, internal analysis or unrequested sub-step into a question.
+- Record content confirmation, authorization to consume compute, and adoption of results separately. Before generating, show a reviewable concrete plan: targets and quantity, model, complete prompts, actual references, specifications and number of runs. To the user, consistently call it "消耗算力" (consume compute); when it cannot be queried, write "算力消耗未知" (compute cost unknown).
+- Obtain authorization through the host's `askUser` or an explicit reply. Do not re-ask node by node for the same approved concrete plan or batch; when adding quantity, changing the actual plan or retrying extra, check whether the authorization covers it. An ordinary "continue", silence or a failed form is not new authorization to generate.
+- The Seedance target model is determined only per PART A A0; **when unspecified, you must first confirm 2.0 or 2.5 with one short question.** That question belongs to Seedance A0, not canvas configuration, and must not release the route latch. Only after the target model is confirmed and PART A is entered does the canvas layer check, via live configuration, whether that model/mode can actually run. Node defaults, host defaults, configuration forms, historical configuration, or the user's answers about resolution/aspect ratio and similar settings must never override or release A0's model routing in reverse; after the configuration exchange, continue in the current Seedance execution state.
+- Having dialogue does not mean an external voice sample is required. Sound wording in prompts follows only PART A; in actual execution, only check via [Canvas Execution](references/canvasExecution.md) whether the model supports native sound and real audio input, and do not rewrite PART A's dialogue/sound rules based on that.
 
-## 完成与恢复的底线
+## Baseline for completion and recovery
 
-文本节点正文通过节点函数保存，文件路径从实际 `data.textPath` 读取。跨轮制作使用一个简洁状态记录和一个总览节点；沿用现有台账，不因缺固定模板要求重做。
+Text node bodies are saved through node functions, and the file path is read from the actual `data.textPath`. Cross-round production uses one concise status record and one overview node; keep using the existing ledger and don't require redoing it for lack of a fixed template.
 
-待确认或已采用文本需要固定版本依据，生成需保留本次提示词、参数、参考和旧输出。确认后再次核对实际节点，防止用户在等待期间的修改被当作已批准；已采用素材优先固定在素材节点，修订另建候选。具体做法见[状态与交付](references/stateAndDelivery.md)。
+Text pending confirmation or already adopted needs a fixed version basis, and generation must keep this run's prompts, parameters, references and old outputs. After confirmation, check the actual nodes again so that changes the user made while waiting are not treated as approved; adopted material is preferably pinned in material nodes, and revisions create new candidates. See [State and Delivery](references/stateAndDelivery.md) for details.
 
-当前原生媒体节点返回 `generating` 只表示开始，不能宣称完成。若本轮没有真实状态或等待工具，完成本轮已授权且无依赖的启动与文字工作后，登记并告知用户完成后回复，再回读对应节点；不编造自动唤醒或后台轮询。连续片段的后段生成需等前段采用并取得真实交界状态，文字规划可先列预期状态；无依赖的资产或片段可按已明确授权的批次安排。
+When a native media node currently returns `generating`, that only means it has started; do not claim it is finished. If this round has no real status or wait tool, after completing this round's authorized, dependency-free starts and text work, record it and tell the user to reply when it finishes, then read the corresponding nodes back; do not invent automatic wake-ups or background polling. For consecutive clips, later generations wait until the earlier ones are adopted and their real boundary states are obtained; text planning may list expected states first. Dependency-free assets or clips may be scheduled in batches with explicit authorization.
 
-视频路径不代表 Agent 看过视频。只按实际媒体读取能力核验，能力不足时由用户预览并报告问题、交界状态与采用决定，明确 Agent 未核验的部分。交付区分已生成片段、用户采用片段、已合成成片与已归集副本；没有对应工具就如实交付现有成果及缺项。
+A video path does not mean the Agent has watched the video. Verify only according to actual media-reading capability; when capability is insufficient, the user previews and reports problems, boundary states and adoption decisions, and you clearly state which parts the Agent did not verify. Delivery distinguishes generated clips, user-adopted clips, composited finished films and collected copies; without the corresponding tool, truthfully deliver the existing results and what is missing.

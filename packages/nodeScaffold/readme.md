@@ -210,7 +210,7 @@ nodeTools.register({
 });
 ```
 
-Function names use lowerCamelCase; the example above appears as `node:setText`, and functions with the same name are distinguished by `nodeId`. With the Canvas Operations plugin (`画布操作`) from `packages/tools/canvas` enabled, the Agent finds nodes with `findCanvasNodes`, queries node fields and ports on demand with `getCanvasNodes`, fetches the full schema of target functions with `getNodeTools({ nodeIds: [...] })`, and calls them through the unified `nodeTools`:
+Function names use lowerCamelCase; the example above appears as `node:setText`, and functions with the same name are distinguished by `nodeId`. With the Canvas Operations plugin from `packages/tools/canvas` enabled, the Agent finds nodes with `findCanvasNodes`, queries node fields and ports on demand with `getCanvasNodes`, fetches the full schema of target functions with `getNodeTools({ nodeIds: [...] })`, and calls them through the unified `nodeTools`:
 
 ```json
 { "nodeId": "<node ID>", "name": "node:setText", "args": { "text": "New content" } }

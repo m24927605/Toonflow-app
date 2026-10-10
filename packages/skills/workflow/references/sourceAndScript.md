@@ -1,76 +1,76 @@
-# 输入与剧本
+# Input and Script
 
-> **Seedance 硬隔离：** 本文件只用于剧本尚未定稿时的创作/改编，或非 Seedance 的文本制作。用户已经给出定稿剧本/时间轴并要求 Seedance 2.0/2.5 提示词时，**不得读取或套用本文件**，直接执行主 `SKILL.md` 内嵌 PART A。尤其不得用本文件的时长、连续性或改编方法覆盖 PART A。
+> **Seedance hard isolation:** This file is only for writing or adapting while the script is not yet finalized, or for non-Seedance text production. When the user has already provided a finalized script or timeline and asks for Seedance 2.0/2.5 prompts, **never read or apply this file**; execute the embedded PART A of the main `SKILL.md` directly. In particular, never let this file's duration, continuity, or adaptation methods override PART A.
 
-在写作、小说改编、定稿剧本接入或续作时读取。本次完整剧本是后续资产与视频的剧情依据；“完整”指约定范围，不要求先写整季或整部小说。
+Read this when writing, adapting a novel, taking in a finalized script, or continuing a work. The complete script for this task is the story basis for later assets and videos; "complete" means the agreed scope and does not require writing a whole season or a whole novel first.
 
-进行创意开发、诊断、大纲或续作构思时读取[故事开发方法](methods/storyDevelopment.md)，用人物选择和事件因果支撑内容；把故事写成剧本、改编心理与对白或解决时长时读取[剧本改编方法](methods/screenAdaptation.md)。方法推导直接写入下述成果。已有定稿仅做制作提取时，按实际疑点查阅，不启动重写。
+When doing creative development, diagnosis, outlining, or planning a sequel, read [Story Development Methods](methods/storyDevelopment.md) and support the content with character choices and event causality; when turning a story into a script, adapting inner thoughts and dialogue, or solving duration, read [Screen Adaptation Methods](methods/screenAdaptation.md). Write the results of the methods directly into the outputs described below. When an existing finalized script only needs production extraction, consult them only for actual doubts and do not start a rewrite.
 
-## 先锁定本次范围
+## First lock the scope of this task
 
-从现有消息和文件提取：本次要交什么、采用哪个版本、改编或修改范围、时长或画幅硬要求、语言、风格及声音要求。已有信息直接沿用；确实缺少且会改变作品的再问。
+Extract from the existing messages and files: what to deliver this time, which version to use, the adaptation or revision scope, hard requirements on duration or aspect ratio, language, style, and audio requirements. Carry over information that already exists; ask only about what is truly missing and would change the work.
 
-实际制作按[画布执行](canvasExecution.md)保存原文、当前剧本和必要简报；收到资料并不意味着获得任意改编范围。只做到文稿阶段仍可在画布文本节点交付，用户明确仅要对话文字或阅读建议时直接回复，不操作画布。
+For actual production, save the original text, the current script, and the necessary brief according to [Canvas Execution](canvasExecution.md); receiving material does not mean being granted an arbitrary adaptation scope. Work that stops at the written stage can still be delivered in canvas text nodes; when the user explicitly wants only conversation text or reading advice, reply directly without operating the canvas.
 
-## 小说或故事改编
+## Adapting a novel or story
 
-1. 读到约定范围的完整原文。长文本分批读取时记录章节或段落覆盖范围、未读部分及下次准确起点；不从摘要或截断内容宣称读完。整部长篇先确定本次选段或分集目标，保留全局人物和未解信息索引。
-2. 提取会影响改编的事件顺序、人物关系、动机、重要对白、时间地点、物件变化和未解问题。简短故事可直接写入制作简报，复杂故事用下表追踪，避免另造一套冗长报告。
-3. 将叙述和心理转为可见行动、可听对白、原文已有旁白或必要的画内文字。涉及新增对白、删并事件、改叙事视角或揭开悬念时，作为改编提案展示；未经确认不冒充原著事实。
-4. 按本次约定的忠实度检查因果和信息覆盖。不得把重要背景只留在幕后人物卡，却声称成片已经表达；也不为了表现背景凭空新增实体人物或解释未知机制。
+1. Read the complete original text for the agreed scope. When reading long text in batches, record the chapters or paragraphs covered, the unread parts, and the exact starting point for next time; do not claim to have read everything based on a summary or truncated content. For a full-length novel, first settle the excerpt or episode goal for this task, and keep an index of global characters and unresolved information.
+2. Extract the order of events, character relationships, motives, important dialogue, times and places, changes to objects, and unresolved questions that affect the adaptation. A short story can go straight into the production brief; track a complex story with the table below instead of producing a separate lengthy report.
+3. Turn narration and inner thoughts into visible actions, audible dialogue, narration already in the original, or necessary on-screen text. Present new dialogue, deleted or merged events, a changed narrative viewpoint, or revealed suspense as adaptation proposals; without confirmation, do not pass them off as facts of the original work.
+4. Check causality and information coverage against the agreed fidelity. Do not leave important background only in behind-the-scenes character cards while claiming the final video conveys it; do not invent physical characters or explain unknown mechanisms just to show the background either.
 
-| 原文位置或事实 | 本次是否采用 | 剧本中的视听表达 | 改编补充或待确认项 |
+| Original location or fact | Used this time? | Audiovisual expression in the script | Adaptation additions or items pending confirmation |
 |---|---|---|---|
-| 填实际章节、事件或对白 | 保留、经确认压缩或范围外 | 对应场次、动作、对白、画内文字或旁白 | 仅记实质变化 |
+| Fill in the actual chapter, event, or dialogue | Kept, condensed with confirmation, or out of scope | Corresponding scene, action, dialogue, on-screen text, or narration | Record only substantive changes |
 
-用户要求诊断时指出具体内容问题并给可执行改法；能在授权范围内解决的继续处理，不设置“诊断不通过就永远停工”的关口。
+When the user asks for a diagnosis, point out specific content problems and give actionable fixes; continue handling what can be resolved within the authorized scope, and do not set up a gate of "if the diagnosis fails, work stops forever".
 
-## 已定稿剧本直接进入制作
+## A finalized script goes straight into production
 
-保存并固定用户指定的原稿版本，保留场号、事件、对白、OS/VO和明确的制作要求。直接提取制作资料，不再进入从零构思、策划、大纲或重新编剧。
+Save and pin the original draft version the user specified, keeping scene numbers, events, dialogue, OS/VO, and explicit production requirements. Extract production material directly; do not go back to ideation from scratch, planning, outlining, or rewriting.
 
-可从原稿提取的剧情事实，等价满足后续制作的内容输入；制作简报负责补齐实际执行选择，不要求补出不存在的上游文件。若目标是 Seedance，定稿后直接进入主 PART A，不经过另一套分镜规则。角色未写性别、职业、动机、生平时保持未提及；外形、声线或空间缺项只补本次画面确实需要的设计。
+Story facts that can be extracted from the original draft are an equivalent content input for later production; the production brief fills in the actual execution choices and does not require upstream files that do not exist. If the target is Seedance, go straight into the main PART A after finalization, without passing through another set of storyboard rules. When the script does not state a character's gender, occupation, motive, or life story, leave it unmentioned; for missing appearance, voice, or space, design only what this task's images actually need.
 
-| 制作资料 | 从定稿提取或处理 |
+| Production material | Extracted from the finalized script or handled as |
 |---|---|
-| 剧情和声音 | 按原文保留场次、事件、完整对白及说话人，区分画内对白、画外音、旁白 |
-| 角色与状态 | 出场范围、已知身份、造型、随身物及剧情触发的变化 |
-| 场景和道具 | 实际空间、陈设关系、关键物件的起止状态与持有人 |
-| 规格与视觉 | 沿用明确的时长、画幅、画风；缺少的必要选择给简短提案 |
-| 已有素材 | 指定的图片、视频、音频及采用用途，核实文件和适用范围 |
+| Story and audio | Keep scenes, events, complete dialogue, and speakers as in the original, distinguishing on-screen dialogue, off-screen voice, and narration |
+| Characters and states | Scope of appearance, known identity, look, items carried, and changes triggered by the story |
+| Scenes and props | Actual spaces, layout relationships, and the start and end states and holders of key objects |
+| Specifications and visuals | Carry over explicit duration, aspect ratio, and art style; give a short proposal for any necessary choice that is missing |
+| Existing material | Specified images, videos, and audio and their adopted purposes, verifying the files and their applicable scope |
 
-例如只有定稿剧本和两张已确认角色图时，下一步是检查这些图是否覆盖造型、提取环境及道具需求；不是要求用户补策划书。参考图未覆盖服装或全身时说明实际缺口，只补必要部分，保留身份。
+For example, when there is only a finalized script and two confirmed character images, the next step is to check whether these images cover the looks and to extract the environment and prop requirements, not to ask the user for a planning document. When the reference images do not cover the costume or the full body, state the actual gap, add only the necessary parts, and keep the identity.
 
-若原稿的硬时长与完整对白、动作明显冲突，给出依据及拆段、延长或调整的选择。未获改稿授权时不删台词或改结局，也不把模型支持的时长当作剧情可以容纳的证明。
+If the original draft's hard duration clearly conflicts with its complete dialogue and actions, give the basis along with the options to split into segments, extend, or adjust. Without authorization to revise the draft, do not cut lines or change the ending, and do not treat the duration a model supports as proof that the story fits.
 
-## 从创意写到可制作剧本
+## From an idea to a producible script
 
-围绕“谁想要什么、遇到什么阻碍、如何行动、付出什么、结果改变了什么”补齐故事。类型、结构与反转服务于本次作品，不强制五段式、固定爆点、固定题材或每场反转。
+Fill in the story around "who wants what, what obstacles they meet, how they act, what they pay, and what the outcome changes". Genre, structure, and twists serve this work; do not force a five-part structure, fixed hook points, a fixed genre, or a twist in every scene.
 
-把故事写为有场次、空间与时段、人物、连续动作、对白和声音的可视听文本。明确每场推进的事件或信息，使用能拍出的行为表达情绪；人物小传只补解释行为所需部分，不与剧本互相等待。
+Write the story as audiovisual text with scenes, location and time of day, characters, continuous action, dialogue, and sound. Make clear the event or information each scene advances, and express emotion through behavior that can be filmed; character biographies only add what is needed to explain behavior, and they and the script do not wait on each other.
 
-推荐的紧凑交付格式：
+Recommended compact delivery format:
 
 ```text
-本次范围与目标：
-已确定的视觉、语言和声音要求：
-总时长估算及硬约束：
+Scope and goal of this task:
+Confirmed visual, language, and audio requirements:
+Estimated total duration and hard constraints:
 
-场01｜空间与时段｜出场人物
-人物的位置、起始状态、行动、阻力与可见结果。
-人物名：完整对白。
-必要的 OS/VO、音乐、音效、字幕或画内文字。
-本场结束状态及转场。
+Scene 01 | Location and time of day | Characters present
+Characters' positions, starting states, actions, resistance, and visible outcomes.
+Character name: complete dialogue.
+Necessary OS/VO, music, sound effects, subtitles, or on-screen text.
+End state of this scene and transition.
 ```
 
-已有剧本保留其格式；模板不构成要求用户重新排版的理由。用户同时要求资产方案时，可据当前剧本草案提取[资产](assets.md)需求与设计提案，一并提交审阅，标明它们尚依赖该草案。关键选择确认并固定剧本版本后，再制作正式资产。
+An existing script keeps its format; the template is not a reason to ask the user to reformat. When the user also asks for an asset plan, you may extract [asset](assets.md) requirements and design proposals from the current script draft and submit them for review together, marking that they still depend on that draft. Produce formal assets only after the key choices are confirmed and the script version is pinned.
 
-## 时长与连续性
+## Duration and continuity
 
-时长依据对白自然语速、完整行动、阅读画内信息、反应停顿和转场估算；可并行发生的声音与动作不重复累计。说明估算与硬限制，只有存在实质取舍时比较完整版和压缩版，不强制每次提交两套方案。
+Estimate duration from the natural speaking rate of dialogue, complete actions, reading on-screen information, reaction pauses, and transitions; do not double-count sound and action that can happen in parallel. State the estimate and the hard limits; compare a full version with a condensed version only when there is a substantive trade-off, and do not force submitting two plans every time.
 
-剧情时长、模型单次支持时长、素材总时长和最终剪辑时长分别记录。根据实时模型能力把完整事件划入片段，不固定每段秒数、段数或统一上下限；模型不支持时给兼容方案，不悄悄丢事件。
+Record story duration, the model's per-run supported duration, total material duration, and final edited duration separately. Divide complete events into segments according to the live model capability; do not fix seconds per segment, the number of segments, or uniform upper and lower limits. When the model cannot support it, give a compatible plan instead of quietly dropping events.
 
-续集读取用户指定的历史及已采用版本，提取已发生事件、人物状态、道具归属、空间变化和未解钩子。新提案不登记成历史事实；旧剧本与采用视频不一致时列明差异，不自行选择其一改写连续性。
+For a sequel, read the history and adopted versions the user specified, and extract events that have happened, character states, prop ownership, spatial changes, and unresolved hooks. Do not record new proposals as historical facts; when an old script and an adopted video disagree, list the differences, and do not pick one on your own to rewrite continuity.
 
-局部修订沿实际使用关系检查受影响的资产、片段、声音与交界状态。保留未受影响的确认；修改事件和造型时先更新权威剧本或制作资料，再更新相关提示词。版本保存与恢复见[状态与交付](stateAndDelivery.md)。
+For partial revisions, check the affected assets, segments, audio, and boundary states along the actual usage relationships. Keep unaffected confirmations; when changing events or looks, first update the authoritative script or production material, then update the related prompts. For saving and restoring versions see [State and Delivery](stateAndDelivery.md).

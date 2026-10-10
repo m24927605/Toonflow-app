@@ -1,157 +1,157 @@
-# 故事开发：把创意变成有因果的行动
+# Story Development: Turning an Idea into Causal Action
 
-用于从零创作、已有故事诊断、需要大纲的复杂故事，以及续作承接。它补充[输入与剧本](../sourceAndScript.md)的写作方法，不新增制作阶段或确认关口。
-已定稿剧本直接提取制作资料；以下方法可用来定位执行疑点，不能成为自动重写人物、情节、对白或结局的理由。
-方法提供判断工具，不规定作品必须正向成长、反转、悬念收尾或采用某个类型。引用的例子均为方法示例，不是当前项目事实。
+Use for creating from scratch, diagnosing an existing story, complex stories that need an outline, and continuing into sequels. It supplements the writing methods in [Input and Script](../sourceAndScript.md) and adds no production stage or confirmation gate.
+For a finalized screenplay, extract production material directly; the methods below can be used to locate execution doubts, but must not become grounds for automatically rewriting characters, plot, dialogue or the ending.
+The methods provide tools for judgment; they do not require the work to show positive growth, a twist or a suspenseful ending, or to adopt any particular genre. All examples cited are method examples, not facts of the current project.
 
-## 1. 先分清事实、提案与未知
+## 1. Separate facts, proposals and unknowns first
 
-什么时候用：收到故事、片段或续作资料时，以及写作中准备补一个动机、规则或答案时。
+When to use: when receiving a story, a fragment or sequel material, and when, during writing, you're about to add a motive, rule or answer.
 
-1. 从本次范围找出实际发生的事件、人物说过的话、已建立的关系和规则，保留出处。
-2. 区分“人物认为如此”和“故事已经证实如此”；不可靠叙述、传闻和角色谎言不能直接登记为真相。
-3. 将为了串起剧情而新增的动机、对白、因果桥梁单列为提案；作者未揭开的身份、信件内容和机制继续保持未知。
-4. 缺口只在影响本次选择时处理。可合理提出的创意主动补齐，事实性缺项则说明依据不足；不要求用户填写整套问卷。
+1. From the current scope, find the events that actually happened, the words characters said, and the established relationships and rules, keeping their sources.
+2. Distinguish "the character believes this" from "the story has confirmed this"; unreliable narration, rumors and characters' lies can't be logged directly as truth.
+3. List motives, dialogue and causal bridges newly added to connect the plot separately as proposals; identities, letter contents and mechanisms the author hasn't revealed stay unknown.
+4. Handle gaps only when they affect this installment's choices. Proactively fill in ideas that can reasonably be proposed, and for factual gaps state that the grounds are insufficient; don't require the user to fill in a whole questionnaire.
 
-交给下一步：一份能区分已知依据、创作补充和保留悬念的工作底稿，可直接附在当前剧本旁，无须另造报告。
-常见误用：从“她收起信”推断“信中是父亲遗言”，继而把遗言写进高潮；这个答案必须另有来源或属于明确提案。
+Hand off to the next step: a working draft that distinguishes known grounds, creative additions and retained suspense; it can be attached directly beside the current screenplay, with no need to produce a separate report.
+Common misuse: inferring from "she put the letter away" that "the letter contains her father's last words", then writing those last words into the climax; this answer must have another source or be an explicit proposal.
 
-## 2. 用故事命题收束创意
+## 2. Focus the idea with a story premise
 
-什么时候用：用户只有情绪、题材或一句设定，或现有故事支线很多、难以说清核心时。
+When to use: the user has only a feeling, a subject or a one-line setup, or an existing story has many subplots and its core is hard to state.
 
-先找本次希望观众持续关心的问题，再写一个工作句：什么样的人，必须完成什么，受什么阻碍，失败会失去什么。
-把抽象目标落到一次可识别的行动；“追求自由”可落实为“在家人回来前搬走自己的工作台”，但新行动仍属于创作提案。
-再写命题的另一半：人物因何选择，从什么状态走向什么状态。主题由结果证明，不由结尾一段道理替代。
-若用户尚无方向，给少量彼此有差异的情境供其表达偏好；已有兴趣则发展它，不不断另造竞争故事。
+First find the question you want the audience to keep caring about this time, then write a working sentence: what kind of person must accomplish what, blocked by what, and what they will lose if they fail.
+Ground the abstract goal in one recognizable action; "pursuing freedom" can become "moving her own workbench out before her family comes back", but the new action is still a creative proposal.
+Then write the other half of the premise: why the character makes the choice, and from what state to what state they move. The theme is proven by the outcome, not replaced by a moral speech at the end.
+If the user has no direction yet, offer a few situations that differ from each other so they can express a preference; if they already have an interest, develop it rather than repeatedly inventing competing stories.
 
-没有事件时，可以从一件日常事务里找出不能照常完成的环节，再追问由谁处理、他为什么迟疑、一次处理会怎样影响别人。先试写人物的一次决定；若删掉设定中的新奇名词仍有具体冲突，这个方向才有继续发展的基础。
-教学例：食堂新人把两批午餐标签贴反，发餐前想悄悄调换箱子；核对特殊餐时，他发现仅凭外包装无法复原，只得叫停发餐，请班长共同检查。
-接着需要发展的，是他怎样承担耽误发餐的责任、同事怎样回应，而不是继续增加更大的事故。例子仅演示从任务失误引出选择。
+When there's no event, look in an everyday task for a step that can't be completed as usual, then ask who handles it, why they hesitate, and how one way of handling it would affect others. Try writing the character's single decision first; only if concrete conflict remains after removing the novel nouns from the setup does this direction have a basis for further development.
+Teaching example: a new cafeteria worker swaps the labels on two batches of lunches and, before service, wants to quietly swap the boxes back; while checking the special meals, he finds that the outer packaging alone isn't enough to restore the original assignment, so he has to halt service and ask the shift lead to check with him.
+What needs developing next is how he takes responsibility for delaying service and how his coworkers respond, not adding an even bigger accident. The example only demonstrates drawing a choice out of a mistake in a task.
 
-### 让观看条件影响具体取舍
+### Let viewing conditions shape concrete trade-offs
 
-先沿用已知的发布用途、观看方式和观众对题材的熟悉程度；没有依据时，把判断写成工作假设。平台名称不能直接推出“观众只接受快节奏”，年龄标签也不能代替具体需求。
-从本片希望留下的体验倒推取舍：初次接触人物的观众需要尽早看懂正在发生的事；熟悉前作的观众更需要知道这次哪里变了。移动端观看时检查小字和多人同时说话是否难以辨认；依赖迟疑、尴尬或失落的段落则需要保留反应时间。把这些判断落实为保留哪次互动、简化哪条说明、让哪个结果更清楚，而不是另写一套受众画像。
-故事规模也应与可用篇幅相称：如果主要体验来自两人的一次重新配合，就优先展开这次互动；额外人物或背景只有影响选择时才占时间。
+First carry over the known release purpose, viewing method and the audience's familiarity with the genre; when there's no basis, write the judgment as a working assumption. A platform name can't directly imply "the audience only accepts fast pacing", and an age label can't replace concrete needs.
+Work backward from the experience you want the film to leave to the trade-offs: viewers meeting the characters for the first time need to understand early what's happening; viewers familiar with the previous work need more to know what has changed this time. For mobile viewing, check whether small text and several people talking at once are hard to make out; sections that rely on hesitation, awkwardness or disappointment need their reaction time kept. Put these judgments into practice as which interaction to keep, which explanation to simplify and which outcome to make clearer, rather than writing a separate audience persona.
+The story's scale should also match the available length: if the main experience comes from two people learning to work together again, develop that interaction first; extra characters or backstory take up time only when they affect choices.
 
-### 把参考作品转成可检验的写作选择
+### Turn reference works into testable writing choices
 
-用户提供参考作品时，先说清借鉴的具体效果，再根据实际读到或看到的内容解释它如何实现。叙事上可观察观众何时理解任务、何时修正判断；视觉上可观察注意力如何被安排、环境怎样影响动作。未读到的片段不补成分析结论。
-随后回到本项目，为相同的表达目的设计符合现有人物、事件和空间的做法，并检查它是否有效。不要搬用参考的角色关系组合、标志性设定、连续剧情、对白或镜头段落；也不把片名和风格标签当作已经完成的分析。无需参考时直接开发当前故事。
+When the user provides reference works, first state the specific effect being borrowed, then explain how it is achieved based on what was actually read or watched. For narrative, observe when the audience understands the task and when it revises its judgment; for visuals, observe how attention is directed and how the environment affects action. Don't turn parts you haven't read or watched into analytical conclusions.
+Then come back to this project, design an approach for the same expressive purpose that fits the existing characters, events and spaces, and check whether it works. Don't lift the reference's combination of character relationships, signature setups, ongoing plot, dialogue or shot sequences; and don't treat a title or style label as an analysis already done. When no reference is needed, develop the current story directly.
 
-交给下一步：一句行动命题、一项主要观众问题，以及结尾拟检验的价值变化，供人物与事件设计共用。
-常见误用：把“勇气、爱、救赎”当作命题，或用更多专有名词让一个没有行动方向的设定显得复杂。
+Hand off to the next step: a one-sentence action premise, one main audience question, and the value change the ending is meant to test, shared by character and event design.
+Common misuse: treating "courage, love, redemption" as the premise, or using more proper nouns to make a setup with no direction of action look complex.
 
-## 3. 从读不通或留不住注意的地方诊断
+## 3. Diagnose from where it stops making sense or stops holding attention
 
-什么时候用：用户要求评估、素材丰富但短片主线不明，或改编时需要判断哪些内容已经具备。
-读完约定范围，先用已有事件复述人物正在处理什么，标出自己开始无法解释下一步、认不出人物差异，或不再关心结果的位置。诊断围绕这些具体位置展开，不给所有故事套同一组评分栏。
+When to use: the user asks for an assessment, there's rich material but the short film's main line is unclear, or during adaptation you need to judge what content is already in place.
+Read through the agreed scope, first use the existing events to restate what the character is dealing with, and mark where you start being unable to explain the next step, can't tell characters apart, or no longer care about the outcome. Center the diagnosis on these specific spots; don't apply the same set of scoring columns to every story.
 
-如果不明白人物为何这样做，就回到这次决定之前：他想改变的事情是否明确，他掌握的消息和惯常做法是否足以解释决定，对方是否真的妨碍了它。能从文本找到的依据写出来；没有读到动机不等于已经证明人物没有动机，也不能代替作者补上。
-如果事情很多却没有进展，就选前后相邻的两次重要行动，检查后一次是否依赖前一次的结果。再试想由另一个人物完成同一动作：若原因和结果都不变，可能是人物特点尚未参与剧情；若某段拿掉也不影响任何选择或必要体验，可能是重复展开。由此定位具体的因果断点、游离目标或角色作用，不一律删掉慢段落。
-如果知道发生什么却缺少期待，就从文本已有的未完成行动、矛盾关系或异常结果中找一个仍待发生的变化，说明观众为何会关心。它可以是任务能否完成，也可以是一次交流会怎样结束；原文开篇平缓不代表没有可用的开场材料。
-如果好奇变成混乱，则沿一条重要消息追踪它如何被发现、隐瞒、误读或证实。分别核对人物与观众得到消息的依据，以及得知后会改变什么决定；答案尚未提供时保持未知。公开目标的作品可以没有秘密，不能为了制造信息差破坏已经成立的行动。
+If you don't understand why a character acts this way, go back to just before this decision: is what they want to change clear, are the information they hold and their usual ways of doing things enough to explain the decision, and does the other party really obstruct it? Write out the grounds you can find in the text; not having read a motive doesn't prove the character has none, and you can't fill it in for the author either.
+If there's a lot happening but no progress, pick two adjacent important actions and check whether the later one depends on the result of the earlier one. Then imagine another character performing the same action: if the cause and result stay the same, the character's traits may not yet be involved in the plot; if removing a section affects no choice or necessary experience, it may be repetitive development. Use this to locate specific causal breaks, stray goals or character roles, rather than deleting slow sections across the board.
+If you know what happens but there's no anticipation, find, among the text's existing unfinished actions, conflicting relationships or anomalous results, a change that is still pending, and explain why the audience would care. It can be whether a task gets done, or how a conversation will end; a calm opening in the source doesn't mean there's no usable opening material.
+If curiosity turns into confusion, follow one important piece of information to see how it is discovered, hidden, misread or confirmed. Separately check the grounds by which the characters and the audience get the information, and which decision changes once they know; when the answer hasn't been provided, keep it unknown. A work with an open goal can have no secrets; don't break action that already works in order to create an information gap.
 
-把发现落到受影响事件，区分“已有内容无法支撑”与“本次资料尚未提供”，并指出仍然有效的材料。结论靠文本依据，不靠等级或分数。
-用户只要诊断时，交付发现与依据；用户同时授权开发时，针对具体断点继续修复，并标明新增内容。
-交给下一步：保留哪些有效条件、优先处理哪个问题及其影响范围；不生成“诊断未过不得继续”的门槛。
-常见误用：只给“人物弱、节奏慢”的标签，没有指出哪次决定缺依据；或为了增加悬念给温和关系戏硬加秘密。
+Tie findings to the affected events, distinguish "the existing content can't support it" from "this material hasn't provided it yet", and point out the material that still works. Conclusions rely on textual grounds, not grades or scores.
+When the user only wants a diagnosis, deliver the findings and grounds; when the user also authorizes development, go on to fix the specific breaks and mark the new content.
+Hand off to the next step: which valid conditions to keep, which problem to prioritize, and its scope of impact; don't create a "can't continue until the diagnosis passes" gate.
+Common misuse: giving only labels like "weak characters, slow pacing" without pointing to which decision lacks grounds; or forcing a secret onto a gentle relationship scene to add suspense.
 
-## 4. 用目标、缺陷与选择塑造人物
+## 4. Shape characters through goals, flaws and choices
 
-什么时候用：主角只能被动承受事件、人物可以互换，或高潮选择缺乏可信动机时。
+When to use: the protagonist only passively endures events, characters are interchangeable, or the climactic choice lacks a believable motive.
 
-1. 写外在目标：本次到底要得到、阻止、证明或保住什么，何时算成功。
-2. 写内在需要：人物可能需要承认、放弃或承担什么；它可以与外在目标冲突，也可以保持一致。
-3. 写旧策略：他惯于怎样解决问题，为什么过去有效，为什么这次会造成损失。
-4. 把缺陷落实为行为与后果，例如“怕失控”表现为替同伴做决定，使同伴不再提供帮助。
-5. 在压力下安排真正的选择，让观众从行为识别人；外貌、标签和身世只能解释行为，不能替代它。
+1. Write the external goal: what exactly they want to get, prevent, prove or protect this time, and when it counts as success.
+2. Write the inner need: what the character may need to admit, give up or take on; it can conflict with the external goal or stay aligned with it.
+3. Write the old strategy: how they habitually solve problems, why it worked in the past, and why it causes losses this time.
+4. Make the flaw concrete as behavior and consequence, for example "fear of losing control" shows up as making decisions for companions, so the companions stop offering help.
+5. Arrange a real choice under pressure, so the audience recognizes the person through behavior; looks, labels and backstory can only explain behavior, not replace it.
 
-不要给每个角色强加创伤、秘密或成长弧。坚定不变的主角也可用选择改变周围人；悲剧可由拒绝改变造成结果。
-关键配角按本次功能建立：谁阻挡目标、提供信息、提出另一种选择、承受结果；同一人可以承担多个功能。
-交给下一步：角色的当前目标、惯用策略、关键关系与选择依据，足够支持场景写作即可，不必先写完整生平。
-常见误用：只写“外冷内热”；应补一个会影响本次剧情的矛盾，如嘴上拒绝合作，却提前替对方保留了工具。
+Don't force trauma, secrets or a growth arc onto every character. A steadfast, unchanging protagonist can also change those around them through choices; a tragedy can result from refusing to change.
+Build key supporting characters by their function this time: who blocks the goal, provides information, offers an alternative choice, or bears the consequences; one person can serve several functions.
+Hand off to the next step: characters' current goals, habitual strategies, key relationships and the grounds for their choices, enough to support scene writing, without first writing a full biography.
+Common misuse: writing only "cold outside, warm inside"; add instead a contradiction that affects this story, such as refusing to cooperate in words while having set aside tools for the other person in advance.
 
-## 5. 把事件串成因果，再安排升级
+## 5. Chain events by causality, then escalate
 
-什么时候用：梗概像事件清单、连续受挫却没有推进，或主角突然获得解法时。
+When to use: the synopsis reads like a list of events, there are repeated setbacks without progress, or the protagonist suddenly gains a solution.
 
-先写“人物预期 → 采取行动 → 实际后果 → 被迫改用的策略”。实际后果与预期的落差，需要来自对手、既定规则或人物误判。
-把主要事件用“因为、所以、但是”连接；倒叙可以改变讲述顺序，事件的发生原因仍应成立。
-对抗力量不限于反派；环境、时间、制度、关系和主角旧策略都可施压。只选择能互相作用的层次，不强凑三层冲突。
+First write "character's expectation → action taken → actual consequence → strategy they are forced to switch to". The gap between the actual consequence and the expectation needs to come from the opponent, established rules or the character's misjudgment.
+Connect the main events with "because, so, but"; a flashback can change the order of telling, but the causes of events must still hold.
+Opposing forces aren't limited to villains; environment, time, institutions, relationships and the protagonist's old strategy can all apply pressure. Choose only layers that can act on each other; don't force three layers of conflict.
 
-| 可改变的条件 | 如何形成升级，而不是重复 |
+| Changeable condition | How it escalates rather than repeats |
 |---|---|
-| 时间与空间 | 机会窗口缩短、退路关闭，原先可慢慢解决的问题必须立刻选择 |
-| 资源 | 工具、证据或帮助耗损，迫使人物改用另一种方法 |
-| 信息 | 新事实推翻旧判断，使原计划可能伤害真正目标 |
-| 关系 | 合作附带新条件、盟友开始怀疑，解决外部问题要付关系代价 |
-| 失败代价 | 从可恢复的不便变成具体损失，并由前面的决定累积而来 |
+| Time and space | The window of opportunity shrinks and retreat is cut off, so a problem that could have been solved slowly demands an immediate choice |
+| Resources | Tools, evidence or help are depleted, forcing the character to switch to another method |
+| Information | New facts overturn old judgments, so the original plan may harm the real goal |
+| Relationships | Cooperation comes with new conditions, allies start to doubt, and solving the external problem costs the relationship |
+| Cost of failure | It goes from a recoverable inconvenience to a concrete loss, accumulated from earlier decisions |
 
-例如：管理员为保住旧钟而隐瞒故障 → 同事照常启动它导致零件破损 → 他必须公开自己隐瞒的检修记录才能阻止再次启动。
-每一步都改变他的可选行动；若只是接连遇到三个陌生人的阻拦，阻碍数量增加未必构成升级。
-交给下一步：一条能追溯原因的事件链，以及各转折改变的目标、资源、关系或认知。
-常见误用：临近结尾才补新能力救场；关键规则和解题资源应提前建立，但不必提前解释全部用途。
+For example: the caretaker hides a malfunction to save the old clock → a coworker starts it as usual and a part breaks → he must make public the maintenance records he hid to stop it from being started again.
+Each step changes his available actions; if he merely runs into three strangers blocking him in a row, more obstacles don't necessarily constitute escalation.
+Hand off to the next step: an event chain whose causes can be traced, and the goal, resources, relationships or understanding each turning point changes.
+Common misuse: adding a new ability near the end to save the day; key rules and problem-solving resources should be established in advance, though not all their uses need to be explained in advance.
 
-## 6. 用代价选择完成高潮与主题
+## 6. Complete the climax and theme through a costly choice
 
-什么时候用：高潮只有大场面，或结尾虽解释了谜底却没有人物结果时。
+When to use: the climax is only a big set piece, or the ending explains the mystery but has no outcome for the character.
 
-回到命题，找人物最不愿同时失去的两样东西，再检查压力是否确实让二者难以兼得。
-危机提供代价，选择暴露价值排序，高潮展示选择的行动与后果；不要只让人物说“我决定了”就切到结果。
-前面应建立代价为什么私人而具体。一次公开承认错误，可以比没有情感关联的大规模破坏更有分量。
-结尾回应主要等待问题，并用关系、处境、物件或动作与开头形成对照；悲剧、停滞或矛盾结果同样可以成立。
-开放结局可以不回答事情最终怎样，但要让本次人物选择或情绪过程到达有意义的位置；不能仅在高潮前截断。
+Go back to the premise, find the two things the character least wants to lose at once, then check whether the pressure really makes it hard to keep both.
+The crisis provides the cost, the choice exposes the ranking of values, and the climax shows the action and consequences of the choice; don't just have the character say "I've decided" and cut to the result.
+Earlier material should establish why the cost is personal and concrete. A public admission of a mistake can weigh more than large-scale destruction with no emotional connection.
+The ending answers the main waiting question and contrasts with the opening through relationships, situation, objects or actions; tragic, stalled or contradictory outcomes can work just as well.
+An open ending need not answer how things ultimately turn out, but this character's choice or emotional process must reach a meaningful place; it can't simply cut off before the climax.
 
-交给下一步：最后选择、可见结果、必要的情绪停留，以及仍有意保留的问题。
-常见误用：两个选项一边毫无代价、一边明显错误，却宣称人物经历了两难；也不要为了制造两难篡改定稿。
+Hand off to the next step: the final choice, the visible outcome, the necessary emotional pause, and questions deliberately left open.
+Common misuse: one option with no cost at all and the other obviously wrong, while claiming the character faced a dilemma; also, don't tamper with a finalized screenplay to create a dilemma.
 
-## 7. 为当前难题分配推进与停留的时间
+## 7. Allocate time for pushing forward and lingering on the current problem
 
-什么时候用：已有事件但重心不清，或不同段落争抢篇幅时。先选当前故事最需要让观众经历的一次改变，再找出理解它所需的前提、改变发生的过程和承受后果的时间。题材名称不能直接决定这些段落怎样展开。
+When to use: there are events but the focus is unclear, or different sections compete for length. First choose the one change the current story most needs the audience to experience, then find the premises needed to understand it, the process by which the change happens, and the time to bear its consequences. A genre name can't directly decide how these sections unfold.
 
-先尝试把这次改变写成完整场景，观察它实际卡在哪里，再处理相应问题：
+First try writing this change as a complete scene, observe where it actually gets stuck, then deal with the corresponding problem:
 
-- **行动容易结束，后文只能不断添事。** 写清任务完成的条件，检查现有环境与人物是否真的会阻止完成。危险应改变可用路线或应对方法；规则应落实成某次行动受到的限制。处于弱势的人要面对具体的资格、资源或权力差异，并用故事已建立的能力争取空间。给阻碍与应对足够篇幅，不用陌生援手突然解决。
-- **每次尝试看起来都一样。** 顺着一次补救追踪它留下的问题：误判怎样让下一次更难，获得的便利又让谁承担损失。写诱惑时先让好处成立，再让使用它的代价进入下一次决定；写失误连锁时让后果来自人物刚做的事。两种情况都需要策略改变，不能仅加大事故规模。
-- **结果清楚，人物却像没有经历过。** 对比他面对相似处境时的做法，把内在变化落实到一次不同的选择。关系变化要影响合作、拒绝或依赖的方式；身份被隐瞒、公开或使用时，要改变他与周围人的相处条件。给旧习惯、新认识和实际互动留出辨认时间，不把追逐或大反转当成必需品。
-- **读者只等一个解释，中段没有事可看。** 让查证或等待中的人物仍有当前任务。每条新信息应使某个判断成立或失效，并影响随后行动；解释答案之前，先确保观众已经知道什么值得追问。若作品靠情感而非谜题推进，则把时间留给交流和观察，无须制造秘密。
+- **The action ends too easily, and later material can only keep adding things.** Spell out the conditions for completing the task, and check whether the existing environment and characters would really prevent it. Danger should change the available routes or ways to respond; rules should become limits on a specific action. Someone in a weaker position should face concrete differences in qualifications, resources or power, and fight for room using abilities the story has established. Give obstacles and responses enough length; don't let an unfamiliar helper suddenly step in and solve it.
+- **Every attempt looks the same.** Follow one remedy to track the problems it leaves behind: how a misjudgment makes the next attempt harder, and who bears the loss for a convenience gained. When writing temptation, first make the benefit real, then let the cost of using it enter the next decision; when writing a chain of mistakes, have the consequences come from what the character just did. Both cases need a change of strategy, not just a larger scale of accident.
+- **The outcome is clear, but the character seems not to have lived through it.** Compare how they act when facing similar situations, and make the inner change concrete as a different choice. A relationship change should affect the way they cooperate, refuse or depend on others; when an identity is hidden, revealed or used, it should change the terms on which they deal with those around them. Leave time to recognize old habits, new understanding and actual interaction; don't treat chases or big twists as necessities.
+- **The reader is only waiting for an explanation, and there's nothing to watch in the middle.** Give characters who are investigating or waiting a current task. Each new piece of information should make some judgment hold or fail and affect the action that follows; before explaining the answer, make sure the audience already knows what is worth asking. If the work advances through emotion rather than a puzzle, give the time to exchange and observation, with no need to manufacture secrets.
 
-这些处理可以在同一场景交织使用，也可以完全不需要。回看篇幅时，优先保留一次选择发生前的必要依据及其后果；压缩重复尝试时，不能连同策略改变一起抹去。事件小而清楚的故事可以很快完成，复杂选择则可能需要跨场建立，不能按镜头或台词数量平均分配时间。
-对弱因果、碎片式或观察式作品，改查视角、情绪、重复意象或主题的内部秩序，不能因其不合常规就自动改写。
-交给下一步：主导观众问题、最需要展开的转折和情绪落点，供大纲与估时分配篇幅。
-常见误用：把上述症状当作故事必须经历的阶段，逐个补场；或为了“节奏更强”删掉刚好让选择成立的停留。
+These treatments can be interwoven within the same scene, or not needed at all. When reviewing length, prioritize keeping the necessary grounds before a choice and its consequences; when compressing repeated attempts, don't erase the change of strategy along with them. A story with small, clear events can be done quickly, while complex choices may need to be built across scenes; don't distribute time evenly by number of shots or lines.
+For works with weak causality, fragmented works or observational works, check instead the internal order of point of view, emotion, recurring imagery or theme; don't rewrite them automatically just because they're unconventional.
+Hand off to the next step: the dominant audience question, the turning point most in need of development, and the emotional landing point, for allocating length in the outline and the time estimate.
+Common misuse: treating the symptoms above as stages a story must go through and adding a scene for each; or deleting the very lingering that makes a choice hold in order to get "stronger pacing".
 
-## 8. 需要时写大纲，让结构承担交接
+## 8. Write an outline when needed, and let the structure carry the handoffs
 
-什么时候用：故事跨多个阶段、角色关系复杂或用户要求先看结构；短而清楚的故事可直接写剧本，定稿剧本无需逆补大纲。
+When to use: the story spans several stages, character relationships are complex, or the user asks to see the structure first; a short, clear story can go straight to the screenplay, and a finalized screenplay doesn't need an outline reconstructed after the fact.
 
-先把事件按阶段目标分组，不预设组数。每组写清关键事件、人物行动、阻力或代价、结束变化，以及怎样导致下一组。
-再核对角色功能与关系：双方各想要什么、互相掌握什么资源或信息、本次事件之后关系怎样变。
-可用“甲需要乙的许可；乙依赖甲的技术；故障公开后双方失去合作基础”这样的文字表达，无需为画关系图增设文档。
-检查一个段落能否删去：如果关键原因、选择依据、必要体验或后续兑现会丢失，应保留；只重复相同作用的段落可提议合并。
-情绪停留本身可以是必要体验，不以“没有新信息”为由一律删除。
+First group events by stage goals, without presetting the number of groups. For each group, state the key events, character actions, resistance or cost, the closing change, and how it leads to the next group.
+Then check character functions and relationships: what each side wants, what resources or information they hold over each other, and how the relationship changes after this event.
+You can express it in text such as "A needs B's permission; B relies on A's skills; once the fault is made public, both lose the basis for cooperation", without creating an extra document to draw a relationship diagram.
+Check whether a section can be deleted: if key causes, grounds for a choice, necessary experience or a later payoff would be lost, keep it; only sections repeating the same function may be proposed for merging.
+An emotional pause can itself be a necessary experience; don't delete it across the board on the grounds that it has "no new information".
 
-交给下一步：连贯梗概、必要角色及功能、关系变化、按实际需要分组的事件结构；沿用已有定位和时长约束。
-常见误用：为了填满五段添事件，或在大纲阶段虚构外貌、生平和未确认答案，迫使后续资产继承这些内容。
+Hand off to the next step: a coherent synopsis, the necessary characters and their functions, relationship changes, and an event structure grouped by actual need; carry over the existing positioning and duration constraints.
+Common misuse: adding events to fill out five sections, or inventing appearances, biographies and unconfirmed answers at the outline stage, forcing later assets to inherit them.
 
-## 9. 续作从已采用状态继续
+## 9. A sequel continues from the adopted state
 
-什么时候用：续集、同一作品后续片段或重用旧角色与场景时；只读取用户指定历史与本次实际相关资料。
+When to use: sequels, later segments of the same work, or reusing old characters and scenes; read only the history the user specified and material actually relevant to this installment.
 
-1. 从历史提取已发生事件、关系、规则、时间线、道具归属、伤势及空间状态，标明采用版本。
-2. 对照本次内容，分别记为沿用、新增、有原因的变化、冲突、资料缺失；新构思不写成历史。
-3. 变化写出“此前状态 → 本次触发事件 → 后续状态”，既不冻结人物，也不靠重设历史解决矛盾。
-4. 继承稳定的风格和人物基础，重新检查本集目标、开场问题与收束；上集已解决的任务不自动成为本集目标。
-5. 历史剧本与已采用片段有差异时指出具体影响，未确定的部分保持待定；不按文件时间擅自裁决。
+1. Extract from history the events that happened, relationships, rules, timeline, prop ownership, injuries and spatial states, marking the adopted version.
+2. Compared against this installment's content, record each item as carried over, new, changed for a reason, conflicting, or missing material; don't write new ideas as history.
+3. Write changes as "prior state → triggering event in this installment → subsequent state"; neither freeze the characters nor resolve contradictions by resetting history.
+4. Inherit stable style and character foundations, and re-check this episode's goal, opening question and resolution; a task solved in the previous episode doesn't automatically become this episode's goal.
+5. When the historical screenplay differs from adopted segments, point out the specific impact and keep undecided parts pending; don't rule on it by file timestamps.
 
-剧情变化与资产变化分开：信任破裂可能只影响表演；服装破损才可能需要相应外观状态。缺少无关的历史文件不阻止当前创作。
-交给下一步：本次起点、不可改写的历史事实、新事件范围、可复用状态与有因变化，供剧本和资产提取使用。
-常见误用：只读上集最后一句就续写，或为介绍旧角色重新编一份身份、性格和世界规则。
+Keep plot changes and asset changes separate: broken trust may only affect performance; damaged clothing is what might need a corresponding appearance state. Missing unrelated history files doesn't block current creation.
+Hand off to the next step: this installment's starting point, historical facts that can't be rewritten, the scope of new events, reusable states and changes with causes, for screenplay and asset extraction.
+Common misuse: reading only the last line of the previous episode before continuing, or re-inventing an old character's identity, personality and world rules just to introduce them.
 
-## 10. 将内部判断变成可用成果
+## 10. Turn internal judgment into usable results
 
-上述方法按问题选用，不要求逐项交报告。一般交付一个当前故事方向：主角行动、关键因果、选择与结果；必要时附大纲和实质提案。
-已有明确授权的改稿范围内直接完成修订；超出范围的实质变化说明影响，使用工作流已有确认方式，不新增逐方法确认。
-准备写成视听文本时进入[剧本改编](screenAdaptation.md)，把事件链落为场景任务、完整行动、对白与声音；后续制作只读取当前有效剧本，不继承未采用的创意分支。若目标是 Seedance，剧本定稿后直接进入主 `SKILL.md` PART A。
+Choose the methods above by problem; they don't call for item-by-item reports. Usually deliver one current story direction: the protagonist's action, key causality, the choice and the outcome; attach an outline and substantive proposals when needed.
+Within an explicitly authorized revision scope, complete the revision directly; for substantive changes beyond that scope, explain the impact and use the workflow's existing confirmation method, without adding per-method confirmations.
+When ready to write it as an audiovisual text, move to [Screen Adaptation](screenAdaptation.md) to turn the event chain into scene tasks, complete action, dialogue and sound; later production reads only the currently valid screenplay and doesn't inherit unadopted creative branches. If the target is Seedance, once the screenplay is finalized, go directly to PART A of the main `SKILL.md`.

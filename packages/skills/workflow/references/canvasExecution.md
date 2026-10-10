@@ -1,20 +1,20 @@
-# 画布执行
+# Canvas Execution
 
-> **Seedance 使用边界：** 本文件只负责画布与真实模型参数/引用的执行，不参与 Seedance prompt 的创作。只要已有可执行剧本/时间轴且目标进入视频制作/生成/修订，必须先由主 `SKILL.md` 的“Seedance 路由锁存”进入内嵌 PART A；**不得把五个画布读取工具、节点的 `node:getConfig` 或配置询问当作 Seedance 之前的入口步骤。** 正式提示词必须先由 PART A 规划/定稿；本文件不得重新分段、改写 A9.1/A9.2 格式、替换 Timeline、补表演/运镜/连续性规则。用户对画幅、分辨率、模式、音频等配置问题的回答只补充当前 Seedance 任务参数，不解除或重置 Seedance 路由。
+> **Seedance usage boundary:** This file only covers executing on the canvas with real model parameters and references; it takes no part in writing Seedance prompts. Whenever an executable script or timeline exists and the goal enters video production, generation, or revision, you must first enter the embedded PART A through the "Seedance route latch" in the main `SKILL.md`; **never treat the five canvas read tools, a node's `node:getConfig`, or configuration questions as an entry step that comes before Seedance.** Formal prompts must first be planned and finalized by PART A; this file must not re-segment them, rewrite the A9.1/A9.2 format, replace the Timeline, or add performance, camera-movement, or continuity rules. The user's answers to configuration questions such as aspect ratio, resolution, mode, or audio only supplement the parameters of the current Seedance task; they do not release or reset the Seedance route.
 
-只用本轮实际提供的工具操作当前 Toonflow 画布。下面是当前合约；实时 `parameters` 是调用依据，宿主文档中的旧例不覆盖它。制作流程见入口，版本和结果记录见[状态与交付](stateAndDelivery.md)。
+Operate on the current Toonflow canvas only with the tools actually provided this round. The following is the current contract; the live `parameters` are what calls are based on, and old examples in host documents do not override them. For the production flow see the entry point; for version and result records see [State and Delivery](stateAndDelivery.md).
 
-## 发现与绑定
+## Discovery and binding
 
-`getCanvas({})` 只返回激活画布概览；需要类型或画布列表时传 `include: ["nodeTypes"]` 或 `["canvases"]`。用 `findCanvasNodes` 按名称、类型或选择状态定位目标；已知节点 ID 时直接用 `getCanvasNodes` 读取必要字段，`getCanvasEdges` 读取局部连接，`getNodeTools` 发现函数与完整 schema。节点类型可能带运行时前缀，不硬编码。
+`getCanvas({})` returns only an overview of the active canvas; when you need types or the canvas list, pass `include: ["nodeTypes"]` or `["canvases"]`. Use `findCanvasNodes` to locate targets by name, type, or selection state; when node IDs are known, use `getCanvasNodes` directly to read the necessary fields, `getCanvasEdges` to read local connections, and `getNodeTools` to discover functions and their full schema. Node types may carry a runtime prefix; do not hard-code them.
 
-五个画布读取工具受条数和 64 KiB 体积限制，按 `hasMore` / `nextCursor` 继续分页；节点和连线每页最多扫描 2000 项，空结果但 `hasMore: true` 仍需继续。`totalNodes/totalEdges` 是画布总量而非命中数；`selectedOnly` 现场筛选，不是冻结快照。保持原查询参数，仅替换游标；游标失效重新查询。全图任务分批处理，上下文仅保留当前批次、摘要和游标。`getCanvasNodes` 默认只读 `label/type/position`，端口、正文和输出须显式选择 `ports/data/outputs`；`dataKeys` 仅在选择 `data` 时筛选字段。详情和函数查询的 `nodeIds` 每批最多 20 个，须先去重；移动、重命名、删除和连接每批最多 64 项。
+The five canvas read tools are limited by item count and a 64 KiB size; continue paging by `hasMore` / `nextCursor`. Nodes and edges are scanned at most 2000 items per page, and an empty result with `hasMore: true` still requires continuing. `totalNodes/totalEdges` are canvas totals, not match counts; `selectedOnly` filters live and is not a frozen snapshot. Keep the original query parameters and replace only the cursor; if the cursor becomes invalid, query again. Process whole-canvas tasks in batches, keeping only the current batch, a summary, and the cursor in context. `getCanvasNodes` reads only `label/type/position` by default; ports, body text, and outputs must be selected explicitly with `ports/data/outputs`; `dataKeys` filters fields only when `data` is selected. Detail and function queries take at most 20 `nodeIds` per batch, deduplicated first; move, rename, delete, and connect take at most 64 items per batch.
 
-顶层 `nextCursor` 仅用于保持原参数继续节点分页。处理节点任一 `truncated` 时，仅查询所属节点，使用该项路径及偏移，不携带原 `cursor`：`text` 用该项 `path` 和 `nextOffset` 作为 `textOffset` 续读；`entries` 改用 `valueOffset`，没有 `nextOffset` 表示该路径已到末尾。`depth/budget` 沿该项 `path` 缩小范围重新查询，不携带旧 `cursor`；对象/数组的 `valueLimit` 最多 100，字符串的 `textLimit` 最多 4000，正偏移必须指定 `path`。路径最多 64 层和 2048 JSON UTF-8 字节，每段最多 256 字符；`pathDepthLimit/pathBytesLimit/circular` 不可靠重复请求补齐，`keyTooLong` 可用返回的 `nextOffset` 作为 `valueOffset` 跳过该键继续，但被跳过的值仍未读取。不把截断内容当完整证据。
+The top-level `nextCursor` is only for continuing node paging with the original parameters. When handling any `truncated` item of a node, query only the node it belongs to, using that item's path and offset, without carrying the original `cursor`: for `text`, continue reading with that item's `path` and `nextOffset` as `textOffset`; for `entries`, use `valueOffset` instead, and a missing `nextOffset` means that path has reached its end. For `depth/budget`, narrow the scope along that item's `path` and query again without carrying the old `cursor`; `valueLimit` for objects/arrays is at most 100, `textLimit` for strings is at most 4000, and a positive offset requires `path`. A path has at most 64 levels and 2048 bytes of JSON UTF-8, with at most 256 characters per segment; `pathDepthLimit/pathBytesLimit/circular` cannot be filled in by repeating the request. For `keyTooLong`, the returned `nextOffset` can be used as `valueOffset` to skip that key and continue, but the skipped value is still unread. Do not treat truncated content as complete evidence.
 
-默认复用当前项目和目标画布。有既有台账时核对绑定；用户已明确切换目标则按其授权操作，含糊的“继续”遇到不同绑定先澄清。新建、切换、重命名成功后使用返回的绑定，不沿用旧 ID。
+By default, reuse the current project and target canvas. When an existing ledger exists, check its binding; when the user has explicitly switched targets, operate as they authorized, and when an ambiguous "continue" meets a different binding, clarify first. After creating, switching, or renaming succeeds, use the returned binding and do not keep using old IDs.
 
-| 工具 | 当前参数形状 |
+| Tool | Current parameter shape |
 |---|---|
 | `getCanvas` | `{include?:["canvases","nodeTypes"],cursor?,limit?,canvasId?}` |
 | `findCanvasNodes` | `{query?,types?,selectedOnly?,cursor?,limit?,canvasId?}` |
@@ -22,7 +22,7 @@
 | `getCanvasEdges` | `{nodeIds?:[...],direction?:"incoming"/"outgoing"/"both",cursor?,limit?,canvasId?}` |
 | `getNodeTools` | `{nodeIds:[...],names?,cursor?,limit?,canvasId?}` |
 | `addNode` | `{type, position:{x,y}, label?}` |
-| `nodeTools` | `{nodeId, name:"node:函数名", args:{...}}` |
+| `nodeTools` | `{nodeId, name:"node:functionName", args:{...}}` |
 | `connectNodes` | `{connections:[{source,sourceHandle,target,targetHandle}]}` |
 | `moveNodes` | `{moves:[{nodeId,position:{x,y}}]}` |
 | `renameNodes` | `{renames:[{nodeId,label}]}` |
@@ -31,66 +31,66 @@
 | `renameCanvas` | `{canvasId?,name}` |
 | `fitCanvas` / `arrangeCanvas` | `{nodeIds?}` / `{}` |
 
-批量修改按实际数量限制拆批。`addNode` 不接受任意 `data`、指定 ID 或正文；用返回的 `node.id` 查询 `getNodeTools`，再按完整 schema 用 `nodeTools` 填内容，新增回执不包含函数清单。不要调用旧版单数移动/重命名工具，不直接写画布 JSON。
+Split batch modifications into batches according to the actual count limits. `addNode` does not accept arbitrary `data`, a specified ID, or body text; use the returned `node.id` to query `getNodeTools`, then fill in content with `nodeTools` according to the full schema. The creation receipt does not include the function list. Do not call the old singular move/rename tools, and do not write canvas JSON directly.
 
-结构操作的 ID 回执可能缩略为最多 100 项：`arrangeCanvas` 另给 `arrangedCount`，`fitCanvas` 给 `nodeCount`，`deleteNodes` 给 `removedEdgeCount`。`truncated` 只影响返回 ID 列表，不表示只完成预览部分，不为获取完整回执重复操作；改用只读工具核对。`nodeTools` 返回具体业务函数的结果，不受上述五个读取工具的 64 KiB 上限约束。
+ID receipts of structural operations may be abbreviated to at most 100 items: `arrangeCanvas` additionally gives `arrangedCount`, `fitCanvas` gives `nodeCount`, and `deleteNodes` gives `removedEdgeCount`. `truncated` only affects the returned ID list; it does not mean only the previewed part was completed. Do not repeat an operation to get the full receipt; verify with read-only tools instead. `nodeTools` returns the result of the specific business function and is not subject to the 64 KiB limit of the five read tools above.
 
-按现有布局从左到右放内容、资产、片段，同阶段纵向排列，避免覆盖用户节点。用 `fitCanvas` 展示本轮成果；`arrangeCanvas` 会整理全部顶层节点，只在整幅整理属于用户范围时调用。当前没有分组工具，不伪造分组接口。
+Place content, assets, and segments from left to right following the existing layout, with items of the same stage arranged vertically, and avoid covering the user's nodes. Use `fitCanvas` to show this round's results; `arrangeCanvas` rearranges all top-level nodes, so call it only when arranging the whole canvas is within the user's scope. There is currently no grouping tool; do not fake a grouping interface.
 
-## 内容与素材节点
+## Content and material nodes
 
-- 文本使用该节点实际注册的 `node:setText({text})`。成功后用 `getCanvasNodes({ nodeIds: [目标ID], fields: ["data"], dataKeys: ["textPath"] })` 回读路径，读取对应正文核对并登记；`setText` 当前只返回正文，不返回路径。需要查看当前内存正文时用 `getCanvasNodes` 的 `path: ["outputs", "text", "value"]` 分段读取；持久化画布 JSON 不保存这份内联正文，不能据此判断文本为空。
-- 正文由节点编辑与保存，不直接写其 `textPath` 绕过界面。状态文件和版本快照用实际文本文件工具保存；快照不作为第二份可编辑正文。
-- 素材通过发现的 `node:setImage`、`node:setVideo`、`node:setAudio` 挂载，当前通常为 `{path,mimeType}`。`path` 使用工作区相对路径，指向本工作区实际存在、可读取的文件，不能填写预期输出或外部尚未导入的路径。
-- 新图以图片生成节点制作，已采用的图优先用图片素材节点固定。下一版使用新候选生成节点，保留已采用节点和连接；不为重生成替换仍被下游引用的源节点。
-- 当前文本节点没有 Agent 可调用的 `generateText`，文字由助手完成后写入。文件工具不保证支持视频理解或二进制复制，具体边界见[交付](stateAndDelivery.md)。
+- For text, use the `node:setText({text})` the node actually registered. After it succeeds, read back the path with `getCanvasNodes({ nodeIds: [targetId], fields: ["data"], dataKeys: ["textPath"] })`, read the corresponding body text to verify it, and record it; `setText` currently returns only the body text, not the path. To view the current in-memory body text, read it in segments with `getCanvasNodes` using `path: ["outputs", "text", "value"]`; the persisted canvas JSON does not store this inline body text, so it cannot be used to judge that the text is empty.
+- Body text is edited and saved by the node; do not write its `textPath` directly to bypass the interface. Save state files and version snapshots with the actual text file tools; a snapshot does not serve as a second editable copy of the body text.
+- Mount material through the discovered `node:setImage`, `node:setVideo`, and `node:setAudio`, currently usually `{path,mimeType}`. `path` is a workspace-relative path pointing to a file that actually exists in this workspace and is readable; never fill in an expected output or an external path that has not yet been imported.
+- Make new images with image generation nodes, and prefer to pin adopted images with image material nodes. The next version uses a new candidate generation node, keeping the adopted node and its connections; do not replace a source node that is still referenced downstream in order to regenerate.
+- The current text node has no `generateText` the Agent can call; the assistant writes the text and then writes it in. File tools are not guaranteed to support video understanding or binary copying; for the exact limits see [Delivery](stateAndDelivery.md).
 
-## 真实引用与提示词
+## Real references and prompts
 
-先用 `getCanvasNodes` 的 `ports` 检查源/目标端口的 ID、方向、类型，用 `getCanvasEdges` 检查已有连接。只把本段采用的媒体接给生成节点，不用连线表示阶段、批准或依赖索引。上游还在生成或未采用的候选不能成为正式参考。
+First use the `ports` of `getCanvasNodes` to check the ID, direction, and type of the source and target ports, and use `getCanvasEdges` to check existing connections. Connect only the media adopted for this segment to the generation node; do not use edges to represent stages, approvals, or dependency indexes. Candidates upstream that are still generating or not adopted cannot become formal references.
 
-生成节点 `prompt` 是本次唯一执行提示词入口，通过 `node:setPrompt({prompt})` 写入。完整剧本和分镜文本节点保留内容依据，不再用 STRING 连线重复挂到生成节点；当前实现会把相连文本全文追加到 prompt。现有无关 STRING 引用在已授权编辑范围内移除，否则说明影响后暂停该生成。
+The generation node's `prompt` is the only execution prompt entry for this run, written with `node:setPrompt({prompt})`. Full script and storyboard text nodes keep the content basis; do not also attach them to the generation node with STRING edges, because the current implementation appends the full text of connected text to the prompt. Remove existing unrelated STRING references within the authorized editing scope; otherwise explain the impact and pause that generation.
 
-当供应商/画布接口实际使用 `{{ref N}}` 作为传输引用时，`{{ref N}}` 只能对应本次真实连接顺序与类型，不能把计划清单顺序当作真实顺序。**这属于执行层映射，不授权把 PART A 已定稿 `Reference binding` 的原始节点/资产句柄改写成另一套用户可见提示词格式。** 当前需分批读取现场数据还原顺序，不存在 `getReferences` 工具：
+When the provider or canvas interface actually uses `{{ref N}}` as a transport reference, `{{ref N}}` may correspond only to the real connection order and types of this run; never take the order of a planned list as the real order. **This is an execution-layer mapping and does not authorize rewriting the original node/asset handles of the `Reference binding` that PART A finalized into another user-visible prompt format.** You currently need to read live data in batches to reconstruct the order; there is no `getReferences` tool:
 
-1. 用 `getCanvasEdges({ nodeIds: [目标ID], direction: "incoming" })` 分页读取全部入边，保持返回顺序，筛选实际输入端口的边。用 `getCanvasNodes` 显式指定 `fields: ["ports", "outputs"]` 分批核对源节点，确认源端口存在且类型兼容，从 `outputs[sourceHandle]` 取实际内容，按截断信息补齐必要字段。
-2. 用 `getCanvasNodes` 的 `fields: ["data"], dataKeys: ["referenceOrder"]` 读取目标排序。以 `encodeURIComponent(JSON.stringify([source,sourceHandle]))` 为键，按 `data.referenceOrder[目标端口]` 中的位置稳定排序；没有列入的排最后并保留原入边顺序。仅在字段完整且确实不存在排序记录时按有效入边顺序。
-3. 排序后第 N 项对应 `{{ref N}}`，不同类型共用编号。输出未就绪的输入仍占位并阻止生成，不能把空项删掉后继续套编号。节点/端口类型兼容性以运行时返回为准。
+1. Use `getCanvasEdges({ nodeIds: [targetId], direction: "incoming" })` to page through all incoming edges, keeping the returned order, and filter the edges of the actual input port. Use `getCanvasNodes` with explicit `fields: ["ports", "outputs"]` to check the source nodes in batches, confirm that the source port exists and its type is compatible, take the actual content from `outputs[sourceHandle]`, and fill in necessary fields according to the truncation information.
+2. Read the target ordering with `getCanvasNodes` using `fields: ["data"], dataKeys: ["referenceOrder"]`. With `encodeURIComponent(JSON.stringify([source,sourceHandle]))` as the key, sort stably by position in `data.referenceOrder[targetPort]`; unlisted items go last and keep their original incoming-edge order. Use the valid incoming-edge order only when the field is complete and there really is no ordering record.
+3. After sorting, item N corresponds to `{{ref N}}`, and different types share the numbering. An input whose output is not ready still holds its place and blocks generation; do not drop empty items and keep applying the numbering. Node/port type compatibility follows what the runtime returns.
 
-无法取得完整输入或证明顺序时保留提示词草稿并说明待核实项，不猜编号。
+When you cannot obtain the complete inputs or prove the order, keep the prompt draft and state what is pending verification; do not guess numbers.
 
-当前画布统一给引用编号，而部分供应商适配按图片、视频、音频重新组织请求。默认采用真实图片资产加已确认的原生声音方案；确需混合媒体时，必须核实画布顺序与实际模型/适配的对应关系。不能证明一致时停在“待引用映射确认”，说明具体冲突；不得静默丢掉指定音频、改模式或假称编号正确。
+The current canvas numbers references uniformly, while some provider adapters reorganize the request by image, video, and audio. By default, use real image assets plus the confirmed native audio plan; when mixed media is truly needed, verify the correspondence between the canvas order and the actual model/adapter. When consistency cannot be proven, stop at "pending reference mapping confirmation" and explain the specific conflict; never silently drop specified audio, change the mode, or falsely claim the numbering is correct.
 
-首帧、尾帧有明确语义，顺序变化可能交换作用。只有用户选择该路线且真实能力支持时使用，核对具体输入槽位；不强制所有片段抽尾帧。连接或参考来源变化后重新核对引用和提示词，原授权不自动覆盖变化后的执行方案。
+First and last frames have explicit semantics, and a change of order may swap their roles. Use them only when the user chose that route and the real capability supports it, checking the specific input slots; do not force extracting a last frame for every segment. After connections or reference sources change, re-check references and prompts; the original authorization does not automatically cover the changed execution plan.
 
-## 配置询问不得截断 Seedance
+## Configuration questions must not cut off Seedance
 
-- 本文件中的配置核实只允许发生在主 `SKILL.md` 已经锁存 Seedance 路由、并完成 A0 目标模型确认之后；若用户未指定 2.0/2.5，主 PART A 必须先用一次简短提问确认“Seedance 2.0 还是 2.5”。这个模型确认问题由主 PART A 负责，本文件不得自行选择默认模型，也不得重复询问。
-- 若宿主必须向用户确认 `ratio`、`resolution`、`mode`、`generateAudio`、provider 等执行参数，提问和用户回答都属于同一 Seedance 任务的执行参数补充。回答后继续使用 PART A 已规划/定稿的提示词，不重新进入通用工作流。
-- 若用户在配置回答中明确把模型改为 2.0/2.5，这属于 A0 输入更新：回到 PART A 按新目标模型重新路由受影响的正式提示词，然后再回本文件执行；不得仅在节点配置层换模型而继续使用另一模型的提示词外壳。
-- 若实时能力不支持 PART A 目标模型，报告能力冲突；不得静默采用节点默认模型。
+- Configuration verification in this file may happen only after the main `SKILL.md` has latched the Seedance route and completed the A0 target-model confirmation; if the user did not specify 2.0/2.5, the main PART A must first confirm "Seedance 2.0 or 2.5" with one short question. That model confirmation question belongs to the main PART A; this file must not choose a default model on its own or ask it again.
+- If the host must confirm execution parameters such as `ratio`, `resolution`, `mode`, `generateAudio`, or provider with the user, both the question and the user's answer are supplementary execution parameters of the same Seedance task. After the answer, continue using the prompt PART A planned or finalized; do not re-enter the general workflow.
+- If, in a configuration answer, the user explicitly changes the model to 2.0/2.5, this is an A0 input update: return to PART A to re-route the affected formal prompts for the new target model, then come back to this file to execute; never just switch the model at the node configuration layer while keeping the other model's prompt shell.
+- If the live capability does not support the PART A target model, report the capability conflict; never silently adopt the node's default model.
 
-## 生成前准备
+## Preparation before generation
 
-1. 调用当前节点的 `node:getConfig`，核实可用模型、模式、参考类型与数量、画幅、图片尺寸或视频时长/分辨率、原生声音及音频输入能力。图片和视频的规格分开判断，不沿用不相关的默认值。
-2. 先接好实际素材，再读取当前匹配模式。通过 `node:setConfig` 设置配置：图片字段按 schema 使用 `providerId/modelId/size/ratio`；视频使用 `providerId/modelId/duration/resolution/ratio/mode/generateAudio`。只传所需且支持的字段，`providerId` 与 `modelId` 成对提供，mode 使用实际返回值。
-3. 写入完整提示词，再读配置与画布，核对实际 prompt、引用、规格和调用前 output。缺必要参考就停该生成并继续文稿；不能静默将图生图或多参改成无参考模式。
-4. 固定本次方案：对象、数量、完整提示词、参数、参考文件与用途/顺序、执行次数；展示并沿用或取得具体消耗算力授权。算力无法查询时明确未知，不把对话 Token 当媒体消耗。
-5. **临执行复核。** 用户回复后再次读取当前画布与配置，比对授权方案，包含节点、提示词、模式、声音、引用与数量。若发生变化，沿用仍匹配的对象；受影响对象重新展示差异并核对授权。不要以“已确认”执行界面后来被修改的配置。
-6. 前置和授权满足时，经 `nodeTools` 调用实际 `node:generateImage` 或 `node:generateVideo`，当前参数为 `{}`。不绕过画布改走直接媒体工具。
+1. Call the current node's `node:getConfig` to verify the available models, modes, reference types and counts, aspect ratio, image size or video duration/resolution, native audio, and audio input capability. Judge image and video specifications separately; do not carry over unrelated defaults.
+2. Connect the actual material first, then read the currently matching mode. Set the configuration through `node:setConfig`: image fields use `providerId/modelId/size/ratio` according to the schema; video uses `providerId/modelId/duration/resolution/ratio/mode/generateAudio`. Pass only the fields that are needed and supported, provide `providerId` and `modelId` as a pair, and use the actual returned value for mode.
+3. Write the complete prompt, then read the configuration and canvas again to check the actual prompt, references, specifications, and the output before the call. If a necessary reference is missing, stop that generation and continue the written work; never silently change image-to-image or multi-reference into a no-reference mode.
+4. Fix the plan for this run: targets, quantity, complete prompt, parameters, reference files with their purposes/order, and number of executions; show it, and either carry over or obtain authorization for the specific compute consumption. When compute cost cannot be queried, state that it is unknown; do not treat conversation tokens as media consumption.
+5. **Re-check right before execution.** After the user replies, read the current canvas and configuration again and compare them with the authorized plan, including nodes, prompt, mode, audio, references, and quantity. If something changed, carry on with the targets that still match; for affected targets, show the differences again and re-check authorization. Do not execute a configuration the interface later modified on the strength of "already confirmed".
+6. When prerequisites and authorization are met, call the actual `node:generateImage` or `node:generateVideo` through `nodeTools`; the current parameter is `{}`. Do not bypass the canvas and switch to direct media tools.
 
-读回与执行不是宿主提供的原子操作。复核后仍发生并发编辑时，本次输出不能仅凭当前 prompt 归因；保留尝试快照，标注依据待核实，不能承诺完全消除并发竞态。
+Reading back and executing are not an atomic operation provided by the host. If concurrent edits still happen after the re-check, this run's output cannot be attributed from the current prompt alone; keep the attempt snapshot, mark the basis as pending verification, and do not promise to fully eliminate concurrency races.
 
-## 生成中与结果回读
+## During generation and reading back results
 
-当前原生节点启动后立即返回 `{status:"generating"}`；`getConfig` 不提供任务终态。记录每次尝试及旧输出。同一已授权批次中，其他节点若不依赖待生成结果，可继续核对并启动；依赖基础图、变体或前段采用结果的节点必须等待，不把依赖链当作独立批次。
+The current native node returns `{status:"generating"}` immediately after starting; `getConfig` does not provide the task's final state. Record each attempt and the old output. Within the same authorized batch, other nodes that do not depend on the pending result may continue to be checked and started; nodes that depend on a base image, a variant, or the adopted result of an earlier segment must wait. Do not treat a dependency chain as an independent batch.
 
-完成本轮可执行的独立启动和文字工作后，汇总生成中的节点及依赖待办，告诉用户完成后回复，保留当前画布。没有状态/等待能力时结束本轮，不伪造后台跟进、无限轮询或把旧文件当新结果。
+After finishing the independent starts and text work that can be done this round, summarize the generating nodes and the dependent to-dos, tell the user to reply when generation completes, and keep the current canvas. When there is no status/wait capability, end the round; do not fake background follow-up, poll endlessly, or present old files as new results.
 
-用户报告完成后用 `getCanvasNodes` 读取相关节点的 `outputs` 和必要 `data`，核对新输出、实际文件以及用户是否期间手动生成或替换过素材。新路径只是证据之一，不能自动证明它属于本次方案；归属不清时询问这次输出对应哪次生成，先不下游采用。
+After the user reports completion, use `getCanvasNodes` to read the `outputs` and necessary `data` of the relevant nodes, and check the new output, the actual file, and whether the user manually generated or replaced material in the meantime. A new path is only one piece of evidence and cannot automatically prove that it belongs to this plan; when ownership is unclear, ask which generation this output corresponds to and do not adopt it downstream yet.
 
-本轮若实际提供了新的任务查询或等待工具，可按其真实合约读取完成、失败和结果，仍保留采用与质量检查。不得根据这段说明臆造 API、jobId 或自动唤醒。
+If this round actually provides a new task query or wait tool, read completion, failure, and results according to its real contract, still keeping adoption and quality checks. Never invent an API, jobId, or automatic wake-up based on this paragraph.
 
-生成失败、超时或取消先确认结果状态及原因。工具返回不明确时不盲重试，以免重复消耗算力；改变方案和额外尝试核对授权范围。用户切换画布、项目或关闭页面可能卸载节点并中止请求，恢复后重新发现状态，不保证后台继续。
+When generation fails, times out, or is cancelled, first confirm the result state and the reason. When the tool's return is unclear, do not retry blindly, to avoid consuming compute twice; changing the plan or making extra attempts requires checking the authorized scope. When the user switches canvas or project or closes the page, nodes may be unloaded and requests aborted; after recovery, rediscover the state, with no guarantee that work continued in the background.
 
-结果能读取时按实际能力检查；视频采用和下一片段接戏见[状态与交付](stateAndDelivery.md)。只有实际确认采用的文件才固定为素材节点，引用能力不足或用户选择外部制作时，给最少必要导入要求，不强制外部平台。
+When results are readable, check them according to the actual capability; for video adoption and continuity into the next segment see [State and Delivery](stateAndDelivery.md). Pin only files whose adoption was actually confirmed as material nodes. When reference capability is insufficient or the user chooses external production, give the minimum necessary import requirements, without forcing an external platform.

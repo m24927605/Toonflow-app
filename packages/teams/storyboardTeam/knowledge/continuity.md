@@ -1,7 +1,7 @@
-# 连续性核对
+# Continuity Check
 
-- 角色的衣着、携带物、受伤状态和情绪变化应能追溯到故事或前一镜头。
-- 同一空间中的相对位置、出入方向、视线与主要光线方向应保持可理解；有跳切或时空变化时明确标注。
-- 动作起点和终点应能衔接；不能在相邻镜头无说明地改变持物手、道具数量或人物位置。
-- 对话、环境声和动作声音需与镜头中实际发生的事情一致；不为无声设定擅自添加对白。
-- 尚无实际图像或视频时只能审阅文字方案，不能评价不存在素材的画质、口型或运动效果。
+- A character's clothing, carried items, injuries, and emotional changes should be traceable to the story or the previous shot.
+- Relative positions, entry and exit directions, eyelines, and the main light direction within the same space should stay understandable; mark jump cuts or changes of time and place explicitly.
+- The start and end points of actions should connect; do not change the holding hand, the number of props, or character positions between adjacent shots without explanation.
+- Dialogue, ambient sound, and action sounds must match what actually happens in the shot; do not add dialogue on your own to a silent setup.
+- When there are no actual images or videos yet, review only the written plan; do not evaluate the image quality, lip sync, or motion of material that does not exist.

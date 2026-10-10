@@ -1,152 +1,152 @@
 ---
 name: canvas
-description: Toonflow 画布操作手册。使用画布工具创建、切换和重命名画布，添加、移动、重命名、连接和删除节点，自动整理整幅画布、调整视口，以及调用节点注册的函数。用户要求操作当前画布或搭建节点流程时使用。
+description: Toonflow canvas operation manual. Use the canvas tools to create, switch, and rename canvases; add, move, rename, connect, and delete nodes; automatically arrange the whole canvas and adjust the viewport; and call functions registered by nodes. Use when the user asks to operate the current canvas or build a node flow.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   displayName: 画布操作手册
   author: Toonflow
 ---
 
-# 画布操作手册
+# Canvas Operation Manual
 
-通过已启用的“画布操作”工具控制当前运行中的画布。工具仅在存在画布上下文时可用；缺少工具时，请用户打开目标项目的画布并确认工具已启用，不通过编辑画布 JSON 绕过工具。
+Control the currently running canvas through the enabled "Canvas Operations" tool. The tool is available only when a canvas context exists; when it is missing, ask the user to open the target project's canvas and confirm the tool is enabled. Do not bypass the tool by editing canvas JSON.
 
-## 操作流程
+## Workflow
 
-1. 已知节点 ID 时直接读取目标；否则用 `getCanvas({})` 确认激活画布概览，用 `findCanvasNodes` 按名称、类型或选择状态查找。仅在需要添加节点时用 `getCanvas({ include: ["nodeTypes"] })` 查询类型。
-2. 根据用户要求选择下面的操作，逐次等待返回。后续调用使用前一步返回的 ID，不猜测 ID、节点类型、端口或节点函数。
-3. 用 `getCanvasNodes` 按需读取目标字段，`getCanvasEdges` 查询局部连接；需要调整节点内容时，用 `getNodeTools` 读取该节点函数的描述和完整 `parameters`，通过 `nodeTools` 调用。
-4. 完成结构调整后，按需调用 `fitCanvas` 展示结果，再用 `getCanvasNodes` / `getCanvasEdges` 只核对受影响节点、名称与连接。`arrangeCanvas` 已自动适配视口，不必重复调用 `fitCanvas`。只报告工具实际完成的操作。
+1. When node IDs are known, read the targets directly; otherwise use `getCanvas({})` to confirm the active canvas overview and `findCanvasNodes` to search by name, type, or selection state. Query types with `getCanvas({ include: ["nodeTypes"] })` only when you need to add nodes.
+2. Choose the operations below according to the user's request, waiting for each return in turn. Later calls use the IDs returned by earlier steps; do not guess IDs, node types, ports, or node functions.
+3. Use `getCanvasNodes` to read target fields as needed and `getCanvasEdges` to query local connections; when you need to adjust node content, use `getNodeTools` to read the description and full `parameters` of that node's functions, and call them through `nodeTools`.
+4. After finishing structural changes, call `fitCanvas` as needed to show the result, then use `getCanvasNodes` / `getCanvasEdges` to check only the affected nodes, names, and connections. `arrangeCanvas` already fits the viewport automatically, so there is no need to call `fitCanvas` again. Report only the operations the tools actually completed.
 
-故事或视频制作先读取 [制作阶段与确认](references/videoProduction.md#0-逐阶段协作)。默认只落实当前已确认阶段；先逐步收集信息，再展示阶段成果并询问调整，等用户明确继续。不因用户说“做一个短片”就一次创建全部分镜与生成节点，也不把提问失败、跳过或沉默当作确认。
+For story or video production, first read [Production stages and confirmation](references/videoProduction.md#0-stage-by-stage-collaboration). By default, carry out only the currently confirmed stage; gather information step by step first, then show the stage's results and ask for adjustments, and wait for the user to explicitly continue. Do not create all storyboard and generation nodes at once just because the user says "make a short film", and do not treat a failed question, a skip, or silence as confirmation.
 
-默认从本次完整剧本生成角色、场景、道具资产，再拆为多镜头片段；一片段对应一份视频提示词和一个视频节点，资产直接用于多参生成。写资产提示词前读取 [资产图规范](../script/references/assetGuide.md)，写视频提示词前读取 [片段制作指南](../script/references/productionGuide.md)，角色面部特写与正侧背完整三视图不能省成通用单张剧情图。
+By default, generate character, scene, and prop assets from the complete script for this task, then split it into multi-shot segments; one segment corresponds to one video prompt and one video node, and assets are used directly for multi-reference generation. Read [Asset Image Guidelines](../script/references/assetGuide.md) before writing asset prompts and [Segment Production Guide](../script/references/productionGuide.md) before writing video prompts; a character's face close-up and complete front, side, and back three views cannot be reduced to a generic single story image.
 
-文档内链接相对当前文件目录。跨技能的 `script` 规范按 `available_skills` 中实际 `location` 定位；依赖缺失时说明缺项，仅继续不依赖它的结构操作，不凭简介补造规范。
+Links in this document are relative to the current file's directory. Locate the cross-skill `script` guidelines by the actual `location` in `available_skills`; when a dependency is missing, state what is missing and continue only the structural operations that do not depend on it. Do not make up guidelines from a summary.
 
-以下写法表示“工具名（参数对象）”。直接调用对应工具，不额外包一层 `{ name, args }`；只有 `nodeTools` 自身含有 `name` 和 `args` 参数。
+The notation below means "toolName(parameter object)". Call the corresponding tool directly without wrapping it in an extra `{ name, args }`; only `nodeTools` itself has `name` and `args` parameters.
 
-## 读取画布
+## Reading the canvas
 
-五个读取工具都支持可选 `canvasId`，用于确认当前激活画布，不能用它读取未激活的画布。每次响应最多 64 KiB，不提供全图快照：
+All five read tools support an optional `canvasId`, used to confirm the currently active canvas; it cannot be used to read an inactive canvas. Each response is at most 64 KiB, and no full-canvas snapshot is provided:
 
-| 工具 | 参数与返回 |
+| Tool | Parameters and return |
 | --- | --- |
-| `getCanvas` | 默认返回 `id`、节点数、连线数、选中数量和 `viewport`。`include: ["canvases"]` 查询 `{ id, name }` 画布列表，`include: ["nodeTypes"]` 查询 `availableNodeTypes` 的 `{ type, label }`；两类列表共用分页，`limit` 默认 30、最多 100。 |
-| `findCanvasNodes` | 按 `query`（ID 或完整名称）、`types`（最多 20 类）、`selectedOnly` 筛选；省略筛选时分页列举。返回 `nodes` 摘要，名称预览最多 512 字符；`limit` 默认 30、最多 100。 |
-| `getCanvasNodes` | `nodeIds` 每次 1–20 个、不允许重复；`fields` 默认 `label/type/position`，还可选 `ports/data/outputs`。`dataKeys` 限定需要的 data 自身属性，最多 20 个；返回 `nodes` 投影。 |
-| `getCanvasEdges` | `nodeIds` 可选、最多 20 个；`direction` 取 `incoming/outgoing/both`，默认 `both`，省略 ID 才分页遍历全部边。返回 `edges`；`limit` 默认 100、最多 200。 |
-| `getNodeTools` | `nodeIds` 每次 1–20 个、不允许重复，`names` 可筛选最多 20 个完整函数名。返回 `nodeTools`（含 `nodeId/name/description/parameters`）；`limit` 默认 20、最多 50。schema 不截断，单项过大则明确报错。 |
+| `getCanvas` | By default returns `id`, node count, edge count, selected count, and `viewport`. `include: ["canvases"]` queries the `{ id, name }` canvas list, and `include: ["nodeTypes"]` queries `availableNodeTypes` as `{ type, label }`; the two lists share paging, with `limit` defaulting to 30 and at most 100. |
+| `findCanvasNodes` | Filters by `query` (ID or full name), `types` (at most 20 types), and `selectedOnly`; with filters omitted, it lists by page. Returns `nodes` summaries, with name previews of at most 512 characters; `limit` defaults to 30, at most 100. |
+| `getCanvasNodes` | `nodeIds` takes 1–20 per call with no duplicates; `fields` defaults to `label/type/position`, and `ports/data/outputs` are also available. `dataKeys` limits the needed own properties of data, at most 20; returns `nodes` projections. |
+| `getCanvasEdges` | `nodeIds` is optional, at most 20; `direction` takes `incoming/outgoing/both`, defaulting to `both`; only omitting IDs pages through all edges. Returns `edges`; `limit` defaults to 100, at most 200. |
+| `getNodeTools` | `nodeIds` takes 1–20 per call with no duplicates, and `names` can filter by at most 20 full function names. Returns `nodeTools` (with `nodeId/name/description/parameters`); `limit` defaults to 20, at most 50. Schemas are not truncated; an item that is too large reports an explicit error. |
 
-分页检查 `hasMore` / `nextCursor`，保留全部原查询参数，仅替换 `cursor`；节点筛选和连线查询每次最多扫描 2000 项，即使当前 `nodes` / `edges` 为空，`hasMore: true` 也表示尚未扫描完。`totalNodes` / `totalEdges` 是整张画布的总量，不是筛选命中数。游标不自行解析或构造，失效后重新查询。`selectedOnly` 按各页读取当时的选择状态筛选，用户编辑可能改变查询结果，不把分页当成冻结快照。
+For paging, check `hasMore` / `nextCursor`, keep all original query parameters, and replace only `cursor`. Node filtering and edge queries scan at most 2000 items per call; even when the current `nodes` / `edges` is empty, `hasMore: true` means scanning is not finished. `totalNodes` / `totalEdges` are totals for the whole canvas, not filter match counts. Do not parse or construct cursors yourself; query again when one becomes invalid. `selectedOnly` filters by the selection state at the time each page is read, and user edits may change query results; do not treat paging as a frozen snapshot.
 
-单节点内部也可能很大。`getCanvasNodes` 用 `path` 选择投影内的子路径，例如 `path: ["data", "promptModel"]` 或 `["outputs", "text", "value"]`，返回该路径的 `value`；首段只能是六种投影字段，`ports` 对应节点的 `data.handles`。数组和对象用 `valueOffset` / `valueLimit` 分页，默认 0 / 30、最多 100 项；字符串用 `textOffset` / `textLimit` 分段，默认 0 / 1000、最多 4000 字符。`valueOffset` 或 `textOffset` 大于 0 时必须提供 `path`，避免所有投影字段一起错位。路径只访问自身属性，不能读取继承属性。
+A single node can also be large internally. `getCanvasNodes` uses `path` to select a subpath within a projection, for example `path: ["data", "promptModel"]` or `["outputs", "text", "value"]`, and returns the `value` at that path; the first segment can only be one of the six projection fields, and `ports` corresponds to the node's `data.handles`. Arrays and objects are paged with `valueOffset` / `valueLimit`, defaulting to 0 / 30, at most 100 items; strings are segmented with `textOffset` / `textLimit`, defaulting to 0 / 1000, at most 4000 characters. When `valueOffset` or `textOffset` is greater than 0, `path` is required, to avoid misaligning all projection fields together. Paths access only own properties and cannot read inherited properties.
 
-`path` 最多 64 层，每段最多 256 字符（允许 JSON 对象的空键），整个路径的 JSON UTF-8 长度最多 2048 字节。达到路径深度或字节边界时返回 `pathDepthLimit` / `pathBytesLimit`，不得将该标记误认成已读完整内容；超长键用 `keyTooLong` 标记，并提供 `nextOffset` 以继续读取后续字段。
+`path` has at most 64 levels and at most 256 characters per segment (empty keys of JSON objects are allowed), and the JSON UTF-8 length of the whole path is at most 2048 bytes. When the path depth or byte limit is reached, `pathDepthLimit` / `pathBytesLimit` is returned; never mistake that marker for having read the complete content. An overlong key is marked `keyTooLong`, with a `nextOffset` provided to continue reading later fields.
 
-顶层 `hasMore/nextCursor` 表示还有节点未返回，保持原参数继续节点分页；每个节点的 `truncated` 表示该节点的值未读全。处理任一截断项时仅查询所属节点，使用该项路径及偏移，不携带原 `cursor`；具体规则：
+Top-level `hasMore/nextCursor` means some nodes have not been returned yet; keep the original parameters to continue node paging. Each node's `truncated` means that node's value was not fully read. When handling any truncated item, query only the node it belongs to, using that item's path and offset, without carrying the original `cursor`. Specific rules:
 
-- `text`：用该项 `path` 和 `nextOffset` 作为 `textOffset` 续读；`entries`：用该项 `path` 和 `nextOffset` 作为 `valueOffset` 续读。没有 `nextOffset` 表示该路径已到末尾，标记仍可能存在，因为本次只返回了后半段。
-- `depth/budget`：以该项 `path` 发起新的详情查询，缩小读取范围；重新读取路径时不携带原查询的 `cursor`。
-- `pathDepthLimit/pathBytesLimit/keyTooLong/circular` 表示无法完整展开。`keyTooLong` 可按返回的 `nextOffset` 跳过该键继续读取后续字段，但被跳过的值仍未取得；不反复重试硬限制或把它当完整内容。
+- `text`: continue reading with that item's `path` and `nextOffset` as `textOffset`; `entries`: continue reading with that item's `path` and `nextOffset` as `valueOffset`. A missing `nextOffset` means that path has reached its end; the marker may still be present because this call returned only the latter part.
+- `depth/budget`: start a new detail query with that item's `path`, narrowing the read scope; when re-reading the path, do not carry the original query's `cursor`.
+- `pathDepthLimit/pathBytesLimit/keyTooLong/circular` mean it cannot be fully expanded. For `keyTooLong`, you can skip that key with the returned `nextOffset` and continue reading later fields, but the skipped value is still not obtained; do not repeatedly retry a hard limit or treat it as complete content.
 
-节点内容先读取所需字段，发现截断后再沿路径补齐，不扩大为整图读取。已有文本文件路径交给文件读取工具；核对全文时必须包含已读片段和续读片段。
+For node content, read the needed fields first, and fill in along the path only after finding truncation; do not expand into reading the whole canvas. Hand existing text file paths to the file reading tool; verifying the full text must include both the parts already read and the continued parts.
 
-全局任务逐页处理并记录进度，只在上下文保留当前批次、累计摘要和游标；不要累计全部详情。对全图做增删操作可能使遍历游标失效，重新查询并根据已处理 ID 或结果核对，避免重复执行。节点新增、删除或画布切换后，用 `getNodeTools` 重新发现相关函数。
+For global tasks, process page by page and record progress, keeping only the current batch, a cumulative summary, and the cursor in context; do not accumulate all the details. Adding or deleting across the whole canvas may invalidate the traversal cursor; query again and check against the processed IDs or results to avoid repeated execution. After nodes are added or deleted or the canvas is switched, rediscover the relevant functions with `getNodeTools`.
 
-## 画布管理
+## Canvas management
 
-| 工具 | 参数 | 行为与返回 |
+| Tool | Parameters | Behavior and return |
 | --- | --- | --- |
-| `addCanvas` | `{ name? }` | 创建空白画布并切换到它；省略名称时自动使用未占用的“画布N”。返回新激活画布的概览。 |
-| `switchCanvas` | `{ canvasId }` | 等待当前修改保存后切换到指定画布，返回新激活画布的概览。 |
-| `renameCanvas` | `{ canvasId?, name }` | 省略 ID 时重命名激活画布，同时修改 JSON 文件名。返回操作后的激活画布概览。 |
+| `addCanvas` | `{ name? }` | Creates a blank canvas and switches to it; when the name is omitted, it automatically uses an unused `画布N` (Canvas N). Returns an overview of the newly active canvas. |
+| `switchCanvas` | `{ canvasId }` | Waits for current changes to be saved, then switches to the specified canvas, returning an overview of the newly active canvas. |
+| `renameCanvas` | `{ canvasId?, name }` | When the ID is omitted, renames the active canvas and also changes the JSON file name. Returns an overview of the active canvas after the operation. |
 
-名称去除首尾空白后为 1–120 个字符，不带 `.json` 扩展名，须为合法文件名；不能包含路径分隔符、文件名非法字符、控制字符，不能以点结尾或使用系统保留名。同名文件不会被覆盖。
+After trimming leading and trailing whitespace, a name is 1–120 characters, without the `.json` extension, and must be a valid file name; it cannot contain path separators, characters invalid in file names, or control characters, cannot end with a dot, and cannot use a system-reserved name. A file with the same name is never overwritten.
 
-画布 ID 与文件名关联，重命名后重新读取返回的 ID。重命名非激活画布不会切换过去。通过上述工具成功创建或切换画布后，本轮后续调用会作用于新的激活画布。
+Canvas IDs are tied to file names; after renaming, re-read the returned ID. Renaming an inactive canvas does not switch to it. After a canvas is successfully created or switched through the tools above, later calls this round act on the new active canvas.
 
-## 节点与连线
+## Nodes and edges
 
-| 工具 | 参数 | 行为与返回 |
+| Tool | Parameters | Behavior and return |
 | --- | --- | --- |
-| `addNode` | `{ type, position: { x, y }, label? }` | 新增节点，返回节点信息；函数用 `getNodeTools` 查询。未指定名称时使用类型的 `label`。 |
-| `moveNodes` | `{ moves: [{ nodeId, position: { x, y } }] }` | 批量移动，返回 `nodes` 节点信息。不可拖动的节点会拒绝操作。 |
-| `renameNodes` | `{ renames: [{ nodeId, label }] }` | 批量更新显示名称，返回 `nodes` 节点信息。不改变节点 ID。 |
-| `deleteNodes` | `{ nodeIds: [...] }` | 删除节点及其连接边，返回 `nodeIds`、`removedEdgeCount`、最多 100 项 `removedEdgeIds` 和 `truncated`；截断仅影响回执。 |
-| `connectNodes` | `{ connections: [{ source, sourceHandle, target, targetHandle }] }` | 批量连接输出与输入端口，返回 `{ edges }`。完全相同的连接已存在时返回已有边。 |
-| `deleteEdges` | `{ edgeIds: [...] }` | 删除指定连线，返回 `edgeIds` 及关联节点信息 `nodes`。 |
-| `selectNodes` | `{ nodeIds: [...] }` | 替换当前选择，返回 `selectedCount`、最多 100 项 `selectedNodeIds` 和 `truncated`；空数组取消节点选择。 |
-| `arrangeCanvas` | `{}` | 整理整个当前画布：按真实节点尺寸与连线将顶层节点从左到右排列，子节点随父节点移动，并自动适配视口。返回 `arrangedCount`、最多 100 项 `arrangedNodeIds`、`truncated` 和 `viewport`；不改内容、连线或选择，不触发生成。 |
-| `fitCanvas` | `{ nodeIds?: [...] }` | 调整视口，返回 `fitted`、`viewport`、`nodeCount` 和 `truncated`；传入 `nodeIds` 时另返回最多 100 项 `nodeIds`，省略时展示全部节点。 |
+| `addNode` | `{ type, position: { x, y }, label? }` | Adds a node and returns its information; query functions with `getNodeTools`. When no name is specified, the type's `label` is used. |
+| `moveNodes` | `{ moves: [{ nodeId, position: { x, y } }] }` | Moves in batch, returning `nodes` information. Nodes that cannot be dragged reject the operation. |
+| `renameNodes` | `{ renames: [{ nodeId, label }] }` | Updates display names in batch, returning `nodes` information. Does not change node IDs. |
+| `deleteNodes` | `{ nodeIds: [...] }` | Deletes nodes and their connected edges, returning `nodeIds`, `removedEdgeCount`, at most 100 `removedEdgeIds`, and `truncated`; truncation affects only the receipt. |
+| `connectNodes` | `{ connections: [{ source, sourceHandle, target, targetHandle }] }` | Connects output and input ports in batch, returning `{ edges }`. When an identical connection already exists, the existing edge is returned. |
+| `deleteEdges` | `{ edgeIds: [...] }` | Deletes the specified edges, returning `edgeIds` and the related node information `nodes`. |
+| `selectNodes` | `{ nodeIds: [...] }` | Replaces the current selection, returning `selectedCount`, at most 100 `selectedNodeIds`, and `truncated`; an empty array clears the node selection. |
+| `arrangeCanvas` | `{}` | Arranges the whole current canvas: lays out top-level nodes from left to right by actual node size and edges, child nodes move with their parents, and the viewport is fitted automatically. Returns `arrangedCount`, at most 100 `arrangedNodeIds`, `truncated`, and `viewport`; does not change content, edges, or selection, and does not trigger generation. |
+| `fitCanvas` | `{ nodeIds?: [...] }` | Adjusts the viewport, returning `fitted`, `viewport`, `nodeCount`, and `truncated`; when `nodeIds` is passed, it also returns at most 100 `nodeIds`, and when omitted, it shows all nodes. |
 
-上述操作回执的 `truncated` 只表示 ID 列表缩略，不表示操作只完成了预览部分。不要为了取全回执重复执行操作；按需用读取工具核对受影响范围。
+The `truncated` in the receipts of the operations above means only that the ID list was abbreviated, not that the operation completed only the previewed part. Do not repeat an operation to get the full receipt; check the affected scope with the read tools as needed.
 
-### 参数约束
+### Parameter constraints
 
-- `position` 使用画布坐标，不是屏幕像素坐标；`x`、`y` 必须是有限数字。开启网格吸附时，新增和移动的位置会按网格取整，以返回的 `node.position` 为准。
-- 节点 `label` 去除首尾空白后为 1–200 个字符。
-- `addNode` 只接受当前 `availableNodeTypes` 中的类型，不接受任意 `data` 或自定义节点 ID。需要填写内容或设置节点参数时使用已注册的节点函数。
-- 上述移动、重命名、删除、连接操作每批 1–64 项，单项也使用数组参数。任一项校验失败则整批不执行；执行期间的异常不代表已产生的副作用自动回滚，恢复前仍需回读。
-- 工具顶层参数采用严格对象校验，不传未声明字段。`nodeTools.args` 还要满足具体节点函数的参数定义。
-- 节点 ID、画布 ID、边 ID 是不同的标识，不用显示名称代替它们。
+- `position` uses canvas coordinates, not screen pixel coordinates; `x` and `y` must be finite numbers. When grid snapping is on, added and moved positions are rounded to the grid; the returned `node.position` is authoritative.
+- After trimming leading and trailing whitespace, a node `label` is 1–200 characters.
+- `addNode` accepts only types in the current `availableNodeTypes`, and does not accept arbitrary `data` or custom node IDs. Use registered node functions to fill in content or set node parameters.
+- The move, rename, delete, and connect operations above take 1–64 items per batch, and a single item also uses the array parameter. If any item fails validation, the whole batch is not executed; an exception during execution does not mean side effects already produced are rolled back automatically, so read back before recovering.
+- Top-level tool parameters use strict object validation; do not pass undeclared fields. `nodeTools.args` must also satisfy the specific node function's parameter definition.
+- Node IDs, canvas IDs, and edge IDs are different identifiers; do not use display names in their place.
 
-### 连接规则
+### Connection rules
 
-先通过 `getCanvasNodes({ nodeIds: [...], fields: ["ports"] })` 读取两端端口，每个端口含 `id`、`type`、`dataType`，可能还有 `label`。`source`、`target` 是节点 ID；`sourceHandle`、`targetHandle` 是各自节点内的端口 ID。
+First read the ports at both ends with `getCanvasNodes({ nodeIds: [...], fields: ["ports"] })`; each port has `id`, `type`, `dataType`, and possibly `label`. `source` and `target` are node IDs; `sourceHandle` and `targetHandle` are port IDs within their respective nodes.
 
-- 只能从 `type: "source"` 的输出端口连接到 `type: "target"` 的输入端口。
-- 使用实际端口 ID，不根据“图片输入”等提示文字猜测。不同节点可有同名端口，必须同时确认所属节点。
-- 工具沿用画布和目标节点的连接校验；类型匹配不保证一定可连，目标节点可能有额外规则。连接被拒绝时检查最新端口和函数说明，不修改 JSON 强行接线。
-- 剧本和分镜文本用于规划，不直接作为图片或视频生成节点的输入。先确认角色、场景等资产，再把当前片段的全部镜头转写成一份专用视频提示词；连线只承载本次真正使用的素材。
-- 接好媒体后核对目标的实际引用顺序，再用 `node:setPrompt` 写入 `{{ref N}}`、素材名称和用途。连线成功不等于提示词已绑定素材，详细编号与配置核对见 [制作转换第 3–4 节](references/videoProduction.md)。
-- 节点或连线禁止连接、选择、移动、删除时遵守返回错误。删除有子节点的节点须先删除子节点或将其纳入同一删除批次；若涉及用户未要求删除的内容，先明确范围，不自动扩大删除操作。
+- You can only connect from an output port with `type: "source"` to an input port with `type: "target"`.
+- Use actual port IDs; do not guess from hint text such as "Image input". Different nodes can have ports with the same name, so always confirm the node they belong to as well.
+- The tool follows the connection validation of the canvas and the target node; matching types do not guarantee a connection is allowed, as the target node may have extra rules. When a connection is rejected, check the latest ports and function descriptions; do not force the connection by editing JSON.
+- Script and storyboard text are for planning and do not serve directly as inputs to image or video generation nodes. First confirm assets such as characters and scenes, then transcribe all shots of the current segment into one dedicated video prompt; edges carry only the material actually used this time.
+- After connecting media, check the target's actual reference order, then use `node:setPrompt` to write `{{ref N}}`, the material names, and their purposes. A successful connection does not mean the prompt is bound to the material; for detailed numbering and configuration checks see [sections 3–4 of the production conversion](references/videoProduction.md).
+- When a node or edge forbids connecting, selecting, moving, or deleting, follow the returned error. To delete a node that has child nodes, first delete the child nodes or include them in the same deletion batch; if this involves content the user did not ask to delete, clarify the scope first and do not automatically expand the deletion.
 
-## 调用节点函数
+## Calling node functions
 
-使用 `nodeTools({ nodeId, name, args })`：
+Use `nodeTools({ nodeId, name, args })`:
 
-- `nodeId` 与 `name` 必须来自同一项函数清单；`name` 保留完整 `node:` 前缀。
-- 按该项 `parameters` 的 JSON Schema 构造 `args`，遵守必填字段、枚举与数据结构；无参数函数也传 `{}`。
-- 不假定所有节点都有同一组函数，例如设置提示词、导入素材、生成媒体等能力必须以该节点实际注册内容为准。
-- 需要核对或修改生成配置时，若清单提供 `node:getConfig`，通过它读取当前配置和可用模型能力；需要变更的选项使用 `node:setConfig` 按实际参数说明修改，再核对返回结果。配置修改不触发生成；用户已确认的有效设置继续沿用，不因普通编辑任务重新选模型。
-- 图片或视频生成前展示实际模型、对象与数量、规格、提示词、参考及费用，等待用户明确批准算力消耗方案；报价未知就说明未知。单张、小样、追加、重生成和可能收费的重试都受授权范围约束，具体批次可一次确认。使用可用的 `askUser`，没有该工具时文字提问等待答复；未回答不能触发生成。图片未指定模型时优先选择可用的 gpt-image，不能把节点自动默认值当成用户选择；不可用时先确认替代模型。
-- 返回值由节点函数决定；无返回值时为 `null`。五个画布读取工具的 64 KiB 上限不适用于 `nodeTools` 业务函数执行结果。执行成功不自动代表媒体生成成功，须检查返回内容及最新节点状态。
-- 新建节点后可立即用返回的节点 ID 查询 `getNodeTools` 并调用，不必结束当前轮对话。
+- `nodeId` and `name` must come from the same entry in the function list; `name` keeps the full `node:` prefix.
+- Build `args` according to the JSON Schema in that entry's `parameters`, following required fields, enums, and data structures; pass `{}` even for functions with no parameters.
+- Do not assume all nodes have the same set of functions; capabilities such as setting prompts, importing material, and generating media must follow what the node actually registered.
+- When you need to check or change the generation configuration, if the list provides `node:getConfig`, use it to read the current configuration and available model capabilities; change the options that need changing with `node:setConfig` according to the actual parameter descriptions, then check the returned result. Configuration changes do not trigger generation; valid settings the user has confirmed stay in use, and do not re-select the model for ordinary editing tasks.
+- Before image or video generation, show the actual model, targets and quantity, specifications, prompt, references, and cost, and wait for the user to explicitly approve the compute consumption plan; when the price is unknown, say it is unknown. Single images, samples, additions, regenerations, and possibly charged retries are all bound by the authorized scope, and a specific batch can be confirmed at once. Use the available `askUser`; without that tool, ask in text and wait for the answer. No answer cannot trigger generation. When no image model is specified, prefer an available gpt-image, and do not treat the node's automatic default as the user's choice; when it is unavailable, confirm an alternative model first.
+- The return value is determined by the node function; it is `null` when there is no return value. The 64 KiB limit of the five canvas read tools does not apply to the execution results of `nodeTools` business functions. Successful execution does not automatically mean media generation succeeded; check the returned content and the latest node state.
+- After creating a node, you can immediately query `getNodeTools` with the returned node ID and call functions, without ending the current conversation round.
 
-## 常见任务
+## Common tasks
 
-### 把创作方案转成可执行画布
+### Turning a creative plan into an executable canvas
 
-剧本、小说或创意制作任务需要把分镜、素材和提示词落实为节点时，读取 [视频制作的画布转换](references/videoProduction.md)。其中说明哪些内容放进文本节点、如何复用媒体和连接真实依赖，以及后台生成的完成核对。通用参数仍以本手册和当前工具返回的说明为准。
+When a script, novel, or creative production task needs storyboards, material, and prompts turned into nodes, read [Canvas Conversion for Video Production](references/videoProduction.md). It explains what goes into text nodes, how to reuse media and connect real dependencies, and how to verify completion of background generation. General parameters still follow this manual and the descriptions returned by the current tools.
 
-### 新建画布并添加节点
+### Creating a canvas and adding nodes
 
-调用 `addCanvas({ "name": "分镜草稿" })`，再用 `getCanvas({ "include": ["nodeTypes"] })` 查询 `availableNodeTypes`，选取符合用户要求的类型传入 `addNode` 的 `type`。例如位置可用 `{ "x": 120, "y": 160 }`；名称由用户意图决定。记录返回的 `node.id`，用 `getNodeTools` 查询并调用函数填写节点内容，最后调用 `fitCanvas({})`。
+Call `addCanvas({ "name": "Storyboard Draft" })`, then query `availableNodeTypes` with `getCanvas({ "include": ["nodeTypes"] })`, and pass a type that matches the user's request as the `type` of `addNode`. For example, the position can be `{ "x": 120, "y": 160 }`; the name is determined by the user's intent. Record the returned `node.id`, query with `getNodeTools` and call functions to fill in the node content, and finally call `fitCanvas({})`.
 
-### 连接两个已有节点
+### Connecting two existing nodes
 
-调用 `findCanvasNodes`，按用户指定的名称或选择状态定位两个节点；已知 ID 时跳过查找，若同名节点无法区分则先明确目标。用 `getCanvasNodes` 读取输出与输入端口后，将实际 ID 填入 `connectNodes` 的 `connections` 数组。检查返回 `edges` 的两端，再按需聚焦这两个节点。
+Call `findCanvasNodes` to locate the two nodes by the name or selection state the user specified; skip the search when IDs are known, and if nodes with the same name cannot be told apart, clarify the targets first. After reading the output and input ports with `getCanvasNodes`, fill the actual IDs into the `connections` array of `connectNodes`. Check both ends of the returned `edges`, then focus on these two nodes as needed.
 
-### 查找并读取指定片段
+### Finding and reading a specified segment
 
-例如用户指定 G51，先调用 `findCanvasNodes({ "query": "G51", "limit": 20 })`，按分页结果确认目标。以下 `目标ID` 须替换成返回的实际 ID：
+For example, when the user specifies G51, first call `findCanvasNodes({ "query": "G51", "limit": 20 })` and confirm the target from the paged results. Replace `targetId` below with the actual returned ID:
 
-- 核对提示词与输出：`getCanvasNodes({ "nodeIds": ["目标ID"], "fields": ["label", "data", "outputs"], "dataKeys": ["prompt", "referenceOrder"] })`。默认字段不含 `ports/data/outputs`，不能把未请求的字段当作空值。
-- 读取长提示词：`getCanvasNodes({ "nodeIds": ["目标ID"], "path": ["data", "prompt"], "textLimit": 4000 })`；后续使用返回的 `nextOffset`，不自行按请求长度推算。
-- 查询目标入边：`getCanvasEdges({ "nodeIds": ["目标ID"], "direction": "incoming", "limit": 100 })`；查询可调用函数：`getNodeTools({ "nodeIds": ["目标ID"], "limit": 20 })`。
+- Check the prompt and output: `getCanvasNodes({ "nodeIds": ["targetId"], "fields": ["label", "data", "outputs"], "dataKeys": ["prompt", "referenceOrder"] })`. The default fields do not include `ports/data/outputs`; do not treat fields you did not request as empty.
+- Read a long prompt: `getCanvasNodes({ "nodeIds": ["targetId"], "path": ["data", "prompt"], "textLimit": 4000 })`; afterwards use the returned `nextOffset`, and do not calculate it yourself from the requested length.
+- Query the target's incoming edges: `getCanvasEdges({ "nodeIds": ["targetId"], "direction": "incoming", "limit": 100 })`; query callable functions: `getNodeTools({ "nodeIds": ["targetId"], "limit": 20 })`.
 
-### 批量整理节点
+### Arranging nodes in bulk
 
-仅当用户明确要求整理整幅当前画布时，在确认目标后调用一次 `arrangeCanvas({})`，不自行计算所有节点坐标再逐个移动。此工具复用画布现有整理功能，不接受 `nodeIds` 或其他局部范围参数。
+Only when the user explicitly asks to arrange the whole current canvas, call `arrangeCanvas({})` once after confirming the target; do not calculate coordinates for all nodes yourself and move them one by one. This tool reuses the canvas's existing arrange feature and does not accept `nodeIds` or any other partial scope parameter.
 
-待整理节点尚未测量或不可移动时，工具明确返回错误；不要猜测尺寸或绕过移动限制。空画布正常返回空的 `arrangedNodeIds`，不执行布局或视口调整。
+When nodes to be arranged have not been measured yet or cannot be moved, the tool returns an explicit error; do not guess sizes or bypass movement restrictions. An empty canvas normally returns an empty `arrangedNodeIds` and performs no layout or viewport adjustment.
 
-只整理指定镜头或局部节点时，读取实际位置与目标范围，用 `moveNodes` 的 `moves` 数组调整这些节点，按需用 `fitCanvas({ "nodeIds": [...] })` 展示。只要求看清内容时直接用 `fitCanvas`，不重排节点。不得为了局部整理调用 `arrangeCanvas` 移动用户其他节点，也不删除或重建节点来代替移动。
+When arranging only specified shots or some nodes, read their actual positions and the target area, adjust these nodes with the `moves` array of `moveNodes`, and show them with `fitCanvas({ "nodeIds": [...] })` as needed. When the user only wants to see content clearly, use `fitCanvas` directly without rearranging nodes. Never call `arrangeCanvas` for partial arrangement and move the user's other nodes, and do not delete or rebuild nodes instead of moving them.
 
-## 失败后的处理
+## Handling failures
 
-- 节点类型未启用、端口不存在、函数未注册：分别用 `getCanvas({ include: ["nodeTypes"] })`、`getCanvasNodes`、`getNodeTools` 查询最新状态并调整操作，不要猜测替代函数。
-- 画布已关闭、用户手动切换项目或画布、本轮上下文失效：停止沿用旧 ID，请用户在目标画布重新发送请求。
-- 超时、取消或保存失败不等于操作已回滚。上下文仍有效时先读取最新画布状态，确认是否已创建节点、连线或画布，再决定是否重试，避免重复创建或重复触发生成。
-- 工具会等待需要保存的操作完成保存；不要另外直接写画布 JSON。当前工具不提供删除画布、任意写入节点数据或任意设置视口参数的通用接口。
+- Node type not enabled, port does not exist, function not registered: query the latest state with `getCanvas({ include: ["nodeTypes"] })`, `getCanvasNodes`, and `getNodeTools` respectively and adjust the operation; do not guess substitute functions.
+- The canvas was closed, the user manually switched project or canvas, or this round's context became invalid: stop using the old IDs and ask the user to resend the request on the target canvas.
+- A timeout, cancellation, or save failure does not mean the operation was rolled back. While the context is still valid, first read the latest canvas state to confirm whether nodes, edges, or canvases were created, then decide whether to retry, avoiding duplicate creation or duplicate generation triggers.
+- The tool waits for operations that need saving to finish saving; do not separately write canvas JSON directly. The current tools provide no general interface for deleting canvases, writing arbitrary node data, or setting arbitrary viewport parameters.

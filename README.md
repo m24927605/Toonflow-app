@@ -24,7 +24,7 @@ Toonflow is an open-source AI creation platform for short dramas, animated comic
 | 🧩 **Plugins** | Extend Toonflow with node, tool, skill, agent, and editor extension plugins, installed from local packages and managed under Settings → Plugins. |
 | 🤖 **Open Agent** | Open access to prompts, tools, and A2A to customize Agent behavior and collaborate with external Agents. |
 | 🔧 **Flexible model integration** | Sign in with OpenAI Codex, use a local Claude Code, add API providers such as DeepSeek or any OpenAI- or Anthropic-compatible service, or connect local ComfyUI instances and LLMs. See [Model Providers](#4--model-providers). |
-| 🌐 **Interface languages** | English, 繁體中文 (Traditional Chinese), and 简体中文 (Simplified Chinese). |
+| 🌐 **Interface languages** | English, Traditional Chinese, and Simplified Chinese. |
 
 ---
 
@@ -128,7 +128,7 @@ mkdir -p data/workspaces/myProject
 bun run start:server
 ```
 
-When the log shows `[服务启动成功]` (service started), open `http://127.0.0.1:3000` on the server itself. The command above runs in the foreground; press `Ctrl+C` to stop it. For startup at boot and process management, see [Bun's systemd deployment guide](https://bun.sh/guides/ecosystem/systemd): set the working directory to the repository directory and the start command to the absolute path of Bun followed by `run start:server`, and run it as a user with read and write access to that directory.
+When the log prints the service address, open `http://127.0.0.1:3000` on the server itself. The command above runs in the foreground; press `Ctrl+C` to stop it. For startup at boot and process management, see [Bun's systemd deployment guide](https://bun.sh/guides/ecosystem/systemd): set the working directory to the repository directory and the start command to the absolute path of Bun followed by `run start:server`, and run it as a user with read and write access to that directory.
 
 </details>
 

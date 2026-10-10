@@ -5,7 +5,7 @@ Lets the Agent read the body text of a specified public URL; suitable for summar
 ## How to Use
 
 Provide the URL and the task in the conversation, for example: "Read this web page, extract the points related to video production, and cite the source."
-This tool reads known URLs; when you first need to find relevant websites, use it together with Web Search (`联网搜索`).
+This tool reads known URLs; when you first need to find relevant websites, use it together with Web Search.
 
 ## Features
 
@@ -17,9 +17,9 @@ This tool reads known URLs; when you first need to find relevant websites, use i
 
 ## Configuration
 
-In Settings → Plugins → Installed, find Read Web Page (`读取网页`) and click "Configuration".
+In Settings → Plugins → Installed, find Read Web Page and click "Configuration".
 
-- "Timeout (ms)" (`超时（毫秒）`): defaults to 20000 and can be set to 1000–60000.
-- "Maximum body characters" (`正文最大字符数`): defaults to 40000 and can be set to 1000–100000; body text beyond the limit is truncated.
+- "Timeout (ms)": defaults to 20000 and can be set to 1000–60000.
+- "Maximum body characters": defaults to 40000 and can be set to 1000–100000; body text beyond the limit is truncated.
 
 No API key is required. Pages that depend on script rendering may not return their full content.

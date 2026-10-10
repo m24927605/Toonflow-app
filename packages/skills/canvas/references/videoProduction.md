@@ -1,116 +1,116 @@
-# 视频制作的画布转换
+# Canvas Conversion for Video Production
 
-把已确定的创作内容变成用户可以编辑、连接和继续生成的画布。适用于剧本、小说和创意技能中的画布制作阶段；创作判断由对应技能负责，本文件只说明如何落实。工具调用约定见 [画布操作手册](../SKILL.md)，不需要访问外部资料。
+Turn settled creative content into a canvas the user can edit, connect, and keep generating from. This applies to the canvas production stage in script, novel, and creative skills; creative judgment belongs to the corresponding skill, and this file only explains how to carry it out. For tool call conventions see the [Canvas Operation Manual](../SKILL.md); no external resources are needed.
 
-## 0. 逐阶段协作
+## 0. Stage-by-stage collaboration
 
-默认采用 Seedance 2.0/2.5 多参生产：先完成并确认本次范围的完整剧本，再根据剧本生成角色、场景、道具资产；从完整剧本拆出多个片段，每片段的全部镜头转成一份视频提示词，资产直接作为视频输入。一个片段可以有多个镜头和动作，对应一个视频节点；不默认生成关键帧。用户明确提出首帧、首尾帧、构图锁定等特殊要求时，再增加对应阶段。
+By default, use Seedance 2.0/2.5 multi-reference production: first complete and confirm the complete script for this task's scope, then generate character, scene, and prop assets from the script; split the complete script into multiple segments, turn all shots of each segment into one video prompt, and use the assets directly as video inputs. A segment can have multiple shots and actions and corresponds to one video node; do not generate keyframes by default. Add the corresponding stage only when the user explicitly asks for special requirements such as a first frame, first and last frames, or composition locking.
 
-写资产提示词前必须读取 [资产图规范](../../script/references/assetGuide.md)，拆片段和写视频提示词前必须读取 [片段制作指南](../../script/references/productionGuide.md)。本文件负责画布映射，不能用操作说明代替上述具体模板。
+You must read [Asset Image Guidelines](../../script/references/assetGuide.md) before writing asset prompts, and [Segment Production Guide](../../script/references/productionGuide.md) before splitting segments and writing video prompts. This file covers canvas mapping and cannot replace those specific templates with operating instructions.
 
-| 阶段 | 给用户看的成果 | 确认后才推进的内容 |
+| Stage | Results shown to the user | What advances only after confirmation |
 | --- | --- | --- |
-| 需求与简报 | 已知需求、尚缺的受众/时长/画幅/风格/声音/参考用途 | 故事与剧本；每轮只问当前必要的少量问题 |
-| 完整剧本 | 本次范围的逐场正文、完整动作和对白/OS/VO、开头经过与结尾；梗概不能代替正文 | 根据剧本提取角色、场景和道具；不能因题目熟悉就跳过剧本 |
-| 资产设计与准备 | 剧本资产清单、分类型提示词、角色面部特写及正侧背三视图等实际资产成果 | 按确认范围生成并验收素材，已有合格资产复用；通过后供视频使用 |
-| 剧本分片段与视频提示词 | 每片段的剧本范围、内部镜头、预计时长、承接状态及一份完整多参提示词 | 一个明确范围的完整片段小样，不按内部镜头各建生成任务 |
-| 视频小样 | 实际视频、已检查内容及需调整之处 | 用户确认效果后扩展其同意的镜头范围 |
-| 批量制作与交付 | 对应片段的素材、实际规格、剩余问题 | 剪辑/合成或下一批；没有合成能力就交付片段，不宣称成片 |
+| Requirements and brief | Known requirements and what is still missing: audience/duration/aspect ratio/style/audio/reference purposes | Story and script; ask only the few questions currently necessary each round |
+| Complete script | Scene-by-scene body text for this scope, complete action and dialogue/OS/VO, the opening, development, and ending; a synopsis cannot replace the body text | Extracting characters, scenes, and props from the script; do not skip the script because the topic is familiar |
+| Asset design and preparation | The script's asset list, prompts by type, and actual asset results such as character face close-ups and front, side, and back three views | Generating and reviewing material within the confirmed scope, reusing existing qualified assets; once approved, they are available to videos |
+| Script segments and video prompts | Each segment's script range, internal shots, estimated duration, carried-over state, and one complete multi-reference prompt | One complete segment sample of a clear scope; do not create separate generation tasks for internal shots |
+| Video sample | The actual video, what was checked, and what needs adjusting | After the user confirms the result, expanding to the shot range they agreed to |
+| Batch production and delivery | Material for the corresponding segments, actual specifications, remaining problems | Editing/compositing or the next batch; without compositing capability, deliver segments and do not claim a final cut |
 
-- 每阶段先完成可审阅成果，再用可用的 `askUser` 询问“按当前方案继续 / 调整”；未提供该工具时文字提问并等待答复。等待真实回答后再推进，不在同一轮连做多个未经确认的阶段，也不把每次工具调用变成一次提问。涉及消耗算力生成时，问题明确写出本次生成方案和收费性质。
-- 用户已明确确认或授权连续完成的具体阶段直接沿用。确认简报不代表确认剧本，确认资产生成不代表验收生成结果，允许一个小样不代表允许整片批量生产。
-- `askUser` 的 `title`、`question` 都必填；多问题用 `fields`，字段名用 `visualStyle`、`referenceUse` 这样唯一的小驼峰名称。不要同时传 `fields` 和顶层 `options`。表单失败时修正参数重发，不能当作用户跳过；阶段确认被跳过、取消或未回答时保留成果并暂停，不自动批准，也不循环追问。
-- 用户调整内容后，先同步更新受影响的简报、分镜和节点提示词，再展示更新后的阶段成果。比如改为“无旁白”时，不能让画布保留旧旁白，而另用聊天里的新提示词直接生成。
-- 画布制作沿节点内的实际配置与生成能力执行；不能为了绕过阶段确认或节点参数缺口，转用其他生成工具偷偷换一套方案。
+- For each stage, first complete reviewable results, then use the available `askUser` to ask "Continue with the current plan / Adjust"; when that tool is not provided, ask in text and wait for the answer. Advance only after a real answer; do not run several unconfirmed stages in the same round, and do not turn every tool call into a question. When compute-consuming generation is involved, the question explicitly states the generation plan for this run and that it is charged.
+- Carry over specific stages the user has explicitly confirmed or authorized to complete continuously. Confirming the brief does not confirm the script, confirming asset generation does not accept the generated results, and allowing one sample does not allow batch production of the whole film.
+- `askUser` requires both `title` and `question`; for multiple questions use `fields`, with unique lowerCamelCase field names such as `visualStyle` and `referenceUse`. Do not pass both `fields` and top-level `options`. When the form fails, fix the parameters and resend; do not treat it as the user skipping. When a stage confirmation is skipped, cancelled, or unanswered, keep the results and pause; do not auto-approve and do not keep asking in a loop.
+- After the user adjusts content, first update the affected brief, storyboard, and node prompts, then show the updated stage results. For example, when it changes to "no narration", do not leave the old narration on the canvas while generating directly from a new prompt in the chat.
+- Canvas production follows the actual configuration and generation capabilities in the nodes; do not switch to other generation tools to quietly swap in another plan in order to bypass stage confirmation or gaps in node parameters.
 
-## 1. 读取现状，再决定需要哪些节点
+## 1. Read the current state, then decide which nodes are needed
 
-用 `getCanvas` 确认目标画布概览，按需传 `include: ["nodeTypes"]` 查询可用类型。用 `findCanvasNodes` 定位已有节点；已知 ID 时直接用 `getCanvasNodes` 查询必要字段，用 `getCanvasEdges` 查询局部连接，用 `getNodeTools` 查询函数。遵守分页、截断信息和游标，不读取整图详情；全图任务分批完成，仅保留当前批次和摘要。在当前画布制作时沿用当前画布；只有明确需要新画布或切换已有作品时才使用相应工具。
+Use `getCanvas` to confirm the target canvas overview, passing `include: ["nodeTypes"]` as needed to query available types. Use `findCanvasNodes` to locate existing nodes; when IDs are known, use `getCanvasNodes` directly to query the necessary fields, `getCanvasEdges` to query local connections, and `getNodeTools` to query functions. Follow paging, truncation information, and cursors, and do not read the details of the whole canvas; complete whole-canvas tasks in batches, keeping only the current batch and a summary. When producing on the current canvas, keep using it; use the corresponding tools only when a new canvas or switching to an existing work is explicitly needed.
 
-- 节点类型从 `getCanvas` 的 `availableNodeTypes` 选择，内容修改与生成函数从 `getNodeTools` 返回的 `nodeTools` 清单选择，再通过 `nodeTools` 执行。名称相似不代表能力相同，不把示例名称当作固定类型 ID。
-- 用剧本场号、片段号或用户已有名称定位内容；内部镜号保留在片段计划和提示词中。结合文本、素材及连接区分同名节点，续作时只补当前缺项。
-- 文本、图像、视频是内容职责，不强制每个环节都建节点。已经存在的媒体输出可以直接连接下游，不另建复制结果的节点。
-- 先完成当前已确认阶段的一个制作单元，填内容、核对引用，再展开获准的范围。资产未确认时不批量建立整片视频节点，也不先建一批空节点再补内容。
+- Choose node types from `availableNodeTypes` of `getCanvas`, and content-editing and generation functions from the `nodeTools` list returned by `getNodeTools`, then execute them through `nodeTools`. Similar names do not mean the same capability; do not treat example names as fixed type IDs.
+- Locate content by script scene numbers, segment numbers, or the user's existing names; keep internal shot numbers in the segment plan and prompts. Distinguish nodes with the same name by their text, material, and connections, and when continuing a work, fill in only the current gaps.
+- Text, image, and video are content responsibilities; you do not have to create a node for every step. An existing media output can connect downstream directly, without creating a node that duplicates the result.
+- First complete one production unit of the currently confirmed stage, filling in content and checking references, then expand to the approved scope. When assets are not confirmed, do not create video nodes for the whole film in bulk, and do not create a batch of empty nodes first and fill them in later.
 
-## 2. 内容落在可编辑的位置
+## 2. Put content where it can be edited
 
-| 内容 | 放在哪里 | 怎样使用 |
+| Content | Where it goes | How it is used |
 | --- | --- | --- |
-| 创意简报、完整剧本、片段与镜头表 | 文本节点 | 保存可编辑的正文和规划；不直接连到图片或视频生成节点。 |
-| 角色、场景、道具设计 | 对应资产的图片生成节点 | 按资产图规范填写：角色面部特写加完整三视图，场景/道具按各自类型与画风布局；不把片段动作、对白、运镜当成出图提示词。 |
-| 已确认角色图、场景图、道具图 | 已有媒体输出或素材节点 | 直接复用并连接多参视频节点；已有文件通过实际素材导入函数装入节点。 |
-| 一个片段的全部镜头 | 一个视频生成节点的提示词 | 从本段对应剧本与镜头计划转写一份三段式提示词，包含真实素材定义、顺序镜头及风格约束；不把内部镜头拆成多个节点。 |
-| 特殊要求的关键帧或首尾帧 | 对应图片生成节点 | 仅在该路线已明确确认时准备，不作为多参制作的固定中间步骤。 |
+| Creative brief, complete script, segment and shot tables | Text nodes | Keep the editable body text and planning; do not connect them directly to image or video generation nodes. |
+| Character, scene, and prop designs | Image generation nodes for the corresponding assets | Fill in according to the asset image guidelines: a character face close-up plus complete three views, and scene/prop layouts according to their type and art style; do not use segment action, dialogue, or camera movement as image prompts. |
+| Confirmed character, scene, and prop images | Existing media outputs or material nodes | Reuse them directly and connect them to the multi-reference video node; load existing files into nodes through the actual material import function. |
+| All shots of one segment | The prompt of one video generation node | Transcribe one three-part prompt from this segment's script and shot plan, containing real material definitions, sequential shots, and style constraints; do not split internal shots into multiple nodes. |
+| Keyframes or first and last frames for special requirements | The corresponding image generation nodes | Prepare them only when that route has been explicitly confirmed; they are not a fixed intermediate step of multi-reference production. |
 
-操作顺序为：`addNode` → 记录返回的 `node.id` → `getNodeTools` 查询函数 → `renameNodes`（需要时，传 `renames` 数组）→ `nodeTools` 填内容。创建时也可直接设置名称；已有节点从修改内容开始。只创建空节点或把提示词留在聊天里，都不算完成画布搭建。
+The order of operations is: `addNode` → record the returned `node.id` → query functions with `getNodeTools` → `renameNodes` (when needed, passing the `renames` array) → fill in content with `nodeTools`. The name can also be set directly at creation; for existing nodes, start from editing the content. Creating only empty nodes or leaving prompts in the chat does not count as finishing the canvas build.
 
-当前内置节点可能提供 `node:setText`、`node:setImage`、`node:setVideo`、`node:setAudio`、`node:setPrompt`、`node:getConfig`、`node:setConfig` 和相应生成函数；只有本次函数清单确实包含它时才使用，参数读取该函数说明，不将这些名称套给其他插件。
+Current built-in nodes may provide `node:setText`, `node:setImage`, `node:setVideo`, `node:setAudio`, `node:setPrompt`, `node:getConfig`, `node:setConfig`, and the corresponding generation functions; use one only when this run's function list actually contains it, read that function's description for its parameters, and do not apply these names to other plugins.
 
-文本节点写入的是可供下游读取的文本内容，不等同于触发节点内的语言模型。文字已由当前助手完成时直接写入，不需要再次生成。用 `getCanvasNodes` 的 `fields: ["data"], dataKeys: ["textPath"]` 读取正文文件位置，再读取实际文件核对；需要查看当前内存正文时用 `path: ["outputs", "text", "value"]` 分段读取。默认详情未包含正文不代表节点为空，也不要猜路径或直接改文件替代节点函数。
+What a text node stores is text content that downstream nodes can read; it is not the same as triggering the language model inside the node. When the assistant has already written the text, write it in directly without generating it again. Use `getCanvasNodes` with `fields: ["data"], dataKeys: ["textPath"]` to read the body text file location, then read the actual file to verify it; to view the current in-memory body text, read it in segments with `path: ["outputs", "text", "value"]`. Default details not including the body text does not mean the node is empty; do not guess paths or edit the file directly in place of node functions.
 
-新节点的文件或模型可能仍在初始化。收到明确的“尚未加载”错误时保留该节点，先处理独立内容，待初始化后再尝试；不要删除重建，也不要把暂未加载和确实未配置模型混为一谈。
+A new node's files or model may still be initializing. When you receive an explicit "not yet loaded" error (`尚未加载`), keep the node, handle independent content first, and try again after initialization; do not delete and rebuild it, and do not confuse "not loaded yet" with "no model actually configured".
 
-素材导入必须使用已存在且可读取的文件。图片名称、描述、待生成提示词都不能当作图片文件。已有媒体在画布上时直接复用；缺少导入能力则明确该缺口，不用文本路径冒充媒体输出。
+Material import must use files that exist and are readable. Image names, descriptions, and prompts awaiting generation cannot serve as image files. When media is already on the canvas, reuse it directly; when import capability is missing, state that gap clearly, and do not pass a text path off as a media output.
 
-## 3. 连接输入依赖，不连接制作步骤
+## 3. Connect input dependencies, not production steps
 
-先读取两端真实端口，再用 `connectNodes` 连接输出与兼容输入。端口 ID 和类型从最新节点信息获取。每条边都应回答“下游要使用上游的什么内容”。
+First read the real ports at both ends, then use `connectNodes` to connect outputs to compatible inputs. Get port IDs and types from the latest node information. Every edge should answer "what content from upstream does downstream use".
 
-- 已连接的文字会作为上下文整段加入提示词，所以剧本和片段表不能当装饰线接入生成节点。助手先读完整剧本，再把本段原文和全部内部镜头转写到目标提示词中；剧本仍是内容来源。
-- 图像生成用于资产准备，视频直接接入已确认资产，以多参提示词描述整个片段；不能拿一张风格图代替小蝌蚪、青蛙或池塘资产，也不能把角色三视图变成视频里并排的三个角色。
-- 风格图只用于已确认的配色、笔触或材质；角色图约束身份外观，场景图约束环境空间，道具图约束物件形制。视频、音频参考仅在当前任务需要且目标实际支持时加入，不机械连接全部资产。
-- 每项实际使用的媒体都在提示词中写 `{{ref N}}`、素材名称和具体用途，不能只连边，或写“若附带参考图”。多个角色分别说明谁做什么，不能让模型猜素材对应关系。
-- 普通参考图不天然等于首帧或尾帧。首尾约束需要支持该方式的实际配置和正确顺序，不能仅在提示词里写“作为首帧”便宣称设置完成。
-- 先接线，再用 `getCanvasEdges` 的 `nodeIds: [目标ID], direction: "incoming"` 分页读完整目标入边。用 `getCanvasNodes` 的 `fields: ["data"], dataKeys: ["referenceOrder"]` 读取目标排序，用 `fields: ["ports", "outputs"]` 分批读取源节点并核对引用编号，最后调用目标的 `node:setPrompt`。默认详情不返回这些字段；分页和字段截断都须按[画布读取规则](../SKILL.md#读取画布)补齐。文字和媒体共用编号，不能把第一张图片一律写成参考 1。编号无法确认时不猜、不触发生成；接线、删除或排序改变后重新核对。
-- 两个视频节点的前后排列不要求连边。只有下段实际使用上段视频作为参考、延续等输入且目标支持时才连；剪辑顺序写在名称、位置或说明中。
+- Connected text is added to the prompt in full as context, so scripts and segment tables cannot be connected to generation nodes as decorative edges. The assistant first reads the complete script, then transcribes this segment's original text and all internal shots into the target prompt; the script remains the content source.
+- Image generation is for asset preparation; videos connect directly to confirmed assets and describe the whole segment with a multi-reference prompt. A single style image cannot stand in for the tadpole, frog, or pond assets, and a character's three views cannot become three characters side by side in the video.
+- A style image is used only for the confirmed palette, brushwork, or materials; character images constrain identity and appearance, scene images constrain the environment and space, and prop images constrain the form of objects. Add video and audio references only when the current task needs them and the target actually supports them; do not mechanically connect all assets.
+- For every piece of media actually used, write `{{ref N}}`, the material name, and its specific purpose in the prompt; do not just connect an edge or write "if a reference image is attached". With multiple characters, state who does what for each, and do not leave the model to guess which material corresponds to what.
+- An ordinary reference image is not inherently a first or last frame. First/last-frame constraints need an actual configuration that supports that method and the correct order; writing "as the first frame" in the prompt alone does not mean it is set up.
+- Connect first, then use `getCanvasEdges` with `nodeIds: [targetId], direction: "incoming"` to page through all of the target's incoming edges. Use `getCanvasNodes` with `fields: ["data"], dataKeys: ["referenceOrder"]` to read the target ordering, and with `fields: ["ports", "outputs"]` to read the source nodes in batches and check the reference numbers; finally call the target's `node:setPrompt`. Default details do not return these fields; paging and field truncation must both be filled in according to the [canvas reading rules](../SKILL.md#reading-the-canvas). Text and media share numbering; do not always write the first image as reference 1. When the numbering cannot be confirmed, do not guess and do not trigger generation; re-check after connecting, deleting, or reordering.
+- Two video nodes placed one after another do not need an edge. Connect them only when the next segment actually uses the previous segment's video as a reference, continuation, or other input and the target supports it; write the editing order in names, positions, or notes.
 
-当前内置节点按目标输入端口（通常为 `in`）收集有效入边。存在 `data.referenceOrder[端口ID]` 时，按其中的键排序，键为 `encodeURIComponent(JSON.stringify([source, sourceHandle]))`；未列入的项按入边顺序排在后面，没有排序配置时保持入边顺序。列表中第 N 项就是 `{{ref N}}`。这些是核对依据，不是让助手直接修改节点数据的接口。
+Current built-in nodes collect valid incoming edges by the target input port (usually `in`). When `data.referenceOrder[portId]` exists, sort by the keys in it, where the key is `encodeURIComponent(JSON.stringify([source, sourceHandle]))`; unlisted items go after in incoming-edge order, and without an ordering configuration the incoming-edge order is kept. Item N in the list is `{{ref N}}`. These are a basis for checking, not an interface for the assistant to modify node data directly.
 
-提示词开头用真实 `{{ref N}}` 定义主体、场景、道具及稳定特征；之后按本段原镜号逐镜写动作与空间、单一主运镜、完整台词和声音，最后写已确认风格与必要约束。写法和完整多镜示例见 [制作指南](../../script/references/productionGuide.md)。不能用一句“引用小蝌蚪和池塘，游向青蛙”替代整段剧情与镜头，也不能仅因有标记便宣称模型已准确遵循。
+Start the prompt by using real `{{ref N}}` to define subjects, scenes, props, and their stable features; then, following this segment's original shot numbers, write action and space, a single main camera movement, complete lines, and sound shot by shot; finally write the confirmed style and necessary constraints. For the writing method and a complete multi-shot example see the [Production Guide](../../script/references/productionGuide.md). One sentence such as "reference the tadpole and the pond, swim toward the frog" cannot replace the whole segment's story and shots, and having markers alone does not let you claim the model followed them accurately.
 
-生成用到的上游内容必须准备好。可先搭好依赖并填写下游提示词，但空输出、尚未生成的图像不能作为已就绪参考启动下游。
+Upstream content used by generation must be ready. You may build the dependencies and fill in downstream prompts first, but empty outputs and images not yet generated cannot be used as ready references to start downstream generation.
 
-## 4. 触发生成前核对当前能力
+## 4. Check current capabilities before triggering generation
 
-读取生成节点的实际提示词、当前配置与已连接素材，先展示本次生成对象与数量、模型、画幅/分辨率/视频时长、完整提示词及参考，并告知会产生费用，再询问是否消耗算力生成，等明确同意后才调用生成函数。费用无可靠报价时说明未知。单张、变体和小样也适用；一个具体批次可确认一次，超出已批准范围的追加、重生成或可能收费的重试重新确认。确认内容设计或让助手继续，不等于批准未经说明、需要消耗算力的生成调用。用户只要求搭建或修改提示词时，不自动生成。
+Read the generation node's actual prompt, current configuration, and connected material; first show the targets and quantity for this generation, the model, aspect ratio/resolution/video duration, the complete prompt, and references, and say that it will incur costs; then ask whether to consume compute for generation, and call the generation function only after explicit consent. When there is no reliable quote, say the cost is unknown. This also applies to single images, variants, and samples; a specific batch can be confirmed once, and additions, regenerations, or possibly charged retries beyond the approved scope need confirmation again. Confirming the content design or letting the assistant continue is not approval for a compute-consuming generation call that was not explained. When the user only asks to build or edit prompts, do not generate automatically.
 
-模型、比例、分辨率、模式、时长与声音选项必须与用户当前确认一致。需要核对时，通过本节点的 `node:getConfig` 读取当前配置及可用模型能力；沿用用户已确认且满足任务的配置，不为普通编辑重新选模型。图片未指定模型时优先选择实际可用且支持所需输入/规格的 gpt-image 系列，节点自动填入的默认模型不算用户指定；不可用则说明并确认替代模型。视频尚未确定制作模型时，按已确认路线选择实际提供的 Seedance 2.0/2.5 多参能力，不能只因名称相同就假定支持所需素材、数量和规格。提示词写“9:16”不能让 `16:9` 节点变成竖屏，写“6秒”也不能覆盖实际 `4` 秒。
+The model, aspect ratio, resolution, mode, duration, and audio options must match what the user currently confirmed. When checking is needed, read the current configuration and available model capabilities through this node's `node:getConfig`; keep a configuration the user confirmed that meets the task, and do not re-select the model for ordinary edits. When no image model is specified, prefer the gpt-image series that is actually available and supports the needed inputs/specifications; the default model the node fills in automatically does not count as the user's choice. When it is unavailable, say so and confirm an alternative model. When the video production model is not yet determined, choose the actually provided Seedance 2.0/2.5 multi-reference capability according to the confirmed route; do not assume it supports the needed material, quantity, and specifications just because the name matches. Writing "9:16" in the prompt cannot turn a `16:9` node vertical, and writing "6 seconds" cannot override an actual `4` seconds.
 
-需要调整时，通过实际提供的 `node:setConfig` 只修改本次所需选项，参数和支持范围以函数说明及 `node:getConfig` 为准；切换模型时一并提供供应商与模型。配置修改不触发生成，核对生效结果后再按已确认范围调用生成函数。目标确实没有可用配置能力时，才指出具体节点与待调整选项，请用户处理。不得把参数塞进 `node:setPrompt`、直接改画布 JSON，或转用媒体工具绕开冲突。
+When adjustments are needed, use the actually provided `node:setConfig` to change only the options this run needs; parameters and supported ranges follow the function description and `node:getConfig`. When switching models, provide the provider together with the model. Configuration changes do not trigger generation; check that they took effect, then call the generation function within the confirmed scope. Only when the target truly has no usable configuration capability, point out the specific node and the options to adjust, and ask the user to handle it. Never stuff parameters into `node:setPrompt`, edit canvas JSON directly, or switch to media tools to get around the conflict.
 
-节点只为未设置或不兼容的选项补默认值：图片使用模型支持的最低分辨率，比例默认 `16:9`；视频使用支持的最短时长和对应最低分辨率，比例默认 `9:16`，声音默认开启并服从模型音频能力。已有有效设置不被默认值覆盖，也不主动把用户已确认的较高规格改成默认最低值。
+The node fills in defaults only for options that are unset or incompatible: images use the lowest resolution the model supports with aspect ratio defaulting to `16:9`; videos use the shortest supported duration and the corresponding lowest resolution, with aspect ratio defaulting to `9:16`, and audio on by default subject to the model's audio capability. Existing valid settings are not overwritten by defaults, and a higher specification the user confirmed is not proactively changed to the default minimum.
 
-按已确认依赖推进：完整剧本 → 角色/场景/道具资产 → 剧本分片段与逐段多参提示词 → 片段小样 → 获准的其余片段。规划表记录时长，正式 Seedance 提示词默认按镜号组织而不写绝对秒数时间轴。已有资产直接复用，不逐镜增加关键帧，不对同一节点重复发起生成。
+Advance along the confirmed dependencies: complete script → character/scene/prop assets → script segments and per-segment multi-reference prompts → segment sample → the remaining approved segments. The planning table records duration; formal Seedance prompts are organized by shot number by default rather than written as an absolute-seconds timeline. Reuse existing assets directly, do not add keyframes shot by shot, and do not start generation repeatedly on the same node.
 
-请求失败时先读取错误并检查当前参数。在已确认规格内可以纠正明确的参数格式问题；不能自行降分辨率、缩时长、换模型/模式、删除参考或改变声音来“跑通”。这些变化要先解释影响并询问用户。同类错误未找到原因时停下，不连续试不同制作路线。
+When a request fails, first read the error and check the current parameters. Within the confirmed specifications you may correct clear parameter format problems; you may not lower the resolution, shorten the duration, change the model/mode, remove references, or change the audio on your own to "get it to run". Explain the impact of such changes and ask the user first. When the cause of the same kind of error cannot be found, stop instead of trying different production routes in succession.
 
-## 5. 后台开始与完成分开处理
+## 5. Handle background start and completion separately
 
-发起前记录该节点原有输出。生成函数返回“已开始”后，当前步骤仅是已提交；不要立即宣称有新素材，也不要再次调用同一生成函数来等待结果。
+Before starting, record the node's existing output. After the generation function returns "started", the current step is only submitted; do not immediately claim there is new material, and do not call the same generation function again to wait for the result.
 
-- 优先使用工具实际提供的完成通知、等待或状态能力。当前没有可靠状态查询时，不编造查询函数，也不把节点仍存在或旧输出仍可见当作成功。
-- 可先完成其他不依赖此结果的文字和结构工作，再读取画布检查输出。需要重新生成时，旧输出不能证明本次完成；应有新的结果或明确完成证据，并确认媒体可读。
-- 只有上游结果确实就绪且用户确认本阶段效果后，才启动下游；助手自评不能代替用户验收。没有新结果且无法确认状态时标记待完成，保留已搭好的结构与依赖，不高频空转查询或重复提交。
-- 当前媒体生成由节点持有，卸载可能取消任务。生成期间不为了整理工作而切换画布、删除或重建生成节点；整理可在同一画布移动位置。
-- 本轮只换了提示词时，已有媒体仍是旧版本；报告修改完成和生成状态时分清，不能把旧图当成修改后结果。
-- 生成进行中改提示词不会改变已提交的那次请求；要让修改参与下一次生成，先确认当前任务结束或通过实际停止能力取消。停止对话也不等于停止节点后台任务。
+- Prefer the completion notification, waiting, or status capabilities the tools actually provide. When there is currently no reliable status query, do not invent query functions, and do not treat the node still existing or the old output still being visible as success.
+- You may first finish other text and structural work that does not depend on this result, then read the canvas to check the output. When regenerating, the old output cannot prove this run finished; there must be a new result or explicit evidence of completion, and the media must be confirmed readable.
+- Start downstream only when the upstream result is truly ready and the user has confirmed this stage's result; the assistant's self-assessment cannot replace the user's acceptance. When there is no new result and the status cannot be confirmed, mark it as pending completion and keep the structure and dependencies already built; do not spin with frequent empty queries or resubmit.
+- Current media generation is held by the node, and unloading may cancel the task. During generation, do not switch canvases or delete or rebuild generation nodes to tidy up; tidying can be done by moving positions on the same canvas.
+- When this round only changed the prompt, existing media is still the old version; keep modification completion and generation status distinct when reporting, and do not present an old image as the modified result.
+- Changing the prompt while generation is in progress does not change the request already submitted; to have the change take part in the next generation, first confirm the current task has ended or cancel it through an actual stop capability. Stopping the conversation does not stop the node's background task.
 
-## 6. 示例：三镜头组成一个视频片段
+## 6. Example: three shots making up one video segment
 
-假设已确认的完整短剧本为“林宁推门进屋，发现桌上的信，拆开信封后停住”，无对白。模型实际容量能容纳这段连续事件；节点类型、ID 与端口仍从当前工具获取。
+Suppose the confirmed complete short script is "Lin Ning pushes the door open and enters the room, notices a letter on the table, opens the envelope, and freezes", with no dialogue. The model's actual capacity can hold this continuous event; node types, IDs, and ports are still obtained from the current tools.
 
-1. 从剧本提取林宁、房间、信件，复用已有合格素材；缺项按资产图规范制作，展示角色参考板、无人物场景图和道具图并等待确认。
-2. 将该连续事件作为“场01·片段01”，内部安排三个镜头：中景跟拍进屋，特写发现信件，中近景固定观察拆信后的反应。三个镜头都保留在该片段的同一份视频提示词中。
-3. 只创建一个“场01·片段01·视频”节点，接入三个真实资产，核对引用顺序，按三段式写素材定义、三个镜头的完整动作/环境音和风格约束。剧本文本不直接连入节点，不额外制作开门、信件、反应三张分镜图。
-4. 核对节点实际模型、模式、时长、画幅与声音，展示片段计划、完整提示词、数量与费用，用户明确批准本次算力消耗方案后再调用一次生成；展示实际片段并询问调整。其他片段仅按已获准的算力消耗范围继续，不按每个内部镜头另发一次请求。
-5. 要展示结果使用 `fitCanvas`；局部排布用 `moveNodes`，只有用户要求整理整幅画布时才用 `arrangeCanvas`。多个片段不因时间先后自动连边，未剪辑时明确交付为视频片段。
+1. Extract Lin Ning, the room, and the letter from the script, reusing existing qualified material; make missing items according to the asset image guidelines, show the character reference sheet, the scene image without people, and the prop image, and wait for confirmation.
+2. Treat this continuous event as "Scene 01 · Segment 01", with three internal shots: a medium tracking shot entering the room, a close-up discovering the letter, and a static medium close-up observing the reaction after opening the letter. All three shots stay in the same video prompt for this segment.
+3. Create only one "Scene 01 · Segment 01 · Video" node, connect the three real assets, check the reference order, and write, in three parts, the material definitions, the complete action and ambient sound of the three shots, and the style constraints. The script text is not connected directly to the node, and no extra storyboard images are made for opening the door, the letter, and the reaction.
+4. Check the node's actual model, mode, duration, aspect ratio, and audio; show the segment plan, complete prompt, quantity, and cost; call generation once only after the user explicitly approves this compute consumption plan; show the actual segment and ask for adjustments. Other segments continue only within the approved compute consumption scope, without a separate request for each internal shot.
+5. Use `fitCanvas` to show results; use `moveNodes` for local layout, and use `arrangeCanvas` only when the user asks to arrange the whole canvas. Multiple segments are not connected automatically because of time order; when they are not edited together, deliver them explicitly as video segments.
 
-## 7. 核对画布交付
+## 7. Verify the canvas delivery
 
-完成后用 `getCanvasNodes` / `getCanvasEdges` 核对受影响节点、文字或提示词、局部连接与输出，按需 `fitCanvas` 展示本次范围。检查截断提示，必要时沿 `path` 分段补齐内容。不要把交付核对变成默认重排整幅画布；若已按用户要求调用 `arrangeCanvas`，它已适配视口，无需额外整理或重复适配。标题或位置不能代替内容验证。
+When done, use `getCanvasNodes` / `getCanvasEdges` to check the affected nodes, text or prompts, local connections, and outputs, and `fitCanvas` as needed to show this task's scope. Check truncation notices, and when necessary fill in content in segments along `path`. Do not turn delivery verification into rearranging the whole canvas by default; if `arrangeCanvas` was already called at the user's request, it has already fitted the viewport, so no extra arranging or repeated fitting is needed. Titles or positions cannot replace content verification.
 
-分别报告已写入内容、已建立引用、已提交生成、已有新产物、已查看验收和已合成的部分。只有文件工具时不能用直接编写画布文件冒充实时操作；缺少画布工具时保留创作成果，并明确需要打开目标画布或启用相应能力。
+Report separately what content was written, which references were established, which generations were submitted, which new outputs exist, what was viewed and accepted, and what was composited. When only file tools are available, do not pass off writing canvas files directly as live operations; when canvas tools are missing, keep the creative results and state clearly that the target canvas needs to be opened or the corresponding capability enabled.
 
-## 参考依据
+## References
 
-创作方法的公开来源见 [制作来源说明](../../script/references/sources.md)。操作时使用本手册、已安装的本地制作指南和实际工具返回值，无需访问外部资料。
+For the public sources of the creative methods see [Production Source Notes](../../script/references/sources.md). Operate using this manual, the locally installed production guide, and the actual tool return values; no external resources need to be accessed.

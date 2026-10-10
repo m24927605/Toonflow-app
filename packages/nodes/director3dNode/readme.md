@@ -6,7 +6,7 @@ Generates scenes, model animations, and camera moves from text, then lets you ad
 
 - Inputs accept text, image, and video references that describe or illustrate the scene, motion, and camera moves.
 - Keyframes can be exported as PNG image nodes, and the selected animation can be exported as an MP4 video node.
-- Exporting requires the corresponding Image (`图片`) or Video (`视频`) node plugin to be enabled.
+- Exporting requires the corresponding Image or Video node plugin to be enabled.
 
 ## Usage
 

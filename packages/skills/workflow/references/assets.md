@@ -1,91 +1,91 @@
-# 角色、场景与道具资产
+# Character, Scene, and Prop Assets
 
-> **Seedance 使用边界：** 本文件不是 Seedance 分段/提示词规则。进入主 `SKILL.md` PART A 后，只有 A1.2/A4 明确需要补真实参考资产或必要设计提案时才按需读取本文件；只用于资产外观/结构/空间/材质，不得从本文件派生第二套时长、镜头、表演、运镜、连续性或模板规则。
+> **Seedance usage boundary:** This file is not a set of Seedance segmentation or prompt rules. After entering PART A of the main `SKILL.md`, read this file on demand only when A1.2/A4 explicitly requires adding real reference assets or necessary design proposals. Use it only for asset appearance, structure, space, and material; never derive from it a second set of rules for duration, shots, performance, camera movement, continuity, or templates.
 
-在盘点本次剧本所需资产、单独设计资产或准备可复用视觉素材时读取。用户已授权同轮交剧本与资产方案时，可从剧本草案提取清单和设计提案，标明待确认；剧情制作中的正式资产依据已确认版本。独立资产任务以用户确认的设计需求及已有素材为依据，不要求剧本或场次；下面的出处和状态只填写本次实际需要的内容。剧本范围与改编方法见[故事与剧本](sourceAndScript.md)，节点配置和生成执行见[画布执行](canvasExecution.md)。
-资产固定身份、空间和物件；表演、运镜与对白写入视频提示词。先复用符合当前设定的已确认素材，再补真实缺项。
+Read this when inventorying the assets the current script needs, designing assets on their own, or preparing reusable visual material. When the user has authorized delivering the script and the asset plan in the same round, you may extract the list and design proposals from the script draft and mark them as pending confirmation; formal assets in story production are based on the confirmed version. Standalone asset tasks are based on the design requirements the user confirmed and the existing material, and do not require a script or scenes; fill in the sources and statuses below only with what this task actually needs. For script scope and adaptation methods see [Story and Script](sourceAndScript.md); for node configuration and generation see [Canvas Execution](canvasExecution.md).
+Assets fix identity, space, and objects; performance, camera movement, and dialogue go into the video prompt. First reuse confirmed material that fits the current setting, then fill the real gaps.
 
-需要设计或修订外观、空间、道具和变体时读取[视觉设计方法](methods/visualDesign.md)，按剧情事实、行动约束和识别需求推导，再写进资产条目与提示词。需要定画风、配色、材质或灯光时读取[色彩与用光](methods/colorAndLight.md)，区分资产本色、场景受光和片段调色；已有适用素材只复用，不重新展开设计。
+When you need to design or revise appearance, space, props, or variants, read [Visual Design Methods](methods/visualDesign.md); derive them from story facts, action constraints, and recognition needs, then write them into asset entries and prompts. When you need to set the art style, palette, materials, or lighting, read [Color and Light](methods/colorAndLight.md), and distinguish an asset's base colors, scene lighting, and segment grading. When suitable material already exists, only reuse it; do not redo the design.
 
-## 按制作范围提取需求
+## Extract requirements by production scope
 
-- 剧情制作完整读取本次约定的一集、一场或其他范围，以及理解连续性必需的上下文；独立设计读取本次设计需求。不要求先另写策划、大纲或完整人物小传。
-- 按场次盘点角色、场景、关键道具和持续状态，合并同一身份的别名，记录出处及适用范围；不能只为首个视频准备资产便称全片齐备。
-- 剧情制作中的独立资产应实际入画或参与可见行动，并需要复用或单独引用。对白提及的人物、偶发装饰、纯声音角色不自动生成肖像或道具图。
-- 角色记录物种、年龄或生长阶段、轮廓、识别特征与必要服装；场景记录空间锚点、通道、时间和环境状态；道具记录形制、材质、尺寸关系、持有者与状态。
-- 换装、变身、持续伤势、道具破损等影响跨段识别的变化建立必要变体；瞬时表情、转身、局部特写不单独建资产。
-- 未提供的外观可作为设计提案，不能说成原文或参考图已有事实。关键身份、数量或剧情功能有冲突时，只澄清受影响项。
-- 真实可读且适用的旧图直接复用，不为统一版式重做。名称、提示词、占位路径和风格参考均不能冒充已存在的具体资产。
+- For story production, read the entire episode, scene, or other agreed scope for this task in full, plus the context needed to understand continuity; for standalone design, read the current design requirements. Do not require a separate plan, outline, or full character biographies first.
+- Inventory characters, scenes, key props, and persistent states scene by scene; merge aliases of the same identity and record the source and applicable scope. Do not prepare assets only for the first video and then claim the whole film is covered.
+- In story production, a standalone asset should actually appear on screen or take part in visible action, and need reuse or a separate reference. Characters only mentioned in dialogue, incidental decoration, and voice-only characters do not automatically get portraits or prop images.
+- For characters, record species, age or growth stage, silhouette, distinguishing features, and necessary costume; for scenes, record spatial anchors, passages, time, and environmental state; for props, record form, material, size relationships, holder, and state.
+- Create the necessary variants for changes that affect recognition across segments, such as a change of costume, a transformation, a lasting injury, or a damaged prop; do not create separate assets for momentary expressions, turning around, or partial close-ups.
+- Appearance that was not provided may be offered as a design proposal, but never presented as a fact from the source text or reference images. When key identity, quantity, or story function conflicts, clarify only the affected items.
+- Reuse old images that are actually readable and suitable as they are; do not redo them for a uniform layout. Names, prompts, placeholder paths, and style references cannot pass for an existing concrete asset.
 
-资产表可并入现有制作文档，不另造一套重复正文：
+The asset table may be merged into an existing production document; do not create a duplicate set of body text:
 
-| 资产标识与名称 | 类型与状态 | 剧本或设计需求出处及使用范围 | 外观或结构锚点 | 已有节点与真实文件 | 本次处理 | 状态 |
+| Asset ID and name | Type and state | Script or design-requirement source and scope of use | Appearance or structure anchors | Existing nodes and real files | Handling this time | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| {稳定标识、名称} | {角色／场景／道具，基础态或变体} | {场次、事件、片段或指定设计用途} | {保持项及允许变化} | {实际位置；缺失写缺失} | {复用／补图／变体} | {待设计／待生成／生成中／待验收／已采用} |
+| {stable ID, name} | {character / scene / prop, base state or variant} | {scene, event, segment, or specified design purpose} | {what stays fixed and what may change} | {actual location; write "missing" if missing} | {reuse / add image / variant} | {to design / to generate / generating / awaiting review / adopted} |
 
-## 角色：特写与完整三视图
+## Characters: close-up and full three views
 
-新建角色默认用一张参考板，横向排列**头部特写、正面全身、右侧 90° 全身、背面全身**。四个视角描述同一身份、同一状态，不是四个角色。
+By default, a new character uses one reference sheet, arranged horizontally as **head close-up, front full body, right-side 90° full body, back full body**. The four views depict the same identity in the same state; they are not four characters.
 
-- 特写保留完整头部至锁骨附近；三个全身视角保留头顶、身体、四肢及脚部，不能裁头、截身或切脚。
-- 全身视角比例一致，特写可放大；身份、体型、发型、服装、配色和携带物一致，视图互不遮挡。
-- 使用自然静态姿态、中性表情与符合画风的简洁背景；不混入剧情场景、动作过程、其他角色或标注。
-- 动物按其既定身体结构和自然姿态适配；无腿、无翼或特殊生长阶段不因套模板长出额外器官。群体的外观样本数量与剧情出场数量分别记录。
-- 用户指定的版式及适用旧图继续保留。变体使用实际基础图，只改变有依据的部位、服装或物件，保留未变项。
-
-```text
-{已确认风格}角色参考板，同一角色为{名称、身份或物种、年龄或生长阶段}。
-外观锚点：{轮廓、体型、头部特征、表皮或毛发、配色、服装及必要识别物}。
-同一画面横向排列：头部特写、正面完整全身、右侧90°完整全身、背面完整全身。
-各视角身份与状态一致，全身尺度一致，完整保留{适用身体结构}，不裁切、不重叠。
-{自然静态姿态}，中性表情，{符合风格的简洁背景与光照或平涂方式}。
-{有真实参考才填写：使用 {{ref N}} 的某身份与状态，仅改变哪些已确认内容，保留哪些部分。}
-保留已确认服装、徽记等必要文字或图案；无剧情场景、额外角色、动作过程、无关说明字、水印或尺寸标注。
-```
-
-## 场景：可复用的空间主视图
-
-- 默认一张能说明场地的主视图，交代前中后层次、主要出入口、通道及稳定建筑或地形；保留人物行动所需空间。
-- 同一地点内，只有结构不同且独立承载剧情的空间才另拆资产。时间、天气或破坏状态改变时按实际需要补变体，不穷举方向。
-- 独立场景图不夹带人物、人影或故事动物；后续视频用角色参考加入主体，不把场景做成灰底物件展示。
-- 空间表达服从画风；扁平色块不必强加写实景深和复杂阴影。需要环视板时再采用用户确认的布局。
+- The close-up keeps the whole head down to around the collarbone; the three full-body views keep the top of the head, the body, the limbs, and the feet, without cropping the head, cutting off the body, or cutting off the feet.
+- The full-body views share the same scale, while the close-up may be enlarged; identity, build, hairstyle, costume, palette, and carried items are consistent, and the views do not overlap.
+- Use a natural static pose, a neutral expression, and a simple background that fits the art style; do not mix in story scenes, action in progress, other characters, or annotations.
+- Adapt animals to their established body structure and natural posture; legless, wingless, or special growth stages do not grow extra organs because of the template. Record the number of appearance samples for a group separately from the number that appears in the story.
+- Keep any layout the user specified and any suitable old images. A variant uses the actual base image and changes only the parts, costume, or objects that are justified, and keeps the items that do not change.
 
 ```text
-{已确认风格}场景主视图：{场景名、室内外、地理或建筑类型、时段与天气}。
-前景{进入空间的元素}；中景{主要活动区与固定物件}；后景{边界及远处结构}。
-空间关系：{出入口、通道、稳定地标及必要的相对位置}，保留{剧情所需活动空间}。
-材质与视觉：{材质、配色及符合风格的光照或平涂方式}。
-单画面主视图，{观察高度和方向}，结构清楚；无人物、人影、故事动物、剧情动作或标注。
-{有真实参考才填写：使用 {{ref N}} 保持哪些布局和材质，仅改变哪个时段、状态或视角。}
+{Confirmed style} character reference sheet of one character: {name, identity or species, age or growth stage}.
+Appearance anchors: {silhouette, build, head features, skin or fur, palette, costume, and necessary identifying items}.
+Arranged horizontally in one image: head close-up, front full body, right-side 90° full body, back full body.
+Identity and state are consistent across views, full-body scale is consistent, {applicable body structure} is kept complete, with no cropping or overlap.
+{Natural static pose}, neutral expression, {simple background and lighting or flat-color treatment that fits the style}.
+{Fill in only with a real reference: use the identity and state of {{ref N}}, change only which confirmed details, and keep which parts.}
+Keep necessary confirmed text or patterns such as costume and emblems; no story scene, extra characters, action in progress, unrelated caption text, watermark, or dimension annotations.
 ```
 
-## 道具：按识别需要展示结构
+## Scenes: a reusable spatial master view
 
-- 只为剧情关键且现有资产无法完整覆盖的物件补图；普通装饰不逐件拆出，衣饰优先作为角色外观的一部分处理。
-- 新建道具默认采用当前 Toonflow 的一张 2×2 参考板：正面、右侧90°、背面、局部细节。已确认且能覆盖本次用途的独立静物图可直接复用；用户选择单图时沿用，不为版式补无用途图片。
-- 多视图始终为同一个物件，各视角结构、材质、尺寸关系和状态一致；局部特写只放大真实存在的结构。
-- 道具独立摆放，不附带人物、手臂或握持姿态。已有文字、符号或图案按剧情保留，不添加无关说明字或水印。
+- By default, one master view that explains the location, showing foreground, midground, and background layers, the main entrances and exits, passages, and stable architecture or terrain; keep the space characters need for their actions.
+- Within one location, split off a separate asset only for spaces that are structurally different and carry story on their own. When time, weather, or damage state changes, add variants as actually needed; do not enumerate every direction.
+- A standalone scene image does not include characters, silhouettes, or story animals; later videos add the subjects through character references. Do not turn the scene into an object display on a gray background.
+- Spatial rendering follows the art style; flat color blocks do not need forced realistic depth of field or complex shadows. Use a panoramic sheet only with a layout the user confirmed.
 
 ```text
-{已确认风格}道具资产，唯一物件为{名称、形制、用途、材质、配色、尺寸关系与状态}。
-关键结构：{功能部件、装饰、影响剧情识别的细节}。
-展示方式：{默认2×2：左上正面、右上右侧90°、左下背面、右下局部细节；用户另有已确认版式时替换本项}。
-各视角同一结构和状态，完整展示、不裁切，{符合画风的简洁背景与光照}。
-{有真实参考才填写：使用 {{ref N}} 保持哪些结构，仅改变哪个已确认状态。}
-无人物、手部、额外物件和剧情背景；{需要保留的实际文字或图案}，无无关标注或水印。
+{Confirmed style} scene master view: {scene name, interior or exterior, geographic or architectural type, time of day, and weather}.
+Foreground {elements leading into the space}; midground {main activity area and fixed objects}; background {boundaries and distant structures}.
+Spatial relationships: {entrances and exits, passages, stable landmarks, and necessary relative positions}, keeping {activity space the story needs}.
+Materials and visuals: {materials, palette, and lighting or flat-color treatment that fits the style}.
+Single-frame master view, {viewing height and direction}, clear structure; no characters, silhouettes, story animals, story action, or annotations.
+{Fill in only with a real reference: use {{ref N}} to keep which layout and materials, changing only which time of day, state, or viewpoint.}
 ```
 
-## 声音角色与视觉状态
+## Props: show structure as recognition requires
 
-仅以 OS、VO 或画外对白出现的角色保留声音身份、台词出处与声线描述，不为其生成无用途肖像。声线可用音区、音色、语速、口音和表达习惯描述，跨段沿用。
-当前视频模型支持原生声音时，可直接使用已确认的文字声线；真实音频只在确有素材且能力支持时作为声音参考，不假造引用，也不把取得外部音色样本设为前置。
-视觉资产变化不自动改变声音身份。持续变体记录“原状态 → 触发事件 → 新状态 → 适用场次”，保留旧状态供此前片段使用。
+- Add images only for story-critical objects that existing assets cannot fully cover; do not split ordinary decoration into separate items, and treat clothing and accessories as part of the character's appearance where possible.
+- By default, a new prop uses the current Toonflow 2×2 reference sheet: front, right side 90°, back, and a detail close-up. A confirmed standalone still-life image that covers the current use may be reused as is; when the user chose a single image, keep it and do not add images that serve no purpose just for the layout.
+- Multiple views always show the same object, with consistent structure, material, size relationships, and state across views; a detail close-up only enlarges structure that actually exists.
+- Props are placed on their own, without people, arms, or holding poses. Keep existing text, symbols, or patterns as the story requires; do not add unrelated caption text or watermarks.
 
-## 准备生成与验收
+```text
+{Confirmed style} prop asset of a single object: {name, form, purpose, material, palette, size relationships, and state}.
+Key structure: {functional parts, decoration, and details that affect recognition in the story}.
+Presentation: {default 2×2: top left front, top right right side 90°, bottom left back, bottom right detail close-up; replace this item when the user has another confirmed layout}.
+Same structure and state in every view, shown completely without cropping, {simple background and lighting that fits the art style}.
+{Fill in only with a real reference: use {{ref N}} to keep which structures, changing only which confirmed state.}
+No people, hands, extra objects, or story background; {actual text or patterns to keep}, no unrelated annotations or watermarks.
+```
 
-- 先交可查看的全量清单与设计，按用户授权制作缺项；提示词准备完成与实际生成分开登记，生成授权依[画布执行](canvasExecution.md)统一处理。
-- 由实际 `node:getConfig` 能力选择模型、比例、分辨率和参考模式；横排参考板要能容纳完整身体，参数与文字布局一致，不绑定某个型号或固定画幅。
-- 真实素材接入后核对引用编号与用途。变体缺少所需基础图时标明待补参考，不假装完成图生图；可继续已授权的文字工作。
-- 检查身份、结构、完整身体、视图顺序、持续状态、空间布局、是否夹带主体及文件可读性；展示实际图和问题，按用户结果决定登记采用。
-- 视频只引用资产的身份、空间和结构，不复现参考板背景、网格或视图数量；剧情人数与物件数量由剧本决定。
-- 已采用素材与候选分开，变更只影响实际使用它的片段，版本和交付按[状态与交付](stateAndDelivery.md)记录。
+## Voice characters and visual states
+
+Characters who appear only as OS, VO, or off-screen dialogue keep their voice identity, line sources, and voice description; do not generate portraits that serve no purpose for them. Describe a voice by register, timbre, speaking rate, accent, and delivery habits, and carry it across segments.
+When the current video model supports native audio, the confirmed written voice description may be used directly; use real audio as a voice reference only when such material actually exists and the capability supports it. Do not fabricate references, and do not make obtaining an external voice sample a prerequisite.
+Changes to visual assets do not automatically change voice identity. Record persistent variants as "original state → triggering event → new state → applicable scenes", and keep the old state for earlier segments.
+
+## Preparing generation and review
+
+- First deliver the full list and designs for viewing, then produce missing items as the user authorizes; record prompt preparation and actual generation separately, and handle generation authorization uniformly through [Canvas Execution](canvasExecution.md).
+- Choose the model, aspect ratio, resolution, and reference mode from the actual `node:getConfig` capabilities; a horizontal reference sheet must fit complete bodies, and the parameters must match the text layout. Do not tie this to a particular model or a fixed frame size.
+- After real material is connected, check reference numbers and purposes. When a variant lacks the base image it needs, mark the reference as pending; do not pretend image-to-image is done. Authorized text work may continue.
+- Check identity, structure, complete bodies, view order, persistent states, spatial layout, whether subjects slipped in, and file readability; show the actual images and issues, and record adoption according to the user's decision.
+- Videos reference only the identity, space, and structure of assets; they do not reproduce the reference sheet's background, grid, or number of views. The number of people and objects in the story is determined by the script.
+- Keep adopted material separate from candidates; a change only affects the segments that actually use it. Record versions and delivery according to [State and Delivery](stateAndDelivery.md).
