@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { marked, Renderer } from "marked";
+import { translate } from "@toonflow/i18n/vue";
 
 export interface MarkdownFiles {
   read(path: string): Promise<ArrayBuffer>;
@@ -100,7 +101,7 @@ export function loadMarkdownImage(element: HTMLImageElement, source: string, pat
       else release = () => URL.revokeObjectURL(url);
       return url;
     });
-    void pending.then(url => { if (!cancelled) element.src = url; }, () => { if (!cancelled) element.title = "图片读取失败"; });
+    void pending.then(url => { if (!cancelled) element.src = url; }, () => { if (!cancelled) element.title = translate("图片读取失败"); });
   } catch (error) { element.title = error instanceof Error ? error.message : "图片读取失败"; }
   return () => { cancelled = true; release(); };
 }

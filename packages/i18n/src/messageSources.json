@@ -2864,7 +2864,8 @@
   ],
   "图片读取失败": [
     "apps/web/src/lib/clipboard.ts",
-    "packages/nodes/imageGenerationNode/src/index.vue"
+    "packages/nodes/imageGenerationNode/src/index.vue",
+    "packages/nodeShared/src/markdownContent.ts"
   ],
   "当前环境无法处理图片": [
     "apps/web/src/lib/clipboard.ts"
@@ -7483,7 +7484,10 @@
   "配音音量": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
-  "原声音量": [
+  "配音时原声": [
+    "packages/nodes/dubbingNode/src/index.vue"
+  ],
+  "配音时原声音量": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
   "合成": [
@@ -7526,6 +7530,9 @@
     "packages/nodes/dubbingNode/src/dubbing.ts"
   ],
   "配音输入不包含音轨": [
+    "packages/nodes/dubbingNode/src/dubbing.ts"
+  ],
+  "无法读取有效的配音时长": [
     "packages/nodes/dubbingNode/src/dubbing.ts"
   ],
   "生成的视频文件无效": [
@@ -8151,6 +8158,9 @@
   "相对原图 · {0}° / {1}° · {2}": [
     "packages/nodes/imageNode/src/components/imageMultiAngle.vue"
   ],
+  "生成新视角": [
+    "packages/nodes/imageNode/src/components/imageMultiAngle.vue"
+  ],
   "图片打光": [
     "packages/nodes/imageNode/src/components/imageLighting.vue"
   ],
@@ -8268,12 +8278,13 @@
   "拖动旋转 · 滚轮缩放 · 16:9 取景": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
   ],
-  "水平 {0}°": [
+  "水平 {0}° · 俯仰 {1}°": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue",
     "packages/nodes/imageNode/src/imagePanorama.ts"
   ],
-  "· 俯仰 {0}°": [
-    "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
+  "水平 {0}°": [
+    "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue",
+    "packages/nodes/imageNode/src/imagePanorama.ts"
   ],
   "视野": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
@@ -8506,9 +8517,6 @@
   ],
   "截图失败，请重试": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
-  ],
-  "水平 {0}° · 俯仰 {1}°": [
-    "packages/nodes/imageNode/src/imagePanorama.ts"
   ],
   "3D导演台": [
     "packages/nodes/director3dNode/vite.config.ts",

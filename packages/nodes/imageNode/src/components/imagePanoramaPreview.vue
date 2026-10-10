@@ -32,7 +32,7 @@
           </div>
         </div>
         <div class="viewControls">
-          <span class="viewAngles">水平 {{ Math.round(yaw) }}°<template v-if="mode === 'sphere'"> · 俯仰 {{ Math.round(pitch) }}°</template></span>
+          <span class="viewAngles">{{ mode === 'sphere' ? translate('水平 {0}° · 俯仰 {1}°', { 0: Math.round(yaw), 1: Math.round(pitch) }) : translate('水平 {0}°', { 0: Math.round(yaw) }) }}</span>
           <div class="viewFov"><span>视野</span><el-slider v-model="fov" :min="minFov" :max="maxFov" :step="1" :disabled="busy || !ready" aria-label="全景视野" /><span>{{ Math.round(fov) }}°</span></div>
           <el-button size="small" text :disabled="busy || !ready" @click="resetView">重置视角</el-button>
         </div>

@@ -29,8 +29,8 @@
             <span class="settingUnit">{{ data.voiceVolume }}%</span>
           </div>
           <div class="settingRow">
-            <span class="settingLabel">原声音量</span>
-            <el-slider v-model="data.originalVolume" class="volumeSlider" :min="0" :max="200" :disabled="processing" aria-label="原声音量" />
+            <span class="settingLabel">配音时原声</span>
+            <el-slider v-model="data.originalVolume" class="volumeSlider" :min="0" :max="200" :disabled="processing" aria-label="配音时原声音量" />
             <span class="settingUnit">{{ data.originalVolume }}%</span>
           </div>
           <div class="settingsFooter">
@@ -68,7 +68,8 @@ const { getTargetValues } = useNodeInputs();
 const data = computed(() => node.data as { start: number; voiceVolume: number; originalVolume: number });
 data.value.start ??= 0;
 data.value.voiceVolume ??= 100;
-data.value.originalVolume ??= 30;
+// The original audio is silenced only while the dubbing plays; ambience before and after it stays.
+data.value.originalVolume ??= 0;
 const settingsSchema = z.strictObject({
   start: z.number().min(0).optional(),
   voiceVolume: z.number().int().min(0).max(200).optional(),
@@ -166,7 +167,7 @@ async function resizeVideo(event: Event) {
 
 nodeTools.register({
   name: "setConfig",
-  description: "修改配音合成参数并返回当前参数与输入连接状态：start 为配音开始秒数，voiceVolume 与 originalVolume 为 0–200 的百分比，originalVolume 为 0 时只保留配音；不传参数即只读取，不启动合成",
+  description: "修改配音合成参数并返回当前参数与输入连接状态：start 为配音开始秒数，voiceVolume 为配音音量，originalVolume 为配音播放期间原声的音量，均为 0–200 的百分比；配音前后原声保持 100%，originalVolume 为 0 时配音期间只听到配音；不传参数即只读取，不启动合成",
   parameters: settingsSchema,
   execute(args) {
     if (processing.value) throw new Error("配音正在合成，请稍后修改");
@@ -222,6 +223,11 @@ nodeTools.register({
       .settingLabel {
         color: var(--el-text-color-regular);
         white-space: nowrap;
+      }
+
+      // The slider handle overhangs the track at 0%, so keep it clear of the label.
+      .volumeSlider {
+        padding-left: 10px;
       }
 
       .settingUnit {

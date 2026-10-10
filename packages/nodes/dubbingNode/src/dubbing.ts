@@ -9,7 +9,7 @@ export type DubbingOptions = {
   start: number;
   /** Gain of the dubbing track, 1 keeps it unchanged. */
   voiceVolume: number;
-  /** Gain of the video's own audio, 0 replaces it with the dubbing. */
+  /** Gain of the video's own audio while the dubbing plays; before and after the dubbing it stays at full volume. */
   originalVolume: number;
 };
 
@@ -24,11 +24,22 @@ export async function dubVideo(ffmpeg: BrowserFfmpegFactory, options: DubbingOpt
   if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取有效的视频时长");
   if (!Number.isFinite(options.start) || options.start < 0 || options.start >= duration) throw new Error("配音开始时间须在 0 到视频时长之间");
   const audio = await probeMedia(ffmpeg, options.audioPath, signal);
-  if (!audio.streams.some(stream => stream.codec_type === "audio")) throw new Error("配音输入不包含音轨");
+  const voice = audio.streams.find(stream => stream.codec_type === "audio");
+  if (!voice) throw new Error("配音输入不包含音轨");
+  const voiceLength = Number(audio.format.duration ?? voice.duration);
+  if (!Number.isFinite(voiceLength) || voiceLength <= 0) throw new Error("无法读取有效的配音时长");
 
   const filters = [`[1:a:0]adelay=${Math.round(options.start * 1000)}:all=1,volume=${options.voiceVolume}[voice]`];
-  if (options.originalVolume > 0 && video.streams.some(stream => stream.codec_type === "audio")) {
-    filters.push(`[0:a:0]volume=${options.originalVolume}[original]`, "[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,apad[mix]");
+  if (video.streams.some(stream => stream.codec_type === "audio")) {
+    // Ducking: the original audio only drops while the dubbing plays and eases back over `ramp` seconds outside that span,
+    // so ambience before and after the dubbing keeps its full volume.
+    const ramp = 0.25;
+    const end = Math.min(duration, options.start + voiceLength);
+    const inside = `min(1,max(0,(t-(${options.start - ramp}))/${ramp}))*min(1,max(0,((${end + ramp})-t)/${ramp}))`;
+    filters.push(
+      `[0:a:0]volume='1-(${1 - options.originalVolume})*${inside}':eval=frame[original]`,
+      "[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,apad[mix]",
+    );
   } else {
     filters.push("[voice]apad[mix]");
   }

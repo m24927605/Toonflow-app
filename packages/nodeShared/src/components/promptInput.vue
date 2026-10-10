@@ -13,6 +13,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import { ElButton, ElDialog, ElImageViewer, useZIndex } from "element-plus";
 import { IconMaximize } from "@tabler/icons-vue";
 import xSender, { type AnyTagProps, type MentionItem } from "x-sender";
@@ -237,7 +238,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
     if (sender === instance && editor.isConnected) await insertNodes(nodes);
   };
   editor.setAttribute("role", "textbox");
-  editor.setAttribute("aria-label", "生成提示词");
+  // The editor is recreated whenever the prompt panel mounts, so the label follows the current language.
+  editor.setAttribute("aria-label", translate("生成提示词"));
   editor.setAttribute("aria-multiline", "true");
   instance.bus.on("textPrompt", xSender.EventSet.EVENT_COMMON_CHANGE, () => syncModel());
   syncModel(initialModel);

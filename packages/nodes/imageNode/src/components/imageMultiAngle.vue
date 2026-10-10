@@ -59,7 +59,7 @@
         :prompt="buildMultiAnglePrompt(settings)"
         :disabled="props.disabled"
         label="多角度"
-        buttonLabel="生成新视角"
+        :buttonLabel="translate('生成新视角')"
         @generated="emit('close')" />
     </section>
   </teleport>
