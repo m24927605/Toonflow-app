@@ -1,5 +1,5 @@
-# 画布节点文档
+# Canvas Node Document
 
-在文档标签页中显示原画布节点的上槽位、内容和下槽位，复用节点运行实例与生成状态。
+Shows the original canvas node's top slot, content, and bottom slot in a document tab, reusing the node's running instance and generation state.
 
-运行 `bun run build` 生成 `build/ext/ext-canvasNode.umd.js`，可在插件市场的已安装页面导出、安装和更新。
+Run `bun run build` to produce `build/ext/ext-canvasNode.umd.js`. It can be exported, installed, and updated from Settings → Plugins → Installed.

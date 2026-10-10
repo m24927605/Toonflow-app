@@ -1,15 +1,15 @@
-# 音频节点
+# Audio Node
 
-将音频素材放到画布中试听，并提供给支持音频参考的下游节点。
+Places an audio asset on the canvas for listening and supplies it to downstream nodes that accept audio references.
 
-## 输入与输出
+## Inputs and outputs
 
-- 导入本地音频文件，单个文件不能为空且不超过 100 MB。
-- 输出当前音频素材，可连接支持音频输入的节点。
+- Imports a local audio file; a single file must not be empty and must not exceed 100 MB.
+- Outputs the current audio asset, which can be connected to nodes that accept audio input.
 
-## 使用方法
+## Usage
 
-1. 点击上传按钮，选择音频文件。
-2. 上传完成后，使用节点内的播放器试听、暂停或调整播放进度。
-3. 将音频输出连接到需要该素材的节点。
-4. 需要换素材时，将鼠标移到节点上，点击“替换音频”。
+1. Click the upload button and choose an audio file.
+2. After the upload finishes, use the player in the node to listen, pause, or seek.
+3. Connect the audio output to the nodes that need this asset.
+4. To swap the asset, hover over the node and click "Replace audio".

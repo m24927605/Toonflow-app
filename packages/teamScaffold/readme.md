@@ -1,10 +1,10 @@
 # Team Scaffold
 
-`@toonflow/teams-scaffold` 负责团队清单校验、目录打包及标准 A2A 接入。模型、会话、工作区权限和成员执行由宿主提供，团队包不启动服务，也不包含模型密钥。
+`@toonflow/teams-scaffold` handles team manifest validation, directory packaging, and standard A2A integration. Models, sessions, workspace permissions, and member execution are provided by the host; a team package does not start a service and does not contain model keys.
 
-## 开发团队
+## Developing a Team
 
-团队放在 `packages/teams/<teamName>`，可参考 `storyboardTeam`：
+Teams live in `packages/teams/<teamName>`; see `storyboardTeam` for reference:
 
 ```text
 package.json
@@ -18,7 +18,7 @@ knowledge/continuity.md
 tools/example.tool.js
 ```
 
-`tools` 可省略；其中只接受通过现有 toolScaffold 构建的单文件工具，不再打包一套 SDK 或模型运行时。
+`tools` can be omitted; it only accepts single-file tools built with the existing toolScaffold and does not bundle another SDK or model runtime.
 
 ```ts
 import { createTeamConfig } from "@toonflow/teams-scaffold";
@@ -28,44 +28,44 @@ await createTeamConfig(import.meta.url, {
 });
 ```
 
-`createTeamConfig` 从 `build.ts` 同目录读取 `team.json` 与 `package.json`，发布版本以 `package.json.version` 为准，输出项目根目录 `build/agents/<name>/` 和 `build/agents/<name>.agent.zip`。构建同时检查清单、资源引用、委派环及路径，不发布 package.json、源码依赖或构建脚本。
+`createTeamConfig` reads `team.json` and `package.json` from the same directory as `build.ts`, uses `package.json.version` as the release version, and outputs `build/agents/<name>/` and `build/agents/<name>.agent.zip` under the project root. The build also checks the manifest, resource references, delegation cycles, and paths, and does not publish package.json, source dependencies, or build scripts.
 
-仅 `NODE_ENV=dev` 时同步 `data/agents/<name>`。默认仅安装缺失团队，已有安装目录完整保留，避免覆盖用户修改的提示词、技能和知识。显式 `sync: "replace"` 才用本次产物完整替换，包括删除源码中不存在的旧文件；使用前应备份需要保留的修改。正式安装和升级的确认由宿主处理。
+`data/agents/<name>` is synced only when `NODE_ENV=dev`. By default only missing teams are installed, and existing install directories are kept intact so that prompts, skills, and knowledge modified by the user are not overwritten. Only an explicit `sync: "replace"` fully replaces the installation with this build's output, including deleting old files that no longer exist in the source; back up any changes you need to keep before using it. Confirmation for formal installation and upgrades is handled by the host.
 
-团队名、成员名、技能目录名和工具插件名使用小驼峰。入口必须是现有成员，委派关系不能成环；导演可以多次分别调用成员，但成员调用链不可递归。
+Team names, member names, skill directory names, and tool plugin names use lowerCamelCase. The entry must be an existing member, and delegation relationships must not form a cycle; the director can call members separately multiple times, but member call chains cannot recurse.
 
-成员字段：
+Member fields:
 
-| 字段 | 含义 |
+| Field | Meaning |
 | --- | --- |
-| description | 供协调成员查看的职责摘要 |
-| instructions | `members/` 内的 Markdown 相对路径 |
-| delegates | 允许委派的成员名 |
-| tools | 实际工具名称；省略时继承本轮宿主与团队私有工具，空数组关闭普通工具；显式名称必须在本轮可用 |
-| skills | `skills/<name>/SKILL.md` 中的目录名 |
-| knowledge | `knowledge/` 内的相对文件路径，或含文件的目录路径 |
+| description | A summary of responsibilities for the coordinating member to see |
+| instructions | Relative path of a Markdown file in `members/` |
+| delegates | Names of members it may delegate to |
+| tools | Actual tool names. When omitted, the host and team-private tools for the current turn are inherited; an empty array turns off ordinary tools; explicit names must be available in the current turn |
+| skills | Directory names in `skills/<name>/SKILL.md` |
+| knowledge | Relative file paths in `knowledge/`, or directory paths that contain files |
 
-根级 `tools` 是工具插件名到配置的映射，对应 `tools/<name>.tool.js`。它与成员的实际工具名称清单不同；插件可提供多个工具。运行时按需读取成员被授权的资源，不把全部正文塞进初始上下文。私有资源仅表示团队作用域，无法向本机用户隐藏文件，也不是可执行代码沙箱。
+The root-level `tools` is a mapping from tool plugin name to configuration, corresponding to `tools/<name>.tool.js`. It differs from a member's list of actual tool names; a plugin can provide several tools. At runtime, the resources a member is authorized for are read on demand, and full content is not stuffed into the initial context. Private resources only indicate team scope; they cannot hide files from the local user and are not a sandbox for executable code.
 
-单文件、解包后的文件总量及压缩包均最多 20 MiB，目录与文件最多 2000 条目。拒绝符号链接、跨目录路径、Windows 保留文件名及大小写冲突。
+A single file, the total size of unpacked files, and the archive are each limited to 20 MiB, and directories and files are limited to 2000 entries. Symbolic links, paths that escape the directory, Windows reserved file names, and case conflicts are rejected.
 
 ## A2A
 
-在 Toonflow 的「设置 → 插件市场 → Agent」中安装 `.agent.zip`，可以启用、禁用、导出、卸载或编辑成员说明、技能、知识与 `team.json`。团队安装在 `data/agents/<name>`；更新发现本地修改时会要求明确覆盖，开发构建也不会默认覆盖它们。团队资料工具允许成员在清单授予的范围内读写文本，不能借此修改工具代码或扩大成员授权。
+Install `.agent.zip` under Settings → Plugins → Agent in Toonflow, where you can enable, disable, export, or uninstall it, or edit member instructions, skills, knowledge, and `team.json`. Teams are installed in `data/agents/<name>`; when an update finds local modifications, it asks for explicit confirmation before overwriting, and development builds do not overwrite them by default either. The team resource tool lets members read and write text within the scope granted by the manifest; it cannot be used to modify tool code or expand member authorization.
 
-主 Agent 使用现有 `subAgent` 工具调用团队，例如：
+The main Agent calls teams with the existing `subAgent` tool, for example:
 
 ```json
-{"tasks":[{"name":"分镜方案","team":"storyboardTeam","task":"根据工作区 story.md 整理文字分镜，先读取原文，不执行消耗算力的媒体生成。"}]}
+{"tasks":[{"name":"Storyboard plan","team":"storyboardTeam","task":"Organize a text storyboard from story.md in the workspace. Read the original text first, and do not run media generation that consumes compute."}]}
 ```
 
-不传 `team` 仍是临时子 Agent，无须安装团队，自动继承父 Agent 的全部工具，包括提问与继续委派，无需指定 `tools`。团队使用主 Agent 当前选定的模型和本轮工具，成员可用范围仍由团队清单决定，成员上下文独立。同批任务直接并行执行，不设并发名额或等待队列。任务数量、执行轮次、累计成员调用和总时长不设固定上限，团队委派关系仍须通过清单的无环校验。成员与工具在任务开始时加载，编辑用于后续任务；知识和 Skill 正文使用时读取。当前运行不因禁用插件而自动终止，应通过调用方取消任务。
+Without `team`, it is still a temporary sub-Agent: no team needs to be installed, and it automatically inherits all of the parent Agent's tools, including asking questions and further delegation, without specifying `tools`. A team uses the model currently selected by the main Agent and the tools of the current turn; the scope available to members is still determined by the team manifest, and member contexts are independent. Tasks in the same batch run in parallel directly, with no concurrency quota or waiting queue. There is no fixed limit on the number of tasks, execution rounds, cumulative member calls, or total duration; team delegation relationships must still pass the manifest's acyclicity check. Members and tools are loaded when a task starts, and edits apply to later tasks; knowledge and Skill content are read when used. A running task is not terminated automatically when the plugin is disabled; cancel the task from the caller.
 
-对外服务在同一页面的「A2A 服务」中开启：选择明确授权的工作区和文本模型，保存后复制访问令牌，以及团队卡片上的 Agent Card 地址。默认关闭；远端调用不能指定其他本机目录或模型。Linux 部署只允许服务器工作区，配置入口须从本机访问。已有页面控制连接时可复用画布工具，未连接页面时只具备当前可用的文件及服务端工具。
+The external service is enabled under "A2A Service" on the same page: choose an explicitly authorized workspace and text model, save, then copy the access token and the Agent Card URL on the team card. It is off by default; remote calls cannot specify other local directories or models. Linux deployments only allow server workspaces, and the settings entry must be accessed from the local machine. When a page control connection exists, the canvas tools can be reused; without a connected page, only the currently available file and server tools are available.
 
-「连接远程 Agent」保存外部服务的完整 Agent Card 地址和可选 Bearer 令牌，连接名也用于 `subAgent` 的 `team` 字段。只有任务文本发送到远端，不传模型密钥、宿主工具或自动上传工作区文件。返回 `inputRequired` 时，将补充内容与原 `taskId`、`contextId` 一起提交同一团队。远端用量不计入本机可核实的模型用量。
+"Connect to remote Agent" saves the external service's full Agent Card URL and an optional Bearer token; the connection name is also used in the `team` field of `subAgent`. Only the task text is sent to the remote side; model keys and host tools are not sent, and workspace files are not uploaded automatically. When `inputRequired` is returned, submit the additional content together with the original `taskId` and `contextId` to the same team. Remote usage is not counted in the model usage that can be verified locally.
 
-`@toonflow/teams-scaffold/a2a` 使用官方 `@a2a-js/sdk` 1.2.0，协议为 A2A 1.0。导出的 `AgentCard`、`Message`、`Task`、`Artifact` 均为 SDK 原始类型；使用 SDK 的 `fromJSON` / `toJSON` 转换线上 JSON，不手工拼接内部 oneof 结构。
+`@toonflow/teams-scaffold/a2a` uses the official `@a2a-js/sdk` 1.2.0 with the A2A 1.0 protocol. The exported `AgentCard`, `Message`, `Task`, and `Artifact` are the SDK's original types; use the SDK's `fromJSON` / `toJSON` to convert wire JSON instead of assembling the internal oneof structures by hand.
 
 ```ts
 import { createTeamAgentCard, createTeamA2aRouter } from "@toonflow/teams-scaffold/a2a";
@@ -74,31 +74,31 @@ app.use("/team", createTeamA2aRouter({
   card: createTeamAgentCard(manifest, "https://example.com/team"),
   authenticate: async request => verifyBearerAndGetStableUserId(request),
   execute: async ({ taskId, contextId, message, task, userId, signal, emit }) => {
-    emit({ type: "status", text: "正在执行" });
+    emit({ type: "status", text: "Running" });
     return runTeam({ taskId, contextId, message, task, userId, signal, emit });
   },
   onCancel: taskId => clearSavedSession(taskId),
 }));
 ```
 
-宿主回调返回 `{ status: "completed" | "inputRequired", text, artifacts? }`；异常记录为失败。通过 `emit` 发布状态文本或标准 Artifact 更新。需要补充信息时返回 `inputRequired`，宿主保存自己的会话状态；下一条用户消息携带原 taskId 和 contextId 再次调用 `execute`，其中 task 包含已保存的协议历史。完成或失败后不能继续原任务。
+The host callback returns `{ status: "completed" | "inputRequired", text, artifacts? }`; exceptions are recorded as failures. Publish status text or standard Artifact updates through `emit`. When more information is needed, return `inputRequired` and the host saves its own session state; the next user message carries the original taskId and contextId and calls `execute` again, with task containing the saved protocol history. A task cannot be continued after it completes or fails.
 
-Card 位于挂载路径下 `/.well-known/agent-card.json`，公开团队能力摘要和 Bearer 认证声明，不公开私有正文。宿主验证 Bearer 并返回稳定身份；任务的读取、列表、续跑和取消均按该身份隔离。执行回调必须处理 AbortSignal 并等待所有子工作结束，取消响应才会确认 CANCELED；`onCancel` 在通过身份校验并完成取消后清理宿主状态。SSE 断开不会自动取消任务。
+The Card is at `/.well-known/agent-card.json` under the mount path and publishes a summary of the team's capabilities and the Bearer authentication declaration, without exposing private content. The host verifies the Bearer token and returns a stable identity; reading, listing, resuming, and canceling tasks are all isolated by that identity. The execute callback must handle the AbortSignal and wait for all child work to finish before the cancellation response confirms CANCELED; `onCancel` cleans up host state after the identity check passes and cancellation completes. An SSE disconnect does not cancel the task automatically.
 
-任务、事件和身份索引使用 SDK 内存存储，服务重启后不恢复；宿主需自行清理保存的模型会话。首期不提供推送通知或旧版 0.3 兼容层。
+Tasks, events, and identity indexes use the SDK's in-memory store and are not restored after a service restart; the host must clean up its saved model sessions itself. The first release does not provide push notifications or a legacy 0.3 compatibility layer.
 
 ```ts
 import { createTeamA2aClient } from "@toonflow/teams-scaffold/a2a";
 
 const client = await createTeamA2aClient({
   url: "https://example.com/team/.well-known/agent-card.json",
-  token: "由宿主读取的密钥",
+  token: "key read by the host",
 });
 const card = await client.getAgentCard();
 ```
 
-客户端返回官方 Client，支持其消息、SSE、任务读取、列表和取消接口；可发现 JSON-RPC 或 HTTP+JSON 服务。传入的 URL 是完整 Card 地址。携带 token 时不允许 Card 把请求转发到其他 origin，且禁止 HTTP 重定向，避免密钥随 Card 或跳转泄露。媒体文件不会由这个适配器自动下载。
+The client returns the official Client, supporting its message, SSE, task read, list, and cancel interfaces; it can discover JSON-RPC or HTTP+JSON services. The URL passed in is the full Card URL. When a token is provided, the Card is not allowed to forward requests to another origin, and HTTP redirects are forbidden, so the key cannot leak through the Card or a redirect. This adapter does not download media files automatically.
 
-## 验证
+## Verification
 
-脚手架修改后运行 `bun run --cwd packages/teamScaffold typecheck`，示例执行 `bun run --cwd packages/teams/storyboardTeam build`。构建本身会检查所有成员引用、资源限制和发布内容；实际成员执行、授权和模型调用仍需由宿主联调。
+After changing the scaffold, run `bun run --cwd packages/teamScaffold typecheck`; for the example, run `bun run --cwd packages/teams/storyboardTeam build`. The build itself checks all member references, resource limits, and published content; actual member execution, authorization, and model calls still need to be tested together with the host.

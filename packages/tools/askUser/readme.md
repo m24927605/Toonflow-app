@@ -1,17 +1,17 @@
-# 提问器
+# Question Tool
 
-让 Agent 在需要补充信息或作出选择时，在对话中展示可填写的提问卡片。
+Lets the Agent show a fillable question card in the conversation when it needs more information or a decision from you.
 
-## 使用方式
+## How to Use
 
-打开项目后，直接告诉 Agent 需要确认的事项，例如：“开始制作前，先问我视频用途、风格和时长。”
-Agent 提问后，在卡片中填写内容并点击“提交回答”，也可以点击“跳过”。
+After opening a project, tell the Agent what needs to be confirmed, for example: "Before you start, ask me about the video's purpose, style, and length."
+After the Agent asks, fill in the card and click "Submit answer" (`提交回答`), or click "Skip" (`跳过`).
 
-## 支持的功能
+## Features
 
-- 单个问题支持文字回答、选项选择和补充说明，最多提供 8 个选项。
-- 多问题表单最多包含 12 项，支持文本、长文本、单选、多选、下拉选择、数字和开关。
-- 表单可按问题设置必填项；提交后，Agent 获取回答并继续处理任务。
-- 跳过整组提问会明确记录为“已跳过”，不代表同意或通过阶段确认。
+- A single question supports a text answer, choosing an option, and additional notes, with up to 8 options.
+- A multi-question form has up to 12 items and supports text, long text, single choice, multiple choice, dropdown, number, and switch.
+- Required items can be set per question; after submission, the Agent receives the answers and continues the task.
+- Skipping the whole set of questions is explicitly recorded as "Skipped" (`已跳过`); it does not mean consent or approval of a stage confirmation.
 
-本工具没有配置项，无需单独填写 API Key。
+This tool has no configuration items and does not need a separate API key.

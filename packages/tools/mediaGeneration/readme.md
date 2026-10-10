@@ -1,25 +1,25 @@
-# 媒体生成
+# Media Generation
 
-让 Agent 查询已配置的媒体模型，按要求生成图片、视频或音频，并将结果保存到当前工作区。
+Lets the Agent query configured media models, generate images, videos, or audio on request, and save the results to the current workspace.
 
-## 使用方式
+## How to Use
 
-先在“设置 → 媒体模型”添加供应商，配置其 API Key 和需要使用的模型，再打开项目。
-需要 Agent 直接生成文件时，可以说：“请直接生成一张暖色调产品海报，保存到工作区。”
-需要在节点内制作时，配合“画布操作”工具，让 Agent 使用对应节点的生成功能。
+First add a provider in Settings → Media models, configure its API key and the models you want to use, then open a project.
+When you want the Agent to generate a file directly, you can say: "Please generate a warm-toned product poster directly and save it to the workspace."
+When you want to produce it inside a node, use it together with the Canvas Operations (`画布操作`) tool so the Agent uses the corresponding node's generation function.
 
-## 支持的功能
+## Features
 
-- 查询当前允许使用的图片、视频和音频模型，以及模型支持的生成选项。
-- 根据提示词生成图片，可按模型能力使用参考图、画幅和尺寸。
-- 生成视频，可按模型能力使用图片、视频、音频、首尾帧，以及时长、分辨率和声音选项。
-- 生成音频，可按模型能力使用参考音频、音色、语速、音量和输出格式。
-- 等待生成并保存后返回文件位置；默认保存在工作区的 `assets/generated`，也可指定工作区内的输出目录。
+- Query the image, video, and audio models currently allowed, and the generation options each model supports.
+- Generate images from prompts, using reference images, aspect ratio, and size as the model supports.
+- Generate videos, using images, videos, audio, first and last frames, and duration, resolution, and sound options as the model supports.
+- Generate audio, using reference audio, voice, speed, volume, and output format as the model supports.
+- Wait for generation and saving, then return the file location; files are saved to `assets/generated` in the workspace by default, or to an output directory you specify within the workspace.
 
-参考素材须已存在于工作区。具体可用功能取决于所选模型，并非所有模型都支持全部选项。
+Reference materials must already exist in the workspace. The features available depend on the selected model, and not every model supports all options.
 
-## 配置
+## Configuration
 
-在“设置 → 插件市场 → 已安装”找到“媒体生成”，点击“配置”。
-“允许 AI 生成图片”“允许 AI 生成视频”“允许 AI 生成音频”默认全部开启，分别控制 Agent 可直接调用的生成类型。
-供应商密钥在“媒体模型”中单独配置，不复用文本模型密钥；这里的开关不代替节点自身的配置。
+In Settings → Plugins → Installed, find Media Generation (`媒体生成`) and click "Configuration".
+"Allow AI to generate images", "Allow AI to generate videos", and "Allow AI to generate audio" (`允许 AI 生成图片`, `允许 AI 生成视频`, `允许 AI 生成音频`) are all on by default and control which generation types the Agent can call directly.
+Provider keys are configured separately in Media models and do not reuse text model keys; these switches do not replace a node's own configuration.

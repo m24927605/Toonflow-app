@@ -1,18 +1,18 @@
-# Skill 操作器
+# Skill Operator
 
-通过一个 `skillOperator` 工具统一查询、读取、新建和修改技能。源码说明在构建时嵌入 `.tool.js`，安装只需这个 JS 文件。
+Queries, reads, creates, and modifies skills through a single `skillOperator` tool. The source readme is embedded into `.tool.js` at build time, so installation only needs this JS file.
 
-读取、新建、修改三个配置开关默认开启；关闭某项后，该操作从工具参数中移除，执行时也会拒绝。目录查询始终可用。这些开关只约束本工具，不替代其他工具的文件权限。
+The three configuration switches for reading, creating, and modifying are on by default; when one is turned off, that operation is removed from the tool parameters and also refused at execution time. Directory queries are always available. These switches only constrain this tool and do not replace other tools' file permissions.
 
-| action | 用途 | 参数 |
+| action | Purpose | Parameters |
 | --- | --- | --- |
-| `list` | 实时列出技能名称、描述、来源及路径 | 可选 `scope` |
-| `read` | 读取技能正文或引用资料 | `name`，可选 `scope`、`path` |
-| `create` | 新建技能或资料文件，不覆盖已有文件 | `name`、`content`，可选 `scope`、`path` |
-| `update` | 用完整内容修改已有文件 | `name`、`content`，可选 `scope`、`path` |
+| `list` | Lists skill names, descriptions, sources, and paths in real time | Optional `scope` |
+| `read` | Reads a skill's content or referenced resources | `name`, optional `scope`, `path` |
+| `create` | Creates a skill or resource file without overwriting existing files | `name`, `content`, optional `scope`, `path` |
+| `update` | Modifies an existing file with complete content | `name`, `content`, optional `scope`, `path` |
 
-`scope` 为 `workspace`（当前工作区 `skill/`）或 `global`（全局 `data/skills/`）。读取、修改未指定范围时，同名技能优先使用工作区版本；新建默认工作区。可指定全局范围访问被覆盖的版本。
+`scope` is `workspace` (`skill/` in the current workspace) or `global` (the global `data/skills/`). When reading or modifying without a scope, the workspace version of a same-named skill takes priority; creation defaults to the workspace. Specify the global scope to access the shadowed version.
 
-`path` 相对于该技能的目录，默认 `SKILL.md`。可使用 `references/example.md` 操作附带资料，禁止越出技能目录。新技能先创建 `SKILL.md`，名称使用小驼峰；正文必须包含有效的 YAML frontmatter，`name` 与技能名称一致，`description` 不为空。修改前先读取原内容。
+`path` is relative to the skill's directory and defaults to `SKILL.md`. Use paths such as `references/example.md` to operate on bundled resources; escaping the skill directory is forbidden. For a new skill, create `SKILL.md` first, and use lowerCamelCase for the name; the content must contain valid YAML frontmatter, with `name` matching the skill name and a non-empty `description`. Read the original content before modifying.
 
-目录按调用实时扫描，新建后可立即查询、读取；`/skill:名称` 仍可手动调用。列表中的 `disableModelInvocation` 表示该技能是否仅适用于用户主动指定。
+The directory is scanned in real time on each call, so a newly created skill can be queried and read immediately; `/skill:<name>` can still be invoked manually. `disableModelInvocation` in the list indicates whether the skill only applies when the user explicitly specifies it.

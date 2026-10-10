@@ -1,44 +1,44 @@
-# Code of Conduct · 行为准则
+# Code of Conduct
 
-Toonflow 希望成为创作者与开发者可以安心提问、交流和协作的社区。无论经验、背景、身份或观点如何，每位参与者都应得到尊重。本准则适用于项目的 Issue、Pull Request、官方交流群，以及代表 Toonflow 参与的社区活动，也同样适用于维护者。
+Toonflow aims to be a community where creators and developers can ask questions, exchange ideas and collaborate with peace of mind. Every participant deserves respect regardless of experience, background, identity or opinion. This Code of Conduct applies to the project's Issues, Pull Requests, official community groups and community activities in which people represent Toonflow, and it applies equally to maintainers.
 
-## 我们鼓励的交流方式
+## How we encourage people to communicate
 
-- 围绕具体问题讨论，说明观察到的现象、理由和可执行的建议。
-- 尊重不同的经验和需求，耐心对待新手，允许提问、纠错和合理分歧。
-- 接受建设性意见；发现自己造成误解或伤害时，及时澄清和修正。
-- 分享他人的代码、作品或资料时，尊重作者意愿，保留必要的来源与署名。
-- 公开日志、截图或示例前，移除密钥、账号、私人对话和其他敏感信息。
+- Discuss concrete problems: describe what you observed, your reasoning and actionable suggestions.
+- Respect different experiences and needs, be patient with newcomers, and allow questions, corrections and reasonable disagreement.
+- Accept constructive feedback; when you realize you have caused a misunderstanding or harm, clarify and correct it promptly.
+- When sharing other people's code, work or materials, respect the author's wishes and keep the necessary source and attribution.
+- Before publishing logs, screenshots or examples, remove keys, accounts, private conversations and other sensitive information.
 
-我们全职投入 Toonflow，为爱发电。欢迎直接提出问题和批评，也请给维护者和其他参与者留出处理、回复的时间。开源协作不承诺即时答复或完成每一项需求，是否采纳建议取决于项目方向和实际资源。
+We work on Toonflow full time, out of passion. You are welcome to raise problems and criticism directly, but please give maintainers and other participants time to handle and reply. Open-source collaboration does not promise immediate answers or that every request will be completed; whether a suggestion is adopted depends on the project's direction and available resources.
 
-## 不被接受的行为
+## Unacceptable behavior
 
-- 辱骂、歧视、人身攻击、威胁，或针对个人身份和背景进行贬低。
-- 性骚扰、令人不适的性暗示，以及持续且不受欢迎的私人联系。
-- 未经允许公开他人的个人信息、私人通信或账号凭证。
-- 刷屏、恶意引战、垃圾广告，或在明确要求停止后继续骚扰、催促和干扰讨论。
-- 冒充维护者或其他成员，以项目名义作出未经授权的承诺。
-- 因他人报告问题、提出不同意见或参与违规调查而进行报复。
+- Insults, discrimination, personal attacks, threats, or belittling someone based on their identity or background.
+- Sexual harassment, unwelcome sexual innuendo, and persistent, unwanted private contact.
+- Publishing other people's personal information, private communications or account credentials without permission.
+- Spamming, deliberately provoking conflict, junk advertising, or continuing to harass, pressure or disrupt discussions after being clearly asked to stop.
+- Impersonating maintainers or other members, or making unauthorized commitments in the project's name.
+- Retaliating against people for reporting problems, expressing different opinions or taking part in an investigation of a violation.
 
-不同意某个设计、质疑代码或报告缺陷本身不构成违规。请针对内容表达意见，避免把技术分歧转为对人的攻击。
+Disagreeing with a design, questioning code or reporting a defect is not in itself a violation. Comment on the content, and avoid turning technical disagreements into attacks on people.
 
-## 如何反馈
+## How to report
 
-遇到骚扰、隐私泄露或其他违反本准则的行为，可以联系所在官方交流群的管理员，或发送邮件至 [ltlctools@outlook.com](mailto:ltlctools@outlook.com)，标题注明“Toonflow 社区行为反馈”。
+If you encounter harassment, a privacy leak or other behavior that violates this Code of Conduct, contact an administrator of the official community group you are in, or email [ltlctools@outlook.com](mailto:ltlctools@outlook.com) with the subject "Toonflow community conduct report".
 
-请尽量提供发生位置、时间、相关链接或已脱敏的截图，以及需要我们协助的事项。只提交调查所需的信息，不必在公开 Issue 中披露敏感经历、个人身份或完整聊天记录。
+Where possible, include where and when it happened, relevant links or redacted screenshots, and what you need help with. Submit only the information needed for the investigation; you do not need to disclose sensitive experiences, your identity or full chat logs in a public Issue.
 
-维护者会尽量限制反馈信息的知悉范围，仅向处理事件所需的人员提供必要内容。如果反馈涉及某位维护者，该维护者应回避处理本人相关的争议。
+Maintainers will limit who learns about a report as far as possible and share only what is necessary with the people who need it to handle the incident. If a report involves a maintainer, that maintainer must recuse themselves from handling the dispute.
 
-普通使用问题和功能建议请通过 [README 中的交流与反馈入口](./README.md) 提交，技术贡献请参阅 [Contributing · 贡献指南](./CONTRIBUTING.md)。
+Submit general usage questions and feature suggestions through the [community and feedback channels in the README](./README.md); for technical contributions, see the [Contributing Guide](./CONTRIBUTING.md).
 
-## 处理方式
+## Enforcement
 
-维护者会结合上下文、影响程度和是否重复发生作出处理，并在条件允许时听取相关人员的说明。可采取的措施包括提醒并要求修正、删除不当内容、暂停参与，或对严重及反复违规者限制访问社区。
+Maintainers will act based on context, impact and whether the behavior is repeated, and will hear from the people involved when circumstances allow. Possible measures include a reminder with a request to correct the behavior, removing inappropriate content, suspending participation, or restricting community access for serious or repeated violators.
 
-对于威胁、隐私泄露或持续骚扰，可以先采取必要措施防止伤害扩大，再补充核实情况。处理应针对具体行为，避免因为善意批评或合理分歧限制参与。
+For threats, privacy leaks or ongoing harassment, necessary measures may be taken first to prevent further harm, with the facts verified afterwards. Enforcement targets specific behavior and avoids restricting participation because of good-faith criticism or reasonable disagreement.
 
-如果认为处理有误，可以通过上述邮箱补充事实并请求复核。请勿通过刷屏、公开他人隐私或换号骚扰的方式申诉。
+If you believe a decision was wrong, you can provide additional facts and request a review through the email address above. Do not appeal by spamming, exposing other people's private information or harassing from other accounts.
 
-感谢每一位愿意认真反馈、耐心沟通和分享经验的参与者。
+Thank you to every participant who gives careful feedback, communicates patiently and shares their experience.

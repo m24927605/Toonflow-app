@@ -1,23 +1,23 @@
-# 工作区文件
+# Workspace Files
 
-让 Agent 阅读、列出和编辑当前项目工作区内的文件，并下载远程图片。
+Lets the Agent read, list, and edit files in the current project workspace, and download remote images.
 
-## 使用方式
+## How to Use
 
-先选择或打开项目，再给出文件名称与任务，例如：“阅读分镜.md并总结”“把这段设定保存为角色设定.md”。
-文件位置相对于当前工作区；修改已有内容前，Agent 会先读取相关文件。
+Select or open a project first, then give the file name and the task, for example: "Read storyboard.md and summarize it", "Save this setting as characterSettings.md".
+File locations are relative to the current workspace; before modifying existing content, the Agent reads the relevant file first.
 
-## 支持的功能
+## Features
 
-- 列出目录内容，读取文件。
-- 新建或写入文件，编辑已有文件中的内容。
-- 下载公开 HTTP(S) 图片到 `assets/chatImages/`，返回可直接预览的工作区相对路径；支持 PNG、JPEG、WebP、GIF、AVIF、BMP，单张不超过 20 MB，不支持 SVG、登录图片或内网地址。
-- 阅读可用的全局技能及其附带资料；全局技能目录只允许读取。
+- List directory contents and read files.
+- Create or write files, and edit content in existing files.
+- Download public HTTP(S) images to `assets/chatImages/` and return a workspace-relative path that can be previewed directly; supports PNG, JPEG, WebP, GIF, AVIF, and BMP, up to 20 MB per image. SVG, images behind a login, and internal network addresses are not supported.
+- Read available global skills and their bundled resources; the global skills directory is read-only.
 
-## 配置
+## Configuration
 
-在“设置 → 插件市场 → 已安装”找到“工作区文件”，点击“配置”。
-“只读模式”默认关闭。开启后，本工具只提供文件读取和目录列表，不再提供写入、编辑或图片下载。
-只读模式仅限制本工具，不会关闭画布操作等其他工具的修改能力。
+In Settings → Plugins → Installed, find Workspace Files (`工作区文件`) and click "Configuration".
+"Read-only mode" (`只读模式`) is off by default. When enabled, this tool only provides file reading and directory listing, and no longer provides writing, editing, or image download.
+Read-only mode only restricts this tool; it does not turn off the modification capabilities of other tools such as Canvas Operations.
 
-文件修改限定在当前工作区内。本工具没有删除、重命名或执行终端命令的功能。
+File modifications are limited to the current workspace. This tool has no features for deleting, renaming, or running terminal commands.

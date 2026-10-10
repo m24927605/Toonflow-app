@@ -1,39 +1,39 @@
-# 浏览器
+# Browser
 
-让 Toonflow Agent 操作本机 Chrome 或 Edge，并在工作区中实时查看正在操作的页面。
+Lets the Toonflow Agent operate the local Chrome or Edge and shows the page being operated live in the workspace.
 
-## 使用
+## Usage
 
-1. 在工具设置中启用「网页浏览器」。工具会查找本机浏览器，也可以配置浏览器可执行文件的绝对路径。
-2. 在 Agent 对话中要求打开网页、搜索或读取信息。
-3. Agent 首次使用浏览器时，对应那条消息的工具栏下方会显示一张小预览卡片。Agent 分步操作时持续更新这张画面，不为每次工具调用新增卡片，也不把画面移到整个消息列表末尾。可直接悬停、点击、双击、右键、拖拽、输入文字、使用修饰键和滚轮操作网页，也可以点击「放大」查看细节。画面失焦、切换页面或停止观看时会释放人工按住的鼠标和按键。
+1. Enable Web Browser (`网页浏览器`) in the tool settings. The tool looks for a local browser; you can also configure the absolute path of the browser executable.
+2. In an Agent conversation, ask it to open a web page, search, or read information.
+3. The first time the Agent uses the browser, a small preview card appears below the toolbar of that message. The Agent keeps updating this view as it works step by step; it does not add a card for every tool call or move the view to the end of the whole message list. You can hover, click, double-click, right-click, drag, type text, use modifier keys, and scroll to operate the page directly, or click "Enlarge" (`放大`) to see details. Mouse buttons and keys held down manually are released when the view loses focus, switches pages, or stops being watched.
 
-放大视图的顶栏提供地址栏、返回、前进和刷新按钮。输入完整 HTTP/HTTPS 地址后按 Enter 访问；返回与前进使用当前标签页的真实历史，没有对应历史时按钮禁用。导航错误直接显示在放大视图中。
+The top bar of the enlarged view provides an address bar and Back, Forward, and Refresh buttons. Enter a full HTTP/HTTPS address and press Enter to visit it; Back and Forward use the current tab's real history and are disabled when there is no corresponding history. Navigation errors are shown directly in the enlarged view.
 
-每个 Agent 对话使用独立浏览器会话，并只显示一个画面。会话可跨多轮对话继续使用；多步操作及放大收起持续复用同一画面连接。切换到其他对话时暂停观看，切回后恢复；Agent 可以继续操作。在浏览器操作执行期间点击停止，会关闭当前浏览器会话，防止取消后仍继续执行；可重新打开。应用退出时清理本次启动的浏览器。
+Each Agent conversation uses an independent browser session and shows only one view. The session can continue across multiple turns; multi-step operations and enlarging or collapsing keep reusing the same view connection. Watching pauses when you switch to another conversation and resumes when you switch back; the Agent can keep operating. Clicking Stop while a browser operation is running closes the current browser session so that nothing keeps executing after cancellation; it can be reopened. Browsers started in this run are cleaned up when the app exits.
 
-工具支持打开、导航、页面快照、分页读取正文、点击、悬停、填入文本、按键、滚动、截图和标签页管理。根据快照返回的元素引用操作，页面变化或引用失效后重新获取快照；使用 `hover` 展开菜单后重新读取快照。画面通过独立接口传输，不写入聊天历史。
+The tool supports opening, navigation, page snapshots, paginated reading of body text, clicking, hovering, filling in text, key presses, scrolling, screenshots, and tab management. Operations use element references returned by snapshots; take a new snapshot after the page changes or a reference becomes invalid, and read the snapshot again after using `hover` to expand a menu. The view is transmitted through a separate interface and is not written to the chat history.
 
-需要本机 Chrome 或 Edge。首版使用独立临时浏览器资料，不读取个人浏览器的登录资料。登录状态保留到当前浏览器会话关闭为止。本机浏览器会话隔离不等同操作系统沙箱。
+A local Chrome or Edge is required. The first version uses a separate temporary browser profile and does not read the login data of your personal browser. Login state is kept until the current browser session closes. Local browser session isolation is not the same as an operating system sandbox.
 
-默认减少常见自动化特征：启动时移除自动化开关、关闭 `AutomationControlled` 标记，并设置与预览匹配的窗口和虚拟屏幕尺寸；在网页导航前去除 User-Agent 中的 `HeadlessChrome`，同时保留本机浏览器真实的版本、品牌、平台及 Client Hints。无需另外安装 stealth 插件，也不修改页面的语言、GPU 或插件对象。这些设置在新浏览器进程启动时生效。
+Common automation traits are reduced by default: the automation switch is removed at launch, the `AutomationControlled` flag is disabled, and the window and virtual screen sizes are set to match the preview; `HeadlessChrome` is removed from the User-Agent before page navigation, while keeping the local browser's real version, brand, platform, and Client Hints. No stealth plugin needs to be installed, and the page's language, GPU, and plugin objects are not modified. These settings take effect when a new browser process starts.
 
-这不是完全隐身。已在本机 Edge 153 和 Chrome 154 实测：SharedWorker、ServiceWorker 的脚本环境及它们发出的请求仍可暴露 `HeadlessChrome`；网页自行弹出的新窗口在初始化前的首次请求和首段脚本也存在泄漏。主页面、iframe 和 DedicatedWorker 的页面级覆盖不能代表这些上下文。网站还可能结合行为、网络和其他浏览器特征识别自动化。遇到登录或人工验证时，可在实时画面中手动接管。
+This is not full stealth. Tested on local Edge 153 and Chrome 154: the script environments of SharedWorker and ServiceWorker, and the requests they send, can still expose `HeadlessChrome`; new windows opened by the page itself also leak in their first request and first script before initialization. Page-level overrides in the main page, iframes, and DedicatedWorker do not cover these contexts. Websites may also detect automation by combining behavior, network, and other browser traits. When you hit a login or human verification, you can take over manually in the live view.
 
-页面最早执行的脚本还可能短暂读到窗口外尺寸为 `0×0`，随后恢复正常。等待空白页尺寸就绪不能消除导航时的新文档瞬态，因此没有使用这种无效等待或篡改尺寸属性。
+The earliest scripts on a page may also briefly read the window's outer size as `0×0` before it returns to normal. Waiting for a blank page's size to be ready cannot eliminate the transient state of the new document during navigation, so such an ineffective wait is not used, and size properties are not tampered with.
 
-2026-10-07 使用上述两个浏览器验证，[Sannysoft](https://bot.sannysoft.com/) 的 20 项 Fingerprint Scanner 检查均为 `ok`，WebDriver 两项通过，[BotD v2](https://github.com/fingerprintjs/BotD) 返回 `bot: false`；默认 Puppeteer 启动的 Edge 对照组被 BotD 识别为 `headless_chrome`。这些公开检测结果只覆盖对应检查项，不能证明网站风控不会识别自动化。
+Verified on 2026-10-07 with the two browsers above: all 20 Fingerprint Scanner checks on [Sannysoft](https://bot.sannysoft.com/) were `ok`, both WebDriver checks passed, and [BotD v2](https://github.com/fingerprintjs/BotD) returned `bot: false`; an Edge control group launched with default Puppeteer was identified by BotD as `headless_chrome`. These public detection results only cover the corresponding checks and do not prove that a website's risk controls will not detect automation.
 
-## 开发
+## Development
 
 `bun run --filter @toonflow/tool-browser typecheck`
 
 `NODE_ENV=dev bun run --filter @toonflow/tool-browser build`
 
-`bun run --filter @toonflow/tool-browser demo` 启动临时本机网页，调用真实浏览器并检查操作、画面、隔离、取消清理及人工悬停、拖拽、双击、修饰键、释放、地址导航、前后退与刷新；不调用模型服务。
+`bun run --filter @toonflow/tool-browser demo` starts a temporary local web page, drives a real browser, and checks operations, the view, isolation, cancellation cleanup, and manual hover, drag, double-click, modifier keys, release, address navigation, back/forward, and refresh; it does not call model services.
 
-在子包目录运行 `bun demo.ts --detect`，检查主页面、跨源 iframe、三类 Worker、网页弹窗和 Agent 新标签的 UA、Client Hints、webdriver、原生描述符及尺寸；加 `--executable=浏览器绝对路径` 可指定 Edge 或 Chrome。探针使用本机内存网页，不访问检测网站。缺少检测结果或受保障项退化会失败退出；已知泄漏单独列在 `knownLeaks` 和 `geometryWarnings`，进程退出成功仅表示探针完成，不能当作隐蔽性全部通过。
+Run `bun demo.ts --detect` in the subpackage directory to check the UA, Client Hints, webdriver, native descriptors, and sizes of the main page, a cross-origin iframe, the three kinds of Workers, a page popup, and an Agent-opened tab; add `--executable=<absolute browser path>` to specify Edge or Chrome. The probe uses in-memory local pages and does not visit detection websites. Missing detection results or regressions in guaranteed items cause a failing exit; known leaks are listed separately in `knownLeaks` and `geometryWarnings`. A successful process exit only means the probe completed and must not be taken to mean that all stealth checks passed.
 
-浏览器运行时与输入协议分别通过 `./host`、`./protocol` 导出。宿主持有运行时，并通过工具上下文注入调用入口，确保工具和画面接口共享同一会话。
+The browser runtime and the input protocol are exported through `./host` and `./protocol` respectively. The host holds the runtime and injects the call entry through the tool context, ensuring the tool and the view interface share the same session.
 
-前端通过 `./client` 的 `isBrowserTool` 筛选浏览器工具，保留完整工具历史数据，将筛选结果传给 `./panel` 的 `browserPanel`：`tools: ToolCall[]`、`directory?: string`、`active: boolean`。面板位于对应消息的工具栏下方，虚拟列表额外保留当前浏览器消息，滚动或追加消息不会卸载画面或重建连接。历史会话失效时显示已结束，工具失败和中断仍在卡片中显示。
+The frontend filters browser tools with `isBrowserTool` from `./client`, keeps the full tool history data, and passes the filtered results to `browserPanel` from `./panel`: `tools: ToolCall[]`, `directory?: string`, `active: boolean`. The panel sits below the toolbar of the corresponding message; the virtual list additionally keeps the current browser message, so scrolling or appending messages does not unmount the view or rebuild the connection. When a historical session has expired, it is shown as ended, and tool failures and interruptions are still shown in the card.

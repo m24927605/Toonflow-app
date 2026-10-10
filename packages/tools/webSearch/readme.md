@@ -1,22 +1,22 @@
-# 联网搜索
+# Web Search
 
-搜索公开网页，为 Agent 提供标题、来源链接和摘要。默认使用 `duck-duck-scrape` 调用 DuckDuckGo，无需注册或填写 API Key，也可切换为 DeepSeek 或 Tavily。
+Searches public web pages and provides the Agent with titles, source links, and snippets. By default it uses `duck-duck-scrape` to call DuckDuckGo, with no registration or API key required; it can also switch to DeepSeek or Tavily.
 
-## 使用方式
+## How to Use
 
-在对话中直接提出检索任务，例如：“搜索最近的 AI 视频制作资料，列出来源和要点。”
-搜索结果适合发现资料；需要核对完整正文时，可配合“读取网页”工具。
+Give a search task directly in the conversation, for example: "Search for recent material on AI video production and list the sources and key points."
+Search results are good for discovering material; when you need to check the full text, use it together with the Read Web Page (`读取网页`) tool.
 
-## 配置
+## Configuration
 
-在“设置 → 插件市场 → 已安装”找到“联网搜索”，点击“配置”。
+In Settings → Plugins → Installed, find Web Search (`联网搜索`) and click "Configuration".
 
-- “搜索服务”：默认 DuckDuckGo（免 Key），可选 DeepSeek、Tavily。
-- “DeepSeek API Key”：选择 DeepSeek 后必填，填写官方 DeepSeek 密钥；兼容此前保存的密钥。
-- “Tavily API Key”：选择 Tavily 后必填，填写 Tavily 密钥。两种服务的密钥分别保存。
-- “最多返回结果”：默认 8 条，可设为 1–20 条。
-- “超时（毫秒）”：默认 30000，可设为 1000–60000。
+- "Search service" (`搜索服务`): defaults to DuckDuckGo (no key); DeepSeek and Tavily are optional.
+- "DeepSeek API Key": required when DeepSeek is selected; enter an official DeepSeek key. Previously saved keys remain compatible.
+- "Tavily API Key": required when Tavily is selected; enter a Tavily key. The keys for the two services are saved separately.
+- "Maximum results" (`最多返回结果`): defaults to 8 and can be set to 1–20.
+- "Timeout (ms)" (`超时（毫秒）`): defaults to 30000 and can be set to 1000–60000.
 
-DuckDuckGo 需要当前网络能够访问，可能遇到限流或验证码；失败时可稍后重试或手动切换搜索服务。不会自动切换到付费服务。
-DeepSeek 使用官方搜索服务，其他供应商或中转平台的密钥不能替代其配置；Tavily 使用基础搜索。
-结果包含来源网址，Agent 可以据此引用资料；搜索摘要不等于已经读取完整网页。
+DuckDuckGo requires that the current network can reach it, and you may run into rate limits or CAPTCHAs; on failure, retry later or switch the search service manually. It never switches to a paid service automatically.
+DeepSeek uses the official search service, and keys from other providers or relay platforms cannot replace its configuration; Tavily uses basic search.
+Results include source URLs that the Agent can cite; a search snippet does not mean the full page has been read.

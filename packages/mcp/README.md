@@ -1,130 +1,130 @@
 # @toonflow/mcp
 
-Toonflow 的独立 MCP 适配包。宿主提供独立的本机 HTTP 监听端口，同时保留现有 Server 的 `/mcp` 路径；stdio 入口只连接正在运行的 Toonflow，不创建第二个应用进程。使用官方 MCP TypeScript SDK v2 的 Streamable HTTP 会话传输，兼容 2025 年版客户端协议并支持取消工具调用。
+The standalone MCP adapter package for Toonflow. The host provides a separate local HTTP listening port while keeping the existing Server's `/mcp` path; the stdio entry only connects to a running Toonflow and does not start a second app process. It uses the Streamable HTTP session transport from the official MCP TypeScript SDK v2, is compatible with 2025 client protocol versions, and supports canceling tool calls.
 
-已验证 `2025-03-26`、`2025-06-18`、`2025-11-25` 初始化、SDK v2 自动协商回退、HTTP/stdio 工具调用与取消。未启用 2026 年版无会话 HTTP 协议。
+Verified: initialization with `2025-03-26`, `2025-06-18` and `2025-11-25`, automatic negotiation fallback in SDK v2, and HTTP/stdio tool calls and cancellation. The 2026 sessionless HTTP protocol is not enabled.
 
-## 开启
+## Enabling
 
-1. 启动 Toonflow，进入 **设置 → MCP**。
-2. 打开 MCP 开关，复制连接地址和客户端配置。
-3. 在外部 Coding 工具中添加 MCP 服务，重新连接后调用 `getAppState`。
+1. Start Toonflow and open **Settings → MCP**.
+2. Turn on the MCP switch, then copy the connection address and the client configuration.
+3. Add the MCP server in your external coding tool, reconnect, and call `getAppState`.
 
-开关默认关闭。访问凭证由设置管理；关闭或更换凭证会取消进行中的控制调用。画布、节点、当前文档和切换项目等界面操作需要打开的 Toonflow 窗口或网页。服务端文件、技能和媒体能力可以在没有前端连接时使用指定的工作区目录；Linux 部署的目录必须位于 `data/workspaces` 内。
+The switch is off by default. The access token is managed in Settings; turning MCP off or replacing the token cancels control calls in progress. UI operations such as canvases, nodes, the current document and switching projects require an open Toonflow window or web page. Server-side file, skill and media capabilities can use a specified workspace directory without a frontend connection; on Linux deployments the directory must be inside `data/workspaces`.
 
-本机 MCP 默认地址为 `http://127.0.0.1:10588/mcp`，仅监听本机回环地址。可在 **设置 → MCP** 手动修改首选端口，保存后自动切换 MCP 服务，无需重启 Toonflow。MCP 端口独立于桌面页面的随机端口，切换只影响 MCP 监听服务。
+The default local MCP address is `http://127.0.0.1:10588/mcp`, and it only listens on the loopback address. You can change the preferred port manually in **Settings → MCP**; after saving, the MCP service switches automatically without restarting Toonflow. The MCP port is independent of the desktop page's random port, and switching it only affects the MCP listener.
 
-首选端口已被占用时，实例会向后顺延尝试端口；达到重试上限仍无法监听时报告失败。切换端口时先监听新地址，成功后再关闭旧地址；切换失败时保留原地址，并在设置中显示错误。多开时每个实例使用自己的实际地址，例如 `10588`、`3002`，请从目标实例的设置中复制配置。实际顺延端口不会覆盖保存的首选端口，已有实例也不会因较低端口空闲而自动迁移。共用同一 `data` 目录的实例共用首选端口、MCP 开关和访问凭证；保存新的首选端口后，各实例会自动应用并分别顺延。这些配置不是各窗口独立设置。
+If the preferred port is already in use, the instance tries the following ports in turn and reports a failure if it still cannot listen after reaching the retry limit. When switching ports, it listens on the new address first and closes the old one only after that succeeds; if the switch fails, the old address is kept and the error is shown in Settings. When several instances are open, each uses its own actual address, for example `10588` or `3002`; copy the configuration from the settings of the target instance. The actual fallback port does not overwrite the saved preferred port, and an existing instance does not migrate automatically when a lower port becomes free. Instances sharing the same `data` directory share the preferred port, the MCP switch and the access token; after a new preferred port is saved, each instance applies it automatically and falls back separately. These settings are not per-window.
 
-实际地址改变后，请从目标实例重新复制外部客户端的 HTTP 或 stdio 配置并重新连接。
+After the actual address changes, copy the external client's HTTP or stdio configuration again from the target instance and reconnect.
 
 ## Streamable HTTP
 
-将设置中给出的 MCP 地址填入支持 HTTP 的客户端，同时设置请求头：
+Enter the MCP address shown in Settings into a client that supports HTTP, and set the request header:
 
 ```text
-Authorization: Bearer <设置中的访问凭证>
+Authorization: Bearer <access token from Settings>
 ```
 
-不同客户端配置字段可能不同；以下为常见结构：
+Configuration fields differ between clients; a common structure is:
 
 ```json
 {
   "mcpServers": {
     "toonflow": {
-      "url": "http://127.0.0.1:<实际端口>/mcp",
-      "headers": { "Authorization": "Bearer <访问凭证>" }
+      "url": "http://127.0.0.1:<actual port>/mcp",
+      "headers": { "Authorization": "Bearer <access token>" }
     }
   }
 }
 ```
 
-从本机访问设置时显示独立 MCP 监听地址；从远程访问设置时保留页面公网地址下的 `/mcp`。Linux 远程部署请通过 HTTPS 反向代理转发宿主 Server 的 `/mcp`，保留 Authorization 请求头，不将访问凭证写入 URL；本机回环监听地址不能直接用于远程连接。
+When Settings is opened locally, it shows the separate MCP listening address; when opened remotely, it keeps `/mcp` under the page's public address. For remote Linux deployments, forward the host Server's `/mcp` through an HTTPS reverse proxy, keep the Authorization header, and do not put the access token in the URL; the local loopback listening address cannot be used directly for remote connections.
 
-MCP 凭证只保护 MCP 入口。现有 Web 页面及其接口本身就是管理端，不属于全站认证方案；Linux 远程部署应由反向代理身份认证或私有网络等部署侧措施保护整个站点。
+The MCP token only protects the MCP entry. The existing Web pages and their APIs are themselves the management interface and are not covered by a site-wide authentication scheme; remote Linux deployments should protect the whole site with deployment-side measures such as reverse proxy authentication or a private network.
 
 ## stdio
 
-优先点击目标实例设置中的 **复制 stdio 配置**，其中已填写当前宿主的运行时、入口产物和运行信息文件的绝对路径。以下仅为配置结构示意：
+Prefer clicking **Copy stdio configuration** in the settings of the target instance; it already contains the absolute paths of the current host's runtime, entry artifact and runtime info file. The following only illustrates the configuration structure:
 
 ```json
 {
   "mcpServers": {
     "toonflow": {
       "command": "node",
-      "args": ["<build/mcp/stdio.js 绝对路径>", "--runtime", "<运行信息文件绝对路径>"]
+      "args": ["<absolute path to build/mcp/stdio.js>", "--runtime", "<absolute path to the runtime info file>"]
     }
   }
 }
 ```
 
-运行信息按实际 MCP 端口保存，例如 `data/mcpRuntime10588.json`、`data/mcpRuntime3002.json`，仅在 MCP 开启时生成。格式为 `{ "pid": 进程ID, "url": "http://127.0.0.1:端口/mcp", "token": "访问凭证" }`，由宿主维护；关闭或退出时只删除仍属于当前进程的文件。只允许连接本机地址；macOS/Linux 上文件必须属于当前用户且权限为 `0600`。
+Runtime info is saved per actual MCP port, for example `data/mcpRuntime10588.json` or `data/mcpRuntime3002.json`, and is only generated while MCP is enabled. The format is `{ "pid": process ID, "url": "http://127.0.0.1:port/mcp", "token": "access token" }`, maintained by the host; on shutdown or exit, the host only deletes files that still belong to the current process. Only local addresses may be connected; on macOS/Linux the file must belong to the current user and have permission `0600`.
 
-stdio 配置绑定所选数据目录内的实际端口，不会自动跟随某个窗口。修改首选端口或重启后，如果实际端口改变，需要从目标实例重新复制配置；重启后若仍取得原端口，重新连接 MCP 即可。多开顺序变化后，同一端口可能属于另一实例，连接前应核对目标实例的实际地址，并通过 `getAppState` 确认页面与工作区。各实例的 MCP 会话分别维护。
+The stdio configuration is bound to the actual port within the selected data directory and does not follow any particular window. After changing the preferred port or restarting, if the actual port changes, copy the configuration again from the target instance; if the same port is obtained after a restart, just reconnect MCP. When the order in which instances are opened changes, the same port may belong to another instance; check the target instance's actual address before connecting, and confirm the page and workspace with `getAppState`. MCP sessions are maintained separately for each instance.
 
-旧版共用的 `data/mcpRuntime.json` 不再作为运行信息别名维护；升级后请重新复制 stdio 配置。
+The legacy shared `data/mcpRuntime.json` is no longer maintained as a runtime info alias; copy the stdio configuration again after upgrading.
 
-也可以显式传入 URL，并从环境变量读取访问凭证：
+You can also pass the URL explicitly and read the access token from an environment variable:
 
 ```json
 {
   "mcpServers": {
     "toonflow": {
       "command": "node",
-      "args": ["<build/mcp/stdio.js 绝对路径>", "--url", "https://<服务域名>/mcp", "--token-env", "TOONFLOW_MCP_TOKEN"],
-      "env": { "TOONFLOW_MCP_TOKEN": "<访问凭证>" }
+      "args": ["<absolute path to build/mcp/stdio.js>", "--url", "https://<service domain>/mcp", "--token-env", "TOONFLOW_MCP_TOKEN"],
+      "env": { "TOONFLOW_MCP_TOKEN": "<access token>" }
     }
   }
 }
 ```
 
-Node.js 需要 20 或更新版本，也支持 Bun。源码开发可使用 `bun packages/mcp/src/stdio.ts`。stdio 的 stdout 只传输 MCP 消息，错误写入 stderr；桥接工具列表与调用，以及资源列表、读取和模板列表，保留取消信号。每次工具调用最长等待 30 分钟，异步生成节点按节点契约返回启动结果。
+Node.js 20 or later is required; Bun is also supported. For source development, use `bun packages/mcp/src/stdio.ts`. stdio's stdout only carries MCP messages, and errors are written to stderr; it bridges tool listing and calls, as well as resource listing, reading and template listing, preserving cancellation signals. Each tool call waits at most 30 minutes, and asynchronous generation nodes return the start result according to the node contract.
 
 ## Skill
 
-`skills/toonflow/SKILL.md` 面向外部 Agent，随包打包到 `build/mcp/skills/toonflow/SKILL.md`，也可以从设置中导出。将整个 `toonflow` 目录放进外部工具支持的 Skill 目录。
+`skills/toonflow/SKILL.md` is intended for external Agents. It is packaged into `build/mcp/skills/toonflow/SKILL.md` and can also be exported from Settings. Put the whole `toonflow` directory into the Skill directory supported by your external tool.
 
-Skill 介绍实时画布、节点参数、媒体引用与生成结果的操作顺序。连接 MCP 不会自动安装 Skill；不安装 Skill 也能根据工具说明调用。
+The Skill describes the order of operations for the live canvas, node parameters, media references and generation results. Connecting MCP does not install the Skill automatically; tools can still be called from their descriptions without the Skill.
 
-## 全局技能资源
+## Global skill resources
 
-全局 `data/skills` 中已安装技能的主文和附属文件通过标准 MCP resources 提供给外部 Agent：
+The main files and supporting files of skills installed in the global `data/skills` are provided to external Agents as standard MCP resources:
 
-1. 调用 `resources/list` 发现文件及其 URI。
-2. 将返回的 URI 传入 `resources/read`，读取所需技能或附属资料。
+1. Call `resources/list` to discover the files and their URIs.
+2. Pass a returned URI to `resources/read` to read the skill or supporting material you need.
 
-URI 结构为 `toonflow://skills/<技能名称编码>/<技能内文件路径分段编码>`。技能名称整体使用 `encodeURIComponent`，文件路径中的每段独立编码并保留 `/` 层级；使用列表返回的 URI 即可，无需猜测磁盘路径。
+The URI structure is `toonflow://skills/<encoded skill name>/<encoded path segments within the skill>`. The skill name is encoded as a whole with `encodeURIComponent`, and each segment of the file path is encoded separately, keeping the `/` hierarchy; just use the URIs returned by the listing, without guessing disk paths.
 
-资源接口和工具共用 MCP 开关及 Bearer 凭证。每次请求读取最新目录或文件，stdio 桥接也会刷新上游资源，不缓存技能内容；不提供资源订阅或变更推送，模板列表为空。资源读取不会执行技能中的脚本，也不会自动安装 Skill 到外部客户端。
+Resources and tools share the MCP switch and the Bearer token. Each request reads the latest directory or file, and the stdio bridge also refreshes upstream resources, so skill content is not cached; resource subscriptions and change notifications are not provided, and the template list is empty. Reading resources does not run scripts in skills, nor does it install the Skill into external clients automatically.
 
-## 工具约定
+## Tool conventions
 
-`getAppState` 使用 `{}`，先发现连接及工作区。其余业务工具使用以下结构，实际可用字段以 `tools/list` 返回的 JSON Schema 为准：
+`getAppState` takes `{}` and is used first to discover connections and workspaces. Other business tools use the structure below; the fields actually available are defined by the JSON Schema returned by `tools/list`:
 
 ```json
 {
-  "target": { "connectionId": "连接 ID", "directory": "工作区绝对路径", "canvasId": "当前画布 ID" },
-  "args": { "工具原有参数": "值" }
+  "target": { "connectionId": "connection ID", "directory": "absolute workspace path", "canvasId": "current canvas ID" },
+  "args": { "originalToolParameter": "value" }
 }
 ```
 
-`target` 及其字段可选，操作画布时建议明确传入 `connectionId`、`directory` 和 `canvasId`，避免用户手动切换画布后旧命令作用于新画布。切换项目或画布成功后重新读取状态，更新目标 ID。
+`target` and its fields are optional. When operating on a canvas, pass `connectionId`, `directory` and `canvasId` explicitly, so that an old command does not act on a new canvas after the user switches canvases manually. After successfully switching projects or canvases, read the state again and update the target IDs.
 
-画布工具与内置 Agent 共用已有实现。`getCanvas` 默认返回概览，按需附带分页的画布列表或节点类型；`findCanvasNodes` 筛选定位节点，`getCanvasNodes` 按 ID 和字段读取详情，`getCanvasEdges` 分页查询局部连接，`getNodeTools` 查询目标节点完整函数 schema，再通过 `nodeTools` 调用。每次读取限制为 64 KiB，使用 `hasMore/nextCursor` 续读，空结果也可能仍需扫描；大节点字段可通过 `path` 和 `textOffset/textLimit` 或 `valueOffset/valueLimit` 分段读取。全图任务按批推进并保留摘要和游标，不注入全量节点函数。插件禁用、目标不匹配、连接断开时返回明确错误。
+Canvas tools share their existing implementation with the built-in Agent. `getCanvas` returns an overview by default and can include a paginated canvas list or node types on request; `findCanvasNodes` filters and locates nodes, `getCanvasNodes` reads details by ID and field, `getCanvasEdges` queries local connections with pagination, and `getNodeTools` returns the full function schemas of a target node, which are then called through `nodeTools`. Each read is limited to 64 KiB; continue with `hasMore/nextCursor`, and note that an empty result may still require further scanning. Large node fields can be read in segments with `path` plus `textOffset/textLimit` or `valueOffset/valueLimit`. Whole-graph tasks proceed in batches and keep a summary and cursor, without injecting the full set of node functions. Disabled plugins, mismatched targets and disconnections return explicit errors.
 
-节点/连线查询每页最多扫描 2000 项；`totalNodes/totalEdges` 是画布总量，`selectedOnly` 为现场筛选。名称匹配全文，结果名称预览最多 512 字符。详情和函数查询的节点 ID 不能重复；正偏移要求 `path`，路径最多 64 层、2048 JSON UTF-8 字节，`pathDepthLimit` 表示达到深度限制。整理、适配视口和删除回执中的 ID 最多 100 项，并附实际计数及截断标志；不能因回执缩略重复执行。`nodeTools` 的业务返回值不受五个读取工具的 64 KiB 上限约束。
+Node/edge queries scan at most 2000 items per page; `totalNodes/totalEdges` are canvas totals, and `selectedOnly` filters on the current selection at the time of the call. Name matching covers the full text, and name previews in results are at most 512 characters. Node IDs in detail and function queries must not repeat; a positive offset requires `path`, and paths are limited to 64 levels and 2048 JSON UTF-8 bytes, with `pathDepthLimit` indicating that the depth limit was reached. ID receipts for arrange, fit-viewport and delete are limited to 100 items and include the actual count and a truncation flag; do not repeat an operation because its receipt was abbreviated. The business return values of `nodeTools` are not subject to the 64 KiB limit of the five read tools.
 
-| 能力 | 调用方式 |
+| Capability | How to call |
 | --- | --- |
-| 应用管理 | `listAppOperations` 使用 `{ "args": {} }` 查询当前 31 项管理操作，或 `{ "args": { "name": "操作名" } }` 查询单项描述和 schema；随后 `appOperation` 使用 `{ "args": { "name": "操作名", "parameters": {} } }` 执行。覆盖插件、技能、媒体供应商、素材库和 Agent 历史；以实际返回的操作列表和 schema 为准。 |
-| 会话管理 | 通过 `appOperation` 调用对应操作，工作目录由 `target.directory` 或指定页面的工作区注入，不在 `parameters` 中另填目录。 |
-| 委托内置 Agent | 按用户请求调用 `runAgent`，`args` 提供 `providerId`、`modelId`、`prompt`，可选 `sessionFile` 继续已有对话；等待本轮完成后返回回复及对话文件。调用会使用配置的模型。 |
-| 文件和媒体传输 | `workspaceFiles` 的 `action` 支持 `list`、`mkdir`、`rename`、`remove`、`readBinary`、`writeBinary`。二进制通过 Base64 传输，解码后不超过 20 MiB；写入默认 `exclusive: true`，不覆盖已有文件。文本读写复用已启用的文件工具。 |
-| 文档编辑 | 先 `getDocument` 取得 `text`，再 `writeDocument` 传入新 `text` 和原文 `expectedText`；原文不匹配时拒绝写入。已打开的画布和文档拒绝通过原始文件操作修改，应使用对应界面工具。 |
+| App management | `listAppOperations` with `{ "args": {} }` lists the current 31 management operations, or `{ "args": { "name": "operationName" } }` returns the description and schema of one operation; then `appOperation` with `{ "args": { "name": "operationName", "parameters": {} } }` runs it. Covers plugins, skills, media providers, the asset library and Agent history; the operation list and schemas actually returned are authoritative. |
+| Session management | Call the corresponding operation through `appOperation`. The working directory is injected from `target.directory` or the workspace of the specified page; do not add a directory in `parameters`. |
+| Delegating to the built-in Agent | Call `runAgent` when the user requests it. `args` provides `providerId`, `modelId` and `prompt`, plus an optional `sessionFile` to continue an existing conversation; it waits for the current turn to finish and returns the reply and the conversation file. The call uses the configured model. |
+| File and media transfer | The `action` of `workspaceFiles` supports `list`, `mkdir`, `rename`, `remove`, `readBinary` and `writeBinary`. Binary data is transferred as Base64 and may not exceed 20 MiB after decoding; writes default to `exclusive: true` and do not overwrite existing files. Text reading and writing reuse the enabled file tools. |
+| Document editing | First call `getDocument` to get `text`, then call `writeDocument` with the new `text` and the original text as `expectedText`; the write is rejected if the original text does not match. Raw file operations on open canvases and documents are rejected; use the corresponding UI tools instead. |
 
-管理结果中的供应商密钥等敏感字段显示为 `[REDACTED]`。不要将读到的脱敏对象整体回写；按操作 schema 提交需要修改的字段，必须提供密钥时填写真实值。
+Sensitive fields such as provider keys are shown as `[REDACTED]` in management results. Do not write a redacted object back as a whole; submit the fields you need to change according to the operation schema, and enter real values when a key is required.
 
-## 宿主接入
+## Host integration
 
 ```ts
 import { createMcpRouter } from "@toonflow/mcp";
@@ -140,15 +140,15 @@ const mcp = createMcpRouter({
 app.use("/mcp", mcp);
 ```
 
-每项工具包含 `name`、`description`、`inputSchema`（JSON Schema）与 `execute(args, signal)`。SDK 校验工具输入，普通结果转换为文本与结构化结果，已有工具的 content 保留为 MCP 内容块；执行异常返回 `isError: true`。`mcp.close()` 释放协议资源，业务任务的取消由宿主同时处理。
+Each tool has `name`, `description`, `inputSchema` (JSON Schema) and `execute(args, signal)`. The SDK validates tool input; ordinary results are converted into text and structured results, while the content of existing tools is kept as MCP content blocks; execution errors return `isError: true`. `mcp.close()` releases protocol resources, and the host handles cancellation of business tasks at the same time.
 
-`resources` 可选，提供时声明 MCP 资源能力。`list(signal)` 返回 `Promise<Resource[]>`，`read(uri, signal)` 返回 `Promise<ReadResourceResult>`；这两个官方 SDK 类型可从 `@toonflow/mcp` 导入。目录扫描、URI 校验、文件读取和权限检查由宿主实现，包负责协议转发与取消信号传递。
+`resources` is optional; when provided, the MCP resources capability is declared. `list(signal)` returns `Promise<Resource[]>` and `read(uri, signal)` returns `Promise<ReadResourceResult>`; both official SDK types can be imported from `@toonflow/mcp`. Directory scanning, URI validation, file reading and permission checks are implemented by the host; the package handles protocol forwarding and passing cancellation signals.
 
-宿主负责 MCP 开关、Bearer 凭证、Host/Origin 校验和工作区权限。包不依赖 `apps/server/src` 或前端组件，也不自行创建 HTTP 监听端口。
+The host is responsible for the MCP switch, the Bearer token, Host/Origin validation and workspace permissions. The package does not depend on `apps/server/src` or frontend components, and does not create its own HTTP listening port.
 
 ```sh
 bun run --filter @toonflow/mcp typecheck
 bun run --filter @toonflow/mcp build
 ```
 
-产物位于 `build/mcp/`，包括 HTTP 模块、stdio 入口、README 和 Skill。stdio 所需 SDK 已打包，可直接使用 Node.js/Bun 运行；独立导入 HTTP 模块时宿主需提供 Express 5。
+The artifacts are in `build/mcp/`, including the HTTP module, the stdio entry, the README and the Skill. The SDK needed by stdio is bundled, so it can run directly with Node.js/Bun; when importing the HTTP module on its own, the host must provide Express 5.

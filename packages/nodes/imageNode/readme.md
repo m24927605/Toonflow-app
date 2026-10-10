@@ -1,15 +1,15 @@
-# 图片节点
+# Image Node
 
-在画布中展示图片，可作为角色、场景、道具或分镜参考。
+Displays an image on the canvas as a reference for characters, scenes, props, or storyboards.
 
-## 输入与输出
+## Inputs and outputs
 
-- 导入本地图片文件，单个文件不能为空且不超过 100 MB。
-- 输出当前图片素材，可连接图片生成、视频生成等支持图片输入的节点。
+- Imports a local image file; a single file must not be empty and must not exceed 100 MB.
+- Outputs the current image asset, which can be connected to nodes that accept image input, such as image generation and video generation.
 
-## 使用方法
+## Usage
 
-1. 点击上传按钮，选择图片文件。
-2. 上传完成后，节点按图片比例显示预览。
-3. 将图片输出连接到需要参考图的节点。
-4. 选中节点后，使用顶部工具栏下载、预览或替换图片。
+1. Click the upload button and choose an image file.
+2. After the upload finishes, the node shows a preview in the image's aspect ratio.
+3. Connect the image output to the nodes that need a reference image.
+4. With the node selected, use the top toolbar to download, preview, or replace the image.

@@ -1,16 +1,16 @@
-# 视频节点
+# Video Node
 
-导入、播放视频素材，并将视频或截取的画面用于后续制作。
+Imports and plays video assets, and makes the video or captured frames available for later production.
 
-## 输入与输出
+## Inputs and outputs
 
-- 导入本地视频文件，单个文件不能为空且不超过 100 MB。
-- 输出当前视频素材，可连接支持视频输入的节点。
-- 截帧结果作为新的图片节点出现在画布中。
+- Imports a local video file; a single file must not be empty and must not exceed 100 MB.
+- Outputs the current video asset, which can be connected to nodes that accept video input.
+- Captured frames appear on the canvas as new image nodes.
 
-## 使用方法
+## Usage
 
-1. 点击上传按钮选择视频，使用播放器播放、暂停、拖动进度或调整音量。
-2. 将视频输出连接到需要参考视频的节点。
-3. 点击“截取视频帧”，选择当前帧、首帧或尾帧；此功能需要启用图片节点。
-4. 需要换视频时，将鼠标移到节点上，点击“替换视频”。
+1. Click the upload button to choose a video, and use the player to play, pause, seek, or adjust the volume.
+2. Connect the video output to the nodes that need a reference video.
+3. Click "Capture video frame" and choose the current, first, or last frame; this requires the Image node plugin (`图片`) to be enabled.
+4. To swap the video, hover over the node and click "Replace video".

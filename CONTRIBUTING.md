@@ -1,43 +1,43 @@
-# Contributing · 贡献指南
+# Contributing
 
-欢迎参与 Toonflow。无论是反馈问题、改进文档、开发插件，还是修复代码，都可以帮助创作者更顺畅地完成作品。
+Welcome to Toonflow. Whether you report issues, improve documentation, build plugins, or fix code, you help creators finish their work more smoothly.
 
-参与讨论和协作前，请阅读 [社区行为准则](./CODE_OF_CONDUCT.md)。项目介绍和使用方法见 [README](./README.md)，完整开发说明见 [开发与扩展指南](./docs/development.md)，代码修改以 [开发规范](./AGENTS.md) 为准。
+Before joining discussions and collaborating, please read the [Code of Conduct](./CODE_OF_CONDUCT.md). See the [README](./README.md) for the project introduction and usage, the [Development and Extension Guide](./docs/development.md) for complete development instructions, and the [Development Conventions](./AGENTS.md) for the rules that code changes must follow.
 
-## 从哪里开始
+## Where to Start
 
-- **报告问题**：在 [GitHub Issues](https://github.com/HBAI-Ltd/Toonflow-app/issues) 搜索已有记录，再补充信息或提交新问题。
-- **提出建议**：说明创作场景、遇到的限制和期望结果；较大的功能或架构调整建议先讨论范围与影响。
-- **改进文档**：修正错误、补全步骤，或提供能够复现的操作说明。
-- **开发扩展**：参考 [节点脚手架](./packages/nodeScaffold/readme.md)、[工具脚手架](./packages/toolScaffold/readme.md) 和现有实现。
-- **贡献代码**：选择一个明确的问题，提交范围集中的 Pull Request（PR）。
+- **Report issues**: search existing reports in [GitHub Issues](https://github.com/HBAI-Ltd/Toonflow-app/issues) first, then add information or open a new issue.
+- **Suggest improvements**: describe the creative scenario, the limitation you ran into, and the result you expect. Discuss the scope and impact of larger feature or architecture changes first.
+- **Improve documentation**: fix mistakes, fill in missing steps, or provide reproducible instructions.
+- **Build extensions**: refer to the [Node Scaffold](./packages/nodeScaffold/readme.md), the [Tool Scaffold](./packages/toolScaffold/readme.md), and existing implementations.
+- **Contribute code**: pick a well-defined problem and submit a focused Pull Request (PR).
 
-不必等到能修改代码才参与。清晰的复现步骤、经过脱敏的截图和实际使用反馈同样有价值。
+You do not need to wait until you can change code to take part. Clear reproduction steps, redacted screenshots, and real usage feedback are just as valuable.
 
-## 提交 Issue
+## Opening an Issue
 
-一个 Issue 尽量只描述一个问题，标题直接说明出错位置或期望行为。请提供：
+Keep each issue to a single problem, and use a title that states where the error occurs or what behavior you expect. Please provide:
 
-1. Toonflow 版本；从源码运行时附上相关提交或分支信息。
-2. 操作系统、处理器架构，以及桌面端或浏览器运行方式。
-3. 从初始状态开始的最短复现步骤，注明是否每次都出现。
-4. 期望结果与实际结果，必要时附截图或短视频。
-5. 与问题有关的错误日志，保留错误上下文并删除无关内容。
-6. 涉及插件或模型时，注明插件版本、提供方与模型名称。
+1. The Toonflow version; when running from source, include the relevant commit or branch.
+2. The operating system, processor architecture, and whether you run the desktop app or a browser.
+3. The shortest reproduction steps from a clean starting state, noting whether it happens every time.
+4. The expected and actual results, with screenshots or a short video if needed.
+5. Error logs related to the problem, keeping the error context and removing unrelated content.
+6. For problems involving plugins or models, the plugin version, provider, and model name.
 
-请先删去 API Key、访问令牌、账号信息和个人路径。不要上传完整 `data/`、真实用户配置、私有工作区或未经授权的素材；需要示例时，使用最小的脱敏内容。
+Remove API keys, access tokens, account information, and personal paths first. Do not upload a complete `data/` directory, real user configuration, private workspaces, or unauthorized assets; when an example is needed, use the smallest redacted content.
 
-涉及安全漏洞或不宜公开的敏感信息时，请通过 [联系邮箱](mailto:ltlctools@outlook.com) 说明情况，避免在公开 Issue 中披露可被利用的细节。
+For security vulnerabilities or sensitive information that should not be public, describe the situation by [email](mailto:ltlctools@outlook.com) instead of disclosing exploitable details in a public issue.
 
-## 准备开发环境
+## Setting Up the Development Environment
 
-本仓库使用 Bun Workspaces，Web、业务 Server 和桌面端在同一个仓库中开发，无需另行克隆前端仓库。
+This repository uses Bun Workspaces. The Web app, the business Server, and the desktop app are developed in the same repository, so there is no separate frontend repository to clone.
 
-- 安装 Git 和根目录 `package.json` 中指定的 **Bun 1.3.14**，使用 `bun --version` 确认版本。
-- 使用 Bun 安装依赖、运行脚本，不混用 npm、Yarn 或 pnpm 的安装流程。
-- 除特别说明外，下面的命令都在仓库根目录执行。桌面端另有平台要求，见下方说明。
+- Install Git and **Bun 1.3.14**, the version specified in the root `package.json`, and confirm the version with `bun --version`.
+- Use Bun to install dependencies and run scripts; do not mix in npm, Yarn, or pnpm installation flows.
+- Unless stated otherwise, run the commands below in the repository root. The desktop app has additional platform requirements, described below.
 
-需要提交 PR 时，可以先 Fork 仓库，再克隆自己的 Fork；下面演示从项目仓库开始：
+To submit a PR, you can fork the repository first and then clone your fork. The example below starts from the project repository:
 
 ```sh
 git clone https://github.com/HBAI-Ltd/Toonflow-app.git
@@ -45,167 +45,167 @@ cd Toonflow-app
 bun install
 ```
 
-### Web 与业务 Server
+### Web and Business Server
 
 ```sh
-# 首次开发或修改节点、工具后，构建并同步到 data/
+# On first development, or after changing nodes or tools, build and sync them to data/
 bun run dev:plugins
 
-# 同时启动 Web 与业务 Server
+# Start Web and the business Server together
 bun run dev
 ```
 
-打开 `http://localhost:5173`，若该端口被占用，以 Vite 终端输出为准。业务 Server 监听 `3000`；Vite 将 `/api`、`/a2a`、`/mcp` 代理到 `127.0.0.1:3000`。启动失败时先检查端口占用，不要重复启动同一服务。
+Open `http://localhost:5173`; if that port is taken, use the address in the Vite terminal output. The business Server listens on `3000`, and Vite proxies `/api`, `/a2a`, and `/mcp` to `127.0.0.1:3000`. If startup fails, check for port conflicts first, and do not start the same service twice.
 
-`dev` 只启动 Web 和 Server，**不会自动执行 `dev:plugins`，也不会启动桌面窗口**。日常开发按需选择：
+`dev` only starts Web and Server. **It does not run `dev:plugins` automatically and does not open the desktop window.** For everyday development, choose as needed:
 
-| 命令 | 用途 |
+| Command | Purpose |
 | --- | --- |
-| `bun run dev:web` | 只启动 Vite；需要接口的功能仍依赖另行启动的业务 Server。 |
-| `bun run dev:server` | 只启动业务 Server，使用 Bun 监听源码变化。 |
-| `bun run dev:plugins` | 一次性构建节点、工具并同步到 `data/`，不是持续监听命令。 |
-| `bun run dev:desktop` | 完成下方平台准备后，构建并启动桌面应用。 |
+| `bun run dev:web` | Starts only Vite; features that need the API still require a separately started business Server. |
+| `bun run dev:server` | Starts only the business Server, with Bun watching source changes. |
+| `bun run dev:plugins` | Builds nodes and tools once and syncs them to `data/`; it is not a watch command. |
+| `bun run dev:desktop` | Builds and starts the desktop app after the platform preparation below. |
 
-更新服务与业务 Server 相互独立，普通开发无需启动。涉及更新功能时再按 [更新服务说明](./apps/updateServer/readme.md) 使用 `bun run dev:updateServer`。
+The update service is independent of the business Server and is not needed for ordinary development. When working on update features, use `bun run dev:updateServer` as described in the [Update Service Guide](./apps/updateServer/readme.md).
 
-### 桌面开发（按需）
+### Desktop Development (Optional)
 
-桌面脚本支持 **Windows x64、macOS arm64 和 macOS x64**，需要在对应系统与架构上运行；当前不支持 Linux 桌面构建。
+The desktop scripts support **Windows x64, macOS arm64, and macOS x64** and must run on the matching system and architecture; Linux desktop builds are not currently supported.
 
-- **Windows x64**：使用 Electrobun 2.0.1。运行窗口需要 WebView2；构建脚本会调用 `%WINDIR%/Microsoft.NET/Framework64/v4.0.30319/csc.exe` 编译原生辅助程序。NSIS 是制作 Windows 安装包的要求，不是普通 Web 开发或桌面开发的前置条件。
-- **macOS**：先安装 Xcode Command Line Tools。Apple Silicon 使用 Electrobun 2.0.1；Intel Mac 使用独立的 Electrobun 1.18.1 兼容构建，先安装其依赖：
+- **Windows x64**: uses Electrobun 2.0.1. The window requires WebView2, and the build script calls `%WINDIR%/Microsoft.NET/Framework64/v4.0.30319/csc.exe` to compile the native helper. NSIS is required for building the Windows installer; it is not a prerequisite for ordinary Web or desktop development.
+- **macOS**: install the Xcode Command Line Tools first. Apple Silicon uses Electrobun 2.0.1; Intel Macs use a separate Electrobun 1.18.1 compatibility build, so install its dependencies first:
 
 ```sh
-# 仅 Intel Mac 需要；执行后回到仓库根目录
+# Intel Mac only; return to the repository root afterward
 cd compat/macIntel
 bun install --frozen-lockfile
 cd ../..
 ```
 
-Apple Silicon 与 Intel Mac 都需要在各自的 Mac 上准备当前架构的原生启动库，首次桌面开发或更新原生启动实现后执行：
+Both Apple Silicon and Intel Macs need the native launcher library for the current architecture, prepared on that Mac. Run this before your first desktop development session or after updating the native launcher implementation:
 
 ```sh
 bun packages/startup/scripts/buildMac.ts
 ```
 
-完成对应平台准备后，启动桌面开发：
+After preparing your platform, start desktop development:
 
 ```sh
 bun run dev:desktop
 ```
 
-该命令会同步开发节点和工具、构建 Web 与 MCP，再启动桌面应用。桌面宿主复用业务 Server，并监听系统分配的本机端口，**不需要提前运行 `bun run dev`**。它使用构建后的 Web 页面，不是 Vite 热更新页面；修改 Web 后需重新构建再验证。
+This command syncs the development nodes and tools, builds Web and MCP, and then starts the desktop app. The desktop host reuses the business Server and listens on a local port assigned by the system, so **you do not need to run `bun run dev` first**. It uses the built Web pages rather than the Vite hot-reload page; after changing Web, rebuild before verifying.
 
-目录选择、原生保存、协议唤起和更新等行为必须在桌面宿主中验证，浏览器验证不能替代。安装包、SDK 准备和平台限制详见 [开发与构建指南](./docs/development.md)。
+Behavior such as directory selection, native saving, protocol launching, and updates must be verified in the desktop host; browser verification cannot replace it. For installers, SDK preparation, and platform limitations, see the [Development and Build Guide](./docs/development.md).
 
-## 定位代码与开发扩展
+## Finding Code and Building Extensions
 
-| 改动范围 | 主要入口 |
+| Area of change | Main entry point |
 | --- | --- |
-| 页面、画布、设置与前端状态 | `apps/web/src/` |
-| HTTP 接口、Agent 运行时与服务端工具 | `apps/server/src/` |
-| 桌面宿主、原生交互、安装与更新 | `apps/desktop/`；Intel Mac 兼容层在 `compat/macIntel/` |
-| 画布节点 | `packages/nodes/`、[节点脚手架](./packages/nodeScaffold/readme.md) |
-| Agent 工具及其交互组件 | `packages/tools/`、[工具脚手架](./packages/toolScaffold/readme.md) |
-| 模型提供方与技能 | `packages/providers/src/`、`packages/skills/` |
+| Pages, canvas, settings, and frontend state | `apps/web/src/` |
+| HTTP endpoints, Agent runtime, and server-side tools | `apps/server/src/` |
+| Desktop host, native interaction, installation, and updates | `apps/desktop/`; the Intel Mac compatibility layer is in `compat/macIntel/` |
+| Canvas nodes | `packages/nodes/`, [Node Scaffold](./packages/nodeScaffold/readme.md) |
+| Agent tools and their interactive components | `packages/tools/`, [Tool Scaffold](./packages/toolScaffold/readme.md) |
+| Model providers and skills | `packages/providers/src/`, `packages/skills/` |
 
-修改节点或工具时，编辑 `packages/` 中的源码，再运行 `bun run dev:plugins`。它会写入 `build/nodes/`、`build/tools/`，并**覆盖 `data/nodes/`、`data/tools/` 中的同名开发产物**；不要直接修改这些产物来代替源码改动。该命令不清理旧产物，改名或删除插件后需检查开发目录中的残留文件。
+When changing nodes or tools, edit the source in `packages/` and then run `bun run dev:plugins`. It writes to `build/nodes/` and `build/tools/` and **overwrites the development artifacts with the same names in `data/nodes/` and `data/tools/`**; do not edit those artifacts directly in place of source changes. The command does not clean up old artifacts, so after renaming or deleting a plugin, check the development directories for leftover files.
 
-`bun run build:nodes` 和 `bun run build:tools` 则分别清空对应的 `build/` 子目录后重新构建，不同步到 `data/`。不要把生产构建当作开发插件同步。其他扩展方式见 [开发与扩展指南](./docs/development.md)。
+`bun run build:nodes` and `bun run build:tools` each clear their `build/` subdirectory and rebuild, without syncing to `data/`. Do not treat production builds as development plugin syncing. For other extension options, see the [Development and Extension Guide](./docs/development.md).
 
-## 数据与工作区边界
+## Data and Workspace Boundaries
 
-- Web/Server 开发默认使用仓库根目录的 `data/`，桌面开发脚本也显式使用该目录。这里包含设置、插件等本机数据，必须保持 Git 忽略；不要与日常使用的数据混用，也不要让多个服务进程同时写同一数据目录或工作区。
-- 验证配置或文件写入时，使用独立的临时数据目录和工作区。独立 Server 可在启动前设置 `TOONFLOW_DATA_DIR`；复用 `createApp` 时通过 `dataDirectory` 传入，且必须在动态加载路由前确定目录。先确认实际读写位置，再执行保存、覆盖或删除操作。
-- 前端工作区文件操作统一复用 `apps/web/src/lib/workspaceFiles.ts` 默认导出的 `useWorkspaceFiles`，不要重复封装 Axios 或拼接文件接口。文件 `path`、`target` 使用工作区内相对路径，目录参数使用绝对路径。
-- 防抖、保存队列或跨 `await` 的多步操作先获取目录字符串快照，再使用固定目录实例，避免切换项目后写错目录。`readJson<T>` 不校验业务结构，调用方仍须检查文件标记与内容。
-- 全局设置继续使用设置接口及 `u.conf`，不重复创建配置实例；未经需求不要把完整覆盖保存改成部分合并。项目列表由 Pinia 持久化，移除列表项不等于删除工作区文件。写入失败必须向调用方反馈，不能吞掉异常后返回成功。
+- Web/Server development uses `data/` in the repository root by default, and the desktop development script uses that directory explicitly too. It contains local data such as settings and plugins and must stay ignored by Git. Do not mix it with the data you use day to day, and do not let multiple server processes write to the same data directory or workspace at once.
+- When verifying configuration or file writes, use a separate temporary data directory and workspace. The standalone Server can set `TOONFLOW_DATA_DIR` before startup; when reusing `createApp`, pass it through `dataDirectory`, and the directory must be settled before routes are loaded dynamically. Confirm the actual read and write location before saving, overwriting, or deleting anything.
+- Frontend workspace file operations all reuse `useWorkspaceFiles`, the default export of `apps/web/src/lib/workspaceFiles.ts`; do not re-wrap Axios or build file API requests by hand. File `path` and `target` arguments are relative paths inside the workspace, and directory arguments are absolute paths.
+- Debounced operations, save queues, and multi-step operations spanning an `await` take a snapshot of the directory string first and then use a fixed-directory instance, so switching projects does not write to the wrong directory. `readJson<T>` does not validate the business structure, so callers must still check the file markers and contents.
+- Global settings keep using the settings API and `u.conf`; do not create additional configuration instances, and do not change full-overwrite saving into partial merging without a requirement. The project list is persisted by Pinia, and removing a list entry does not delete the workspace files. Write failures must be reported to the caller; never swallow the exception and return success.
 
-## 保持修改集中
+## Keeping Changes Focused
 
-开始前先阅读 [AGENTS.md](./AGENTS.md)，再跟踪相关实现与调用方。修复共享逻辑中的根因，优先复用已有工具、Store 和依赖。
+Read [AGENTS.md](./AGENTS.md) before you start, then trace the relevant implementation and its callers. Fix the root cause in shared logic, and prefer reusing existing utilities, Stores, and dependencies.
 
-- 一次 PR 解决一个明确问题，避免夹带无关重构、格式化或依赖升级。
-- 默认使用 TypeScript；新增文件、目录、自有变量、函数及常量统一小驼峰命名，如 `userStore.ts`、`editorPanel/`，不使用短横线、蛇形、大驼峰或全大写。已有例外不是新增代码的依据，类型名保持 TypeScript 的类型命名习惯。
-- 函数保持小而聚焦，仅在复用或可读性有明确收益时抽取逻辑。不为简单需求增加抽象层、新框架或重复封装；只实现已经讨论清楚的范围，不擅自添加占位内容或扩展功能。
-- 跨工作区使用包名及声明的 exports，不直接穿透其他包的 `src/`。第三方导入保留原始导出名，不为转换大小写添加 `as`；新增 Node 内置模块引用使用 `node:`，仅用于类型的引用使用 `import type`。
-- 保留现有格式；Server 使用双引号、分号、两空格缩进。删除未使用的 import 与变量，不添加无意义的 `async` 包装。
-- 有意的简化使用 `ACT:` 注释说明；存在已知上限时写清限制和后续升级方向。不以精简为由省略入参校验、安全、无障碍或防止数据丢失的处理。
-- 不提交密钥、个人配置、运行数据、工作区素材或无关构建产物。
+- Each PR solves one well-defined problem; avoid bundling unrelated refactoring, formatting, or dependency upgrades.
+- Use TypeScript by default. New files, directories, your own variables, functions, and constants all use lowerCamelCase, such as `userStore.ts` and `editorPanel/`; do not use kebab-case, snake_case, PascalCase, or all-uppercase. Existing exceptions do not justify new code, and type names keep TypeScript's type naming conventions.
+- Keep functions small and focused, and extract logic only when it clearly helps reuse or readability. Do not add abstraction layers, new frameworks, or duplicate wrappers for simple requirements; implement only the scope that has been clearly discussed, and do not add placeholder content or extra features on your own.
+- Across workspaces, use the package name and its declared exports instead of reaching into another package's `src/`. Third-party imports keep their original export names, without `as` aliases to change casing; new imports of Node built-in modules use `node:`, and type-only imports use `import type`.
+- Keep the existing formatting; the Server uses double quotes, semicolons, and two-space indentation. Remove unused imports and variables, and do not add meaningless `async` wrappers.
+- Explain intentional simplifications with an `ACT:` comment; when there is a known ceiling, state the limitation and the future upgrade path. Do not skip input validation, security, accessibility, or data-loss protection in the name of simplicity.
+- Do not commit secrets, personal configuration, runtime data, workspace assets, or unrelated build artifacts.
 
-修改模型提供方时，以实际接口文档和请求、响应为依据。涉及持久化、工作区文件或插件安装时，保留现有的数据边界与失败处理。
+When changing model providers, base the work on the actual API documentation, requests, and responses. When persistence, workspace files, or plugin installation are involved, keep the existing data boundaries and failure handling.
 
-### Vue 组件约定
+### Vue Component Conventions
 
-- 自有组件的文件名、导入绑定和模板标签都用小驼峰，例如 `showBox.vue`、`import showBox from "./showBox.vue"`、`<showBox />`。
-- 第三方组件优先使用短横线标签，如 `<el-button />`、`<vue-flow />`，脚本导入仍保留 `ElButton`、`VueFlow` 等原始导出名。所有组件模板标签都禁止大驼峰。
-- 所有组件属性、动态绑定和具名 `v-model` 参数使用小驼峰，如 `showArrow`、`:nodeTypes`、`v-model:snapEnabled`。`v-if`、`aria-label`、`data-*` 等 Vue 语法、HTML 标准或接口强制名称保留原样。
-- `.vue` 顶层区块按 `<template>` → `<script>` → `<style>` 排列；不需要的区块可以省略。DOM 类名及样式选择器使用小驼峰，SCSS 按 DOM 结构嵌套；不手改工具自动生成的声明文件。
+- Your own components use lowerCamelCase for file names, import bindings, and template tags, for example `showBox.vue`, `import showBox from "./showBox.vue"`, `<showBox />`.
+- Third-party components prefer kebab-case tags such as `<el-button />` and `<vue-flow />`, while script imports keep original export names such as `ElButton` and `VueFlow`. PascalCase is forbidden for all component template tags.
+- All component attributes, dynamic bindings, and named `v-model` arguments use lowerCamelCase, such as `showArrow`, `:nodeTypes`, `v-model:snapEnabled`. Names required by Vue syntax, the HTML standard, or an interface, such as `v-if`, `aria-label`, and `data-*`, stay as they are.
+- Top-level `.vue` blocks are ordered `<template>` → `<script>` → `<style>`; blocks you do not need may be omitted. DOM class names and style selectors use lowerCamelCase, and SCSS is nested following the DOM structure. Do not hand-edit declaration files generated by tools.
 
-### Server 接口约定
+### Server Endpoint Conventions
 
-- 沿用 Bun、TypeScript、ES Modules 和 Express。独立入口 `src/index.ts` 单进程监听；桌面通过 `@toonflow/server/app` 复用 `createApp`，不导入独立启动入口，不增加 cluster。
-- **一个接口一个文件**：`src/routes/` 下的每个 `.ts` 都会被扫描为路由，文件默认导出 Router，只注册一个 HTTP 方法与路径，接口内使用 `"/"`。工具、类型和配置不要放进路由目录，也不为简单接口增加 controller、service、repository 层。
-- 路由按文件相对路径生成 `/api` 前缀，大小写与路径一致，`index.ts` 对应所在目录。例如 `routes/settings/get.ts` 对应 `/api/settings/get`，HTTP 方法由文件内的注册语句决定。
-- 新增、移动、重命名或删除路由后，执行 `bun run --cwd apps/server routes`。**不要手改 `src/router.ts` 的 imports、注册项或 hash**，也不要依赖构建或文件监听自动补齐；更改 URL 或 HTTP 方法前搜索并同步所有调用方。
-- Server 的 `@/` 指向 `apps/server/src/`；业务工具放在 `utils/` 对应模块，通过 `src/utils.ts` 统一导出，接口使用 `import u from "@/utils"`。
-- 外部输入复用 `validateFields` 与 Zod，查询参数和路径参数显式指定来源。该中间件只校验，不把默认值、转换或裁剪结果写回请求；需要规范化时显式处理。
-- JSON 响应复用 `success`、`error`，保持 `{ code, data, message }`。包装函数不会设置 HTTP 状态，需要时显式调用 `res.status(...)`；普通异常交给统一错误处理中间件，流式响应沿用流内错误处理和资源清理。
+- Keep using Bun, TypeScript, ES Modules, and Express. The standalone entry point `src/index.ts` listens in a single process; the desktop app reuses `createApp` through `@toonflow/server/app`, without importing the standalone startup entry point or adding a cluster.
+- **One endpoint per file**: every `.ts` file under `src/routes/` is scanned as a route. A file default-exports a Router, registers only one HTTP method and path, and uses `"/"` inside the endpoint. Do not put utilities, types, or configuration in the routes directory, and do not add controller, service, or repository layers for simple endpoints.
+- Routes are generated with the `/api` prefix from the file's relative path, with casing matching the path, and `index.ts` maps to its containing directory. For example, `routes/settings/get.ts` maps to `/api/settings/get`, and the HTTP method is determined by the registration statement in the file.
+- After adding, moving, renaming, or deleting a route, run `bun run --cwd apps/server routes`. **Do not hand-edit the imports, registrations, or hash in `src/router.ts`**, and do not rely on builds or file watching to fill them in. Before changing a URL or HTTP method, search for and update all callers.
+- In the Server, `@/` points to `apps/server/src/`. Business utilities go in the matching module under `utils/` and are exported through `src/utils.ts`; endpoints use `import u from "@/utils"`.
+- External input reuses `validateFields` and Zod, with the source of query and path parameters specified explicitly. The middleware only validates and does not write defaults, transforms, or trimming results back to the request; normalize explicitly when needed.
+- JSON responses reuse `success` and `error` and keep `{ code, data, message }`. The wrapper functions do not set the HTTP status, so call `res.status(...)` explicitly when needed. Ordinary exceptions go to the unified error handling middleware, and streaming responses keep the in-stream error handling and resource cleanup.
 
-## 验证你的改动
+## Verifying Your Changes
 
-根据改动选择已有命令和必要的手动验证，环境准备、类型检查和构建分别执行，不隐式绑定到其他命令。
+Choose the existing commands and any necessary manual verification based on your change. Run environment preparation, type checking, and builds separately, without implicitly binding them to other commands.
 
-### 类型检查的桌面前置条件
+### Desktop Prerequisites for Type Checking
 
-根目录 `bun run typecheck` 会检查各工作区，包括桌面端。Windows x64 或 Apple Silicon 在首次桌面构建前单独检查类型时，先准备 Electrobun SDK：
+The root `bun run typecheck` checks every workspace, including the desktop app. On Windows x64 or Apple Silicon, if you check types on their own before the first desktop build, prepare the Electrobun SDK first:
 
 ```sh
 bun apps/desktop/node_modules/electrobun/bin/electrobun.cjs prepare
 ```
 
-Intel Mac 则先安装兼容 SDK，并运行一次桌面开发或构建命令生成适配文件。类型检查本身不会安装依赖、生成适配文件或编译原生库。只改 Web 或 Server 时，可以先执行下面对应工作区的检查。
+On an Intel Mac, install the compatibility SDK first and run a desktop development or build command once to generate the adapter files. Type checking itself does not install dependencies, generate adapter files, or compile native libraries. If you only changed Web or Server, you can run the matching workspace check below first.
 
-### 按改动选择命令
+### Choosing Commands for Your Change
 
-以下命令均从仓库根目录执行：
+Run all of the following commands from the repository root:
 
-| 命令 | 适用情况 |
+| Command | When to use it |
 | --- | --- |
-| `bun run --cwd apps/server routes` | 服务端路由文件新增、移动、重命名或删除后生成注册文件。 |
-| `bun run --cwd apps/web typecheck` | 检查 Web 的 TypeScript 与 Vue 类型。 |
-| `bun run --cwd apps/server typecheck` | 检查业务 Server 类型。 |
-| `bun run typecheck` | 完成对应环境准备后，检查各工作区类型；适合共享接口或跨包改动。 |
-| `bun run --cwd apps/web build` | 验证 Web 构建，输出到 `build/web/`。 |
-| `bun run --cwd apps/server build` | 构建 Server、MCP，并输出技能与提供方文件；不代替路由生成。 |
-| `bun run build` | 构建工具、Web、Server、MCP，并输出技能与提供方；**不包含节点、桌面构建或类型检查**。 |
-| `bun run build:desktop` | 构建当前平台桌面应用及随包资源，包含节点、工具、Web 与 MCP 构建。 |
-| `bun run package:desktop` | 重新构建并制作 Windows NSIS 安装包或 macOS DMG，需满足对应平台的打包要求。 |
+| `bun run --cwd apps/server routes` | Generates the registration file after server route files are added, moved, renamed, or deleted. |
+| `bun run --cwd apps/web typecheck` | Checks Web TypeScript and Vue types. |
+| `bun run --cwd apps/server typecheck` | Checks business Server types. |
+| `bun run typecheck` | Checks types across all workspaces after the matching environment preparation; suited to shared interface or cross-package changes. |
+| `bun run --cwd apps/web build` | Verifies the Web build, output to `build/web/`. |
+| `bun run --cwd apps/server build` | Builds Server and MCP and outputs the skill and provider files; does not replace route generation. |
+| `bun run build` | Builds tools, Web, Server, and MCP and outputs skills and providers; **does not include nodes, the desktop build, or type checking**. |
+| `bun run build:desktop` | Builds the desktop app for the current platform and its bundled resources, including the node, tool, Web, and MCP builds. |
+| `bun run package:desktop` | Rebuilds and produces the Windows NSIS installer or macOS DMG; requires the packaging prerequisites of that platform. |
 
-需要验证构建后的 Web 与独立 Server 时，首次仍先执行 `bun run dev:plugins`，再执行 `bun run build`、`bun run start:server`，访问 `http://localhost:3000`。独立 Server 不负责初始化节点；不能只复制 `build/` 就视作完整安装，也不要与开发 Server 同时占用 `3000`。
+To verify the built Web and the standalone Server, run `bun run dev:plugins` first the first time, then `bun run build` and `bun run start:server`, and visit `http://localhost:3000`. The standalone Server does not initialize nodes; copying only `build/` is not a complete installation, and do not run it on `3000` at the same time as the development Server.
 
-仅改文档时，检查内容、命令、链接和 Markdown 展示即可。代码改动按受影响范围进行类型检查、构建或实际操作验证，不要求每次都执行全部命令。
+For documentation-only changes, checking the content, commands, links, and Markdown rendering is enough. For code changes, type check, build, or verify by actually using the feature according to the affected scope; you do not need to run every command every time.
 
-**仓库禁止编写或新增任何测试文件，包括以其他名称或后缀替代的测试文件；默认不新增测试框架或自动检查入口。** 请遵循已有开发规范，通过必要的命令和手动步骤验证改动。
+**Writing or adding any test files is forbidden in this repository, including test files under other names or suffixes; no test framework or automated check entry point is added by default.** Follow the existing development conventions and verify changes with the necessary commands and manual steps.
 
-记录真实的检查结果和未验证部分：类型检查与构建通过，不代表真实模型调用、媒体生成、桌面安装、升级或数据持久化已经验证。遇到未改动文件中的已有错误时，注明位置及其对本次验证的影响。
+Record the real check results and what was not verified: passing type checks and builds does not mean real model calls, media generation, desktop installation, upgrades, or data persistence have been verified. When you hit existing errors in files you did not change, note their location and how they affect this verification.
 
-## 提交 Pull Request
+## Submitting a Pull Request
 
-从当前代码创建自己的工作分支，保持提交内容围绕本次修改。推送前检查 diff，确认没有混入本机数据和无关文件。
+Create your own working branch from the current code and keep the commits focused on this change. Review the diff before pushing to make sure no local data or unrelated files slipped in.
 
-PR 标题直接说明解决的问题，正文建议包含：
+The PR title should state the problem it solves directly. The description should ideally include:
 
-- **问题与关联**：原有行为、影响的使用场景，以及相关 Issue。
-- **改动结果**：用户会看到什么变化，涉及哪些范围。
-- **验证方式**：实际执行的命令、复现步骤和结果；界面改动附上必要截图。
-- **验证边界**：未运行的环境、未调用的模型服务，以及尚未验证的安装或升级行为。
-- **兼容性影响**：需要用户迁移配置或调整现有流程时，说明具体影响。
+- **Problem and references**: the previous behavior, the affected usage scenarios, and related issues.
+- **Result of the change**: what users will see change and which areas are affected.
+- **How it was verified**: the commands actually run, reproduction steps, and results; attach necessary screenshots for UI changes.
+- **Verification limits**: environments not run, model services not called, and installation or upgrade behavior not yet verified.
+- **Compatibility impact**: when users need to migrate configuration or adjust existing workflows, describe the specific impact.
 
-根据评审意见继续更新同一个 PR。讨论中有不明确的地方，可以补充背景或解释取舍；提交 PR 不代表改动一定会被合并。
+Keep updating the same PR based on review feedback. If anything in the discussion is unclear, you can add background or explain trade-offs; opening a PR does not guarantee the change will be merged.
 
-## 许可与素材
+## License and Assets
 
-Toonflow 采用 [MIT 许可证](./LICENSE)。提交代码、文档、图片、字体或其他素材前，请确认你有权将其用于本项目，并保留需要保留的版权与许可证声明。
+Toonflow is licensed under the [MIT License](./LICENSE). Before submitting code, documentation, images, fonts, or other assets, make sure you have the right to use them in this project, and keep any copyright and license notices that must be kept.
 
-第三方依赖和素材遵循各自的许可。请勿提交来源不明、未经授权或含有个人敏感信息的内容。
+Third-party dependencies and assets follow their own licenses. Do not submit content of unknown origin, without authorization, or containing sensitive personal information.

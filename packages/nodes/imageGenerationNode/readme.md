@@ -1,18 +1,18 @@
-# 图片生成节点
+# Image Generation Node
 
-根据提示词生成图片，也可使用已有图片和文本作为参考，制作角色、场景或分镜图。
+Generates images from a prompt and can also use existing images and text as references to create character, scene, or storyboard images.
 
-## 输入与输出
+## Inputs and outputs
 
-- 输入支持图片和文本；连接的文本会作为生成要求的一部分。
-- 输出一张生成图片，可继续用作图片或视频生成的参考。
+- Inputs accept images and text; connected text becomes part of the generation request.
+- Outputs one generated image, which can be used as a reference for further image or video generation.
 
-## 使用方法
+## Usage
 
-1. 选中节点，在下方选择图片模型；没有模型时先在设置中添加图片模型。
-2. 输入画面要求，按需连接图片或文本参考，并在提示词中引用它们。
-3. 点击比例与分辨率区域，选择当前模型提供的选项。
-4. 点击“生成图片”；生成过程中可点击“停止生成”。
-5. 完成后在节点内查看结果，选中节点可从上方下载或放大预览。
+1. Select the node and choose an image model below; if there is none, add an image model in Settings first.
+2. Describe the image you want, connect image or text references as needed, and refer to them in the prompt.
+3. Click the aspect ratio and resolution area and pick from the options the current model offers.
+4. Click "Generate image"; during generation you can click "Stop generation".
+5. When it finishes, view the result in the node; with the node selected, download it or open an enlarged preview from the toolbar above.
 
-参考素材可在输入区调整顺序或移除。连接的节点需要已有内容，修改提示词或设置后需再次点击生成才会产生新图片。
+Reference assets can be reordered or removed in the input area. Connected nodes must already have content, and after changing the prompt or settings you need to click generate again to produce a new image.

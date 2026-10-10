@@ -1,22 +1,22 @@
-# 文本节点
+# Text Node
 
-使用 Markdown 编写、保存和生成正文，可用于剧本、分镜说明或素材分析。
+Writes, saves, and generates text in Markdown, for scripts, storyboard notes, or asset analysis.
 
-## 输入与输出
+## Inputs and outputs
 
-- 输入支持文本、图片和视频参考。
-- 输出节点当前的完整 Markdown 字符串，可连接支持文本输入的下游节点。
+- Inputs accept text, image, and video references.
+- Outputs the node's current full Markdown string, which can be connected to downstream nodes that accept text input.
 
-## 使用方法
+## Usage
 
-1. 节点内以 Markdown 预览正文；点击“编辑”打开富文本编辑器，也可切换到原文编辑 Markdown。
-2. 需要 AI 生成时，选中节点，在下方输入要求并选择模型；没有模型时先在设置中添加。
-3. 可连接参考节点，在提示词中说明如何使用这些参考内容。
-4. 点击生成按钮，文本会逐步显示；新生成的内容会替换当前文本输出。
-5. 生成结束后可继续手工编辑，再将文本输出连接到后续制作节点。
+1. The node shows the text as a Markdown preview. Click "Edit" to open the rich text editor, or switch to source mode to edit the Markdown directly.
+2. To generate with AI, select the node, enter your request below, and choose a model; if there is none, add one in Settings first.
+3. Connect reference nodes and explain in the prompt how they should be used.
+4. Click the generate button and the text appears progressively; newly generated content replaces the current text output.
+5. After generation you can keep editing by hand, then connect the text output to the next production nodes.
 
-正文自动保存到节点的 `content.md`，下载使用 `.md` 格式。磁盘内容发生冲突时，可先查看并复制当前正文，再选择重新读取磁盘；下方的 AI 提示词仍独立编辑。
+The text is saved automatically to the node's `content.md`, and downloads use the `.md` format. If the content on disk conflicts, you can first view and copy the current text, then choose to reload it from disk; the AI prompt below is edited independently.
 
-节点自带 Markdown 编辑和预览实现，仅复用宿主提供的 Tiptap、Marked 与 DOMPurify 依赖。富文本编辑会规范化 Markdown；需要保留原始 HTML 写法时，请使用原文模式。
+The node ships its own Markdown editing and preview implementation and only reuses the Tiptap, Marked, and DOMPurify dependencies provided by the host. Rich text editing normalizes the Markdown; to keep raw HTML exactly as written, use source mode.
 
-图片与视频参考的理解能力取决于所选模型。
+How well image and video references are understood depends on the selected model.

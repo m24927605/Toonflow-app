@@ -1,19 +1,19 @@
-# 视频生成节点
+# Video Generation Node
 
-根据提示词和参考素材生成视频，支持所选模型提供的文生视频、单图、首尾帧或混合参考模式。
+Generates video from a prompt and reference assets, supporting the text-to-video, single-image, first/last-frame, or mixed reference modes offered by the selected model.
 
-## 输入与输出
+## Inputs and outputs
 
-- 输入支持文本、图片、视频和音频，实际可用的素材组合取决于模型与生成模式。
-- 输出生成的视频；播放器还能将当前帧、首帧或尾帧截取为图片节点。
+- Inputs accept text, images, video, and audio; which combinations actually work depends on the model and generation mode.
+- Outputs the generated video; the player can also capture the current, first, or last frame as an image node.
 
-## 使用方法
+## Usage
 
-1. 选中节点，选择视频模型；没有模型时先在设置中添加视频模型。
-2. 输入动作、运镜和声音要求，按需连接参考素材并调整引用顺序。
-3. 打开生成设置，选择模式、时长、分辨率和画面比例；模型允许时可切换“生成音频”。
-4. 使用首尾帧模式时，图片按引用顺序分配；“首帧可选”模式仅有一张图片时，该图片作为尾帧。
-5. 点击“生成视频”，需要中止时点击“停止生成”。
-6. 完成后可播放、拖动进度、调整音量，或从上方下载和全屏预览。
+1. Select the node and choose a video model; if there is none, add a video model in Settings first.
+2. Describe the action, camera movement, and sound, connect reference assets as needed, and adjust their reference order.
+3. Open the generation settings and choose the mode, duration, resolution, and aspect ratio; when the model allows it, toggle "Generate audio".
+4. In first/last-frame modes, images are assigned in reference order; in "First frame optional" mode with only one image, that image is used as the last frame.
+5. Click "Generate video", or click "Stop generation" to abort.
+6. When it finishes, you can play, seek, and adjust the volume, or download and preview full screen from the toolbar above.
 
-截帧需要启用图片节点。时长与分辨率选项随模型变化，通用画面比例的实际支持范围由供应商决定。
+Frame capture requires the Image node plugin (`图片`) to be enabled. Duration and resolution options vary by model, and the provider decides which of the common aspect ratios are actually supported.

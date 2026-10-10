@@ -1,28 +1,28 @@
-# Android 验证包第三方说明
+# Third-party notices for the Android validation package
 
 ## jsQR 1.4.0
 
-扫码使用 [jsQR](https://github.com/cozmo/jsQR) 读取摄像头帧或图片中的二维码，未修改上游库。许可证为 Apache-2.0，原文随 APK 保存在 `assets/jsqrLicense.txt`。
+QR scanning uses [jsQR](https://github.com/cozmo/jsQR) to read QR codes from camera frames or images; the upstream library is unmodified. The license is Apache-2.0, and its full text ships with the APK at `assets/jsqrLicense.txt`.
 
 ## Bun 1.4.2
 
-APK 内置官方 Android ARM64 Bun 1.4.2，位于 `lib/arm64-v8a/libbun.so`，未修改运行时二进制。
+The APK bundles the official Android ARM64 Bun 1.4.2 at `lib/arm64-v8a/libbun.so`; the runtime binary is unmodified.
 
-- 官方发行包：https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2
-- 对应源码：https://github.com/oven-sh/bun/tree/744846f844374847c902b5e7fd59b4342a51ef99
-- 本文下方的官方许可说明原文：https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/LICENSE.md
-- 此版本固定的 WebKit 源码：https://github.com/oven-sh/WebKit/tree/2e2aa2290fac856d6f451ceacb58f7f5b44dd057
-- 对应 WebKit LGPL 原文：https://github.com/oven-sh/WebKit/blob/2e2aa2290fac856d6f451ceacb58f7f5b44dd057/Source/JavaScriptCore/COPYING.LIB
+- Official release: https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2
+- Corresponding source: https://github.com/oven-sh/bun/tree/744846f844374847c902b5e7fd59b4342a51ef99
+- Original text of the official license notice below: https://raw.githubusercontent.com/oven-sh/bun/744846f844374847c902b5e7fd59b4342a51ef99/LICENSE.md
+- WebKit source pinned by this version: https://github.com/oven-sh/WebKit/tree/2e2aa2290fac856d6f451ceacb58f7f5b44dd057
+- Corresponding WebKit LGPL text: https://github.com/oven-sh/WebKit/blob/2e2aa2290fac856d6f451ceacb58f7f5b44dd057/Source/JavaScriptCore/COPYING.LIB
 
-Bun 本体采用 MIT，静态链接的 JavaScriptCore/WebKit 等组件保留各自许可证；下方原文保留了上游组件清单、源码和重新链接说明。正式分发时须履行对应组件的许可与重新链接要求。
+Bun itself is MIT-licensed; statically linked components such as JavaScriptCore/WebKit keep their own licenses. The original text below keeps the upstream component list, source and relinking instructions. Formal distribution must fulfill the license and relinking requirements of the corresponding components.
 
-## 腾讯 TBS SDK 44286
+## Tencent TBS SDK 44286
 
-当前验证包将 `com.tencent.tbs:tbssdk:44286` 的 Java SDK 编入 DEX，不内置 X5 内核。系统 WebView 能力不足时才进入 X5 流程，确认实际加载 X5 后直接进入页面，不重复检测网页能力。新版 X5 接入仍需替换为腾讯提供的新 SDK 和专用 `config.tbs`，见 README 中的接入状态说明。
+The current validation package compiles the Java SDK of `com.tencent.tbs:tbssdk:44286` into the DEX and does not bundle the X5 engine. The X5 flow is entered only when the system WebView lacks required capabilities; once X5 is confirmed to be loaded, the page opens directly without repeating web capability checks. The new X5 integration still needs to be replaced with the new SDK and dedicated `config.tbs` provided by Tencent; see the integration status note in the README.
 
-- 官方发布包：[Maven Central](https://repo.maven.apache.org/maven2/com/tencent/tbs/tbssdk/44286/tbssdk-44286.jar)
-- SDK JAR SHA256：`d70f1544400885a889d8901cbd4d82538a93c6213ef3103d8a75e72fc29a121f`
-- SDK 采用 [Tencent Binary License](https://github.com/TencentBrowsingService/TBS_SDK/blob/3988ed7fdec43f39fc8c2ba881e4064fe0b52024/LICENSE.txt)，原文保留如下；此 SDK 壳的许可不替代下载内核所附的第三方许可。
+- Official release package: [Maven Central](https://repo.maven.apache.org/maven2/com/tencent/tbs/tbssdk/44286/tbssdk-44286.jar)
+- SDK JAR SHA256: `d70f1544400885a889d8901cbd4d82538a93c6213ef3103d8a75e72fc29a121f`
+- The SDK uses the [Tencent Binary License](https://github.com/TencentBrowsingService/TBS_SDK/blob/3988ed7fdec43f39fc8c2ba881e4064fe0b52024/LICENSE.txt), whose original text is kept below; the license of this SDK shell does not replace the third-party licenses attached to the downloaded engine.
 
 It is permitted that distribution of this Android TBS SDK in binary form only is free on Maven Central and GitHub.
 Copyright (C) 2019 THL A29 Limited, a Tencent company.  All rights reserved.
@@ -34,11 +34,11 @@ Redistribution of the Android TBS SDK in binary form only on Maven Central and G
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
 IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-## 打包方案参考
+## Packaging approach reference
 
-参考 [minapk](https://github.com/jjtseng93/minapk/tree/6bf971d65720b0ed868818e73ac334d344dab5ca) 将 Bun 放入 Android 原生库目录并通过 ProcessBuilder 启动的方式。本验证项目自行实现最小 Activity 与 Windows SDK 构建脚本，不包含 minapk/Buninu 源码、终端或工具二进制。
+Follows the approach of [minapk](https://github.com/jjtseng93/minapk/tree/6bf971d65720b0ed868818e73ac334d344dab5ca), which places Bun in the Android native library directory and starts it through ProcessBuilder. This validation project implements its own minimal Activity and Windows SDK build scripts and contains no minapk/Buninu source code, terminal or tool binaries.
 
-## Bun 官方 LICENSE.md 原文
+## Original text of Bun's official LICENSE.md
 
 Bun itself is MIT-licensed.
 

@@ -1,35 +1,37 @@
-# 多语言回归记录
+# Internationalization Regression Record
 
-日期：2026-09-30。验证仓库：`F:/aa/toonflow2`。
+> Note: the locale set was later reduced to English (`en`), Traditional Chinese (`zh-TW`) and Simplified Chinese (`zh-CN`). The records below describe the state at the time of each round.
 
-本次增加繁体中文、英语、日语、俄语、越南语、泰语、韩语、印地语，连同原有简体中文共九种语言。安装器未改动。所有配置和接口写入验证使用临时数据目录，没有修改真实用户配置，也没有运行付费生成。
+Date: 2026-09-30. Verification repository: `F:/aa/toonflow2`.
 
-根据后续范围调整，供应商、tools、nodes 和节点脚手架的多语言接入已撤回，节点专用的 FFmpeg 浏览器接入一并撤回。保留 Web、服务端、桌面应用及 MCP/FFmpeg 服务端基础能力的系统文案。
+This round added Traditional Chinese, English, Japanese, Russian, Vietnamese, Thai, Korean and Hindi, for nine languages together with the existing Simplified Chinese. The installer was not changed. All configuration and API write verification used a temporary data directory; no real user configuration was modified and no paid generation was run.
 
-初始阶段抽取 2022 条源文案，八种新增语言共 16176 条译文；八份字典键集合一致且无空值，1600 组动态 ICU 译文格式验证通过。排除子包在消息来源索引中为零，独立调用 Vite 插件时也不转换这些路径。以下三轮记录保留仍在当前范围内的验证结果；追加亚洲语言的最新数据见文末。
+Following a later scope adjustment, the i18n integration of providers, tools, nodes and the node scaffold was reverted, together with the node-specific FFmpeg browser integration. System text for Web, the server, the desktop app and the MCP/FFmpeg server-side base capabilities was kept.
 
-## 第一轮：语言基础与请求链路
+The initial phase extracted 2022 source strings, with 16176 translations across the eight new languages; the key sets of the eight dictionaries matched with no empty values, and 1600 dynamic ICU translations passed format validation. Excluded subpackages have zero entries in the message source index, and calling the Vite plugin directly does not transform those paths either. The three rounds below keep the verification results that are still within the current scope; the latest data for the added Asian languages is at the end.
 
-- 验证语言归一化、系统语言优先级、Hans/Hant、未知语言回退英语；手动选择优先于系统语言，重新选择跟随系统后恢复监听。
-- 真实首次引导逐一切换八种新增语言，检查页面语言、保存请求的 `Accept-Language`、刷新后的选择；主题、隐私和首次引导完成状态不受影响。
-- 检查模板参数、花括号、单引号、HTML 字面文本和未知消息回退；参数只插入一次。
-- 真实服务端九种语言共 36 个并发 HTTP 请求，检查响应、请求上下文及 `Content-Language`。
+## Round 1: Language basics and request chain
 
-## 第二轮：持久化与实际交互
+- Verified locale normalization, system language priority, Hans/Hant, and fallback to English for unknown languages; a manual choice takes precedence over the system language, and choosing "follow system" again resumes listening.
+- In the real first-run onboarding, switched through the eight new languages one by one, checking the page language, the `Accept-Language` of save requests and the selection after refresh; theme, privacy and onboarding completion state were unaffected.
+- Checked template parameters, curly braces, single quotes, literal HTML text and unknown-message fallback; parameters are inserted only once.
+- Sent 36 concurrent HTTP requests in nine languages to the real server, checking responses, request context and `Content-Language`.
 
-- 在生产构建的 hello 页面切换语言，当前配置步骤保持不变。
-- 设置弹窗切换繁体中文、俄语、印地语和泰语，确认输入框仍为同一 DOM 节点，弹窗不关闭，含中文、模板符号及多语种字符的草稿原样保留。
-- 保存并读取设置，检查其他字段保留。模拟日语系统环境下设置请求失败，启动失败页和重试按钮使用日语，未知网络错误保持原文。
-- MCP SDK 使用独立会话并发调用，确认系统错误按请求语言返回，成功工具结果保持原样。
+## Round 2: Persistence and real interaction
 
-## 第三轮：布局与全量构建
+- Switched languages on the hello page of a production build; the current setup step stayed unchanged.
+- Switched the settings dialog to Traditional Chinese, Russian, Hindi and Thai, confirming that the input stayed the same DOM node, the dialog did not close, and drafts containing Chinese, template symbols and characters from several scripts were preserved as-is.
+- Saved and read settings, checking that other fields were preserved. With a simulated Japanese system environment in which the settings request failed, the startup failure page and retry button used Japanese, and unknown network errors kept their original text.
+- Made concurrent calls from independent MCP SDK sessions, confirming that system errors are returned in the request language and successful tool results stay unchanged.
 
-- 360px 宽度检查英语、俄语、越南语、泰语、韩语和印地语首次引导，页面无横向溢出，长按钮可换行；键盘操作语言下拉正常。
-- 设置菜单在日语、俄语、印地语和英语之间即时更新；九种语言首次引导截图检查通过。
-- Agent 输入框连续切换英语、日语、俄语和印地语，编辑器仍为同一 DOM 实例，草稿完整保留。
-- 全仓类型检查、Web/服务端/工具生产构建、七个节点构建通过。构建仍有现有的大 chunk 与 Electrobun 配置扩展名提示，不影响完成。
+## Round 3: Layout and full build
 
-实际执行的常规命令：
+- At 360px width, checked the onboarding in English, Russian, Vietnamese, Thai, Korean and Hindi: no horizontal page overflow, long buttons wrap, and the language dropdown works with the keyboard.
+- The settings menu updates instantly between Japanese, Russian, Hindi and English; onboarding screenshots in all nine languages passed.
+- Switched the Agent input repeatedly between English, Japanese, Russian and Hindi; the editor stayed the same DOM instance and the draft was fully preserved.
+- The repository-wide type check, the Web/server/tool production builds and seven node builds passed. The build still shows the existing large-chunk and Electrobun config extension warnings, which do not block completion.
+
+Commands actually run:
 
 ```sh
 bun run --cwd packages/i18n extract
@@ -40,141 +42,141 @@ bun run --cwd apps/server routes
 git -c core.safecrlf=false diff --check
 ```
 
-遵循仓库规范，没有新增测试文件或测试框架；额外断言通过临时进程中的内联脚本执行。
+Following the repository rules, no test files or test frameworks were added; extra assertions ran as inline scripts in temporary processes.
 
-## 三轮之后的独立对抗检查
+## Independent adversarial checks after the three rounds
 
-- 编译转换：中文比较值、对象键、索引、协议枚举、用户文件名、提示词和持久化节点名称保持原值；`toRaw` 和 JSON 序列化不受展示 getter 影响。
-- 模板边界：`v-pre`、`pre`、`translate="no"`、忽略标记、包含大于号的属性值、驼峰展示属性和旧式 radio 的 label/value 语义。
-- 响应性：语言切换不会重新挂载页面、重置引导步骤或清空输入；菜单、占位符、无障碍名称和 Markdown 控件更新。
-- HTTP：12 类畸形或加权语言头、9 次真实字段校验、32 次并发直接 Zod 校验、9 种语言的超长系统提示词校验；修复了畸形 q 值接受问题和 prompt 属性下显式词条漏提取。
-- MCP/FFmpeg：9 个 MCP SDK 会话、18 次工具调用；9 种语言的 FFmpeg 服务端结构化错误。
-- 参数边界：7 类恶意或特殊插值乘以 9 种语言，共 63 组；5 类非法描述参数；原型属性名不会被当作字典译文。
-- 模型边界：实际生成路由的 SSE 使用本地 LLM fetch mock，正文、系统提示词、用户输入和 `done.message` 对象结构保持原样；未知供应商错误保持原文。
-- 字典审查：修复空值、纯标点、批量翻译跨条混入、品牌误译和技术字段误译；逐句重译受影响及相邻条目，验证源键集合、参数、异常换行和技术字段保真。
-- 真实截图补漏：修复目录选择器驼峰 `emptyText` 漏译、Agent 输入框无障碍名称，以及俄语设置侧栏长单词引起的内部横向滚动。
-- 浏览器复验：俄语设置侧栏及各菜单均无内部横向溢出；九种语言首次引导截图通过，360px 俄语主按钮自动换行。
-- 发现的问题均在对应范围修复后复验；构建成功不替代上述浏览器、接口及持久化检查。
+- Compile-time transform: Chinese comparison values, object keys, indexes, protocol enums, user file names, prompts and persisted node names keep their original values; `toRaw` and JSON serialization are unaffected by display getters.
+- Template boundaries: `v-pre`, `pre`, `translate="no"`, ignore markers, attribute values containing a greater-than sign, camelCase display attributes, and the label/value semantics of legacy radios.
+- Reactivity: switching languages does not remount pages, reset onboarding steps or clear inputs; menus, placeholders, accessible names and Markdown controls update.
+- HTTP: 12 kinds of malformed or weighted language headers, 9 real field validations, 32 concurrent direct Zod validations, and over-long system prompt validation in 9 languages; fixed the acceptance of malformed q values and the missed extraction of explicit entries under the prompt attribute.
+- MCP/FFmpeg: 9 MCP SDK sessions and 18 tool calls; FFmpeg server-side structured errors in 9 languages.
+- Parameter boundaries: 7 kinds of malicious or special interpolation times 9 languages, 63 groups in total; 5 kinds of invalid descriptor parameters; prototype property names are not treated as dictionary translations.
+- Model boundaries: SSE on the real generation route used a local LLM fetch mock; output text, system prompts, user input and the `done.message` object structure stayed unchanged; unknown provider errors kept their original text.
+- Dictionary review: fixed empty values, punctuation-only values, entries mixed together by batch translation, brand mistranslations and technical-field mistranslations; re-translated the affected and adjacent entries sentence by sentence, and verified source key sets, parameters, abnormal line breaks and fidelity of technical fields.
+- Gaps found in real screenshots: fixed the missing translation of the camelCase `emptyText` in the directory picker, the accessible name of the Agent input, and internal horizontal scrolling caused by long words in the Russian settings sidebar.
+- Browser re-check: the Russian settings sidebar and all menus have no internal horizontal overflow; onboarding screenshots in nine languages passed, and the primary button wraps automatically in Russian at 360px.
+- Every issue found was fixed within its scope and re-verified; a successful build does not replace the browser, API and persistence checks above.
 
-## 范围调整后的追加验证
+## Additional verification after the scope adjustment
 
-- 精确撤销子包改动，`packages/providers`、`packages/tools`、`packages/nodes`、`packages/nodeScaffold` 相对 HEAD 无内容差异。
-- 删除 Web 的插件名称翻译及节点专用语言运行时导出，移除供应商宿主的 `tool.error` 接口；保留应用层管理和配置提示。
-- 重新抽取并裁剪八份字典，移除 381 条仅用于排除范围的词条；类型检查、产物检查和构建重新执行，不沿用撤回前的节点翻译验证结论。
-- 全仓类型检查、Web/服务端构建、7 个节点与 8 个工具构建全部通过；产物不含节点宿主语言接口及语言字典，中文插件文案保留。新的转换边界断言及 1600 组 ICU 校验通过。
+- Precisely reverted the subpackage changes; `packages/providers`, `packages/tools`, `packages/nodes` and `packages/nodeScaffold` have no content diff relative to HEAD.
+- Removed the Web translations of plugin names and the node-specific language runtime exports, and removed the `tool.error` interface from the provider host; kept the app-level management and configuration messages.
+- Re-extracted and trimmed the eight dictionaries, removing 381 entries used only by the excluded scope; re-ran the type checks, artifact checks and builds instead of reusing the node translation verification results from before the revert.
+- The repository-wide type check, the Web/server builds and 7 node and 8 tool builds all passed; the artifacts contain no node-host language interface or language dictionaries, and the Chinese plugin text is retained. The new transform-boundary assertions and the 1600 ICU validations passed.
 
-## 语言卡片界面追加回归
+## Additional regression for the language card UI
 
-- 设置页内联展示卡片，hello 通过弹层展示同一个 `languageSelect.vue`；九种语言均使用本地 SVG 国旗和原生语言名。
-- 两处入口逐一切换九种语言，选中状态和界面即时更新；hello 选择后关闭弹层，设置页保留当前弹窗。跟随系统、保存后刷新及其他配置保留验证通过。
-- 检查 Home/End、方向键、Esc 和点击外部关闭；设置页的 Esc 保留原有关闭设置弹窗行为。
-- 360px 窄屏、深色模式与 125% 字号组合下，设置语言卡片自动使用两列，没有内部或页面横向溢出。
-- 独立审查发现弹层缺少可访问名称，以及 1024×400 矮窗口聚焦卡片时未滚入视野的问题；分别补齐翻译后的名称，并让聚焦仅滚动语言弹层，避免连带滚动 hello 页面。修复后实测已选印地语重开、Home/End 切换均保持卡片可见，页面滚动位置保持为 0；无障碍树中的弹层名称正确显示为“语言”。
-- Web 类型检查、生产构建和差异检查通过；验证继续使用独立临时配置与服务，没有修改用户正在运行的开发服务。
+- The settings page shows the cards inline, and hello shows the same `languageSelect.vue` in a popover; all nine languages use local SVG flags and native language names.
+- Switched through the nine languages in both entry points; the selected state and the UI update instantly. Hello closes the popover after a selection, while the settings page keeps the current dialog open. Follow system, refresh after saving and preservation of other settings passed.
+- Checked Home/End, the arrow keys, Esc and clicking outside to close; on the settings page, Esc keeps its existing behavior of closing the settings dialog.
+- With a 360px narrow screen, dark mode and 125% font size combined, the settings language cards automatically use two columns, with no internal or page-level horizontal overflow.
+- Independent review found that the popover lacked an accessible name, and that in a short 1024×400 window focusing a card did not scroll it into view. Added the translated name, and made focusing scroll only the language popover so the hello page does not scroll along with it. After the fix, reopening with Hindi selected and switching with Home/End kept the cards visible and the page scroll position stayed at 0; the popover name in the accessibility tree correctly showed "Language".
+- The Web type check, production build and diff check passed; verification kept using an independent temporary configuration and service, without modifying the dev service the user was running.
 
-## 验证范围与限制
+## Verification scope and limitations
 
-- 翻译经过机器辅助生成、常用术语校订和结构验证，尚未由各语言的母语人员逐条审校。
-- 真实浏览器覆盖 Web；桌面原生弹窗通过类型检查和错误链路检查，没有宣称完成 Windows/macOS 原生窗口真机验证。
-- FFmpeg 检查覆盖本地错误、序列化和语言传递，没有实际下载安装 FFmpeg。
-- 第三方网站、用户内容、用户自定义插件及未知供应商错误保持原文。内置 TDesign 未提供的部分语言使用英语基底，当前使用的聊天控件文案由本项目字典补齐。
-- 浏览器配置验证中，一次无效测试 API Key 触发 TF-Router 模型列表请求并返回 401；没有真实凭据、没有保存该 Key、没有调用模型生成。后端生成路径验证使用 mock。初始翻译和逐句修正访问了翻译服务，应用运行时不依赖该服务。
+- The translations were machine-assisted, with revision of common terms and structural validation; they have not yet been reviewed entry by entry by native speakers of each language.
+- A real browser covered Web; native desktop dialogs went through type checking and error-path checks, and no real-device verification of native Windows/macOS windows is claimed.
+- The FFmpeg checks covered local errors, serialization and language propagation, without actually downloading and installing FFmpeg.
+- Third-party websites, user content, user-defined plugins and unknown provider errors keep their original text. Some languages that the bundled TDesign does not provide use the English base, and the text of the chat component in use is supplied by this project's dictionary.
+- During browser configuration verification, one invalid test API key triggered a TF-Router model list request that returned 401; no real credentials were used, the key was not saved and no model generation was called. Verification of the backend generation path used mocks. The initial translation and sentence-by-sentence corrections used a translation service; the app runtime does not depend on it.
 
-## 亚洲语言扩展：三轮追加回归
+## Asian language expansion: three additional regression rounds
 
-新增 `id/ms/fil/bn/ur/ta/te/mr/pa/ar/fa/tr`，现共 21 种语言。每份字典含 2022 个源键，二十份译文合计 40440 条；本轮新增 24264 条译文。旁遮普语使用 Gurmukhi 文字，阿拉伯语、波斯语、乌尔都语支持 RTL。安装器和排除子包不扩展。
+Added `id/ms/fil/bn/ur/ta/te/mr/pa/ar/fa/tr`, for 21 languages in total. Each dictionary contains 2022 source keys, for 40440 entries across the twenty translations; this round added 24264 translations. Punjabi uses the Gurmukhi script, and Arabic, Persian and Urdu support RTL. The installer and the excluded subpackages were not extended.
 
-1. 字典与构建：重新抽取仍为 2022 条；全量键、重复键、空值、生成标记检查通过，4000 组动态 ICU 格式与参数一致，147 组特殊插值不二次解析。全仓类型检查和 Web/Server/MCP 生产构建通过。校验脚本对 ICU 复数消息使用数值参数，避免将任意字符串误当合法复数输入。
-2. 实际交互：独立服务 `127.0.0.1:3118` 使用专用临时配置，hello 逐一切换 12 种新增语言；正文无中文回退，桌面无横向溢出。刷新保留土耳其语，跟随系统恢复简体中文。设置切换后弹窗保持开启，含中文、阿拉伯语、泰米尔语和模板符号的创作草稿原样保留。弹层 End/Home/Esc、末尾滚动及焦点恢复通过，页面未连带滚动。
-3. 窄屏与接口：360×780、125% 字号、深色模式下逐一切换设置内的 12 种新增语言，页面宽度/滚动宽度均为 360，内容区均为 252；hello 弹层容纳 22 个选项（含跟随系统）且有内部滚动。修复 RTL 首页 Star 提示使用物理 right 定位造成的溢出，波斯语复测通过。实际 MCP 地址输入保持 LTR。21 种语言共 63 次并发真实 HTTP 请求的响应语言、参数错误、动态上限提示和 Content-Language 均正确，非法请求前后设置完全一致；最终字典重新加载后再通过同组请求。
+1. Dictionaries and build: re-extraction still yields 2022 entries; the full key, duplicate key, empty value and generation marker checks passed, 4000 dynamic ICU format and parameter groups matched, and 147 special interpolation groups were not parsed twice. The repository-wide type check and the Web/Server/MCP production builds passed. The validation script used numeric parameters for ICU plural messages, to avoid treating arbitrary strings as valid plural input.
+2. Real interaction: an independent service at `127.0.0.1:3118` with a dedicated temporary configuration; switched hello through the 12 new languages one by one, with no Chinese fallback in the content and no horizontal overflow on desktop. Refresh kept Turkish, and follow system restored Simplified Chinese. After switching in settings the dialog stayed open, and creative drafts containing Chinese, Arabic, Tamil and template symbols were preserved as-is. Popover End/Home/Esc, scrolling to the end and focus restoration passed, and the page did not scroll along.
+3. Narrow screens and APIs: at 360×780, 125% font size and dark mode, switched through the 12 new languages in settings one by one; page width and scroll width were all 360 and the content area 252; the hello popover holds 22 options (including follow system) and scrolls internally. Fixed an overflow on the RTL home page caused by the Star hint using physical `right` positioning; the Persian re-test passed. The real MCP address input stays LTR. 63 concurrent real HTTP requests across the 21 languages returned the correct response language, parameter errors, dynamic limit hints and Content-Language; settings were identical before and after invalid requests; after the final dictionaries were reloaded, the same request set passed again.
 
-词义检查另外校订 589 条常用词与重点长句，逐项审查 54 个边界源词条的 12 语译文，以及非空、删除/保存/重试否定语义。修复“不超过”被反转、非空误译、递归删除含义、画布被译成布料、命名格式、扩展名等错误。结构验证和重点校订不代表全部译文已经母语逐句审校。
+The wording review additionally revised 589 common words and key long sentences, reviewed item by item the 12-language translations of 54 boundary source entries, and checked the negation semantics of non-empty and delete/save/retry. Fixed errors such as "no more than" being inverted, mistranslations of non-empty, the meaning of recursive delete, canvas being translated as fabric, naming formats and file extensions. Structural validation and focused revision do not mean that all translations have been reviewed sentence by sentence by native speakers.
 
-本轮没有新增测试文件、依赖或默认自动检查入口，没有修改真实用户配置或调用模型生成。部分组件库语言包缺失时仍按 readme 所列范围回退英语；文档装饰等个别既有物理侧样式没有全面镜像。
+This round added no test files, dependencies or default automatic check entries, and did not modify real user configuration or call model generation. Where some component library language packs are missing, English is still used as the fallback within the scope listed in the readme; some existing physical-side styles, such as document decorations, are not fully mirrored.
 
-三轮后的独立对抗检查通过：55 组归一化、4 组语言检测、9 组请求头、126 个并发上下文中的 630 条隔离断言，以及 63 组插值/原型属性与 2101 次缓存轮换。源资源和构建产物均为 15 个 SVG symbol，无已禁用旗帜；供应商、tools、nodes、节点脚手架、安装器和 file 包均无改动。对抗抽查额外修复五种语言的“缓存命中”物理击打误译，以及十二种语言的四条目录大小写冲突、一条标识符说明（60 条）；保留参数和 ID/大写小写限制。最终累计重点校订 654 条，并重新通过全量字典检查及 Web/Server/MCP 构建。
+The independent adversarial check after the three rounds passed: 55 normalization groups, 4 language detection groups, 9 request header groups, 630 isolation assertions across 126 concurrent contexts, 63 interpolation/prototype property groups and 2101 cache rotations. The source asset and the build artifact both contain 15 SVG symbols, with no disabled flags; providers, tools, nodes, the node scaffold, the installer and the file package are unchanged. The adversarial spot check additionally fixed "cache hit" being mistranslated as a physical strike in five languages, plus four directory case conflicts and one identifier description across twelve languages (60 entries), keeping the parameters and the ID/case restrictions. In total, 654 key entries were revised, and the full dictionary checks and the Web/Server/MCP builds passed again.
 
-国旗校正追记：按用户反馈，阿拉伯语、波斯语分别改用沙特阿拉伯和伊朗国旗；同时修正土耳其星形方向与菲律宾太阳、星形细节。四幅图案取自 flag-icons 7.3.2 单个 SVG，授权保留在本地 sprite 中，未引入整套依赖。移除不再使用的地球占位 symbol，现为 16 个 symbol。生产浏览器确认 21 种语言映射、四幅图案实际渲染正确，五种印度语言继续共用印度图标；Web 构建及 XML/差异检查通过。
+Flag correction addendum: following user feedback, Arabic and Persian switched to the flags of Saudi Arabia and Iran respectively; the orientation of the Turkish star and the details of the Philippine sun and stars were also corrected. The four designs are taken from individual flag-icons 7.3.2 SVGs, with the license kept in the local sprite and without adding the whole dependency. Removed the unused globe placeholder symbol, leaving 16 symbols. A production browser confirmed the mapping of the 21 languages and the correct rendering of the four designs; the five Indian languages continue to share the India icon. The Web build and XML/diff checks passed.
 
-统一图源追记：其余十二幅手绘图案也全部替换为 flag-icons 7.3.2，现有十六幅均为上游原始 SVG 图形。独立复核每个 symbol 的内部节点、属性、顺序与 viewBox 和原文件一致；31 个 ID 无重复、20 个内部引用全部有效，无外部引用。21 种语言映射完整，未收录此前禁用的旗帜；保留 xlink 命名空间和完整 MIT 授权。生产浏览器逐卡引用检查及整套图案截图检查通过，无控制台错误，Web 构建与差异检查通过。
+Unified artwork source addendum: the remaining twelve hand-drawn designs were also replaced with flag-icons 7.3.2, so all sixteen are now the original upstream SVG artwork. Independently re-checked that each symbol's internal nodes, attributes, order and viewBox match the original file; the 31 IDs have no duplicates, all 20 internal references are valid, and there are no external references. The mapping of all 21 languages is complete and no previously disabled flags are included; the xlink namespace and the full MIT license were kept. A card-by-card reference check and a screenshot check of the whole artwork set in a production browser passed with no console errors; the Web build and diff check passed.
 
-## 全量文案与 README 校对（2026-10-01）
+## Full text and README proofreading (2026-10-01)
 
-本轮逐条审读简体中文源文案及全部 20 份译文字典：每份 2022 条，共 40440 条译文；同时全文校对仓库内 45 份源码 README，不含依赖、构建产物和运行数据中的副本。项目首页只介绍支持多语言及语言名单，21 份首页均保留完整语言导航。
+This round read through the Simplified Chinese source text and all 20 translated dictionaries entry by entry: 2022 entries each, 40440 translations in total. It also proofread the full text of the 45 source READMEs in the repository, excluding copies in dependencies, build artifacts and runtime data. The project home page only introduces multilingual support and the list of languages, and all 21 home pages keep the full language navigation.
 
-语义、术语与格式校订共 4691 条，按同一语言的同一源词条去重；统一源键拼写替换另计：
+There were 4691 semantic, terminology and formatting revisions in total, de-duplicated by source entry within each language; the uniform source key spelling replacements are counted separately:
 
-| 语言 | 校订译文数 |
+| Language | Revised translations |
 | --- | ---: |
-| 繁体中文 | 24 |
-| 英语 | 337 |
-| 日语 | 193 |
-| 俄语 | 229 |
-| 越南语 | 282 |
-| 泰语 | 258 |
-| 韩语 | 206 |
-| 印地语 | 176 |
-| 印尼语 | 261 |
-| 马来语 | 272 |
-| 菲律宾语 | 279 |
-| 孟加拉语 | 177 |
-| 乌尔都语 | 275 |
-| 泰米尔语 | 214 |
-| 泰卢固语 | 188 |
-| 马拉地语 | 196 |
-| 旁遮普语 | 319 |
-| 阿拉伯语 | 263 |
-| 波斯语 | 286 |
-| 土耳其语 | 256 |
+| Traditional Chinese | 24 |
+| English | 337 |
+| Japanese | 193 |
+| Russian | 229 |
+| Vietnamese | 282 |
+| Thai | 258 |
+| Korean | 206 |
+| Hindi | 176 |
+| Indonesian | 261 |
+| Malay | 272 |
+| Filipino | 279 |
+| Bengali | 177 |
+| Urdu | 275 |
+| Tamil | 214 |
+| Telugu | 188 |
+| Marathi | 196 |
+| Punjabi | 319 |
+| Arabic | 263 |
+| Persian | 286 |
+| Turkish | 256 |
 
-修正包括文生图/视频误译为人名、解组误译为反序列化、音色误译为木材、中止误译为医疗行为，以及分辨率、每页数量、撤销、网格吸附等术语。长句重点修正否定遗漏、读取与修改混淆、删除消息与删除对话混淆、取消状态、文件大小上限、用户名与密码限制、本机操作限制、授权主体和用户修改保留条件。
+Corrections included text-to-image/video mistranslated as a person's name, ungroup mistranslated as deserialize, voice timbre mistranslated as wood, abort mistranslated as a medical procedure, and terms such as resolution, items per page, undo and grid snapping. In long sentences, the main fixes were missing negation, confusing reading with modifying, confusing deleting a message with deleting a conversation, cancel state, file size limits, username and password restrictions, local-only operation restrictions, the authorizing party, and the conditions for preserving user modifications.
 
-文档修正包括 APIMart 赞助范围被擅自增加“算力”、历史信遗漏“耗时后仍不懂”的结果、部分导航漏译，以及节点脚手架中过时的素材删除说明、已存在节点目录被用作新建示例、工具安装入口名称等。节点和工具只校正既有 README，未给其业务文案新增多语言接入。中文源中的 `asstes` 改为 `assets`、“从剪切板粘贴”改为“从剪贴板粘贴”，同步全部字典键并重新抽取，仍为 2022 条。
+Documentation fixes included the APIMart sponsorship scope having "compute" added without authorization, the historical letter omitting the result "still could not understand it after a long time", some untranslated navigation, and, in the node scaffold, an outdated note on asset deletion, an existing node directory used as the example for creating a new one, and the name of the tool installation entry. For nodes and tools only the existing READMEs were corrected; no i18n integration was added for their business text. In the Chinese source, `asstes` was changed to `assets` and "从剪切板粘贴" to "从剪贴板粘贴" (a spelling fix for "paste from clipboard"); all dictionary keys were synchronized and re-extracted, still 2022 entries.
 
-三轮回归：
+Three regression rounds:
 
-1. 字典与来源：21 份字典共 42462 条的键集合、顺序、重复键、空值、首尾换行和编码检查通过；来源索引与中文源一致，排除子包没有被纳入。4200 条动态消息的 ICU 参数 AST 一致，16800 次数值格式化与 38262 次静态翻译通过；1659 个技术标识检查通过。数字抽查中的印尼语、土耳其语千位点号属于正常本地格式。
-2. 运行时边界：29393 次含中文、阿拉伯语、旁遮普语、花括号、单引号、换行、HTML 字面量和 emoji 的插值原样保留；84 个未知内容与原型属性名用例、126 个并发语言上下文及语言归一化/回退检查通过。使用实际翻译和错误出口函数，未运行外部模型请求。
-3. 文档与构建：45 份 README 的 1209 个本地链接及路径大小写全部通过；21 份项目 README 的 420 个语言导航链接、精简语言支持栏、10 个主章节、5 个安装小节、8 个代码块、5 个 details 和 10 张截图齐全。除可翻译的 shell 注释外，安装和运维命令与中文一致。i18n/Web/Server/MCP 类型检查及 Web/Server/MCP 生产构建通过。构建仍有既有的大 chunk 和 Electrobun 配置扩展名提示。
+1. Dictionaries and sources: the key sets, order, duplicate keys, empty values, leading/trailing newlines and encoding of the 42462 entries across 21 dictionaries passed; the source index matches the Chinese source and the excluded subpackages are not included. The ICU parameter ASTs of 4200 dynamic messages matched, 16800 numeric formatting runs and 38262 static translations passed, and 1659 technical identifier checks passed. In the number spot checks, the dot thousands separator in Indonesian and Turkish is normal local formatting.
+2. Runtime boundaries: 29393 interpolations containing Chinese, Arabic, Punjabi, curly braces, single quotes, newlines, HTML literals and emoji were preserved as-is; 84 unknown-content and prototype-property-name cases, 126 concurrent language contexts and the language normalization/fallback checks passed. The real translation and error exit functions were used, and no external model requests were run.
+3. Documentation and build: the 1209 local links in the 45 READMEs and their path casing all passed; the 21 project READMEs had all 420 language navigation links, the condensed language support section, 10 main sections, 5 installation subsections, 8 code blocks, 5 details blocks and 10 screenshots. Apart from translatable shell comments, the installation and operations commands are identical to the Chinese version. The i18n/Web/Server/MCP type checks and the Web/Server/MCP production builds passed. The build still has the existing large-chunk and Electrobun config extension warnings.
 
-独立对抗语义抽查共 750 条，并把同源问题回查到其他语言。末轮针对授权主体、expectedText 读取传回顺序、相同 name、素材引用和内置 Agent 委托对象补修 26 个译值；已逐项核对落盘结果，重新通过全量字典、插值、并发检查和生产构建。最终差异检查通过。
+The independent adversarial semantic spot check covered 750 entries, and issues with the same source were traced back into the other languages. The final round patched 26 translated values concerning the authorizing party, the order in which `expectedText` is read and sent back, identical `name` values, asset references, and the delegation target of the built-in Agent; the on-disk results were checked item by item, and the full dictionary, interpolation and concurrency checks and the production build passed again. The final diff check passed.
 
-本轮未新增测试文件、测试框架或依赖，未修改真实用户配置，未暂存或提交。没有新增浏览器交互或桌面真机测试，上文相关记录属于此前轮次。全量 AI 辅助语义校对与结构/运行验证不等同于各语言母语人员的逐条出版级审校，也不代表能够保证所有措辞 100% 无误。
+This round added no test files, test frameworks or dependencies, did not modify real user configuration, and did not stage or commit. No new browser interaction or desktop real-device tests were run; the related records above belong to earlier rounds. A full AI-assisted semantic review plus structural and runtime verification is not equivalent to entry-by-entry, publication-grade review by native speakers of each language, and does not guarantee that all wording is 100% correct.
 
-## 按实际功能场景复核（2026-10-01）
+## Review by actual feature scenario (2026-10-01)
 
-在上轮全量字典审读之后，按 `messageSources.json` 追踪真实按钮事件、状态分支与接口实现，再复核对应译文。覆盖工作区与项目管理、画布和节点操作、素材保存与移动、文档编辑、Agent 消息与任务、记忆和 A2A/MCP、模型与插件管理、界面设置、支付和应用更新；README 的功能承诺也对照实现复核。该轮属于场景重点复核，不将未逐条重查的所有词条宣称为新增人工验证。
+After the previous round's full dictionary review, real button events, state branches and API implementations were traced through `messageSources.json`, and the corresponding translations were reviewed again. This covered workspace and project management, canvas and node operations, saving and moving assets, document editing, Agent messages and tasks, memory and A2A/MCP, model and plugin management, UI settings, payments and app updates; the feature promises in the README were also checked against the implementation. This round was a scenario-focused review, and entries that were not re-checked one by one are not claimed as newly human-verified.
 
-校订 232 个既有译值；补齐 11 个新增源词条，并替换 1 个充值提示，涉及 240 个新译值。现在每种语言 2033 条，21 份字典合计 42693 条。重点修正分组实体与分组动作、保存位置字段与保存动作、文档与产品文档、表格行与文本行、编号列表、音频时间区间、版本说明、累计支出金额、关闭会话面板、取消远端任务的确认及关闭记忆后的读写禁令。收藏筛选保留名词，“添加收藏”使用独立操作词条；连线颜色的“关闭”改成“不使用高亮颜色”；充值提示明确关闭当前充值弹窗。
+Revised 232 existing translated values; added 11 new source entries and replaced 1 recharge prompt, involving 240 new translated values. Each language now has 2033 entries, 42693 across the 21 dictionaries. The key fixes distinguish grouping as an entity from grouping as an action, the save-location field from the save action, documents from product documentation, table rows from text lines, and cover numbered lists, audio time ranges, release notes, the cumulative spending amount, closing the session panel, the confirmation for canceling a remote task, and the read/write ban after memory is turned off. The favorites filter keeps the noun, while "Add to favorites" uses a separate action entry; "Off" for edge color became "Don't use a highlight color"; the recharge prompt now states explicitly that it closes the current recharge dialog.
 
-同时修复自动转换没有覆盖的显示出口：供应商调试的六种状态、缓存导入与保存提示、构建标识缺省提示、文档标题级别、记忆编辑冲突、提及预览的截断说明和画布操作取消。内部状态值与比较不变，预览正文与系统说明分开处理；用户文本、供应商响应、localStorage 键值和未知错误仍保留原样。
+Display outlets not covered by the automatic transform were also fixed: six provider debugging states, cache import and save prompts, the default build identifier prompt, document heading levels, memory edit conflicts, the truncation note in mention previews, and canceling canvas operations. Internal state values and comparisons are unchanged, and the preview text and system notes are handled separately; user text, provider responses, localStorage keys and values, and unknown errors remain as-is.
 
-三轮回归：
+Three regression rounds:
 
-1. 字典和来源：重新抽取 2033 条，21 语键集合、顺序、非空、编码、ICU 参数和来源范围一致；4221 条动态消息、16884 次数值格式化、38472 条静态翻译及 1659 个技术标识检查通过。
-2. 实际显示与边界：9 个修改组件经真实转换及 Vue 脚本/模板编译；147 个调试状态、84 个文档标题/正文场景、63 个用户内容与错误边界断言通过。固定同一状态和消息描述后切换语言可即时更新。导入与批量删除在 0、1、2、3、11、21、101 下共 294 个数值场景通过；21 语收藏名词与添加动作分别显示。29491 次特殊插值、126 个并发语言上下文、84 个未知内容/原型属性和 7 个语言边界用例通过。实际音频处理保留了 2 秒输入中 0.25–0.75 秒的 4000 个原始样本，并验证四个错误分支。
-3. 文档与构建：45 份 README 的 1209 个本地链接、21 份项目首页的导航/结构/命令检查通过；i18n/Web/Server/MCP 类型检查及 Web/Server/MCP 生产构建通过。构建仅保留既有的大 chunk 与 Electrobun 配置扩展名提示。
+1. Dictionaries and sources: re-extracted 2033 entries; key sets, order, non-empty values, encoding, ICU parameters and source scope are consistent across the 21 languages; 4221 dynamic messages, 16884 numeric formatting runs, 38472 static translations and 1659 technical identifiers passed.
+2. Real display and boundaries: the 9 modified components went through the real transform and Vue script/template compilation; 147 debugging states, 84 document heading/body scenarios, and 63 user content and error boundary assertions passed. With the same state and message descriptor held fixed, switching languages updates immediately. Import and batch delete passed in 294 numeric scenarios at 0, 1, 2, 3, 11, 21 and 101; in all 21 languages the favorites noun and the add action are displayed separately. 29491 special interpolations, 126 concurrent language contexts, 84 unknown-content/prototype-property cases and 7 language boundary cases passed. Real audio processing kept the 4000 original samples between 0.25 and 0.75 seconds of a 2-second input, and four error branches were verified.
+3. Documentation and build: the 1209 local links in the 45 READMEs and the navigation/structure/command checks of the 21 project home pages passed; the i18n/Web/Server/MCP type checks and the Web/Server/MCP production builds passed. The build only keeps the existing large-chunk and Electrobun config extension warnings.
 
-独立对抗复核纠正了 4 语种共 8 条音频“区间/时限”混淆，补齐 5 语种导入数量的单复数；阿拉伯语和乌尔都语使用数量标签避免数词一致性问题。另确认“工具调用已返回”不等于子任务已完成，停止本地调试也没有被翻成远端任务已确认取消。
+The independent adversarial review corrected 8 entries in 4 languages that confused audio "range" with "time limit", and added singular/plural forms for import counts in 5 languages; Arabic and Urdu use count labels to avoid numeral agreement issues. It also confirmed that "tool call returned" is not rendered as the subtask being completed, and that stopping local debugging was not translated as a confirmed cancellation of the remote task.
 
-最终对抗发现收藏按钮的读屏名称仍有中文：模板的静态段没有中文时，转换器提前返回，漏掉内部条件文案。修正现有显示表达式的递归，不增加自动转换入口；对照修复前后的 106 个 Web 源文件，仅收藏按钮的该显示表达式发生变化，消息总数仍为 2033。42 个语言/收藏状态名称检查、6 个独立执行的真实读屏表达式，以及纯用户模板、嵌套条件、存储键值、既有翻译不重复包装等边界通过；业务状态和插件名称原样保留。最后补正 3 语“取消收藏”为从收藏移除，并重新通过类型检查和 Web/Server/MCP 构建。
+The final adversarial pass found that the screen reader name of the favorites button still contained Chinese: when a template's static segment contained no Chinese, the transformer returned early and missed the conditional text inside. The recursion over the existing display expression was fixed without adding an automatic transform entry; comparing the 106 Web source files before and after the fix, only that display expression of the favorites button changed, and the total message count is still 2033. 42 language/favorites state name checks, 6 independently executed real screen-reader expressions, and boundaries such as pure user templates, nested conditions, storage keys and values, and not double-wrapping existing translations passed; business state and plugin names were preserved. Finally, "Unfavorite" was corrected in 3 languages to mean removing from favorites, and the type checks and the Web/Server/MCP builds passed again.
 
-本轮没有新增测试文件、依赖或框架，没有修改真实用户配置，没有真实模型请求、暂存或提交；本轮验证没有启动浏览器或桌面原生窗口，不能将组件编译和响应式检查称为浏览器真机交互测试。
+This round added no test files, dependencies or frameworks, did not modify real user configuration, and made no real model requests, staging or commits. This round did not launch a browser or a native desktop window, so the component compilation and reactivity checks must not be described as real-device browser interaction tests.
 
-## Element Plus 完整语言包（2026-10-01）
+## Complete Element Plus language packs (2026-10-01)
 
-以 Element Plus 2.14.5 为基准，在 `src/elementPlus/` 保存 21 份完整 JSON，每份 142 项组件文案，保留上游 MIT 授权。`@toonflow/i18n/elementPlus` 统一导出，App 的 ConfigProvider 直接响应所选语言；删除 `fil/ur/mr/pa` 的英语回退和零散关闭按钮补丁。Web 声明并复用锁文件已有的 Day.js 1.11.23，注册对应日期包，`fil` 使用 `tl-ph`，Gurmukhi `pa` 使用 `pa-in`。TDesign、Zod 的缺失语言策略不属于本轮改动。
+Based on Element Plus 2.14.5, 21 complete JSON files are stored in `src/elementPlus/`, each with 142 component strings, keeping the upstream MIT license. `@toonflow/i18n/elementPlus` exports them in one place, and the App's ConfigProvider responds directly to the selected language; the English fallback for `fil/ur/mr/pa` and scattered close-button patches were removed. Web declares and reuses Day.js 1.11.23, which was already in the lockfile, and registers the corresponding date locales; `fil` uses `tl-ph` and Gurmukhi `pa` uses `pa-in`. The missing-language strategies for TDesign and Zod were not part of this round.
 
-除补齐英语残留外，修正官方韩语增减方向颠倒、马来语被翻译的 `{color}` / `{max}` 参数与两个无效键、泰米尔语清空按钮误义、泰卢固语日期键盘提示误义、印尼语删除键提示、阿拉伯语关闭对话框与重置筛选误义等。颜色 alpha 按 0 透明、100 不透明的实际数值方向翻译；表格行、季度、轮播与验证码按组件操作语义校对。
+Besides filling in remaining English text, fixes included the official Korean increase/decrease direction being reversed, Malay translating the `{color}` / `{max}` parameters and two invalid keys, the wrong meaning of the Tamil clear button, the wrong meaning of the Telugu date keyboard hint, the Indonesian delete-key hint, and the wrong meanings of closing a dialog and resetting filters in Arabic. Color alpha was translated by its actual numeric direction, with 0 transparent and 100 opaque; table rows, quarters, the carousel and the captcha were proofread according to the component's operation semantics.
 
-三轮回归：
+Three regression rounds:
 
-1. 全量 JSON 与实际翻译函数：21 份共 2982 项组件文案的键、顺序、类型、数组结构与安装版本英语包一致；504 处命名参数一致。通过 Element Plus 自身 `buildLocaleContext` / `buildTranslator` 检查连续语言切换以及花括号、引号、HTML 字面量和 emoji 参数原样插入。21 种 Day.js 的名称、月份和星期格式化通过，导入不会更改全局默认语言。
-2. 浏览器真实组件：使用内存生成的隔离预览页，加载仓库语言包和实际 Element Plus 组件，连续切换全部 21 种语言。分页、空状态、数值输入提示、日历标题与 JSON 一致，输入草稿及其 DOM 标识保持不变；逐语打开并取消真实 `ElMessageBox.confirm`，确认和取消文案均正确；逐语打开日期弹层，7 个星期标题及键盘读屏提示均本地化。另实际点击韩语增加/减少按钮，数值为 5 → 6 → 5；旁遮普语选择日期后值为 `2026-10-13`，草稿未丢失。隔离页没有应用 API、配置写入或外部生成请求。
-3. 集成与构建：i18n 和 Web 类型检查、Web 生产构建、差异检查通过。构建保留已有的大 chunk 与 Electrobun 配置扩展名提示；隔离开发页有 Vue 编译特性标志提示，没有组件运行错误。
+1. Full JSON and the real translation function: the keys, order, types and array structures of the 2982 component strings across the 21 files match the English pack of the installed version, and the 504 named parameters match. Element Plus's own `buildLocaleContext` / `buildTranslator` were used to check consecutive language switches and the verbatim insertion of parameters containing curly braces, quotes, HTML literals and emoji. Name, month and weekday formatting passed for the 21 Day.js locales, and importing them does not change the global default locale.
+2. Real browser components: an isolated preview page generated in memory loaded the repository language packs and the real Element Plus components, and switched through all 21 languages consecutively. Pagination, empty states, number input hints and calendar titles match the JSON, and input drafts and their DOM identifiers stayed unchanged; a real `ElMessageBox.confirm` was opened and canceled in each language with the correct confirm and cancel text; the date popover was opened in each language, and the 7 weekday headers and keyboard screen-reader hints were all localized. The Korean increase/decrease buttons were also actually clicked, with values going 5 → 6 → 5; after selecting a date in Punjabi the value was `2026-10-13` and the draft was not lost. The isolated page made no app API calls, configuration writes or external generation requests.
+3. Integration and build: the i18n and Web type checks, the Web production build and the diff check passed. The build keeps the existing large-chunk and Electrobun config extension warnings; the isolated dev page shows a Vue compile-time feature flag hint, with no component runtime errors.
 
-完成上述检查后，独立复核全量键及参数、未译英文句子与文字体系；合法同形词包括 OK、部分月份缩写和印尼语 Total，不按字面相同误报为漏译。真实 ConfigProvider 的普通子树、Teleport 子树及脱离父树的程序化组件配置链路通过 189 个断言，验证程序化 MessageBox 使用的全局配置钩子；完整弹窗 DOM 行为另由第二轮浏览器验证覆盖。
+After the checks above, all keys and parameters, untranslated English sentences and writing systems were re-checked independently; legitimate identical words such as OK, some month abbreviations and the Indonesian "Total" are not falsely flagged as untranslated just because they look the same. The configuration chains of the real ConfigProvider's normal subtree, Teleport subtree and programmatic components detached from the parent tree passed 189 assertions, verifying the global configuration hook used by the programmatic MessageBox; the full dialog DOM behavior is additionally covered by the second-round browser verification.
 
-本轮没有新增测试文件或测试框架，没有修改真实用户配置，没有付费请求、暂存或提交。浏览器验证范围是实际组件隔离页，没有将其声称为完整业务页面或桌面原生窗口回归。
+This round added no test files or test frameworks, did not modify real user configuration, and made no paid requests, staging or commits. The browser verification covered an isolated page of real components and is not claimed as a regression of full business pages or native desktop windows.
 
-隔离验证另确认 Element Plus 2.14.5 的上游限制：日期面板创建时缓存每周起始日，切换语言会更新星期文字，但列顺序沿用该实例初始值。当前 Web 未使用日期/日历控件，动态表单入口也未注册这两类组件，本轮不修改依赖或重挂全局页面。以后增加此类控件时，若需要即时改变每周起始日，应验证上游修复，或只重建具体日期控件并保留绑定值。
+The isolated verification also confirmed an upstream limitation of Element Plus 2.14.5: the date panel caches the first day of the week when it is created, so switching languages updates the weekday text, but the column order keeps the instance's initial value. Web currently does not use date or calendar controls, and the dynamic form entry does not register these two component types either, so this round neither modified dependencies nor remounted the global page. If such controls are added later and the first day of the week needs to change immediately, verify an upstream fix, or rebuild only the specific date control while keeping its bound value.

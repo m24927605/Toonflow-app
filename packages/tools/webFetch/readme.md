@@ -1,25 +1,25 @@
-# 读取网页
+# Read Web Page
 
-让 Agent 读取指定公开网址的正文，适合总结文章、核对资料或分析公开文本与 JSON。
+Lets the Agent read the body text of a specified public URL; suitable for summarizing articles, checking facts, or analyzing public text and JSON.
 
-## 使用方式
+## How to Use
 
-在对话中提供网址和任务，例如：“阅读这个网页，提炼与视频制作有关的要点，并注明来源。”
-本工具读取已知网址；需要先寻找相关网站时，可配合“联网搜索”。
+Provide the URL and the task in the conversation, for example: "Read this web page, extract the points related to video production, and cite the source."
+This tool reads known URLs; when you first need to find relevant websites, use it together with Web Search (`联网搜索`).
 
-## 支持的功能
+## Features
 
-- 从静态 HTML 中提取文字，也可读取文本和 JSON。
-- 返回实际网址、HTTP 状态和正文，内容超过限制时标记已截断。
-- 使用 Bun 原生 fetch 读取 HTTP(S) 地址，不执行网页脚本，不允许网址中携带用户名或密码。
-- 最多跟随 5 次重定向，每一跳都校验协议；最多读取 2 MiB 解压后的响应正文。
-- 沿用运行环境的 DNS 和网络，不预判域名解析后的地址，兼容代理 Fake-IP。此工具不提供内网隔离，需要隔离时应由部署环境限制网络访问。
+- Extracts text from static HTML, and can also read text and JSON.
+- Returns the actual URL, HTTP status, and body, and marks the content as truncated when it exceeds the limit.
+- Reads HTTP(S) addresses with Bun's native fetch, does not execute page scripts, and does not allow a username or password in the URL.
+- Follows at most 5 redirects, validating the protocol at each hop; reads at most 2 MiB of decompressed response body.
+- Uses the runtime environment's DNS and network, does not pre-check the addresses a domain resolves to, and is compatible with proxy Fake-IP. This tool does not provide internal network isolation; when isolation is needed, network access should be restricted by the deployment environment.
 
-## 配置
+## Configuration
 
-在“设置 → 插件市场 → 已安装”找到“读取网页”，点击“配置”。
+In Settings → Plugins → Installed, find Read Web Page (`读取网页`) and click "Configuration".
 
-- “超时（毫秒）”：默认 20000，可设为 1000–60000。
-- “正文最大字符数”：默认 40000，可设为 1000–100000；超过上限的正文会截断。
+- "Timeout (ms)" (`超时（毫秒）`): defaults to 20000 and can be set to 1000–60000.
+- "Maximum body characters" (`正文最大字符数`): defaults to 40000 and can be set to 1000–100000; body text beyond the limit is truncated.
 
-无需 API Key。依赖脚本渲染的网页可能无法获得完整内容。
+No API key is required. Pages that depend on script rendering may not return their full content.

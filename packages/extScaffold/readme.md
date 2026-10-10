@@ -1,10 +1,10 @@
-# 文档扩展脚手架
+# Document Extension Scaffold
 
-文档页使用 Dockview 管理标签、分屏与关闭流程。`packages/ext/*` 中每个工作区子包提供一种文件编辑器、预览器或画布节点展示器。扩展只接收宿主提供的 `context`，不导入 `apps/web/src`。
+The document page uses Dockview to manage tabs, split views, and the close flow. Each workspace subpackage in `packages/ext/*` provides one file editor, previewer, or canvas node viewer. An extension only receives the `context` provided by the host and does not import `apps/web/src`.
 
-## 创建扩展
+## Creating an Extension
 
-在仓库根目录执行：
+Run the following from the repository root:
 
 ```sh
 bun packages/extScaffold/create.ts myEditor
@@ -13,9 +13,9 @@ bun run --cwd packages/ext/myEditor typecheck
 bun run --cwd packages/ext/myEditor build
 ```
 
-参数是小驼峰名称，不带 `ext-`；例如 `myEditor` 生成 ID `ext-myEditor` 和包名 `@toonflow/ext-myeditor`。已有同名目录时拒绝创建。命令只创建目录和文件，不隐式安装依赖、构建或修改宿主配置。
+The argument is a lowerCamelCase name without `ext-`; for example, `myEditor` generates the ID `ext-myEditor` and the package name `@toonflow/ext-myeditor`. Creation is refused if a directory with the same name already exists. The command only creates directories and files; it does not implicitly install dependencies, build, or modify host configuration.
 
-写入中途失败时保留已创建文件，修复原因后可补齐或手动清理；脚手架不会递归删除目录回滚。
+If writing fails midway, the files already created are kept. After fixing the cause, you can complete them or clean them up manually; the scaffold never rolls back by deleting directories recursively.
 
 ```text
 packages/ext/myEditor/
@@ -29,9 +29,9 @@ packages/ext/myEditor/
     index.vue
 ```
 
-生成的组件可直接编辑文本，并演示由扩展自己声明的图标和字号设置。修改 `src/metadata.ts` 的扩展显示名、图标、文件后缀与配置规则，再实现 `src/index.vue` 的内容。
+The generated component can edit text directly and demonstrates icon and font size settings declared by the extension itself. Change the extension's display name, icon, file extensions, and configuration rules in `src/metadata.ts`, then implement the content of `src/index.vue`.
 
-## 扩展声明
+## Extension Declaration
 
 ```ts
 // src/metadata.ts
@@ -39,15 +39,15 @@ import type { ExtDefinition } from "@toonflow/ext-scaffold/runtime";
 
 export default {
   id: "ext-myEditor",
-  displayName: "我的编辑器",
+  displayName: "My Editor",
   extensions: ["txt"],
   resourceKind: "file",
   text: true,
-  configRules: [{ type: "inputNumber", field: "fontSize", title: "字号", value: 14, props: { min: 10, max: 32 } }],
+  configRules: [{ type: "inputNumber", field: "fontSize", title: "Font size", value: 14, props: { min: 10, max: 32 } }],
 } satisfies Omit<ExtDefinition, "load">;
 ```
 
-入口 `src/index.ts` 将声明与组件加载函数组合：
+The entry `src/index.ts` combines the declaration with the component loader:
 
 ```ts
 import { defineExt } from "@toonflow/ext-scaffold/runtime";
@@ -56,17 +56,17 @@ import metadata from "./metadata";
 export default defineExt({ ...metadata, load: () => import("./index.vue") });
 ```
 
-`id` 在所有扩展中唯一，格式为 `ext-` 加小驼峰名称，例如 `ext-image`、`ext-canvasNode`；目录与变量仍使用小驼峰。后缀不带点，使用小写字母或数字。`resourceKind` 为 `file` 或 `canvasNode`，画布节点扩展允许空后缀数组。文本编辑器设置 `text: true`，宿主才会预载文本并开放文档读写能力；图片等二进制预览省略此标记。
+`id` is unique across all extensions and has the format `ext-` plus a lowerCamelCase name, for example `ext-image` or `ext-canvasNode`; directories and variables still use lowerCamelCase. File extensions have no leading dot and use lowercase letters or digits. `resourceKind` is `file` or `canvasNode`; canvas node extensions may use an empty extension array. Text editors set `text: true` so that the host preloads the text and exposes document read/write capabilities; binary previews such as images omit this flag.
 
-可选 `icon` 是图片 URL，允许 `http:`、`https:`，或 SVG、PNG、JPEG、WebP、GIF、AVIF 的 `data:image` URL。图标随扩展产物声明，宿主只按图片展示；未声明时使用通用文件图标。内置扩展和生成模板使用内嵌 SVG，无需额外图片请求。
+The optional `icon` is an image URL. It allows `http:`, `https:`, or `data:image` URLs for SVG, PNG, JPEG, WebP, GIF, or AVIF. The icon is declared with the extension output, and the host only displays it as an image; when none is declared, a generic file icon is used. Built-in extensions and the generated template use inline SVG, so no extra image request is needed.
 
-可选 `configRules` 复用插件市场现有的 form-create `Rule[]`，每条 `rule.value` 提供默认值，不另建设置 schema。规则必须可序列化为 JSON，最多 100 项；不能包含函数。未声明或空数组时不显示该扩展的设置入口。
+The optional `configRules` reuses the existing form-create `Rule[]` used by the Plugins settings; each `rule.value` provides the default value, and no separate settings schema is created. Rules must be JSON-serializable, with at most 100 entries, and must not contain functions. When undeclared or an empty array, no settings entry is shown for the extension.
 
-布局 `children` 和条件 `control[].rule` 中的字段同样保存。隐藏且未提交的条件字段不触发服务端必填校验。
+Fields in layout `children` and in conditional `control[].rule` are saved as well. Hidden, unsubmitted conditional fields do not trigger server-side required-field validation.
 
-宿主从 `data/ext/` 枚举已安装且启用的扩展，按需加载 UMD 产物和 `load()` 返回的组件，无需修改 web 工作区依赖或静态注册表。同一后缀有多个可用扩展时，宿主弹出“打开方式”选择，可设置默认关联；文件树右键“打开方式”可以重新选择。脚手架不会自动覆盖原有文件关联。
+The host enumerates installed and enabled extensions from `data/ext/` and loads the UMD output and the component returned by `load()` on demand, without changing web workspace dependencies or a static registry. When several extensions are available for the same file extension, the host shows a "Choose How to Open" dialog where a default association can be set; the file tree's right-click "Open With…" lets you choose again. The scaffold never overwrites existing file associations automatically.
 
-## 组件上下文
+## Component Context
 
 ```ts
 import type { ExtContext } from "@toonflow/ext-scaffold/runtime";
@@ -74,34 +74,34 @@ import type { ExtContext } from "@toonflow/ext-scaffold/runtime";
 const props = defineProps<{ context: ExtContext }>();
 ```
 
-| 字段 | 用途 |
+| Field | Purpose |
 | --- | --- |
-| `resource` | 资源身份，包括工作区目录、相对路径、标签名；画布节点另含 `nodeId`。 |
-| `files` | 固定到资源工作区的文件能力，包含 `read`、`readText`、`readJson`、`write`、`writeJson`、`list`、`rename`、`copy`、`reveal`、`remove`、`mkdir`、`acquireUrl`。 |
-| `text`、`loading`、`error`、`dirty` | 宿主管理的文本与加载、保存状态。通过 `updateText()` 提交编辑；不要直接修改宿主状态，`loading` 同时表示文件操作期间暂停编辑。 |
-| `active` | 文档页是否激活；画布节点据此挂载或释放展示，媒体组件可据此暂停。 |
-| `config` | 当前扩展配置，包含规则默认值和已保存值；宿主在市场设置更新后同步。不要直接修改以代替保存。 |
-| `saveConfig(config)` | 保存当前扩展声明的配置并更新宿主状态，失败抛出异常。市场设置使用同一持久化入口。 |
-| `updateText(text)` | 更新当前标签文本，由宿主管理保存队列，不另起一份自动保存。 |
-| `flushSave()` | 等待当前标签的修改保存完成，失败抛出异常。 |
-| `writeClipboardText(text)` | 通过宿主的桌面或浏览器剪贴板能力复制文本。 |
-| `openFile(path)` | 打开同一工作区的相对路径，由宿主管理文件关联、节点映射和标签去重。 |
-| `location` | 可选的当前视图定位请求，包含从 1 开始的 `line`、`column`、待选中 `query` 和变化标记 `revision`。扩展监听后定位自身编辑器；不参与正文保存。 |
-| `mountNode(element)` | 仅画布节点提供。将原节点界面展示到元素，返回释放展示的方法；卸载时须调用。 |
+| `resource` | Resource identity, including the workspace directory, relative path, and tab name; canvas nodes also include `nodeId`. |
+| `files` | File capabilities pinned to the resource's workspace: `read`, `readText`, `readJson`, `write`, `writeJson`, `list`, `rename`, `copy`, `reveal`, `remove`, `mkdir`, `acquireUrl`. |
+| `text`, `loading`, `error`, `dirty` | Text and load/save state managed by the host. Submit edits through `updateText()`; do not modify host state directly. `loading` also means editing is paused during file operations. |
+| `active` | Whether the document page is active; canvas nodes mount or release their view based on it, and media components can pause on it. |
+| `config` | The current extension configuration, including rule defaults and saved values; the host syncs it after the Plugins settings are updated. Do not modify it directly instead of saving. |
+| `saveConfig(config)` | Saves the configuration declared by the current extension and updates host state; throws on failure. The Plugins settings use the same persistence entry. |
+| `updateText(text)` | Updates the current tab's text; the host manages the save queue, so do not start a separate autosave. |
+| `flushSave()` | Waits for the current tab's changes to finish saving; throws on failure. |
+| `writeClipboardText(text)` | Copies text through the host's desktop or browser clipboard capability. |
+| `openFile(path)` | Opens a relative path in the same workspace; the host manages file associations, node mapping, and tab deduplication. |
+| `location` | An optional positioning request for the current view, containing 1-based `line` and `column`, a `query` to select, and a change marker `revision`. The extension watches it and positions its own editor; it is not part of the saved content. |
+| `mountNode(element)` | Canvas nodes only. Renders the original node UI into the element and returns a function that releases the view; it must be called on unmount. |
 
-文本保存支持 UTF-8（有或无 BOM）和带 BOM 的 UTF-16 LE/BE，并保留原编码。不支持的编码会拒绝打开，不修改原文件。宿主保存前核对读取时的文件版本；发现外部修改时停止覆盖，保留当前编辑内容，供用户选择载入磁盘版本或另存副本。扩展应通过 `context.updateText(text)` 编辑当前文档，不要调用 `context.files.write()` 绕过宿主的编码、保存队列和冲突保护。
+Text saving supports UTF-8 (with or without BOM) and UTF-16 LE/BE with BOM, and preserves the original encoding. Unsupported encodings are refused on open, and the original file is not modified. Before saving, the host checks the file version recorded at read time; if an external change is detected, it stops overwriting and keeps the current edits so the user can choose to load the disk version or save a copy. Extensions should edit the current document through `context.updateText(text)` and must not call `context.files.write()` to bypass the host's encoding, save queue, and conflict protection.
 
-同一文件可以在多个分屏视图展示，正文与保存状态共用一个会话。组件应监听 `context.text` 接收另一视图的修改，光标、查找与编辑模式保留在各自组件中。关闭一个视图不会取消其他视图的保存；画布节点保留唯一运行实例，分屏仅移动其视图。
+The same file can be shown in several split views, and the content and save state share one session. Components should watch `context.text` to receive changes from other views; cursor, find, and edit mode stay within each component. Closing one view does not cancel saves in other views; a canvas node keeps a single running instance, and split views only move its view.
 
-二进制预览通过 `context.files.acquireUrl(path)` 取得 `{ url: Promise<string>, release() }`。无论加载完成与否，资源切换或组件卸载时都要调用 `release()`。不要自行撤销共享 URL。文件操作失败须交给界面呈现，路径必须为当前工作区内的相对路径。
+Binary previews obtain `{ url: Promise<string>, release() }` through `context.files.acquireUrl(path)`. Call `release()` when the resource changes or the component unmounts, whether or not loading has finished. Do not revoke the shared URL yourself. File operation failures must be surfaced in the UI, and paths must be relative paths within the current workspace.
 
-`files.copy(path, target)` 只在此工作区内复制，目标已存在时拒绝覆盖；目录复制禁止符号链接，失败可能保留部分目标内容，错误数据中的 `partial` 与 `target` 会说明。`files.reveal(path)` 只支持桌面客户端或本机 Windows/macOS 开发页面，远程访问会被拒绝。
+`files.copy(path, target)` copies only within this workspace and refuses to overwrite an existing target. Directory copies disallow symbolic links; a failure may leave partial target content, which `partial` and `target` in the error data describe. `files.reveal(path)` is only supported in the desktop client or a local Windows/macOS development page; remote access is refused.
 
-## 共享 Markdown 编辑依赖
+## Shared Markdown Editing Dependencies
 
-Tiptap、marked 和 DOMPurify 通过构建配置的 external 复用宿主依赖。编辑器、预览组件、工具栏和生命周期由各扩展或节点在自己的包内实现，不导入宿主组件，也没有组件转发层。子包使用这些依赖时声明与宿主兼容的 peerDependencies：当前 Tiptap 各包为 `3.31.3`，`marked` 为 `18.0.13`，`dompurify` 为 `3.4.16`。
+Tiptap, marked, and DOMPurify reuse the host's dependencies through the build configuration's externals. Editors, preview components, toolbars, and lifecycles are implemented by each extension or node in its own package; they do not import host components, and there is no component forwarding layer. Subpackages that use these dependencies declare host-compatible peerDependencies: currently `3.31.3` for each Tiptap package, `18.0.13` for `marked`, and `3.4.16` for `dompurify`.
 
-直接使用依赖原有 API：
+Use the dependencies' own APIs directly:
 
 ```ts
 import { Editor } from "@tiptap/core";
@@ -110,20 +110,20 @@ import { Markdown } from "@tiptap/markdown";
 
 const editor = new Editor({
   extensions: [StarterKit, Markdown],
-  content: "# 标题",
+  content: "# Title",
   contentType: "markdown",
 });
 ```
 
-共享模块包括 `@tiptap/core`、`@tiptap/vue-3`、`@tiptap/starter-kit`、`@tiptap/markdown`，以及 `extension-find-and-replace`、`extension-highlight`、`extension-image`、`extension-list`、`extension-subscript`、`extension-superscript`、`extension-table`、`extension-text-align`（均为 `@tiptap/` 前缀）；还包括 `@tiptap/pm/model`、`@tiptap/pm/state`、`@tiptap/pm/view`、`marked` 和 `dompurify`。构建产物引用 `window.toonflowTiptapHost` 中对应的依赖，不重复打包这些实现。
+Shared modules include `@tiptap/core`, `@tiptap/vue-3`, `@tiptap/starter-kit`, `@tiptap/markdown`, and `extension-find-and-replace`, `extension-highlight`, `extension-image`, `extension-list`, `extension-subscript`, `extension-superscript`, `extension-table`, `extension-text-align` (all with the `@tiptap/` prefix); also `@tiptap/pm/model`, `@tiptap/pm/state`, `@tiptap/pm/view`, `marked`, and `dompurify`. The build output references the corresponding dependencies in `window.toonflowTiptapHost` instead of bundling these implementations again.
 
-Tiptap 统一使用具名导入，例如 `{ StarterKit }`、`{ Image }`、`{ Highlight }`、`{ Superscript }`、`{ Subscript }`、`{ TextAlign }`、`{ FindAndReplace }`。当前 Vite 8 UMD 的默认导入会取整个外部模块对象，不能用于这些共享模块；DOMPurify 单独共享默认函数，继续使用 `import DOMPurify from "dompurify"`。无需启用影响所有依赖的旧版 CJS 兼容开关。
+Tiptap always uses named imports, for example `{ StarterKit }`, `{ Image }`, `{ Highlight }`, `{ Superscript }`, `{ Subscript }`, `{ TextAlign }`, `{ FindAndReplace }`. With the current Vite 8 UMD build, a default import takes the entire external module object, so it cannot be used for these shared modules. DOMPurify shares its default function separately, so keep using `import DOMPurify from "dompurify"`. There is no need to enable the legacy CJS compatibility switch that affects all dependencies.
 
-宿主先检查 UMD 是否引用 `toonflowTiptapHost`，仅在需要时动态加载共享依赖，后续复用同一个 ES 模块；普通图片、视频或纯文本插件不会因此预载 Tiptap。组件的挂载、销毁、隐藏状态、正文更新和文件保存仍由各包管理。使用共享依赖的产物需要配套宿主版本。
+The host first checks whether the UMD references `toonflowTiptapHost` and dynamically loads the shared dependencies only when needed, then reuses the same ES module; ordinary image, video, or plain-text plugins do not preload Tiptap because of this. Each package still manages component mounting, destruction, hidden state, content updates, and file saving. Output that uses the shared dependencies requires a matching host version.
 
-## 独立构建与开发
+## Standalone Build and Development
 
-`viteConfig.ts` 使用共享配置：
+`viteConfig.ts` uses the shared configuration:
 
 ```ts
 import { createExtConfig } from "@toonflow/ext-scaffold";
@@ -132,9 +132,9 @@ import metadata from "./src/metadata.ts";
 export default createExtConfig(metadata, import.meta.url);
 ```
 
-声明文件不导入组件，避免配置打包器提前解析 Vue 文件。每次重建重新读取声明及其依赖，后缀、图标与设置变更会同步进入 UMD 元数据；修改扩展 ID 后须重启构建。
+The declaration file does not import components, so the configuration bundler does not resolve Vue files early. Each rebuild rereads the declaration and its dependencies, so changes to file extensions, icons, and settings flow into the UMD metadata; restart the build after changing the extension ID.
 
-产物为 `build/ext/<id>.umd.js`，例如 `build/ext/ext-image.umd.js`，包含 `toonflowExt` JSON 元数据注释、版本、说明文档和自动注入的组件样式。产物导出 `window.toonflowExts[id]`，结构为 `ExtDefinition`。Vue、Element Plus 与 Toonflow 语言状态由宿主共享：
+The output is `build/ext/<id>.umd.js`, for example `build/ext/ext-image.umd.js`, and contains a `toonflowExt` JSON metadata comment, the version, the readme, and automatically injected component styles. The output exports `window.toonflowExts[id]` with the `ExtDefinition` shape. Vue, Element Plus, and the Toonflow language state are shared by the host:
 
 ```ts
 import * as vue from "vue";
@@ -144,8 +144,8 @@ import * as i18n from "@toonflow/i18n/vue";
 Object.assign(window, { toonflowExtHost: { vue, elementPlus, i18n } });
 ```
 
-运行时使用 `@toonflow/ext-scaffold/runtime`；构建配置使用 `@toonflow/ext-scaffold`，避免把 Vite 与文件系统代码打包到浏览器。Element Plus 的基础样式由宿主加载，扩展自身的组件样式会打入产物。
+Runtime code uses `@toonflow/ext-scaffold/runtime`; the build configuration uses `@toonflow/ext-scaffold`, which keeps Vite and file system code out of the browser bundle. Element Plus base styles are loaded by the host, and the extension's own component styles are bundled into the output.
 
-`bun run --cwd packages/ext/myEditor dev` 持续构建，并把产物原子替换到 `data/ext/`，供本机插件市场与文档宿主读取。`NODE_ENV=dev` 或 `--mode development` 的单次构建同样同步；生产构建只输出 `build/ext/`。
+`bun run --cwd packages/ext/myEditor dev` builds continuously and atomically replaces the output in `data/ext/` for the local Plugins settings and the document host to read. One-off builds with `NODE_ENV=dev` or `--mode development` sync as well; production builds only output to `build/ext/`.
 
-市场元数据包含 `id`、`displayName`、可选 `icon`、`configRules`、`extensions`、`resourceKind`、可选 `text`、`version` 和 `readme`。`load` 留在运行时导出，不写入 JSON 元数据。插件市场负责安装、更新与启停，脚手架负责声明、生成和独立构建。
+The plugin metadata contains `id`, `displayName`, optional `icon`, `configRules`, `extensions`, `resourceKind`, optional `text`, `version`, and `readme`. `load` stays in the runtime export and is not written to the JSON metadata. Settings → Plugins handles installation, updates, and enabling/disabling; the scaffold handles declaration, generation, and standalone builds.

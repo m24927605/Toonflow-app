@@ -1,11 +1,11 @@
-# Markdown 文档扩展
+# Markdown Document Extension
 
-支持 `.md`、`.markdown` 文件，扩展标识为 `ext-md`。
+Supports `.md` and `.markdown` files. The extension ID is `ext-md`.
 
-本包私有实现 Tiptap 3.31.3 编辑器，默认富文本，可切换原文。工具栏、查找、图片粘贴与拖入、相对图片和链接均由本包维护。Tiptap、marked、DOMPurify 通过脚手架 external 复用宿主依赖，不重复打包，也不共享编辑器组件。
+This package privately implements a Tiptap 3.31.3 editor. It defaults to rich text and can switch to the source view. The toolbar, find, image paste and drag-in, and relative images and links are all maintained by this package. Tiptap, marked, and DOMPurify reuse the host's dependencies through the scaffold's externals; they are not bundled again, and the editor component is not shared.
 
-正文绑定 `context.text`，编辑时同步调用 `context.updateText`。自动保存、版本冲突、错误重试与标签关闭仍由文档宿主管理；本包不保留独立草稿或延迟提交。文件操作、链接打开、剪贴板、搜索定位及视图可见状态均使用宿主传入的能力。
+The body is bound to `context.text`, and `context.updateText` is called synchronously while editing. Autosave, version conflicts, error retries, and tab closing are still managed by the document host; this package keeps no separate draft and does not delay commits. File operations, opening links, the clipboard, search positioning, and view visibility all use capabilities passed in by the host.
 
-构建产物包含扩展元数据、私有编辑器与样式；宿主在执行扩展前按需加载共享依赖。旧文档的下划线、高亮、上下标、段落对齐及复杂表格仍以混合 HTML 保存；仅打开文件或切换模式不会自动改写原文。
+The build output contains the extension metadata, the private editor, and styles; the host loads shared dependencies on demand before running the extension. Underline, highlight, superscript/subscript, paragraph alignment, and complex tables in older documents are still saved as mixed HTML; merely opening a file or switching modes does not rewrite the source automatically.
 
-在仓库根目录安装依赖后，可在 `packages/ext/md` 目录运行 `bun run typecheck`；使用生产环境执行 `bun run build`，产物位于仓库根目录的 `build/ext/ext-md.umd.js`。开发构建或 watch 会同步产物到 `data/ext`。
+After installing dependencies at the repository root, run `bun run typecheck` in `packages/ext/md`. Run `bun run build` in the production environment; the output is `build/ext/ext-md.umd.js` under the repository root. Development builds and watch mode sync the output to `data/ext`.

@@ -1,13 +1,13 @@
-# 音频生成节点
+# Audio Generation Node
 
-根据提示词、文本及可选的参考图片或音频生成音频。模型列表来自媒体模型设置，仅显示音频模型。
+Generates audio from a prompt, text, and an optional reference image or audio clip. The model list comes from the media model settings and shows audio models only.
 
-## 使用方法
+## Usage
 
-1. 选中节点，选择音频模型并输入文本或音频效果描述。
-2. 按需连接参考节点。文本数量不限；图片和音频互斥，合计最多连接一个。
-3. 打开生成设置，选择中文或英文、采样率及输出格式；具体支持范围由供应商校验。
-4. 点击生成，需要中止时点击停止；失败或取消会保留已有输出。
-5. 生成后可播放、下载、截取、变速或替换音频，与普通音频节点使用相同操作。
+1. Select the node, choose an audio model, and enter the text or a description of the sound you want.
+2. Connect reference nodes as needed. Any number of text references can be connected; images and audio are mutually exclusive, with at most one of them connected in total.
+3. Open the generation settings and choose Chinese or English, the sample rate, and the output format; the provider validates what is actually supported.
+4. Click generate, or click stop to abort; a failure or cancellation keeps the existing output.
+5. After generation you can play, download, trim, change the speed of, or replace the audio, just like in a regular audio node.
 
-截取和变速会在右侧生成新的普通音频节点，需要启用音频节点插件。PCM 等浏览器不支持的格式仍可下载。
+Trimming and speed changes create a new regular audio node to the right and require the Audio node plugin (`音频`) to be enabled. Formats the browser cannot play, such as PCM, can still be downloaded.

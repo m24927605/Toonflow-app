@@ -1,6 +1,6 @@
-# 更新服务器
+# Update server
 
-这是独立的 Bun + Express 项目，可将整个 `updateServer` 文件夹复制到服务器安装依赖后运行。仅负责更新文件的发布与静态下载，不依赖桌面应用或业务 Server。
+This is a standalone Bun + Express project: copy the whole `updateServer` folder to a server, install dependencies and run it. It only handles publishing update files and serving them as static downloads, and depends on neither the desktop app nor the business Server.
 
 ```powershell
 cd apps/updateServer
@@ -8,28 +8,28 @@ bun install
 bun run start
 ```
 
-默认地址 `http://127.0.0.1:8091`，无需 `.env` 配置；需要对外监听或修改端口时，修改 `src/index.ts` 的 `host`、`port`。桌面构建的更新地址应指向客户端可访问的服务器地址。`bun run dev` 会监视源码。
+The default address is `http://127.0.0.1:8091` and no `.env` configuration is needed; to listen externally or change the port, edit `host` and `port` in `src/index.ts`. The update URL in the desktop build must point to a server address reachable by clients. `bun run dev` watches the source code.
 
-## 应用装配
+## Application assembly
 
-`src/app.ts` 的 `createApp(publicDirectory)` 负责静态下载与统一错误处理，`src/index.ts` 只负责目录准备和监听。JSON 错误响应使用 `src/lib/responseFormat.ts`，格式为 `{ code, data, message }`。命令行发布脚本位于 `scripts/publish.ts`。
+`createApp(publicDirectory)` in `src/app.ts` handles static downloads and unified error handling; `src/index.ts` only prepares directories and listens. JSON error responses use `src/lib/responseFormat.ts`, in the format `{ code, data, message }`. The command-line publish script is at `scripts/publish.ts`.
 
-服务只接受 GET/HEAD，不解析请求体、不开放跨域权限、不记录访问日志。独立项目保留自己的依赖与 `@/` 别名，不导入业务 Server 的内部文件。
+The service only accepts GET/HEAD, does not parse request bodies, does not grant cross-origin access and does not log requests. As a standalone project, it keeps its own dependencies and `@/` alias and does not import internal files of the business Server.
 
-## 发布更新
+## Publishing updates
 
-将桌面构建产物复制到服务器后，在本项目目录发布：
+After copying the desktop build outputs to the server, publish from this project's directory:
 
 ```powershell
-bun run publish <桌面构建产物目录>
+bun run publish <desktopBuildOutputDirectory>
 ```
 
-参数必须是包含且仅包含一个 `*-update.json` 的目录。清单的 `platform`、`arch` 必须与文件名前缀一致。新格式读取 `artifact.file` 指定的同前缀 `.tar.zst` 归档；Electrobun 1.18.1 Intel Mac 旧清单没有 `artifact` 时，从同目录查找且仅接受一个同前缀的 `.app.tar.zst`。Apple Silicon 使用包含 `artifact.file` 的新格式。
+The argument must be a directory containing exactly one `*-update.json`. The manifest's `platform` and `arch` must match the file name prefix. The new format reads the `.tar.zst` archive with the same prefix specified by `artifact.file`; when an Electrobun 1.18.1 Intel Mac legacy manifest has no `artifact`, the publisher looks in the same directory and accepts only one `.app.tar.zst` with the same prefix. Apple Silicon uses the new format with `artifact.file`.
 
-发布器同时复制同平台、渠道前缀的 `.patch`，保留旧补丁，先替换文件，最后原子替换清单。`public/` 是所有平台共用的静态目录，文件名前缀区分平台和架构。Windows 保持 `releases/<version>/` 快照；Intel Mac 和 Apple Silicon 分别保存到 `releases/macX64/<version>/`、`releases/macArm64/<version>/`。三个目标可以发布相同版本号，同一目标的同版本禁止重复发布。静态下载只开放平铺 ASCII 文件名的 GET/HEAD，并禁止缓存。
+The publisher also copies `.patch` files with the same platform and channel prefix, keeps old patches, replaces files first and atomically replaces the manifest last. `public/` is a static directory shared by all platforms; file name prefixes distinguish platform and architecture. Windows keeps `releases/<version>/` snapshots; Intel Mac and Apple Silicon are stored in `releases/macX64/<version>/` and `releases/macArm64/<version>/` respectively. The three targets can publish the same version number, but publishing the same version twice for the same target is rejected. Static downloads only serve GET/HEAD for flat ASCII file names, with caching disabled.
 
-复制或发布失败会清理本次新建的快照目录和当前临时文件，允许重试，已有快照不会删除。已替换的公开文件不回滚，因此整个发布过程不是一次原子操作。
+If copying or publishing fails, the snapshot directory created in this run and the current temporary files are cleaned up so it can be retried; existing snapshots are not deleted. Public files that were already replaced are not rolled back, so the publish process as a whole is not atomic.
 
-首次发布基线后保持服务运行，再构建下一版本，让 Electrobun 从该地址下载基线并生成补丁，然后再次发布。此服务不构建桌面程序，不提供 HTTP 上传接口；一次只运行一个发布命令。
+After publishing the first baseline, keep the service running, then build the next version so that Electrobun downloads the baseline from this address and generates patches, and publish again. This service does not build the desktop app and provides no HTTP upload API; run only one publish command at a time.
 
-类型检查：`bun run typecheck`。构建：`bun run build`，输出到本项目的 `build/index.js`，可使用 `bun build/index.js` 启动，仍读取项目根目录的 `public/`。构建不会安装依赖。
+Type check: `bun run typecheck`. Build: `bun run build`, which outputs to this project's `build/index.js`; start it with `bun build/index.js`, which still reads `public/` from the project root. The build does not install dependencies.

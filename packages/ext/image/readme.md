@@ -1,7 +1,7 @@
-# 图片预览
+# Image Preview
 
-支持 JPG、JPEG、PNG、WebP、GIF、BMP、SVG、AVIF 和 ICO。通过宿主共享文件 URL 读取资源，在切换或关闭标签时释放 URL。
+Supports JPG, JPEG, PNG, WebP, GIF, BMP, SVG, AVIF, and ICO. Resources are read through file URLs shared by the host, and the URL is released when the tab is switched or closed.
 
-图标由扩展自行声明；“图片适应窗口”设置默认开启，关闭后按原始尺寸展示并支持滚动。
+The extension declares its own icon. The "Fit image to window" (`图片适应窗口`) setting is enabled by default; when disabled, images are shown at their original size with scrolling.
 
-扩展 ID 为 `ext-image`，包名为 `@toonflow/ext-image`。在仓库根目录执行 `bun run --cwd packages/ext/image build`，产物为 `build/ext/ext-image.umd.js`。扩展开发与上下文接口见 `packages/extScaffold/readme.md`。
+The extension ID is `ext-image` and the package name is `@toonflow/ext-image`. Run `bun run --cwd packages/ext/image build` from the repository root; the output is `build/ext/ext-image.umd.js`. See `packages/extScaffold/readme.md` for extension development and the context interface.

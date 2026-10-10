@@ -1,16 +1,16 @@
-# FFmpeg 媒体处理
+# FFmpeg Media Processing
 
-为 Agent 提供 `ffmpeg` 和 `ffprobe`，直接连接 `context.ffmpeg()`，复用插件市场配置的执行程序及节点已有的调用桥接。
+Provides `ffmpeg` and `ffprobe` to the Agent, connecting directly to `context.ffmpeg()` and reusing the executables configured in Settings → Plugins → FFmpeg and the call bridge that nodes already use.
 
-## 调用方式
+## Calling
 
-`ffprobe` 接收文件路径和可选的原生参数：
+`ffprobe` takes a file path and optional native options:
 
 ```json
 { "path": "assets/input.mp4", "options": ["-count_frames"] }
 ```
 
-`ffmpeg` 的 `steps` 按顺序调用 fluent 方法，`operation` 指定最后执行的方法，省略时使用 `run()`。例如输出图片序列：
+`ffmpeg`'s `steps` call fluent methods in order, and `operation` specifies the method executed last; `run()` is used when it is omitted. For example, to output an image sequence:
 
 ```json
 {
@@ -22,15 +22,15 @@
 }
 ```
 
-也可使用 `operation: { "method": "save", "args": ["assets/output.mp4"] }`，或者原生的 `screenshots`、`concat` 等操作。查询可用编码器、编解码器、格式、滤镜时，省略 `steps`，将 `operation.method` 设为 `availableEncoders`、`availableCodecs`、`availableFormats` 或 `availableFilters`。
+You can also use `operation: { "method": "save", "args": ["assets/output.mp4"] }`, or native operations such as `screenshots` and `concat`. To query available encoders, codecs, formats, or filters, omit `steps` and set `operation.method` to `availableEncoders`, `availableCodecs`, `availableFormats`, or `availableFilters`.
 
-`options` 对应宿主支持的 fluent 构造选项：`source`、`cwd`、`niceness`、`priority`、`stdoutLines`、`timeout`。`steps` 支持宿主已有的全部配置方法和别名；`args` 中的 JSON 值保持原样，`undefinedArgs` 可指定要传入 `undefined` 的位置。
+`options` maps to the fluent constructor options supported by the host: `source`, `cwd`, `niceness`, `priority`, `stdoutLines`, `timeout`. `steps` supports all configuration methods and aliases the host already has; JSON values in `args` are passed as is, and `undefinedArgs` can specify positions that should receive `undefined`.
 
-## 原生能力与执行
+## Native Capabilities and Execution
 
-- 不另设 FFmpeg 参数白名单，不拆分或重写 `inputOptions`、`outputOptions`、滤镜参数。
-- 不限制为单文件输出，图片序列、HLS/DASH 分片、多输入多输出均按原生方式处理。
-- 不重定向到临时文件，不强制设置执行时长。输出目录按原生要求准备，已有文件的覆盖遵循 FFmpeg 原生规则；未要求覆盖时应使用新文件名。
-- 保留宿主已有的显式工作区路径检查、缺少 FFmpeg 时的安装提示、错误传播和转换取消。取消或失败可能留下原生处理产生的部分文件，工具不自动删除素材。
+- There is no separate whitelist of FFmpeg arguments, and `inputOptions`, `outputOptions`, and filter arguments are not split or rewritten.
+- Output is not restricted to a single file; image sequences, HLS/DASH segments, and multiple inputs and outputs are all handled natively.
+- Output is not redirected to temporary files, and no execution time limit is enforced. Output directories are prepared as the native tool requires, and overwriting existing files follows FFmpeg's native rules; when overwriting is not requested, use new file names.
+- The host's existing explicit workspace path checks, the install prompt when FFmpeg is missing, error propagation, and conversion cancellation are kept. Cancellation or failure may leave partial files produced by native processing; the tool does not delete assets automatically.
 
-此工具传递 JSON 调用数据，不接收 JavaScript、回调或 Node 流；可执行文件由插件市场配置。宿主只检查显式文件入口，原始参数、滤镜和媒体清单中的间接访问不是文件系统沙箱。FFprobe 和能力查询的原生接口不暴露子进程，取消会停止等待，底层查询自行退出。
+This tool passes JSON call data and does not accept JavaScript, callbacks, or Node streams; the executables are configured in Settings → Plugins → FFmpeg. The host only checks explicit file entries; indirect access through raw arguments, filters, and media lists is not a file system sandbox. The native FFprobe and capability query interfaces do not expose the child process; canceling stops waiting, and the underlying query exits on its own.

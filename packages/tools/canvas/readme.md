@@ -1,21 +1,21 @@
-# 画布操作
+# Canvas Operations
 
-让 Agent 直接操作项目中打开的画布，搭建和整理节点流程。
+Lets the Agent directly operate the canvas open in a project to build and organize node workflows.
 
-## 使用方式
+## How to Use
 
-先打开目标项目的画布，再向 Agent 描述希望完成的操作。
-例如：“把当前画布整理整齐”“添加一个文本节点写入这段分镜”“把这张参考图接到视频生成节点”。
-Agent 会先读取实际节点和可用能力，再执行操作；已有节点可以继续复用。
+First open the target project's canvas, then describe to the Agent what you want done.
+For example: "Tidy up the current canvas", "Add a text node with this storyboard", "Connect this reference image to the video generation node".
+The Agent first reads the actual nodes and available capabilities, then performs the operation; existing nodes can be reused.
 
-## 支持的功能
+## Features
 
-- 新建、切换和重命名画布。
-- 添加节点；批量移动、重命名、选择和删除节点，一次可处理多个节点。
-- 批量连接兼容的节点端口，批量删除指定连线。
-- 根据节点尺寸与连线自动整理整张画布，或调整视图展示指定节点。
-- 调用节点提供的功能，例如修改文本、设置提示词或生成媒体；具体以该节点支持的功能为准。
+- Create, switch, and rename canvases.
+- Add nodes; move, rename, select, and delete nodes in batches, handling several nodes at once.
+- Connect compatible node ports in batches, and delete specified edges in batches.
+- Automatically tidy the whole canvas based on node sizes and edges, or adjust the view to show specified nodes.
+- Call functions provided by nodes, such as editing text, setting prompts, or generating media; what is available depends on what each node supports.
 
-需要保持目标画布可用。新增节点的类型取决于当前安装的节点插件，连线也须满足节点的输入要求。
-节点生成任务启动后仍需等待实际结果；自动整理画布不会触发生成。
-本工具没有配置项，无需单独填写 API Key；媒体生成所需配置由对应供应商提供。
+The target canvas must remain available. The node types you can add depend on the node plugins currently installed, and edges must also satisfy the nodes' input requirements.
+After a node generation task starts, you still need to wait for the actual result; tidying the canvas does not trigger generation.
+This tool has no configuration items and does not need a separate API key; configuration needed for media generation is provided by the corresponding provider.

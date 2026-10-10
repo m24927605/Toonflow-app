@@ -1,38 +1,38 @@
-# 节点脚手架
+# Node Scaffold
 
-`@toonflow/nodes-scaffold` 提供共享 Vite 配置、节点骨架与宿主接口。节点插件在 `packages/nodes/*` 中各自维护依赖、Vue 子组件和构建入口；跨插件共享源码位于 `packages/nodeShared`，作为独立包 `@toonflow/node-shared`，不单独构建节点。
+`@toonflow/nodes-scaffold` provides the shared Vite configuration, the node skeleton, and host interfaces. Each node plugin in `packages/nodes/*` maintains its own dependencies, Vue child components, and build entry. Source shared across plugins lives in `packages/nodeShared` as the standalone package `@toonflow/node-shared`, which is not built as a node on its own.
 
 ```text
 packages/nodeScaffold/
-  index.ts                 共享构建配置
-  src/runtime.ts           浏览器组件、组合式函数、类型和工具的统一入口
-  src/useNode.ts           当前节点状态、端口、输出、事件和文件能力
-  src/nodeSkeleton.vue     共用标题栏、内容 Card 和左右连接点
-  src/values.ts            固定输出结构与类型校验
-  src/nodeInputs.ts        按目标节点、输入端口读取上游值
-  src/nodeEvent.ts         统一注册节点输入、输出、删除和连接校验事件
-  src/workspaceFiles.ts    使用宿主文件能力、上传节点文件
-packages/nodeShared/       跨插件共享组件与业务逻辑，独立包 @toonflow/node-shared
+  index.ts                 Shared build configuration
+  src/runtime.ts           Single entry for browser components, composables, types, and utilities
+  src/useNode.ts           Current node state, ports, outputs, events, and file capabilities
+  src/nodeSkeleton.vue     Shared title bar, content Card, and left/right connection points
+  src/values.ts            Fixed output structures and type validation
+  src/nodeInputs.ts        Reads upstream values by target node and input port
+  src/nodeEvent.ts         Registers node input, output, delete, and connection-validation events in one place
+  src/workspaceFiles.ts    Uses host file capabilities and uploads node files
+packages/nodeShared/       Components and business logic shared across plugins; standalone package @toonflow/node-shared
 packages/nodes/imageNode/
-  package.json             当前节点自己的依赖
-  vite.config.ts           引用共享配置
+  package.json             This node's own dependencies
+  vite.config.ts           References the shared configuration
   tsconfig.json
-  src/index.vue            当前节点唯一入口
+  src/index.vue            This node's only entry
 build/nodes/
-  imageNode.umd.js          单个节点的元数据、组件、子组件、依赖和样式
+  imageNode.umd.js          Metadata, component, child components, dependencies, and styles of a single node
 data/nodes/
-  imageNode.umd.js          开发时同步，供 server 加载
+  imageNode.umd.js          Synced during development for the server to load
 ```
 
-在节点自身的 `src/components/` 中封装子组件、在其它目录放工具函数，正常 import 即可；它们不会单独生成节点入口。
+Put child components in the node's own `src/components/` and utility functions in other directories, then import them normally; they do not produce separate node entries.
 
-`packages/nodeScaffold` 仅提供通用节点基础能力、构建配置与宿主接口，运行时能力从 `@toonflow/nodes-scaffold/runtime` 导入。插件专属组件、交互、提示词、预设与业务逻辑放在所属插件中，通过其公开导出复用；跨插件共享组件与业务逻辑统一放在 `packages/nodeShared`，通过独立包 `@toonflow/node-shared` 的公开子路径导入，不混入脚手架。根入口 `@toonflow/nodes-scaffold` 仅供 Vite 配置导入 `createNodeConfig`，不要在浏览器组件中引用。
+`packages/nodeScaffold` only provides generic node foundations, build configuration, and host interfaces; runtime capabilities are imported from `@toonflow/nodes-scaffold/runtime`. Plugin-specific components, interactions, prompts, presets, and business logic stay in the owning plugin and are reused through its public exports. Components and business logic shared across plugins live in `packages/nodeShared` and are imported through the public subpaths of the standalone package `@toonflow/node-shared`; they are never mixed into the scaffold. The root entry `@toonflow/nodes-scaffold` is only for importing `createNodeConfig` in Vite configs; do not reference it from browser components.
 
-## 共享 Markdown 编辑依赖
+## Shared Markdown editing dependencies
 
-Tiptap、marked 和 DOMPurify 通过构建配置的 external 复用宿主依赖。编辑器、预览组件、工具栏和生命周期由各扩展或节点在自己的包内实现，不导入宿主组件，也没有组件转发层。子包使用这些依赖时声明与宿主兼容的 peerDependencies：当前 Tiptap 各包为 `3.31.3`，`marked` 为 `18.0.13`，`dompurify` 为 `3.4.16`。
+Tiptap, marked, and DOMPurify reuse the host's dependencies through `external` in the build configuration. Editors, preview components, toolbars, and lifecycles are implemented by each extension or node in its own package; they do not import host components, and there is no component forwarding layer. Subpackages that use these dependencies declare host-compatible peerDependencies: currently `3.31.3` for all Tiptap packages, `18.0.13` for `marked`, and `3.4.16` for `dompurify`.
 
-直接使用依赖原有 API：
+Use the dependencies' own APIs directly:
 
 ```ts
 import { Editor } from "@tiptap/core";
@@ -41,20 +41,20 @@ import { Markdown } from "@tiptap/markdown";
 
 const editor = new Editor({
   extensions: [StarterKit, Markdown],
-  content: "# 标题",
+  content: "# Title",
   contentType: "markdown",
 });
 ```
 
-共享模块包括 `@tiptap/core`、`@tiptap/vue-3`、`@tiptap/starter-kit`、`@tiptap/markdown`，以及 `extension-find-and-replace`、`extension-highlight`、`extension-image`、`extension-list`、`extension-subscript`、`extension-superscript`、`extension-table`、`extension-text-align`（均为 `@tiptap/` 前缀）；还包括 `@tiptap/pm/model`、`@tiptap/pm/state`、`@tiptap/pm/view`、`marked` 和 `dompurify`。构建产物引用 `window.toonflowTiptapHost` 中对应的依赖，不重复打包这些实现。
+The shared modules are `@tiptap/core`, `@tiptap/vue-3`, `@tiptap/starter-kit`, `@tiptap/markdown`, and `extension-find-and-replace`, `extension-highlight`, `extension-image`, `extension-list`, `extension-subscript`, `extension-superscript`, `extension-table`, `extension-text-align` (all with the `@tiptap/` prefix), plus `@tiptap/pm/model`, `@tiptap/pm/state`, `@tiptap/pm/view`, `marked`, and `dompurify`. Build output references the corresponding dependencies in `window.toonflowTiptapHost` and does not bundle these implementations again.
 
-Tiptap 统一使用具名导入，例如 `{ StarterKit }`、`{ Image }`、`{ Highlight }`、`{ Superscript }`、`{ Subscript }`、`{ TextAlign }`、`{ FindAndReplace }`。当前 Vite 8 UMD 的默认导入会取整个外部模块对象，不能用于这些共享模块；DOMPurify 单独共享默认函数，继续使用 `import DOMPurify from "dompurify"`。无需启用影响所有依赖的旧版 CJS 兼容开关。
+Always use named imports for Tiptap, for example `{ StarterKit }`, `{ Image }`, `{ Highlight }`, `{ Superscript }`, `{ Subscript }`, `{ TextAlign }`, `{ FindAndReplace }`. With the current Vite 8 UMD output, a default import resolves to the whole external module object, so it cannot be used for these shared modules. DOMPurify shares its default function separately, so keep using `import DOMPurify from "dompurify"`. There is no need to enable the legacy CJS interop switch, which affects every dependency.
 
-宿主先检查 UMD 是否引用 `toonflowTiptapHost`，仅在需要时动态加载共享依赖，后续复用同一个 ES 模块；普通图片、视频或纯文本插件不会因此预载 Tiptap。组件的挂载、销毁、隐藏状态、正文更新和文件保存仍由各包管理。使用共享依赖的产物需要配套宿主版本。
+The host first checks whether a UMD references `toonflowTiptapHost` and loads the shared dependencies dynamically only when needed, reusing the same ES module afterward; plain image, video, or text plugins therefore do not preload Tiptap. Mounting, teardown, hidden state, content updates, and file saving are still managed by each package. Output that uses the shared dependencies requires a matching host version.
 
-## 插件侧业务复用
+## Plugin-side business reuse
 
-提示词输入、参考列表、生成历史、生成状态和错误解释放在 `packages/nodeShared`。调用节点声明 `@toonflow/node-shared` workspace 依赖并按子路径导入：
+Prompt input, reference lists, generation history, generation status, and error explanations live in `packages/nodeShared`. Consuming nodes declare a `@toonflow/node-shared` workspace dependency and import by subpath:
 
 ```ts
 import promptInput from "@toonflow/node-shared/promptInput";
@@ -64,17 +64,17 @@ import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences("in");
 ```
 
-图片编辑、宫格切分、局部重绘和打光从 `@toonflow/node-image` 的对应子路径导入；视频播放器从 `@toonflow/node-video/videoPlayer` 导入。共享源码随使用方节点打包，Vue、VueFlow 和 Element Plus 继续复用宿主实例。
+Image editing, grid splitting, inpainting, and relighting are imported from the corresponding subpaths of `@toonflow/node-image`; the video player is imported from `@toonflow/node-video/videoPlayer`. Shared source is bundled with the consuming node, while Vue, VueFlow, and Element Plus keep reusing the host instances.
 
-## 节点骨架
+## Node skeleton
 
-从 `@toonflow/nodes-scaffold/runtime` 导入 `nodeSkeleton` 和 `useNode`，在节点入口用 `<nodeSkeleton v-bind="nodeProps">` 包裹内容。`label` 默认是“未命名节点”，上方标题栏无边框，下方内容使用 Element Plus Card，默认插槽用于节点内容。节点入口保留 `defineOptions({ inheritAttrs: false })`，避免 VueFlow 传入的顶层属性覆盖骨架的 `label` 等参数。
+Import `nodeSkeleton` and `useNode` from `@toonflow/nodes-scaffold/runtime`, and wrap the content of the node entry in `<nodeSkeleton v-bind="nodeProps">`. `label` defaults to `未命名节点` ("Untitled node"). The title bar on top has no border, the content below uses an Element Plus Card, and the default slot holds the node content. Keep `defineOptions({ inheritAttrs: false })` in the node entry so that top-level attributes passed by VueFlow do not override skeleton props such as `label`.
 
-标题左侧显示 16px 图标，默认使用 `IconBox`；节点入口在 `defineOptions({ icon: IconPhoto })` 声明图标，`useNode()` 和画布节点列表复用同一个组件。单个实例仍可通过 `useNode({ icon })` 或骨架的 `:icon` 覆盖，图标无需写入节点的 `data`。
+A 16px icon appears to the left of the title, `IconBox` by default. The node entry declares its icon in `defineOptions({ icon: IconPhoto })`, and `useNode()` and the canvas node list reuse the same component. A single instance can still override it through `useNode({ icon })` or the skeleton's `:icon`; the icon does not need to be written to the node's `data`.
 
-通过 `handles` 数组定义连接点，默认没有连接点。每项包含节点内唯一且稳定的 `id`、`type`（`target` 为左侧输入，`source` 为右侧输出）、数据类型 `dataType`，以及可选提示 `label`。同一侧支持多个连接点，按数组顺序均匀排列；单个连接点居中。Card 会按连接点数量增高。
+Connection points are defined by the `handles` array; there are none by default. Each item contains an `id` that is unique and stable within the node, a `type` (`target` is an input on the left, `source` an output on the right), a data type `dataType`, and an optional hint `label`. One side can have several connection points, spaced evenly in array order; a single point is centered. The Card grows taller with the number of connection points.
 
-每个 node 在 `defineOptions({ handles })` 声明默认端口，UMD 组件直接暴露该数组，供画布在创建节点前过滤可连接的节点列表。`useNode()` 自动复制这份定义到独立的 `handles` ref；需要动态初始化时仍可用 `useNode({ handles })` 覆盖，不从 `data.handles` 读取定义或默认值。节点通过修改 `handles.value` 控制端口数量、类型、提示及顺序；接收规则通过 `nodeEvent.on("canConnect", callback)` 注册。`nodeProps` 自动跟随画布中的标题变化。标题换行、端口位置变化后会重新测量连线锚点；删除端口、修改端口 ID 或输入输出方向时，会清理原端口的失效连线。
+Each node declares its default ports in `defineOptions({ handles })`, and the UMD component exposes this array directly so the canvas can filter the list of connectable nodes before creating one. `useNode()` copies this definition into a separate `handles` ref automatically; dynamic initialization can still override it with `useNode({ handles })`, and definitions or defaults are never read from `data.handles`. Nodes control the number, types, hints, and order of their ports by modifying `handles.value`; acceptance rules are registered via `nodeEvent.on("canConnect", callback)`. `nodeProps` follows title changes on the canvas automatically. Edge anchors are re-measured after the title wraps or port positions change; removing a port, or changing a port's ID or input/output direction, cleans up the edges left dangling on the original port.
 
 ```vue
 <template>
@@ -89,35 +89,35 @@ import { nodeSkeleton, useNode, type NodeHandle } from "@toonflow/nodes-scaffold
 
 defineOptions({
   inheritAttrs: false,
-  handles: [{ id: "text", type: "source", dataType: "STRING", label: "文本输出" }] satisfies NodeHandle[],
+  handles: [{ id: "text", type: "source", dataType: "STRING", label: "Text output" }] satisfies NodeHandle[],
 });
 const { nodeProps, outputs } = useNode({
-  label: "文本",
+  label: "Text",
   outputs: { text: { dataType: "STRING", value: "" } },
 });
 </script>
 ```
 
-`useNode(options?)` 接受 `label`、`icon`、`handles`、`outputs`，返回 `id`、`node`、`config`、`nodeProps`、`handles`、`outputs`、`nodeEvent`、`nodeTools`、`files`、`ai`、`ffmpeg`、`updateNodeInternals`。`nodeProps` 是供骨架绑定的 computed，包含标题、图标、端口和输出；`outputs` 根据默认值推导类型，并恢复当前节点保存的合法输出，只接受仍存在的 source 端口及匹配类型。文本默认值保持 `STRING`；图片节点无已保存输出时保持为空。
+`useNode(options?)` accepts `label`, `icon`, `handles`, and `outputs`, and returns `id`, `node`, `config`, `nodeProps`, `handles`, `outputs`, `nodeEvent`, `nodeTools`, `files`, `ai`, `ffmpeg`, and `updateNodeInternals`. `nodeProps` is a computed for binding to the skeleton that contains the title, icon, ports, and outputs. `outputs` infers its types from the defaults and restores the valid outputs saved for the current node, accepting only source ports that still exist and have matching types. Text defaults stay `STRING`; an image node with no saved output stays empty.
 
-`files.uploadFile(file)`、`files.removeNodeFiles()` 和 `updateNodeInternals()` 已绑定当前节点，无需再次传 ID；`files` 同时提供 `getWorkspaceFiles()`、`useFileUrl()`。端口定义、具体 UI、上传校验和上传/删除互斥仍由业务节点管理。选中状态可直接使用 `node.selected`，例如绑定 `v-model:bottomVisible="node.selected"`。
+`files.uploadFile(file)`, `files.removeNodeFiles()`, and `updateNodeInternals()` are already bound to the current node, so no ID needs to be passed; `files` also provides `getWorkspaceFiles()` and `useFileUrl()`. Port definitions, the specific UI, upload validation, and mutual exclusion between upload and delete remain the business node's responsibility. Selection state can use `node.selected` directly, for example by binding `v-model:bottomVisible="node.selected"`.
 
-`useNode()` 还返回 `previewReady`，并通过 `nodeProps` 传给骨架：节点首次靠近视口时才挂载默认槽位，之后保留预览和 UI 状态。工具注册、输出及生成任务应放在节点自身的 `setup` 中，不依赖预览子组件挂载；需要立即挂载内容时，可在骨架上显式设置 `:previewReady="true"`。框选或拖动时上下槽位不挂载，单击单个节点后恢复。
+`useNode()` also returns `previewReady` and passes it to the skeleton through `nodeProps`: the default slot is mounted only when the node first comes near the viewport, after which the preview and UI state are kept. Tool registration, outputs, and generation tasks belong in the node's own `setup` and must not depend on the preview child component being mounted; to mount content immediately, set `:previewReady="true"` on the skeleton explicitly. During box selection or dragging, the top and bottom slots are not mounted; they return after a single node is clicked.
 
-连接点未连接时使用 `IconCircleDashed`，连接后使用 `IconCircleDot`，最后一条连线移除后恢复虚线圆。图标为 18px，透明鼠标交互区域向外扩大 8px（总计 34px），不会显示原来的实心圆背景。
+Unconnected connection points use `IconCircleDashed`, connected ones use `IconCircleDot`, and the dashed circle returns after the last edge is removed. The icons are 18px with a transparent pointer hit area extending 8px outward (34px in total); the former solid circle background is no longer shown.
 
 
 
-### FFmpeg 媒体处理
+### FFmpeg media processing
 
-`await useNode().ffmpeg(signal?)` 获取绑定当前工作区的工厂；在组件 setup 中获取 `ffmpeg`，事件处理函数中再调用。也可以单独使用 `useNodeFfmpeg()`（从 runtime 或 `@toonflow/nodes-scaffold/nodeFfmpeg` 导入）。调用方式与 tools 的 fluent 链一致，支持多输入、多输出、复杂滤镜、截图、拼接、`clone()`、`ffprobe` 和编码器等能力查询。
+`await useNode().ffmpeg(signal?)` returns a factory bound to the current workspace; obtain `ffmpeg` in the component setup and call it from event handlers. You can also use `useNodeFfmpeg()` on its own (imported from runtime or `@toonflow/nodes-scaffold/nodeFfmpeg`). The calling style matches the fluent chain used by tools and supports multiple inputs and outputs, complex filters, screenshots, concatenation, `clone()`, `ffprobe`, and capability queries such as available encoders.
 
 ```ts
 const { ffmpeg: loadFfmpeg, id } = useNode();
 
 async function compose(signal?: AbortSignal) {
   const ffmpeg = await loadFfmpeg(signal);
-  // 输出目录应事先通过 files 创建；新文件名避免覆盖原素材。
+  // Create the output directory beforehand through files; use a new file name so the source asset is not overwritten.
   const output = `assets/${id}/combined.mp4`;
   await new Promise<void>((resolve, reject) => {
     ffmpeg("assets/first.mp4")
@@ -134,30 +134,30 @@ async function compose(signal?: AbortSignal) {
 }
 ```
 
-链式调用通过 `/api/ffmpeg/execute` 交给宿主的 `@toonflow/ffmpeg` 执行，节点 UMD 不包含 Node.js 执行库。支持 `start`、`progress`、`stderr`、`codecData`、`filenames`、`end`、`error` 事件及 `on/once/off`；配置在执行前完成，并行使用独立命令或 `clone()`。目录在获取工厂时固定，切换工作区后不会写入新项目。
+Chained calls are handed to the host's `@toonflow/ffmpeg` through `/api/ffmpeg/execute`; the node UMD does not include the Node.js execution library. The `start`, `progress`, `stderr`, `codecData`, `filenames`, `end`, and `error` events are supported, along with `on/once/off`. Configuration is completed before execution; run things in parallel with separate commands or `clone()`. The directory is fixed when the factory is obtained, so switching workspaces does not write into the new project.
 
-输入输出使用工作区文件路径，上传和读取二进制复用 `files`。浏览器不能传递 Node.js Stream、logger 或子进程，不提供 `.pipe()`、执行程序路径 setter 和服务器预设文件加载；`preset(command => ...)` 可在节点内复用配置。类型使用 `BrowserFfmpegFactory` / `BrowserFfmpegCommand`，不冒充原生 Node.js 对象。
+Inputs and outputs use workspace file paths, and uploading or reading binaries reuses `files`. The browser cannot pass Node.js Streams, loggers, or child processes, so `.pipe()`, executable-path setters, and server-side preset file loading are not provided; `preset(command => ...)` can reuse configuration inside the node. The types are `BrowserFfmpegFactory` / `BrowserFfmpegCommand`, which do not pretend to be native Node.js objects.
 
-节点卸载、传入 signal 取消或 `command.kill()` 会取消请求并终止转换；开始前取消也会阻止随后启动的 FFmpeg 继续执行。FFprobe/能力查询的原生库未暴露子进程，取消仅停止等待查询结果。缺少 FFmpeg 时复用设置中的下载提示，不自动安装或重试。
+Unmounting the node, cancelling through the passed signal, or calling `command.kill()` cancels the request and terminates the conversion; cancelling before the start also stops FFmpeg from proceeding once it launches. The native library behind FFprobe and capability queries does not expose its child process, so cancelling only stops waiting for the query result. When FFmpeg is missing, the download prompt from Settings is reused; nothing is installed or retried automatically.
 
-显式输入输出与截图路径沿用宿主的工作区、符号链接检查；原始参数、滤镜和媒体清单中的间接 I/O 仍仅供可信节点使用，**不是文件系统沙箱**。服务端原生 API 参见 `packages/toolScaffold/readme.md`。
+Explicit input, output, and screenshot paths go through the host's workspace and symlink checks. Indirect I/O in raw arguments, filters, and media lists is for trusted nodes only and **is not a file system sandbox**. For the native server-side API, see `packages/toolScaffold/readme.md`.
 
-### AI 模型调用
+### AI model calls
 
-`useNode()` 返回的 `ai` 提供文本与媒体模型列表、文本生成和媒体生成，也可以在组件 setup 中单独调用 `useNodeAi()`。文本生成统一使用 `ai.generate()`，流式通知与私有工具都是可选参数，不需要切换调用方法。
+The `ai` returned by `useNode()` provides text and media model lists, text generation, and media generation; you can also call `useNodeAi()` on its own in the component setup. Text generation always goes through `ai.generate()`. Streaming notifications and private tools are optional parameters, so there is no need to switch to a different method.
 
 ```ts
 const { ai } = useNode();
 const models = await ai.getModels();
 const model = models[0];
-if (!model) throw new Error("请先在设置中添加模型");
-const input = { providerId: model.providerId, modelId: model.modelId, prompt: "写一段简短介绍" };
+if (!model) throw new Error("Add a model in Settings first");
+const input = { providerId: model.providerId, modelId: model.modelId, prompt: "Write a short introduction" };
 
-// 一次返回完整文本，也可传入 systemPrompt。
+// Returns the complete text at once; systemPrompt can also be passed.
 const result = await ai.generate(input);
 console.log(result.text);
 
-// 按增量更新；Promise 最终返回完整结果。
+// Updates incrementally; the Promise still resolves to the complete result.
 let text = "";
 await ai.generate({
   ...input,
@@ -167,29 +167,29 @@ await ai.generate({
 });
 ```
 
-- `ai.getModels(signal?)`：读取设置中已配置的模型，返回 `providerId`、`providerLabel`、`modelId`、`label`、`protocol` 和可选的上下文、输出长度；`protocol` 为 `openai-completions`、`openai-responses` 或 `anthropic-messages`，不返回密钥或接口地址。
-- `ai.generate(input)`：始终返回 `{ text, reasoning? }`。`input` 包含 `providerId`、`modelId`、`prompt`，可选 `systemPrompt`、`references`、`directory`、`tools`、`onEvent` 和 `signal`。
-- `onEvent` 接收正文或思考增量 `{ type: "text" | "reasoning", delta }`，以及工具开始 `{ type: "toolStart", id, name, args }`、工具完成 `{ type: "toolEnd", id, name, result, isError }`。不传回调也使用相同执行流程，等待最终结果即可。
-- `references` 按列表顺序传入 `STRING`、`IMAGE`、`VIDEO` 的 `{ dataType, value }`，对应 `{{ref 1}}` 等编号；文本携带原文，媒体携带工作区相对路径与 MIME 类型，后端校验目录并读取为附件。媒体参考必须传入工作区绝对路径 `directory`。节点不预判模型附件能力，接口错误原样回传；视频使用 Chat Completions 的 `video_url`，Responses/Anthropic 按文件提交，是否接受取决于供应商。
-- 组件卸载会中止浏览器请求；Bun 1.3.14 在部分静默 SSE 场景下不能及时感知断连，上游生成可能继续到结束。需要提前中止时传入 `signal: controller.signal`。HTTP 错误、流内错误和缺少完成事件的断流都会抛错，调用方负责显示错误；客户端不自动重试。
-- 文本节点保留上次输出，直到收到新文本；流中断时保留已生成部分。
+- `ai.getModels(signal?)`: reads the models configured in Settings and returns `providerId`, `providerLabel`, `modelId`, `label`, `protocol`, and optional context and output lengths. `protocol` is `openai-completions`, `openai-responses`, or `anthropic-messages`. Keys and endpoint URLs are not returned.
+- `ai.generate(input)`: always returns `{ text, reasoning? }`. `input` contains `providerId`, `modelId`, and `prompt`, plus optional `systemPrompt`, `references`, `directory`, `tools`, `onEvent`, and `signal`.
+- `onEvent` receives text or reasoning deltas `{ type: "text" | "reasoning", delta }`, tool starts `{ type: "toolStart", id, name, args }`, and tool completions `{ type: "toolEnd", id, name, result, isError }`. Without a callback the same execution flow is used; just await the final result.
+- `references` passes `STRING`, `IMAGE`, and `VIDEO` items as `{ dataType, value }` in list order, matching numbered references such as `{{ref 1}}`. Text carries its content; media carries the workspace-relative path and MIME type, and the backend validates the directory and reads the files as attachments. Media references require the absolute workspace path `directory`. Nodes do not try to predict a model's attachment support, and API errors are passed back unchanged. Video uses the Chat Completions `video_url`, while Responses and Anthropic submit it as a file; whether it is accepted depends on the provider.
+- Unmounting the component aborts the browser request. In some silent SSE cases Bun 1.3.14 does not notice the disconnect promptly, so upstream generation may run to completion. Pass `signal: controller.signal` to abort earlier. HTTP errors, in-stream errors, and streams that end without a completion event all throw; the caller is responsible for showing the error. The client does not retry automatically.
+- The text node keeps its previous output until new text arrives; if the stream is interrupted, the part already generated is kept.
 
-需要工具调用时向同一个入口传入 `tools: localTools`，类型为 `NodeAiTool[]`，从运行时入口导出。每个工具包含 `{ name, description, parameters, execute }`；`parameters` 是 JSON Schema，`execute(args, signal)` 在节点侧执行并校验参数。工具循环复用 SDK，本次上下文由浏览器维护，每次请求携带模型所需的上下文；服务端仅代理单次模型请求、读取密钥和处理附件，不创建会话、不执行工具。私有工具不注册到 `nodeTools`，后者仅用于外部总 Agent 操作节点。
+When tool calls are needed, pass `tools: localTools` to the same entry. The type is `NodeAiTool[]`, exported from the runtime entry. Each tool contains `{ name, description, parameters, execute }`; `parameters` is a JSON Schema, and `execute(args, signal)` runs on the node side and validates its arguments. The tool loop reuses the SDK, and the browser maintains the context of the call, sending what the model needs with each request. The server only proxies individual model requests, reads keys, and handles attachments; it creates no sessions and executes no tools. Private tools are not registered in `nodeTools`, which exists only for the external main Agent to operate nodes.
 
-带工具的调用最多请求模型 40 次，超过 10 分钟会发出取消信号；异步工具应响应传入的 `signal`，脚手架无法强制中断忽略信号的任意代码。需要原子提交的工具应只修改私有草稿；调用成功后由节点校验并保存，错误或取消时丢弃草稿。脚手架不能自动回滚工具已经产生的外部副作用。
+A call with tools requests the model at most 40 times, and a cancel signal is sent after 10 minutes. Asynchronous tools should honor the passed `signal`; the scaffold cannot forcibly interrupt arbitrary code that ignores it. Tools that need atomic commits should modify only a private draft: after the call succeeds, the node validates and saves the draft, and discards it on error or cancellation. The scaffold cannot automatically roll back external side effects that tools have already produced.
 
-文本 AI 只提供 `generate({ ...input, onEvent, signal })`；服务端只接收 `Context` 请求并返回 SSE，不保留旧调用格式。
+Text AI only provides `generate({ ...input, onEvent, signal })`. The server accepts only `Context` requests and returns SSE; the old call format is not kept.
 
 
-- `ai.getMediaModels(signal?)`：读取已安装供应商声明的图片、视频模型，返回供应商与模型 ID、名称、类型及模式参数。图片模型可通过 `imageSizes`、`imageRatios` 声明支持的分辨率与比例选项，节点生成时使用 `size`、`ratio` 传入选择值。
-- `ai.generateImage(input, signal?)`：非流式生成并落盘，返回 `{ path, mimeType, mediaType: "image" }[]`。`input` 包含工作区绝对路径 `directory`、`providerId`、`modelId`、`prompt`、工作区相对目录 `outputDirectory`；可传 `images: { path, mimeType }[]`、`ratio`、`size`。图片参考只传工作区相对路径，由后端读取。
-- `ai.generateVideo(input, signal?)`：视频生成并落盘，返回 `{ path, mimeType, mediaType: "video" }[]`。基础字段同图片生成；使用 `duration`、`resolution`、`ratio`、`generateAudio`、`mode` 配置视频，可传 `images`、`videos`、`audios` 和 `firstFrame`、`lastFrame`，素材均为工作区内 `{ path, mimeType }` 引用。
+- `ai.getMediaModels(signal?)`: reads the image and video models declared by installed providers and returns provider and model IDs, names, types, and mode parameters. Image models can declare supported resolution and aspect ratio options through `imageSizes` and `imageRatios`, and nodes pass the selected values as `size` and `ratio` when generating.
+- `ai.generateImage(input, signal?)`: generates without streaming, saves to disk, and returns `{ path, mimeType, mediaType: "image" }[]`. `input` contains the absolute workspace path `directory`, `providerId`, `modelId`, `prompt`, and the workspace-relative directory `outputDirectory`; `images: { path, mimeType }[]`, `ratio`, and `size` are optional. Image references pass only workspace-relative paths, which the backend reads.
+- `ai.generateVideo(input, signal?)`: generates video, saves it to disk, and returns `{ path, mimeType, mediaType: "video" }[]`. The basic fields are the same as for image generation. Configure the video with `duration`, `resolution`, `ratio`, `generateAudio`, and `mode`, and optionally pass `images`, `videos`, `audios`, `firstFrame`, and `lastFrame`, all as `{ path, mimeType }` references inside the workspace.
 
-`directory` 在生成前通过 `files.getWorkspaceFiles().list()` 取得快照，`outputDirectory` 使用 `assets/${id}`。结果可直接赋给 `outputs.value.image = { dataType: "IMAGE", value: { url: result.path, mimeType: result.mimeType } }`；使用 `files.useFileUrl` 预览。图片生成节点会合并文本参考、传入图片参考，成功后替换输出，失败或停止时保留上次图片；删除节点前取消请求。当前画布为支持撤销而保留节点素材，不随节点删除物理文件。
+Take a snapshot of `directory` through `files.getWorkspaceFiles().list()` before generating, and use `assets/${id}` as `outputDirectory`. The result can be assigned directly with `outputs.value.image = { dataType: "IMAGE", value: { url: result.path, mimeType: result.mimeType } }` and previewed with `files.useFileUrl`. The image generation node merges text references and passes image references; it replaces its output on success and keeps the previous image on failure or stop, and it cancels the request before the node is deleted. The current canvas keeps node assets to support undo, so physical files are not deleted along with the node.
 
-### Agent 节点函数
+### Agent node functions
 
-在节点的同步 `setup` 中调用 `nodeTools.register`。可以直接从运行时入口导入 `nodeTools`，也可以从 `useNode()` 返回值取得。方法自动绑定当前节点 ID，返回注销函数，并在组件卸载时自动注销。
+Call `nodeTools.register` in the node's synchronous `setup`. You can import `nodeTools` directly from the runtime entry or take it from the return value of `useNode()`. Methods are bound to the current node ID automatically, return an unregister function, and are unregistered automatically when the component unmounts.
 
 ```ts
 import { useNode, z } from "@toonflow/nodes-scaffold/runtime";
@@ -201,7 +201,7 @@ const { outputs, nodeTools } = useNode({
 
 nodeTools.register({
   name: "setText",
-  description: "修改此节点的文本输出",
+  description: "Update this node's text output",
   parameters: z.strictObject({ text: z.string().min(1) }),
   execute({ text }) {
     outputs.value.text.value = text;
@@ -210,39 +210,39 @@ nodeTools.register({
 });
 ```
 
-函数名使用小驼峰，上例显示为 `node:setText`；同名函数通过 `nodeId` 区分。启用 `packages/tools/canvas` 的“画布操作”插件后，Agent 用 `findCanvasNodes` 查找节点，用 `getCanvasNodes` 按需查询节点字段与端口，用 `getNodeTools({ nodeIds: [...] })` 查询目标函数的完整 schema，并通过统一的 `nodeTools` 调用：
+Function names use lowerCamelCase; the example above appears as `node:setText`, and functions with the same name are distinguished by `nodeId`. With the Canvas Operations plugin (`画布操作`) from `packages/tools/canvas` enabled, the Agent finds nodes with `findCanvasNodes`, queries node fields and ports on demand with `getCanvasNodes`, fetches the full schema of target functions with `getNodeTools({ nodeIds: [...] })`, and calls them through the unified `nodeTools`:
 
 ```json
-{ "nodeId": "具体节点 ID", "name": "node:setText", "args": { "text": "新内容" } }
+{ "nodeId": "<node ID>", "name": "node:setText", "args": { "text": "New content" } }
 ```
 
-`parameters` 使用 Zod 对象 schema，`z` 由脚手架统一导出，节点无需单独安装 Zod。`execute` 的参数类型自动推导，注册时转为输入类型的 Draft 7 JSON Schema 供 Agent 和服务端使用。前端执行前调用原始 schema 的 `parseAsync`，保留默认值、转换和异步 `refine`，参数不合法时不会执行回调。不能转换为 JSON Schema 的输入类型会在注册时直接报错。
+`parameters` uses a Zod object schema. `z` is exported by the scaffold, so nodes do not need to install Zod themselves. The parameter types of `execute` are inferred automatically, and at registration the schema is converted to a Draft 7 JSON Schema of the input type for the Agent and the server. Before executing, the frontend calls `parseAsync` on the original schema, preserving defaults, transforms, and async `refine`; the callback never runs with invalid arguments. Input types that cannot be converted to JSON Schema throw at registration.
 
-回调支持同步或异步，返回值须可 JSON 序列化；没有返回值时传回 `null`，抛错会作为工具执行错误返回 Agent。
+Callbacks may be synchronous or asynchronous, and their return values must be JSON-serializable. A missing return value is sent back as `null`, and a thrown error is returned to the Agent as a tool execution error.
 
-注册表共用宿主 Vue Flow 实例，不写入画布 JSON。每次函数查询读取当前注册表；`addNode` 返回新增节点信息，可在同一轮 Agent 对话中通过 `getNodeTools` 查询并调用。节点卸载后的函数不可调用；手动切换画布会终止当前对话绑定的旧画布操作；Agent 通过 `addCanvas` 新建或 `switchCanvas` 切换后，仅发起操作的对话重新绑定新画布并可在同轮继续调用。修改通过 Vue Flow 实例完成，前端执行后等待现有画布保存流程完成再返回结果；读取不触发保存。
+The registry shares the host's Vue Flow instance and is not written to the canvas JSON. Every function query reads the current registry; `addNode` returns information about the new node, whose functions can be queried with `getNodeTools` and called in the same Agent conversation turn. Functions of an unmounted node cannot be called. Switching canvases manually terminates operations on the old canvas bound to the current conversation; after the Agent creates a canvas with `addCanvas` or switches with `switchCanvas`, only the conversation that initiated the operation is rebound to the new canvas and can keep calling in the same turn. Changes go through the Vue Flow instance, and after executing them the frontend waits for the existing canvas save flow to finish before returning the result; reads do not trigger saves.
 
-`getCanvas` 默认只返回画布概览，`include: ["canvases"]` 才分页返回工作区画布列表（`id`、`name`），`include: ["nodeTypes"]` 分页返回可用节点类型。`addCanvas({ name? })` 新建空画布并选中，省略名称时使用未占用的 `画布N`；`switchCanvas({ canvasId })` 在保存后切换画布；`renameCanvas({ canvasId?, name })` 重命名对应 JSON 文件，省略 `canvasId` 则修改激活画布，`name` 不含 `.json` 后缀。三者返回更新后的激活画布概览，新建和重命名不会覆盖已有文件。
+`getCanvas` returns only a canvas overview by default. `include: ["canvases"]` adds a paged list of workspace canvases (`id`, `name`), and `include: ["nodeTypes"]` adds the paged available node types. `addCanvas({ name? })` creates and selects an empty canvas, using an unused `画布N` ("Canvas N") name when `name` is omitted. `switchCanvas({ canvasId })` saves and then switches canvases. `renameCanvas({ canvasId?, name })` renames the corresponding JSON file, targeting the active canvas when `canvasId` is omitted; `name` excludes the `.json` suffix. All three return the updated overview of the active canvas, and creating or renaming never overwrites existing files.
 
-画布读取包括 `getCanvas`、`findCanvasNodes`、`getCanvasNodes`、`getCanvasEdges` 和 `getNodeTools`，均有分页和 64 KiB 响应上限。检查 `hasMore/nextCursor`，保持原参数继续分页；空结果也可能尚未扫描完。`getCanvasNodes` 每批最多 20 个 ID，支持字段投影和 `dataKeys`，大值可沿 `path` 读取，以 `textOffset/textLimit` 分段读字符串、`valueOffset/valueLimit` 分页读数组或对象；返回的 `truncated` 提供续读路径及偏移。全图任务分批处理并保留摘要，不累积全部详情；函数 schema 始终完整。
+Canvas reads are `getCanvas`, `findCanvasNodes`, `getCanvasNodes`, `getCanvasEdges`, and `getNodeTools`, all paged with a 64 KiB response limit. Check `hasMore/nextCursor` and keep the original arguments to continue paging; an empty result may not mean the scan is complete. `getCanvasNodes` takes at most 20 IDs per batch and supports field projection and `dataKeys`. Large values can be read along a `path`: strings in segments with `textOffset/textLimit`, and arrays or objects in pages with `valueOffset/valueLimit`; the returned `truncated` provides the path and offset to continue reading. Whole-graph tasks should process in batches and keep summaries instead of accumulating every detail; function schemas are always complete.
 
-节点与连线每页最多扫描 2000 项，`totalNodes/totalEdges` 是画布总量而非筛选命中数，`selectedOnly` 读取现场选择状态；名称匹配全文，但列表中的名称预览最多 512 字符。详情和函数查询的 `nodeIds` 必须去重，正数 `textOffset/valueOffset` 必须配合 `path`。路径最多 64 层、JSON UTF-8 编码最多 2048 字节；`pathDepthLimit` 表示达到深度边界。结构操作的 ID 回执最多 100 项，整理、适配视口、删除分别带 `arrangedCount`、`nodeCount`、`removedEdgeCount`；`truncated` 仅表示回执缩略，不应重执行。`nodeTools` 业务返回值维持节点定义，不适用五个读取工具的 64 KiB 限制。
+Node and edge scans cover at most 2000 items per page. `totalNodes/totalEdges` are canvas totals, not filtered match counts, and `selectedOnly` reads the live selection state. Name matching uses the full text, but name previews in lists are at most 512 characters. `nodeIds` for detail and function queries must be deduplicated, and a positive `textOffset/valueOffset` requires a `path`. Paths are at most 64 levels deep and at most 2048 bytes as UTF-8 JSON; `pathDepthLimit` indicates that the depth limit was reached. ID receipts of structural operations contain at most 100 items, and arranging, fitting the viewport, and deleting carry `arrangedCount`, `nodeCount`, and `removedEdgeCount` respectively; `truncated` only means the receipt is abbreviated, and the operation should not be run again. Business return values of `nodeTools` follow the node definitions and are not subject to the 64 KiB limit of the five read tools.
 
-画布基础变更包括 `addCanvas`、`switchCanvas`、`renameCanvas`、`addNode`、`deleteNodes`、`moveNodes`、`renameNodes`、`connectNodes`、`deleteEdges`、`selectNodes` 和 `fitCanvas`。节点内容仍通过已注册函数修改，不向 Agent 开放任意写入节点 `data`。删除会先触发节点的 `delete` 回调并清理连接边；连接复用端口方向、数据类型和节点的 `canConnect` 校验。
+The basic canvas changes are `addCanvas`, `switchCanvas`, `renameCanvas`, `addNode`, `deleteNodes`, `moveNodes`, `renameNodes`, `connectNodes`, `deleteEdges`, `selectNodes`, and `fitCanvas`. Node content is still modified only through registered functions; the Agent is not given arbitrary write access to node `data`. Deletion first triggers the node's `delete` callback and cleans up connected edges; connecting reuses the port direction, data type, and node `canConnect` checks.
 
-异步回调可从第二个参数取得 `{ signal }`，传给 `fetch` 等操作并在修改状态前检查 `signal.throwIfAborted()`。单次调用最多等待 120 秒；取消或切换画布会停止等待，但回调内部的异步工作需要配合 signal 才能停止。浏览器直接断开且运行时未触发关闭事件时，服务端由超时清理等待。
+Async callbacks can take `{ signal }` from the second argument, pass it to operations such as `fetch`, and check `signal.throwIfAborted()` before changing state. A single call waits at most 120 seconds. Cancelling or switching canvases stops the wait, but async work inside the callback only stops if it honors the signal. If the browser disconnects without the runtime firing a close event, the server cleans up the pending wait on timeout.
 
-### 上下悬浮插槽
+### Top and bottom floating slots
 
-骨架提供 `top`、`bottom` 两个具名插槽，分别通过 `v-model:topVisible`、`v-model:bottomVisible` 控制显隐，默认隐藏。未提供 `top` 插槽时，上方默认显示“添加到素材库、下载、全屏”工具栏；未提供 `bottom` 插槽时不渲染下方浮层。浮层水平居中，与节点相距 12px，上方浮层位于标题栏之上，避免遮挡标题。两者不占据节点布局空间，不影响卡片和连接点位置。
+The skeleton provides two named slots, `top` and `bottom`, whose visibility is controlled by `v-model:topVisible` and `v-model:bottomVisible`; both are hidden by default. Without a `top` slot, the default toolbar with Add to asset library, Download, and Full screen is shown on top; without a `bottom` slot, no bottom overlay is rendered. The overlays are horizontally centered 12px from the node, and the top overlay sits above the title bar so the title is not covered. Neither takes up node layout space or affects the position of the card and connection points.
 
-`topWidth`、`bottomWidth` 默认均为 `"20vw"`。数字按 px 处理，字符串支持百分比等 CSS 宽度。默认工具栏建议设置 `topWidth="max-content"`；传入 `downloadUrl`、`downloadName` 控制下载，通过 `@fullscreen` 打开节点自己的全屏视图。素材库按钮复用节点的输出与宿主保存弹窗，没有输出时禁用。额外按钮放在 `topActions` 插槽，位置在下载按钮前；图片、视频、音频节点在此提供替换按钮。自定义 `top` 则替换整个工具栏。编辑浮层内容不会拖动画布或弹出节点右键菜单。
+`topWidth` and `bottomWidth` both default to `"20vw"`. Numbers are treated as px, and strings accept CSS widths such as percentages. For the default toolbar, `topWidth="max-content"` is recommended. Pass `downloadUrl` and `downloadName` to control downloads, and open the node's own full-screen view through `@fullscreen`. The asset library button reuses the node's outputs and the host's save dialog, and is disabled when there is no output. Extra buttons go in the `topActions` slot, before the download button; image, video, and audio nodes put their replace button there. A custom `top` slot replaces the whole toolbar. Editing overlay content does not drag the canvas or open the node context menu.
 
 ```vue
 <template>
   <nodeSkeleton v-model:topVisible="topVisible" v-model:bottomVisible="bottomVisible" :bottomWidth="480">
-    <template #top>上方内容</template>
-    <template #bottom>下方内容</template>
+    <template #top>Top content</template>
+    <template #bottom>Bottom content</template>
   </nodeSkeleton>
 </template>
 
@@ -256,13 +256,13 @@ const bottomVisible = ref(false);
 </script>
 ```
 
-### 数据类型与连接校验
+### Data types and connection validation
 
-`dataType` 仿照 [ComfyUI 类型](https://docs.comfy.org/custom-nodes/backend/datatypes)，使用区分大小写的大写字符串：`STRING`、`INT`、`FLOAT`、`BOOLEAN`、`IMAGE`、`MASK`、`LATENT`、`AUDIO`、`VIDEO`、`MODEL`、`CLIP`、`VAE`、`CONDITIONING`，也支持自定义类型。`*` 为通配类型，`["INT", "FLOAT"]` 表示接受多种类型，单类型仍可写 `"IMAGE"`；兼容旧的逗号字符串写法；默认两端类型有交集即可连接。图片输出类型为 `IMAGE`，通用节点使用 `*`。这只是端口兼容性声明，不负责生成或转换数据。
+`dataType` follows [ComfyUI types](https://docs.comfy.org/custom-nodes/backend/datatypes) and uses case-sensitive uppercase strings: `STRING`, `INT`, `FLOAT`, `BOOLEAN`, `IMAGE`, `MASK`, `LATENT`, `AUDIO`, `VIDEO`, `MODEL`, `CLIP`, `VAE`, `CONDITIONING`; custom types are also supported. `*` is the wildcard type, `["INT", "FLOAT"]` accepts several types, and a single type can still be written as `"IMAGE"`; the old comma-separated string form is still accepted. By default, two ends can connect when their types overlap. Image outputs use `IMAGE`, and generic nodes use `*`. This is only a port compatibility declaration; it does not generate or convert data.
 
-只允许 `source` 连接 `target`，同类端口和缺失的端口或类型始终拒绝连接。节点通过 `nodeEvent.on("canConnect", callback)` 注册连接校验回调，使用 VueFlow 的 `ValidConnectionFunc` 签名：`(connection, context) => boolean`。`connection` 包含 `source`、`target`、`sourceHandle`、`targetHandle`；`context` 包含两端节点以及当前画布的节点、连线。无论从哪端开始拖线，字段始终按实际输入输出方向提供，且**只调用 target 节点的回调，source 不参与校验**。
+Only a `source` can connect to a `target`. Ports of the same kind, and missing ports or types, are always rejected. Nodes register a connection-validation callback with `nodeEvent.on("canConnect", callback)` using VueFlow's `ValidConnectionFunc` signature: `(connection, context) => boolean`. `connection` contains `source`, `target`, `sourceHandle`, and `targetHandle`; `context` contains both end nodes plus the current canvas's nodes and edges. Whichever end the drag starts from, the fields always follow the actual input/output direction, and **only the target node's callback is called; the source does not take part in validation**.
 
-附加接收规则在具体节点组件的 `setup` 中注册。下例限制每个输入端口最多接收两条连线；在回调内也可读取 `sourceNode.id`、`sourceNode.type`、`sourceNode.data` 和来源端口来限制来源。图片节点只有输出，不需要接收回调。
+Register extra acceptance rules in the `setup` of the concrete node component. The example below limits each input port to at most two edges; inside the callback you can also read `sourceNode.id`, `sourceNode.type`, `sourceNode.data`, and the source port to restrict where connections come from. The image node only has outputs and needs no acceptance callback.
 
 ```vue
 <template>
@@ -281,19 +281,19 @@ const { nodeProps, nodeEvent } = useNode({
 });
 
 nodeEvent.on("canConnect", (connection, { edges }) => {
-  // 类型兼容由骨架统一检查，本节点只限制每个输入端口的连接数量。
+  // The skeleton checks type compatibility; this node only limits the number of connections per input port.
   return edges.filter(edge => edge.target === connection.target && edge.targetHandle === connection.targetHandle).length < 2;
 });
 </script>
 ```
 
-公共校验先检查端口方向、存在性和类型兼容，通过后才调用 target 的附加回调。未注册回调时允许连接；已注册的回调必须全部同步、严格返回 `true`，返回其它值或抛出异常会拒绝连接，不支持异步校验。node 内无需重复调用 `isTypeCompatible`，也不能通过返回 `true` 绕过类型限制。回调会在拖动过程中重复执行，应保持无副作用。
+The common validation first checks port direction, existence, and type compatibility, and only then calls the target's extra callbacks. Connections are allowed when no callback is registered. Registered callbacks must all return `true` synchronously and strictly; any other return value or a thrown exception rejects the connection, and async validation is not supported. Nodes do not need to call `isTypeCompatible` again, and returning `true` cannot bypass type restrictions. Callbacks run repeatedly while dragging and must be free of side effects.
 
-骨架将端口定义放在 `node.data.handles`，事件按当前 VueFlow 实例和节点 ID 共享，支持独立 UMD 节点互相连接。所有端口使用共享校验入口，以保证从 source 起拖也能调用 target 的回调。`NodeData`、`NodeHandle`、`NodeDataType` 类型以及 `isTypeCompatible`、`validateConnection` 均从 `@toonflow/nodes-scaffold/runtime` 导出；手动调用 `addEdges` 时需要自行调用校验函数，不能绕过拖线流程后仍假定已完成校验。
+The skeleton stores port definitions in `node.data.handles`, and events are shared per VueFlow instance and node ID, so independent UMD nodes can connect to each other. All ports go through the shared validation entry, so the target's callback is called even when the drag starts from the source. The `NodeData`, `NodeHandle`, and `NodeDataType` types as well as `isTypeCompatible` and `validateConnection` are exported from `@toonflow/nodes-scaffold/runtime`. When calling `addEdges` manually, call the validation function yourself; bypassing the drag flow does not mean validation has already happened.
 
-## 节点删除
+## Node deletion
 
-节点通过 `nodeEvent.on("delete", callback)` 注册删除处理，可以使用异步回调。骨架按注册顺序逐个等待，全部成功后才移除节点及连线；没有处理函数则直接移除，任一处理抛错则停止、提示并保留节点。删除按钮和右键菜单共用此入口，不要在组件卸载时清理文件，否则切换画布或刷新节点也会误删资源。
+Nodes register delete handling with `nodeEvent.on("delete", callback)`, and the callback may be asynchronous. The skeleton awaits the handlers one by one in registration order and removes the node and its edges only after all of them succeed. With no handler, the node is removed directly; if any handler throws, deletion stops, an error is shown, and the node is kept. The delete button and the context menu share this entry. Do not clean up files when the component unmounts, or switching canvases or refreshing nodes would delete resources by mistake.
 
 ```ts
 import { useNode } from "@toonflow/nodes-scaffold/runtime";
@@ -304,11 +304,11 @@ nodeEvent.on("delete", async () => {
 });
 ```
 
-图片节点在删除回调中调用 `files.removeNodeFiles()`。当前画布通过 `retainNodeFiles` 保留素材以支持撤销，该方法不会物理删除文件；未启用保留策略的宿主会清理工作区 `assets/<nodeId>/`，目录不存在视为已清理。上传期间拒绝删除，清理期间禁用上传。清理仅作用于该节点自己的目录，不根据输出 URL 删除其它节点的文件；复制节点仍可能共享原图片路径，宿主启用物理清理前须考虑这些引用。
+The image node calls `files.removeNodeFiles()` in its delete callback. The current canvas keeps assets through `retainNodeFiles` to support undo, so this method does not physically delete files; hosts without this retention policy clean up `assets/<nodeId>/` in the workspace, and a missing directory counts as already cleaned. Deletion is refused during an upload, and uploads are disabled during cleanup. Cleanup only affects the node's own directory and never deletes other nodes' files based on output URLs. Copied nodes may still share the original image path, so a host must account for these references before enabling physical cleanup.
 
-## 输出值与读取工具
+## Output values and read utilities
 
-输出由 `useNode` 返回的 `outputs` ref 维护，随 `nodeProps` 传给骨架。对象的 key 是 source handle ID，每个值固定为 `{ dataType, value }`，例如图片节点准备好资源后：
+Outputs are maintained by the `outputs` ref returned by `useNode` and passed to the skeleton with `nodeProps`. Object keys are source handle IDs, and each value is always `{ dataType, value }`. For example, once the image node has its resource ready:
 
 ```ts
 import { useNode } from "@toonflow/nodes-scaffold/runtime";
@@ -316,46 +316,46 @@ import { useNode } from "@toonflow/nodes-scaffold/runtime";
 const { outputs } = useNode({
   handles: [{ id: "image", type: "source", dataType: "IMAGE" }],
 });
-// 在节点的实际加载或生成逻辑完成后赋值。
+// Assign after the node's actual loading or generation logic has finished.
 outputs.value.image = { dataType: "IMAGE", value: { url: "assets/example.png", mimeType: "image/png" } };
 ```
 
-首批输出协议如下。媒体使用文件引用，不是 ComfyUI 后端的 Python 张量；不进行数据转换。
+The initial output protocols are listed below. Media uses file references, not the Python tensors of the ComfyUI backend, and no data conversion is performed.
 
 | dataType | value |
 | --- | --- |
 | STRING | string |
-| INT | 安全整数 number |
-| FLOAT | 有限 number |
+| INT | safe integer number |
+| FLOAT | finite number |
 | BOOLEAN | boolean |
 | IMAGE / MASK | `{ url: string, mimeType: "image/…" }` |
 | VIDEO | `{ url: string, mimeType: "video/…" }` |
 | AUDIO | `{ url: string, mimeType: "audio/…" }` |
 
-输出值必须使用具体类型，不能写 `*` 或类型数组；它们仅用于端口的兼容声明。`LATENT`、`MODEL` 等其它端口类型暂未定义传值协议，新增协议时同步扩展 `NodeValueMap` 与 `isNodeOutput`。图片节点未上传时输出为空，刷新时从画布保存的 `data.outputs` 恢复。
+Output values must use a concrete type, never `*` or a type array; those are only for port compatibility declarations. Other port types such as `LATENT` and `MODEL` do not have a value protocol yet; when adding one, extend `NodeValueMap` and `isNodeOutput` together. The image node's output is empty before an upload and is restored from the `data.outputs` saved in the canvas on refresh.
 
-### 图片上传与工作区文件
+### Image upload and workspace files
 
-图片节点通过上传按钮选择图片，文件保存到当前工作区的 `assets/<nodeId>/<随机文件名>.<扩展名>`（目录名为 `assets`）。替换图片使用新文件名，保留旧文件，避免影响复制节点的已有引用。图片输出为 `{ dataType: "IMAGE", value: { url: "assets/...", mimeType: "image/..." } }`；`url` 是工作区相对路径，不是可直接放入 `<img src>` 的地址。
+The image node picks an image through its upload button and saves it to `assets/<nodeId>/<random file name>.<extension>` in the current workspace (the directory is named `assets`). Replacing the image uses a new file name and keeps the old file, so existing references from copied nodes are unaffected. The image output is `{ dataType: "IMAGE", value: { url: "assets/...", mimeType: "image/..." } }`; `url` is a workspace-relative path, not an address that can go directly into `<img src>`.
 
-在节点 `setup` 中取得 `useNode()` 返回的 `files`，无需自行注入或请求接口：
+In the node `setup`, take `files` from the return value of `useNode()`; there is no need to inject anything or call an API yourself:
 
 ```ts
 import { useNode } from "@toonflow/nodes-scaffold/runtime";
 
 const { files } = useNode();
-const path = await files.uploadFile(file); // 创建当前节点目录，使用唯一文件名写入
+const path = await files.uploadFile(file); // Creates the current node's directory and writes with a unique file name
 const workspaceFiles = files.getWorkspaceFiles();
 const bytes = await workspaceFiles.read(path);
 ```
 
-`getWorkspaceFiles()` 返回宿主的完整文件方法：`list`、`read`、`readText`、`readJson`、`write`、`writeJson`、`rename`、`remove`、`mkdir`。每次调用绑定当时的工作目录，多步操作复用同一个返回值；`uploadFile` 内部也只取得一次，避免上传中切换项目导致文件写到另一目录。文件类型和大小校验由具体节点负责。
+`getWorkspaceFiles()` returns the host's full set of file methods: `list`, `read`, `readText`, `readJson`, `write`, `writeJson`, `rename`, `remove`, and `mkdir`. Each call binds the working directory at that moment, so multi-step operations should reuse the same return value. `uploadFile` also obtains it only once internally, so switching projects during an upload cannot write the file into another directory. File type and size validation is up to the specific node.
 
-画布通过 Vue `provide("workspaceFiles", factory)` 提供宿主文件能力，脚手架负责注入，不打包 Axios 或 Pinia。宿主通过可选的 `acquireUrl(path, mimeType)` 共享相同工作区文件的读取与 Blob URL，返回 `{ url: Promise<string>, release() }`；最后一个使用者释放后撤销 URL，文件写入、改名或删除后使缓存失效。画布 JSON 只持久化相对路径与 MIME 类型。
+The canvas provides the host file capabilities through Vue `provide("workspaceFiles", factory)`, and the scaffold handles the injection without bundling Axios or Pinia. Through the optional `acquireUrl(path, mimeType)`, the host shares reads and Blob URLs for the same workspace file and returns `{ url: Promise<string>, release() }`. The URL is revoked after its last user releases it, and the cache is invalidated after the file is written, renamed, or deleted. The canvas JSON persists only relative paths and MIME types.
 
-`files.useFileUrl(media, onError)` 在 `setup` 中接收 `{ url, mimeType }` 的 ref、computed 或 getter，返回可绑定到图片、音视频 `src` 的 URL ref。它在节点首次靠近视口后读取文件，忽略过期请求，并在替换或卸载时释放资源引用；旧宿主未提供 `acquireUrl` 时仍使用普通读取。错误交给 `onError` 处理。图片节点只需 `const previewUrl = files.useFileUrl(image, error => showError(error, "图片读取失败"))`。
+`files.useFileUrl(media, onError)` takes a ref, computed, or getter of `{ url, mimeType }` in `setup` and returns a URL ref that can be bound to the `src` of an image, audio, or video element. It reads the file after the node first comes near the viewport, ignores stale requests, and releases its resource reference on replacement or unmount; older hosts without `acquireUrl` fall back to plain reads. Errors are passed to `onError`. The image node only needs `const previewUrl = files.useFileUrl(image, error => showError(error, "Failed to read image"))`.
 
-在节点 `setup` 中使用工具集读取指定 target：
+Use the utilities in the node `setup` to read a given target:
 
 ```ts
 import { computed } from "vue";
@@ -364,48 +364,48 @@ import { useNode, useNodeInputs } from "@toonflow/nodes-scaffold/runtime";
 const { id } = useNode();
 const { getTargetSources, getTargetValues } = useNodeInputs();
 const sources = computed(() => getTargetSources(id, "in"));
-// 每项为 { node, handle }：上游节点对象、与该输入连接的 source 端口。
+// Each item is { node, handle }: the upstream node object and the source port connected to this input.
 const inputValues = computed(() => getTargetValues(id, "in"));
-// 也可传其它目标节点 ID：getTargetValues("otherNodeId", "imageInput")。
-// 每项为 { source, sourceHandle, dataType, value }。
+// You can also pass another target node ID: getTargetValues("otherNodeId", "imageInput").
+// Each item is { source, sourceHandle, dataType, value }.
 ```
 
-一个输入可连接多个 source，因此返回数组，按画布连线顺序排列。断开的、端口不存在的、类型不兼容的连接不返回结果；尚未输出的连接仍保留来源和端口声明的 `dataType`，`value` 为 `undefined`，参考列表显示类型图标。合法的 `0`、`false`、空字符串会保留。读取内容或发起生成前须检查 `value`，不能把空引用作为附件发送。输出结构或输出类型不符合 source 声明时抛出错误。放入 `computed` 后，连线、端口及输出值变化会自动更新读取结果。工具只读取当前值，不执行上游节点或请求媒体文件。
+One input can connect to several sources, so an array is returned in canvas edge order. Disconnected connections, connections to missing ports, and type-incompatible connections return nothing. Connections that have no output yet still keep the source and the port-declared `dataType` with `value` set to `undefined`, and the reference list shows the type icon. Valid `0`, `false`, and empty strings are kept. Check `value` before reading content or starting a generation, and never send an empty reference as an attachment. An error is thrown when the output structure or type does not match the source declaration. Inside a `computed`, the results update automatically when edges, ports, or output values change. The utilities only read current values; they do not run upstream nodes or request media files.
 
-`getTargetSources` 按连线顺序返回该 target handle 的来源，不要求上游已有输出。缺失节点、端口、方向错误或端口类型不兼容的连接不会返回；同一上游不同端口分别保留。只查询连接时使用它，需要实际输出值时使用 `getTargetValues`。
+`getTargetSources` returns the sources of a target handle in edge order and does not require the upstream node to have output. Connections with missing nodes or ports, the wrong direction, or incompatible port types are not returned; different ports of the same upstream node are kept as separate entries. Use it when you only need the connections, and `getTargetValues` when you need the actual output values.
 
-纯函数 `getTargetSources(targetId, targetHandleId, nodes, edges)` 和 `getTargetValues(targetId, targetHandleId, nodes, edges)` 也从 `@toonflow/nodes-scaffold/runtime` 导出，可在已有画布数据的逻辑中直接使用。
+The pure functions `getTargetSources(targetId, targetHandleId, nodes, edges)` and `getTargetValues(targetId, targetHandleId, nodes, edges)` are also exported from `@toonflow/nodes-scaffold/runtime` for logic that already has the canvas data.
 
-### 节点事件
+### Node events
 
-在节点组件的 `setup` 中取得 `useNode()` 返回的 `nodeEvent`，也可单独调用 `useNodeEvent()`；不传参数默认使用当前节点，`useNodeEvent(nodeId)` 则使用指定节点。统一通过 `nodeEvent.on(name, callback)` 注册，只有事件名和回调两个参数。`input:<handleId>` 监听 target handle 的上游输入，`output:<handleId>` 监听 source handle 的输出，同名的输入、输出端口分别监听；删除处理和连接校验使用前文的 `delete`、`canConnect` 事件。`useNodeInputs()` 保留即时读取工具，不负责事件注册。
+In the `setup` of a node component, take `nodeEvent` from the return value of `useNode()`, or call `useNodeEvent()` on its own. Without arguments it uses the current node; `useNodeEvent(nodeId)` uses the given node. Every registration goes through `nodeEvent.on(name, callback)`, which takes only an event name and a callback. `input:<handleId>` listens to the upstream input of a target handle, and `output:<handleId>` listens to the output of a source handle; input and output ports with the same name are listened to separately. Delete handling and connection validation use the `delete` and `canConnect` events described above. `useNodeInputs()` keeps the immediate read utilities and does not register events.
 
-`save` 回调应等待节点文件写入完成；抛错会阻止当前切换或刷新。普通保存不传参数，强制刷新时传入 `"reload"`，生成或导出尚未结束的节点可据此拒绝卸载，避免新实例读到未完成的内容。
+`save` callbacks should wait until node file writes have finished; throwing blocks the current switch or refresh. Ordinary saves pass no argument, while a forced refresh passes `"reload"`, so nodes whose generation or export is still running can refuse to unmount and prevent a new instance from reading unfinished content.
 
 ```ts
 import { useNode, useNodeEvent } from "@toonflow/nodes-scaffold/runtime";
 
 const { nodeEvent } = useNode();
 const stopInput = nodeEvent.on("input:in", values => {
-  // values: NodeInputValue[]，每项包含 source、sourceHandle、dataType、value。
+  // values: NodeInputValue[]; each item contains source, sourceHandle, dataType, and value.
 });
 const stopOutput = nodeEvent.on("output:text", output => {
-  // output: NodeOutput | undefined，包含 dataType、value。
+  // output: NodeOutput | undefined, containing dataType and value.
 });
 
 useNodeEvent("otherNodeId").on("output:text", output => {
-  // 监听其它节点的指定输出端口。
+  // Listens to the given output port of another node.
 });
-// 需要提前停止时调用 stopInput() / stopOutput()。
+// Call stopInput() / stopOutput() to stop early.
 ```
 
-输入、输出监听注册后立即回调当前值；此后输入随连线、端口和上游输出变化而通知，输出随端口及输出值变化而通知，包含媒体对象内的 URL 等嵌套字段。输入无有效值时为 `[]`，输出不存在时为 `undefined`；删除节点、移除端口或清空输出也会通知，合法的 `0`、`false`、空字符串会保留。类型校验沿用读取工具，非法输出会抛错。
+Input and output listeners are called with the current value immediately after registration. Afterward, inputs notify when edges, ports, or upstream outputs change, and outputs notify when ports or output values change, including nested fields such as the URL inside a media object. An input without valid values is `[]`, and a missing output is `undefined`. Deleting the node, removing a port, or clearing an output also triggers a notification, and valid `0`, `false`, and empty strings are kept. Type validation follows the read utilities, and invalid outputs throw.
 
-输入、输出监听使用共享 Vue 的深度 `watch`，同一轮同步修改按 Vue 调度合并，不执行上游节点；不要在回调里无条件修改正在监听的输出，以免循环触发。所有 `on` 注册均返回取消函数，在 `setup` 中同步注册会随组件作用域销毁自动清理，也可提前调用返回的函数取消。
+Input and output listeners use a deep `watch` on the shared Vue instance; synchronous changes in the same tick are batched by Vue's scheduler, and upstream nodes are not executed. Do not unconditionally modify the output you are listening to inside the callback, or you will create a loop. Every `on` registration returns a cancel function. Registrations made synchronously in `setup` are cleaned up automatically when the component scope is destroyed, and you can also call the returned function to cancel early.
 
-## 构建和加载
+## Build and load
 
-在仓库根目录运行：
+Run in the repository root:
 
 ```powershell
 bun install
@@ -413,56 +413,56 @@ bun run dev:plugins
 bun run dev
 ```
 
-只构建或监听一个节点：
+To build or watch a single node only:
 
 ```powershell
 bun run --filter '@toonflow/node-image' build
 bun run --filter '@toonflow/node-image' dev
 ```
 
-节点监听命令与根目录 `bun run dev` 分别在两个终端运行；修改源码后刷新宿主页面。默认构建只输出到根目录 `build/nodes`；`dev:plugins` 设置 `NODE_ENV=dev`，节点监听或 Vite `--mode development` 也会同步当前节点到 `data/nodes`。同步先写临时文件，再替换正式文件，避免服务读取到未写完的脚本；同步失败会报告构建错误。
+Run the node watch command and the root `bun run dev` in two separate terminals, and refresh the host page after changing source. A default build outputs only to the root `build/nodes`. `dev:plugins` sets `NODE_ENV=dev`, and node watch mode or Vite `--mode development` also syncs the current node to `data/nodes`. Syncing writes a temporary file first and then replaces the real file, so the server never reads a half-written script; sync failures are reported as build errors.
 
-单包构建不清空这两个目录，避免删掉其它节点的产物。根目录 `bun run build:nodes` 先清空 `build/nodes` 再构建全部节点，不改动 `data/nodes`。已安装但不再需要的节点通过设置页卸载。
+Single-package builds do not clear these two directories, so other nodes' output is not deleted. The root `bun run build:nodes` first clears `build/nodes` and then builds all nodes, without touching `data/nodes`. Installed nodes that are no longer needed are uninstalled in Settings → Plugins.
 
-server 从 `data/nodes` 提供节点列表 `/api/nodes/get`，并通过 `/api/nodes/files?name=<节点名>` 提供脚本。首页自动读取列表，加载对应 `window.toonflowNodes[节点名]` 并注册到 VueFlow，右键菜单中可添加已加载的节点；无需配置 `VITE_NODES_URL` 或单独启动产物服务。
+The server serves the node list at `/api/nodes/get` from `data/nodes` and the scripts at `/api/nodes/files?name=<nodeName>`. The home page reads the list automatically, loads the corresponding `window.toonflowNodes[nodeName]`, and registers it with VueFlow; loaded nodes can be added from the context menu. There is no need to configure `VITE_NODES_URL` or start a separate server for the build output.
 
-已安装列表支持启用、禁用和卸载。禁用状态存为 `data/nodes/<节点名>.disabled` 标记，开发同步不会重置；禁用包仍显示在已安装列表，后端停止提供它的脚本。卸载只删除 `data/nodes` 中对应的 UMD 和状态标记，保留源码及 `build/nodes` 产物；重新安装或开发同步会再次添加该节点。操作后画布添加菜单立即同步，当前画布已有实例和连线保留，刷新页面后仅加载已启用包。
+The Installed list supports enabling, disabling, and uninstalling. The disabled state is stored as a `data/nodes/<nodeName>.disabled` marker, which development syncs do not reset; disabled packages still appear in the Installed list, and the backend stops serving their scripts. Uninstalling deletes only the corresponding UMD and state marker in `data/nodes` and keeps the source and the `build/nodes` output; reinstalling or a development sync adds the node again. After any of these operations, the canvas add menu updates immediately, existing instances and edges on the current canvas are kept, and after a page refresh only enabled packages are loaded.
 
-## 新增节点
+## Adding a node
 
-1. 参考 `packages/nodes/imageNode`，在尚不存在的目录（例如 `packages/nodes/exampleNode`）创建源码与配置，按新节点需求编写内容，修改 `package.json` 的包名，例如 `@toonflow/node-example`，并把 `vite.config.ts` 的节点名改为 `exampleNode`。
-2. 修改 `src/index.vue`，在这个子包的 `dependencies` 中声明自己使用的 UI 框架和第三方库。需要 Sass 或其它构建插件时，加入该子包的 `devDependencies`。
-3. 根目录运行 `bun install` 和 `bun run dev:plugins`，得到 `build/nodes/exampleNode.umd.js` 并同步到 `data/nodes/exampleNode.umd.js`；启动 `bun run dev` 或刷新已打开的首页即可加载，浏览器导出为 `window.toonflowNodes.exampleNode`。仅生成发布产物使用 `bun run build:nodes`。
+1. Using `packages/nodes/imageNode` as a reference, create the source and configuration in a directory that does not exist yet (for example `packages/nodes/exampleNode`) and write the content the new node needs. Change the package name in `package.json`, for example to `@toonflow/node-example`, and change the node name in `vite.config.ts` to `exampleNode`.
+2. Edit `src/index.vue`, and declare the UI framework and third-party libraries it uses in this subpackage's `dependencies`. If Sass or other build plugins are needed, add them to this subpackage's `devDependencies`.
+3. Run `bun install` and `bun run dev:plugins` in the repository root to get `build/nodes/exampleNode.umd.js`, synced to `data/nodes/exampleNode.umd.js`. Start `bun run dev` or refresh an already open home page to load it; the browser export is `window.toonflowNodes.exampleNode`. To produce release artifacts only, use `bun run build:nodes`.
 
-节点名必须唯一且使用小驼峰；显式指定名字可避免 Windows 工具链路径大小写变化影响导出名。各包的 Vite 配置只需：
+Node names must be unique and use lowerCamelCase. Naming the node explicitly keeps case changes in Windows toolchain paths from affecting the export name. Each package's Vite config only needs:
 
 ```ts
 import { createNodeConfig } from "@toonflow/nodes-scaffold";
 
 export default createNodeConfig({
   name: "exampleNode",
-  displayName: "示例节点",
-  author: "", // 填写作者名称
-  github: "", // 填写作者或项目的 https://github.com/... 地址
+  displayName: "Example Node",
+  author: "", // Author name
+  github: "", // https://github.com/... URL of the author or project
 }, import.meta.url);
 ```
 
-`name` 是节点的唯一标识，决定文件名和 VueFlow 注册名；`displayName` 是插件市场显示的名称。`author` 和 `github` 可以留空，市场只显示已填写的信息。
+`name` is the node's unique identifier and determines the file name and the VueFlow registration name; `displayName` is the name shown in Settings → Plugins. `author` and `github` may be left empty; only the fields that are filled in are shown.
 
-版本由每个节点子包的 `package.json.version` 维护，例如 `"version": "2.0.0"`，发布新版本时修改该字段，无需在 Vite 配置重复填写。构建要求版本为非空字符串，并监听 `package.json` 的变化。
+The version is maintained in each node subpackage's `package.json.version`, for example `"version": "2.0.0"`. Change this field when releasing a new version; there is no need to repeat it in the Vite config. The build requires a non-empty version string and watches `package.json` for changes.
 
-构建会把三个展示字段、`version`、`readme` 和 `configRules` 写入 UMD 第一行的 `/*! toonflowNode:{JSON} */` 注释，无需额外清单文件。server 只解析这段 JSON，不执行节点代码，并通过 `/api/nodes/get` 返回元数据。设置中的已安装列表显示插件名称、版本和作者，名称末尾的小图标用于打开 GitHub；没有元数据的旧 UMD 继续显示节点标识，缺少版本时接口返回空字符串。修改配置或版本并开发同步后，重新打开市场即可刷新。
+The build writes the three display fields, `version`, `readme`, and `configRules` into the `/*! toonflowNode:{JSON} */` comment on the first line of the UMD, so no separate manifest file is needed. The server only parses this JSON, never executes node code, and returns the metadata through `/api/nodes/get`. The Installed list in Settings shows the plugin name, version, and author, and the small icon after the name opens GitHub. Older UMDs without metadata keep showing the node identifier, and the API returns an empty string when the version is missing. After changing the config or version and syncing in development, reopen the Plugins panel to refresh it.
 
-需要额外 alias、插件等配置时，在该节点的 `vite.config.ts` 中用 Vite 的 `mergeConfig` 合并。保持共享配置中的 UMD 格式、输出目录和所有共享依赖的 external/globals 设置。
+For extra aliases, plugins, or other configuration, merge them into the node's `vite.config.ts` with Vite's `mergeConfig`. Keep the UMD format, the output directory, and the external/globals settings for all shared dependencies from the shared configuration.
 
-### 节点插件配置
+### Node plugin configuration
 
-节点可在 `createNodeConfig` 中声明 `configRules`，类型直接使用 `@form-create/element-ui` 的 `Rule[]`，与工具共用同一套格式和前端 `<form-create>` 渲染。`type`、`field`、`title`、`value`、`props`、`options`、`validate` 等均遵循库的原生规则，不另定义表单格式。规则随插件元数据以 JSON 传输，最多 100 项，不能包含函数或其它非 JSON 值。未声明或为空时隐藏配置按钮；必填字段使用 `validate` 声明：
+Nodes can declare `configRules` in `createNodeConfig`, typed directly as `Rule[]` from `@form-create/element-ui`; tools use the same format and the same frontend `<form-create>` rendering. `type`, `field`, `title`, `value`, `props`, `options`, `validate`, and the rest follow the library's native rules; no separate form format is defined. Rules travel as JSON with the plugin metadata, are limited to 100 items, and must not contain functions or other non-JSON values. When the rules are undeclared or empty, the configure button is hidden. Declare required fields with `validate`:
 
 ```ts
 export default createNodeConfig({
   name: "exampleNode",
-  displayName: "示例节点",
+  displayName: "Example Node",
   author: "",
   github: "",
   configRules: [{
@@ -470,28 +470,28 @@ export default createNodeConfig({
     field: "apiKey",
     title: "API Key",
     props: { type: "password", showPassword: true },
-    validate: [{ required: true, whitespace: true, message: "请填写 API Key" }],
+    validate: [{ required: true, whitespace: true, message: "Enter an API Key" }],
   }],
 }, import.meta.url);
 ```
 
-用户在设置的插件市场中打开节点的“配置”表单并保存；缺少必填配置时，配置按钮显示小红点。配置按节点类型保存，同类型的所有节点实例共用，不写入 `node.data` 或画布 JSON。
+Users open the node's configuration form in Settings → Plugins and save it; when required configuration is missing, the configure button shows a small red dot. Configuration is saved per node type and shared by all instances of that type; it is not written to `node.data` or the canvas JSON.
 
 ```ts
 const { config } = useNode();
-// 在实际执行时读取，保留配置保存后的响应式更新。
+// Read it at execution time to keep reactive updates after the configuration is saved.
 const apiKey = computed(() => String(config.value.apiKey ?? ""));
 ```
 
-`config` 是只读 computed，仅包含当前节点类型自己的配置，不提供全局 settings。宿主通过 Vue `provide("nodeConfig", (nodeType: string) => config)` 提供响应式读取能力；脚手架传入当前节点的完整类型（例如 `remote-exampleNode`）。用户保存后，已有节点会取得新配置；未保存的字段使用 `configRules` 中声明的 `value` 默认值，未提供宿主能力时返回 `{}`。
+`config` is a read-only computed that contains only the configuration of the current node type; global settings are not exposed. The host provides reactive reads through Vue `provide("nodeConfig", (nodeType: string) => config)`, and the scaffold passes the full type of the current node (for example `remote-exampleNode`). After the user saves, existing nodes receive the new configuration. Unsaved fields use the `value` defaults declared in `configRules`, and `{}` is returned when the host does not provide this capability.
 
-## 依赖和样式边界
+## Dependency and style boundaries
 
-- `vue` 和 `@vue-flow/core` 是节点的 peer dependency，UMD 直接使用宿主提供的 `window.toonflowNodeHost.vue`、`.vueFlow`；节点内不创建 Vue app，`useVueFlow()` 继承所在画布。
-- `element-plus` 同样声明为 peer dependency，复用 `window.toonflowNodeHost.elementPlus`。组件从根入口按需导入，例如 `import { ElButton } from "element-plus"`，模板使用 `<el-button>`；不要导入 `element-plus/es/...` 或其 CSS。宿主统一加载 Element Plus 组件与样式，节点产物不重复打包。
-- `three` 核心通过 external 复用 `window.toonflowNodeHost.three`，宿主提供完整 API。节点继续声明与宿主一致的 `three` 版本（当前 `0.184.0`），正常使用 `import { WebGLRenderer, Vector3 } from "three"`，无需直接访问全局对象。`three/addons/*`、`three/examples/jsm/*` 扩展仍按需打入节点，扩展内部的 `three` 引用同样复用宿主核心；不要从 `three/src/*` 深层导入核心。节点 UMD 与宿主需要使用配套版本。
-- 文本 AI 使用的 Pi SDK 同样通过现有 external 机制复用 `window.toonflowNodeHost.ai`，包含 `runAgentLoop` 和 `createAssistantMessageEventStream`；不在各节点 UMD 中重复打包，不新增运行时或服务。节点 UMD、宿主与后端需要使用配套版本。
-- 第三方库直接引用 `@vue/runtime-core` 或 `@vue/runtime-dom` 时，也使用宿主的 Vue 导出。各节点的 Vue/VueFlow 版本必须与宿主兼容；不要引入自行内嵌 Vue 的库或直接导入 Vue 的 `dist` 产物。
-- 其它依赖随各节点独立打包；不同节点可以使用不同 UI 框架和第三方库版本，同一个库也可能重复出现在不同 UMD 中。
-- 其它 UI 库的组件优先局部 import，所需 CSS 也在节点源码中 import。Vite 的 UMD 模式配合 `cssCodeSplit: true` 将 CSS 注入同一个 JS。需要 provider 的组件库，在节点根组件内包裹它自己的 provider。
-- 独立子包提供依赖管理边界，不提供页面样式隔离；全局 CSS、reset 或依赖 `app.use()` 全局安装的库需要单独适配。节点自有样式优先使用 `<style scoped>`。
+- `vue` and `@vue-flow/core` are peer dependencies of nodes; the UMD directly uses `window.toonflowNodeHost.vue` and `.vueFlow` provided by the host. Nodes do not create a Vue app, and `useVueFlow()` inherits the canvas the node is on.
+- `element-plus` is likewise declared as a peer dependency and reuses `window.toonflowNodeHost.elementPlus`. Import components on demand from the root entry, for example `import { ElButton } from "element-plus"`, and use `<el-button>` in templates; do not import `element-plus/es/...` or its CSS. The host loads Element Plus components and styles centrally, and node output does not bundle them again.
+- The `three` core reuses `window.toonflowNodeHost.three` through external, and the host provides the full API. Nodes keep declaring the same `three` version as the host (currently `0.184.0`) and use `import { WebGLRenderer, Vector3 } from "three"` as usual, without accessing the global object directly. Extensions from `three/addons/*` and `three/examples/jsm/*` are still bundled into the node on demand, and their internal `three` references also reuse the host core; do not deep-import the core from `three/src/*`. Node UMDs and the host must use matching versions.
+- The Pi SDK used by text AI likewise reuses `window.toonflowNodeHost.ai`, including `runAgentLoop` and `createAssistantMessageEventStream`, through the existing external mechanism. It is not bundled into each node UMD again, and no runtime or service is added. Node UMDs, the host, and the backend must use matching versions.
+- When third-party libraries reference `@vue/runtime-core` or `@vue/runtime-dom` directly, they also use the host's Vue exports. Each node's Vue/VueFlow version must be compatible with the host; do not bring in libraries that embed their own copy of Vue, and do not import Vue's `dist` output directly.
+- Other dependencies are bundled independently with each node. Different nodes may use different UI frameworks and third-party library versions, and the same library may appear in several UMDs.
+- Prefer local imports for components from other UI libraries, and import the CSS they need in the node source as well. Vite's UMD mode with `cssCodeSplit: true` injects the CSS into the same JS file. For component libraries that need a provider, wrap that library's provider inside the node's root component.
+- Independent subpackages provide a dependency management boundary, not page style isolation. Global CSS, resets, or libraries that rely on global installation through `app.use()` need separate adaptation. Prefer `<style scoped>` for a node's own styles.

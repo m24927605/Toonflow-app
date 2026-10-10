@@ -1,44 +1,44 @@
-# 3D 导演台
+# 3D Director's Studio
 
-用文字生成场景、模型动画与运镜，再通过三维取景调整镜头，适合动作和镜头预演。人形角色使用内置低多边形关节人偶，布景与道具可使用基础几何体。
+Generates scenes, model animations, and camera moves from text, then lets you adjust shots by framing them in 3D; well suited to previsualizing action and camera work. Humanoid characters use the built-in low-poly jointed mannequin, and sets and props can use basic geometry.
 
-## 输入与输出
+## Inputs and outputs
 
-- 输入支持文本、图片和视频参考，用于描述或参考场景、动作与运镜。
-- 关键帧可导出为 PNG 图片节点，选中的动画可导出为 MP4 视频节点。
-- 导出前需要启用相应的图片或视频节点插件。
+- Inputs accept text, image, and video references that describe or illustrate the scene, motion, and camera moves.
+- Keyframes can be exported as PNG image nodes, and the selected animation can be exported as an MP4 video node.
+- Exporting requires the corresponding Image (`图片`) or Video (`视频`) node plugin to be enabled.
 
-## 使用方法
+## Usage
 
-首次打开导演台会显示操作引导，完成或关闭后不再自动显示。
+The first time you open the Director's Studio, a guided tour is shown; once you finish or close it, it no longer appears automatically.
 
-1. 点击节点预览打开导演台，选择生成模型，描述场景、角色动作和镜头要求，点击“生成动画”。
-2. 在动画列表中选择方案，从头预览对应动作和运镜，并查看该方案的输入提示词；通过播放按钮与进度条暂停或定位，可继续输入要求生成新方案。旧方案若未保存提示词，会明确提示缺少记录。
-3. 点击三维画面进入取景，用鼠标调整朝向；WASD 移动，空格上升，Shift 下降，滚轮调焦。
-4. 右键记录取景，或点击“添加关键帧”；关键帧可拖动排序、点击回看或删除，左键或 Esc 退出取景。
-5. 记录关键帧后再次生成动画，可让运镜参考这些取景及其顺序。
-6. 按需调整画面比例、网格、天空与光照，再导出关键帧图片或点击“导出视频节点”。
+1. Click the node preview to open the Director's Studio, choose a generation model, describe the scene, character actions, and shot requirements, and click "Generate animation".
+2. Choose a variant from the animation list to preview its motion and camera moves from the start and view the prompt it was generated from. Pause or seek with the play button and progress bar, and keep entering requests to generate new variants. If an older variant did not save its prompt, the panel states clearly that the record is missing.
+3. Click the 3D view to enter framing mode and use the mouse to change the viewing direction; WASD moves, Space rises, Shift descends, and the scroll wheel adjusts the focal length.
+4. Right-click to record a framing, or click "Add keyframe". Keyframes can be dragged to reorder, clicked to review, or deleted. Left-click or Esc exits framing mode.
+5. After recording keyframes, generate the animation again so the camera moves follow these framings and their order.
+6. Adjust the aspect ratio, grid, sky, and lighting as needed, then export keyframe images or click "Export video node".
 
-视频导出时保持当前窗口可见，完成后可在画布中新建的视频节点查看结果。
+Keep the current window visible while a video is exporting; when it finishes, view the result in the new video node created on the canvas.
 
-## AI 局部编辑
+## AI partial editing
 
-生成方案与普通文本节点统一调用 `ai.generate()`，通过 `tools` 传入私有 `readDocument` / `editDocument`，所选文本模型需要支持工具调用。每轮先复制选中方案作为草稿，AI 按需读取并局部修改场景、轨道和镜头，保留未修改内容；首次生成也通过同一组工具补齐草稿。工具循环与草稿均在节点侧，服务端只代理单次模型请求，不维护导演台会话。
+Generating a variant calls `ai.generate()` in the same way as the regular text node, passing the private `readDocument` / `editDocument` tools through `tools`; the selected text model must support tool calls. Each round first copies the selected variant as a draft, and the AI reads and partially modifies the scene, tracks, and camera as needed, keeping whatever it does not change; the first generation also fills in the draft through the same tools. The tool loop and the draft both live on the node side; the server only proxies individual model requests and keeps no Director's Studio session.
 
-工具不注册到 `nodeTools`，不向外部总 Agent 暴露，也不直接操作文件。只有完整校验、预览渲染和保存均成功后才追加新方案；场景仍由所有方案共用。失败、取消或并发场景冲突时不会提交草稿。每次生成最多调用模型 40 次，模型与工具调用超过 10 分钟会取消。
+The tools are not registered in `nodeTools`, are not exposed to the external main Agent, and do not operate on files directly. A new variant is appended only after full validation, preview rendering, and saving all succeed; the scene itself is still shared by all variants. On failure, cancellation, or a concurrent scene conflict, the draft is not committed. Each generation calls the model at most 40 times, and model and tool calls are cancelled after 10 minutes.
 
-## 低多边形关节人偶
+## Low-poly jointed mannequin
 
-在导演台“设置”中点击“添加人偶”，即可加入低多边形关节人偶并保存。人偶降低网格细分、不显示额外关节球，内部保留 16 个关节。也可直接要求 AI 使用内置人偶，无需重新拼装人体。
+In the Director's Studio "Settings", click "Add mannequin" to add a low-poly jointed mannequin and save it. The mannequin uses reduced mesh subdivision, shows no extra joint spheres, and keeps 16 joints internally. You can also simply ask the AI to use the built-in mannequin instead of assembling a human body from scratch.
 
-人偶身高约 1.8，原点在脚底，+Y 向上、+Z 朝前，左右按人偶自身，+X 是左。根物体的 position、rotation、scale 控制整体位置、朝向和大小；material.color 控制整个人偶的统一颜色，不同人物可使用不同整体颜色。
+The mannequin is about 1.8 units tall with its origin at the soles of its feet; +Y points up and +Z forward. Left and right follow the mannequin's own perspective, so +X is its left. The root object's position, rotation, and scale control its overall position, orientation, and size; material.color sets one uniform color for the whole mannequin, so different characters can use different colors.
 
-场景中的人偶只占一个 objectList 项：
+A mannequin occupies a single objectList item in the scene:
 
 ```json
 {
   "threeJsonId": "person1",
-  "name": "人物",
+  "name": "Person",
   "objType": "mannequin",
   "geometry": {},
   "position": { "x": 0, "y": 0, "z": 0 },
@@ -47,13 +47,13 @@
 }
 ```
 
-pose 可省略；默认零旋转为自然垂臂站姿。关节姿态使用相对父关节的 XYZ 欧拉角，单位为弧度。层级为 hips → spine → neck → head；spine 下有左右肩 → 肘 → 腕，hips 下有左右髋 → 膝 → 踝。肩部旋转会带动整条手臂，髋部旋转会带动整条腿。
+pose can be omitted; the default zero rotation is a natural standing pose with the arms hanging down. Joint poses use XYZ Euler angles relative to the parent joint, in radians. The hierarchy is hips → spine → neck → head; under spine are the left and right shoulder → elbow → wrist chains, and under hips are the left and right hip → knee → ankle chains. Rotating a shoulder moves the whole arm, and rotating a hip moves the whole leg.
 
-可用关节名：hips、spine、neck、head、leftShoulder、leftElbow、leftWrist、rightShoulder、rightElbow、rightWrist、leftHip、leftKnee、leftAnkle、rightHip、rightKnee、rightAnkle。
+Available joint names: hips, spine, neck, head, leftShoulder, leftElbow, leftWrist, rightShoulder, rightElbow, rightWrist, leftHip, leftKnee, leftAnkle, rightHip, rightKnee, rightAnkle.
 
-人偶默认完整，可按要求添加 hiddenParts 数组，隐藏指定关节及其下游部位。例如 `"hiddenParts": ["leftShoulder", "rightKnee"]` 表示缺左臂和右小腿（含脚）。Shoulder 是整臂，Elbow 是前臂含手，Wrist 仅手；Hip 是整腿，Knee 是小腿含脚，Ankle 仅脚。使用对应的 left/right 关节名，左右按人偶自身。隐藏部位保留骨架名称，已有动画仍可使用。
+The mannequin is complete by default. Add a hiddenParts array on request to hide the given joints and everything below them. For example, `"hiddenParts": ["leftShoulder", "rightKnee"]` removes the left arm and the right lower leg (including the foot). Shoulder is the whole arm, Elbow the forearm including the hand, and Wrist the hand only; Hip is the whole leg, Knee the lower leg including the foot, and Ankle the foot only. Use the matching left/right joint names, with left and right from the mannequin's own perspective. Hidden parts keep their skeleton names, so existing animations still work.
 
-动画的 objectId 始终指向人偶根 ID，用 joint 选择关节，帧只填写 rotation，保留固定骨长。例如弯曲右肘的轨道：
+An animation's objectId always points to the mannequin's root ID. Use joint to select a joint; frames contain only rotation, and bone lengths stay fixed. For example, a track that bends the right elbow:
 
 ```json
 {
@@ -66,4 +66,4 @@ pose 可省略；默认零旋转为自然垂臂站姿。关节姿态使用相对
 }
 ```
 
-省略 joint 的轨道控制整体移动、旋转或缩放，可与关节轨道同时使用；根轨道的 position、scale 可省略，保持基础模型的变换。所有轨道仍需满足方案时长和关键帧格式。
+Tracks without joint control overall movement, rotation, or scaling and can be combined with joint tracks; position and scale can be omitted from the root track to keep the base model's transform. All tracks must still fit the variant's duration and the keyframe format.
