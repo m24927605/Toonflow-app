@@ -125,7 +125,7 @@ public class mobileActivity extends Activity {
     webView.getSettings().setUseWideViewPort(true);
     webView.getSettings().setLoadWithOverviewMode(true);
     webView.getSettings().setSupportZoom(false);
-    // 新窗口在当前 WebView 发起导航，统一交由下面的外链处理。
+    // New windows navigate in the current WebView and are handled by the external-link logic below.
     webView.getSettings().setSupportMultipleWindows(false);
     webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
     webView.setWebChromeClient(new WebChromeClient() {
@@ -672,7 +672,7 @@ public class mobileActivity extends Activity {
           while ((line = reader.readLine()) != null) {
             if (!line.startsWith("TOONFLOW_MOBILE_URL=")) {
               Log.i("ToonflowMobile", line);
-              // 压缩源码上下文保留在 Logcat，避免淹没错误页面中的原因与堆栈。
+              // Keep the minified source context in Logcat so it does not bury the cause and stack on the error page.
               if (line.matches("^\\s*\\d+\\s*\\|.*")) continue;
               synchronized (outputTail) {
                 outputTail.append(line, Math.max(0, line.length() - 8191), line.length()).append('\n');
@@ -710,7 +710,7 @@ public class mobileActivity extends Activity {
       mainHandler.removeCallbacks(startupTimeout);
       if (!stopping) {
         stopBun();
-        // ACT: 子进程可能继承输出管道，退出提示最多等待 200ms 排空日志。
+        // ACT: Child processes may inherit the output pipe, so the exit message waits at most 200ms to drain logs.
         try { readerThread.join(200); } catch (InterruptedException error) { Thread.currentThread().interrupt(); }
         String output;
         synchronized (outputTail) { output = outputTail.toString().trim(); }
@@ -769,7 +769,7 @@ public class mobileActivity extends Activity {
 
   private void removeProgramDirectory(File directory) throws IOException {
     if (!directory.exists()) return;
-    // Files.walk 默认不跟随符号链接；程序清理不会遍历链接指向的数据目录。
+    // Files.walk does not follow symlinks by default, so program cleanup never traverses linked data directories.
     try (Stream<Path> paths = Files.walk(directory.toPath())) {
       Iterator<Path> entries = paths.sorted(Comparator.reverseOrder()).iterator();
       while (entries.hasNext()) Files.delete(entries.next());
@@ -958,7 +958,7 @@ public class mobileActivity extends Activity {
 
   @Override
   protected void onDestroy() {
-    // ACT: 当前版本仅随 Activity 运行；后台长任务需另行接入前台服务。
+    // ACT: The current version runs only with the Activity; long background tasks need a separate foreground service.
     finishCamera(false);
     cameraPermissionPending = false;
     if (fileCallback != null) fileCallback.onReceiveValue(null);

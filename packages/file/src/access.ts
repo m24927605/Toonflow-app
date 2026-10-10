@@ -5,7 +5,8 @@ import type { PathLike } from "node:fs";
 
 type AccessKind = "read" | "write";
 type Entry = { queue: Semaphore; readers: number; writers: number };
-// ACT: 同文件最多同时读取 64 次；写入占满许可，FIFO 防止后到读写插队。
+// ACT: At most 64 concurrent reads per file;
+// a write takes all permits, and FIFO keeps later reads and writes from jumping the queue.
 const readCapacity = 64;
 const entries = new Map<string, Entry>();
 
@@ -30,7 +31,8 @@ function waitForAccess(entry: Entry, kind: AccessKind, signal: AbortSignal): Pro
   });
 }
 
-// ACT: 单进程、规范化的文件路径队列；realpath/目录事务/业务锁由模块负责。
+// ACT: Single-process queue keyed by normalized file path;
+// realpath, directory transactions and business locks belong to the modules.
 export async function acquireFileAccess(paths: PathLike[], kind: AccessKind, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const requests = accessKeys(paths).map(key => {
@@ -70,7 +72,7 @@ export async function withFileAccess<T>(paths: PathLike[], kind: AccessKind, act
 }
 
 export function withSyncFileAccess<T>(paths: PathLike[], kind: AccessKind, action: () => T): T {
-  // 同步操作不能阻塞等待本进程异步句柄，否则事件循环无法关闭句柄。
+  // Sync operations must not block waiting on this process's async handles, or the event loop can never close them.
   for (const key of accessKeys(paths)) {
     const entry = entries.get(key);
     if (entry && (entry.writers || kind === "write" && entry.readers)) {

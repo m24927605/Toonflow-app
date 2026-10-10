@@ -126,7 +126,8 @@ nodeEvent.on("save", async (reason) => {
   await textLoading;
   if (!textReady.value) throw new Error("文本尚未加载，无法保存");
   if (reason === "reload" && generating.value) throw new Error("文本正在生成，请完成后再刷新节点");
-  // 普通编辑已由 watcher 入队；生成中补存当前片段，不因画布保存重复写未改动的文本。
+  // Regular edits are already queued by the watcher; during generation, also save the current chunk,
+  // without rewriting unchanged text on canvas save.
   if (generating.value) saveText(outputs.value.text.value);
   let pending: Promise<void>;
   do {
@@ -165,7 +166,7 @@ async function loadText(fromDisk = false) {
     outputs.value.text.value = value;
     data.value.textPath = textPath;
     delete data.value.textSnapshot;
-    // ACT: 成功落盘后才排除内联正文；迁移失败时画布仍保留原内容。
+    // ACT: Drop the inline body only after it is persisted; if migration fails the canvas keeps the original content.
     if (!Object.hasOwn(outputs.value, "toJSON")) Object.defineProperty(outputs.value, "toJSON", { value: () => ({}) });
     textSaving = Promise.resolve();
     textReady.value = true;
@@ -245,7 +246,7 @@ async function generateText() {
   } catch (error) {
     if (error instanceof Error && error.name !== "AbortError") ElMessage.error(error.message);
   } finally {
-    // 卸载会取消请求并停止 watcher，生成收尾必须自行保存已收到的正文。
+    // Unmounting aborts the request and stops the watcher, so generation cleanup must save the received body itself.
     try { await saveText(outputs.value.text.value); }
     catch (error) { ElMessage.error(error instanceof Error ? error.message : "文本保存失败"); }
     generating.value = false;

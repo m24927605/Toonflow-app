@@ -4,7 +4,7 @@ import config from "../../../electrobun.config";
 
 const startTime = Date.now();
 const realPort = 3000;
-// 源码位于 apps/server/src，生产构建位于 build/server，均从文件位置定位根目录。
+// Source lives in apps/server/src and the production build in build/server; both locate the root from the file location.
 const fromSource = import.meta.path.endsWith(".ts");
 const appDirectory = resolve(import.meta.dirname, fromSource ? "../../.." : "../..");
 const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(appDirectory, "data");
@@ -15,7 +15,7 @@ const app = await createApp({
   toolsRoot: resolve(appDirectory, "build/tools"),
   nodesRoot: resolve(appDirectory, "build/nodes"),
   extRoot: resolve(appDirectory, "build/ext"),
-  // ACT: 暂不安装内置团队，随团队打包一同恢复。
+  // ACT: Built-in teams are not installed for now; restore together with team bundling.
   // agentsRoot: resolve(appDirectory, "build/agents"),
   providersRoot: resolve(appDirectory, fromSource ? "packages/providers/src" : "build/providers"),
   skillsRoot: resolve(appDirectory, fromSource ? "packages/skills" : "build/skills"),

@@ -24,7 +24,7 @@ function openUrl(url: string) {
     pendingInstalls.push(request);
   }
 }
-// 冷启动的 macOS URL 可能先于窗口就绪到达，先接收再等待页面挂载。
+// On a macOS cold start the URL may arrive before the window is ready; accept it first, then wait for the page to mount.
 Electrobun.events.on("open-url", event => {
   try { openUrl(event.data.url); }
   catch (error) {
@@ -36,7 +36,8 @@ async function restoreInstallRegistration(installDirectory: string) {
   const uninstaller = resolve(installDirectory, "UninstallNSIS.exe");
   if (process.platform === "win32" && existsSync(uninstaller)) {
     try {
-      // SDK 启动和更新会重写卸载入口；安装了 NSIS 时统一交给它处理数据保留选项。
+      // SDK launches and updates rewrite the uninstall entry; when
+      // installed via NSIS, let it handle the data retention option.
       const { identifier, channel } = await file(resolve(PATHS.RESOURCES_FOLDER, "version.json")).json();
       const registryKey = `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${identifier}.${channel}`;
       for (const [name, command] of [["UninstallString", `"${uninstaller}"`], ["QuietUninstallString", `"${uninstaller}" /S`]]) {
@@ -54,7 +55,8 @@ async function restoreInstallRegistration(installDirectory: string) {
           if ((error as { code?: number }).code !== 1) throw error;
           protocolExists = false;
         }
-        // ACT: 自动更新不经过 NSIS；仅补全缺失协议，已有注册（包括其他安装）保持不动。
+        // ACT: Auto-updates bypass NSIS; only register a missing protocol and
+        // leave existing registrations (including other installs) untouched.
         if (!protocolExists) {
           for (const [key, value] of [[protocolKey, "URL:Toonflow Protocol"], [`${protocolKey}\\DefaultIcon`, `"${resolve(PATHS.RESOURCES_FOLDER, "app.ico")}",0`], [commandKey, command]]) {
             await execFileAsync("reg.exe", ["add", key, "/ve", "/t", "REG_SZ", "/d", value, "/f"], { windowsHide: true });
@@ -74,10 +76,10 @@ async function start() {
   let isClosing = false;
 
   try {
-    // Windows 的 data 与 app 同级；macOS 的 data 与 .app 同级，避免随程序更新被替换。
+    // On Windows data sits next to app; on macOS data sits next to the .app, so app updates do not replace it.
     const installDirectory = resolve(PATHS.RESOURCES_FOLDER, process.platform === "darwin" ? "../../.." : "../..");
     const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(installDirectory, "data");
-    // ACT: 先显示原生动画，再加载服务，避免初始化期间没有反馈。
+    // ACT: Show the native animation before loading the server so there is feedback during initialization.
     const startupSettings = await file(resolve(dataDirectory, "settings.json")).json().catch((error) => {
       if (error.code !== "ENOENT") console.error("读取启动设置失败，使用默认启动动画：", error);
       return null;
@@ -85,7 +87,7 @@ async function start() {
     setLocaleFallback(() => normalizeLocale(startupSettings?.settings?.ui?.language)
       ?? detectLocale([Intl.DateTimeFormat().resolvedOptions().locale]));
     if (process.platform === "darwin") {
-      // ACT: WKWebView 的 Command 编辑快捷键由原生菜单角色交给当前响应者处理。
+      // ACT: WKWebView Command editing shortcuts are routed to the current responder via native menu roles.
       ApplicationMenu.setApplicationMenu([
         { label: "Toonflow", submenu: [
           { role: "about" },
@@ -136,7 +138,7 @@ async function start() {
       extRoot: resolve(PATHS.VIEWS_FOLDER, "../ext"),
       providersRoot: resolve(PATHS.VIEWS_FOLDER, "../providers"),
       skillsRoot: resolve(PATHS.VIEWS_FOLDER, "../skills"),
-      // ACT: 暂不安装内置团队，随团队打包一同恢复。
+      // ACT: Built-in teams are not installed for now; restore together with team bundling.
       // agentsRoot: resolve(PATHS.VIEWS_FOLDER, "../agents"),
       pluginRevision: hash,
     });
@@ -153,7 +155,8 @@ async function start() {
     console.log(`桌面服务：http://127.0.0.1:${connection.port}`);
 
     const { workArea } = Screen.getPrimaryDisplay();
-    // ACT: 宽高分别限制在屏幕可用区域内，预留标题栏和边距，不固定比例。
+    // ACT: Clamp width and height separately to the screen's usable area,
+    // leaving room for the title bar and margins, with no fixed aspect ratio.
     const width = Math.min(1280, workArea.width - 64);
     const height = Math.min(960, workArea.height - 64);
     const mainWindow = new BrowserWindow({
@@ -167,7 +170,7 @@ async function start() {
         y: workArea.y + Math.round((workArea.height - height) / 2),
       },
     });
-    // ACT: 两版 SDK 的全局事件不带 WebView ID，使用事件名后缀限定主窗口。
+    // ACT: Global events in both SDK versions carry no WebView ID, so an event-name suffix scopes them to the main window.
     Electrobun.events.on(`new-window-open-${mainWindow.webview.id}`, (event: { data: { detail: unknown } }) => {
       const detail = event.data.detail;
       const url = typeof detail === "string" ? detail : detail && typeof detail === "object" && "url" in detail ? detail.url : undefined;
@@ -178,7 +181,7 @@ async function start() {
         void Utils.showMessageBox({ type: "error", title: t`打开链接失败`, message: t`请检查默认浏览器设置后重试。` });
       }
     });
-    // 页面重载时监听器随旧页面销毁，安装请求等新页面 ready 后再投递。
+    // Listeners are destroyed with the old page on reload, so install requests are delivered once the new page is ready.
     Electrobun.events.on(`will-navigate-${mainWindow.webview.id}`, () => { deliverInstall = undefined; });
     let isShowing = false;
     app.locals.desktop = {
@@ -209,7 +212,8 @@ async function start() {
             splash = undefined;
           }
           isShowing = true;
-          // ACT: 安装器已完成注册；更新后的修复仅首次展示时执行，不阻塞主窗口。
+          // ACT: The installer has completed registration; the post-update
+          // repair runs only on first show and does not block the main window.
           void restoreInstallRegistration(installDirectory);
         }
         if (failed && !connection.remote) {
@@ -219,7 +223,8 @@ async function start() {
           return;
         }
         if (connection.remote) {
-          // 远端离线不代表本机更新启动失败；安装协议等回到独立运行后再投递。
+          // An offline remote does not mean the local update launch failed;
+          // install protocol requests are delivered after returning to standalone.
           deliverInstall = undefined;
           if (process.platform === "win32") confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER);
           else await (Updater as DesktopRuntime["updater"]).confirmStartup?.();
@@ -239,11 +244,11 @@ async function start() {
         else await (Updater as DesktopRuntime["updater"]).confirmStartup?.();
       },
       openDevTools() { mainWindow.webview.openDevTools(); },
-      // ACT: Windows 使用两阶段退出；Intel Mac 由兼容入口适配 1.18.1 更新器。
+      // ACT: Windows uses a two-phase exit; Intel Mac adapts the 1.18.1 updater through a compatibility entry.
       updater: process.platform === "win32" ? createWindowsUpdater(PATHS.RESOURCES_FOLDER, Utils as unknown as Parameters<typeof createWindowsUpdater>[1]) : Updater,
     } satisfies DesktopRuntime;
     if (process.platform === "win32") {
-      // ACT: Electrobun 2.0.1 未设置 Windows 窗口图标，复用构建产物中的应用 ICO。
+      // ACT: Electrobun 2.0.1 does not set the Windows window icon, so reuse the app ICO from the build output.
       const user32 = dlopen("user32.dll", {
         LoadImageW: { args: ["ptr", "ptr", "u32", "i32", "i32", "u32"], returns: "ptr" },
         SendMessageW: { args: ["ptr", "u32", "u64", "ptr"], returns: "ptr" },
@@ -255,7 +260,7 @@ async function start() {
       const window = mainWindow.ptr;
       const dpi = native.GetDpiForWindow(window);
       const iconPath = Buffer.from(`${resolve(PATHS.RESOURCES_FOLDER, "app.ico")}\0`, "utf16le");
-      // ICON_SMALL / ICON_BIG，各自使用当前窗口 DPI 对应的系统尺寸。
+      // ICON_SMALL / ICON_BIG, each using the system size for the current window DPI.
       const icons = [49, 11].map((metric) => native.LoadImageW(
         null, ptr(iconPath), 1, native.GetSystemMetricsForDpi(metric, dpi), native.GetSystemMetricsForDpi(metric + 1, dpi), 0x10,
       ));
@@ -281,7 +286,8 @@ async function start() {
     });
     function saveRuntime(port: number) {
       if (process.platform === "win32") {
-        // ACT: 切换连接也更新端口；启动器通过 PID 忽略已退出进程留下的记录。
+        // ACT: Switching connections also updates the port; the launcher
+        // uses the PID to ignore records left by exited processes.
         writeAtomicSync(resolve(PATHS.RESOURCES_FOLDER, "desktopRuntime.json"), JSON.stringify({ pid: process.pid, port }));
       }
     }

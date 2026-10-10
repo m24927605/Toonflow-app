@@ -35,7 +35,7 @@ if (process.argv[2] === "write") {
     assert.equal(await readFile(asyncPath, "utf8"), "普通异步覆盖");
     assert.equal(await readFile(syncPath, "utf8"), "普通同步覆盖");
 
-    // ACT: 用独立进程竞争，避免只验证到进程内路径队列。
+    // ACT: Race from a separate process so we do not only exercise the in-process path queue.
     const racePath = join(directory, "race.txt");
     const children = Array.from({ length: 4 }, () => Bun.spawn([process.execPath, import.meta.path, "write", racePath], { stdout: "inherit", stderr: "inherit" }));
     const codes = await Promise.all(children.map(child => child.exited));

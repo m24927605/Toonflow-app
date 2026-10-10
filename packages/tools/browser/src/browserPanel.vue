@@ -98,7 +98,7 @@ const toolError = computed(() => {
   try {
     const result: unknown = JSON.parse(tool.result ?? "null");
     if (result && typeof result === "object" && "error" in result && typeof result.error === "string") return result.error;
-  } catch { /* 工具失败也可能返回普通文本。 */ }
+  } catch { /* A failed tool may also return plain text. */ }
   return tool.result?.trim() || "浏览器操作失败";
 });
 const operationLabel = computed(() => {
@@ -114,7 +114,7 @@ let sessionEnded = false;
 
 function readSession(tool: ToolCall): PanelSession | undefined {
   try {
-    // 截图结果的图片块会追加为 [image]，会话信息始终位于首行 JSON。
+    // Image blocks from screenshot results are appended as [image]; session info is always the first-line JSON.
     const value: unknown = JSON.parse((tool.result ?? "null").trimStart().split("\n", 1)[0]!);
     if (!value || typeof value !== "object" || !("browserSessionId" in value) || typeof value.browserSessionId !== "string" || !value.browserSessionId.trim()) return;
     const data = value as Record<string, unknown>;
@@ -193,7 +193,8 @@ function resetInput() {
   composing.value = false;
   if (keyboardInput.value) keyboardInput.value.value = "";
   keyboardInput.value?.blur();
-  // ACT: 释放必须排在已开始的输入之后，不能随观看流一起取消，否则远端会留下按住的键或鼠标。
+  // ACT: Releases must queue after inputs already started and must not be cancelled with the viewing stream,
+  // or the remote side is left with keys or mouse buttons held.
   if (target) releasePending = releasePending.then(() => fetch("/api/browser/input", { method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ ...target, input: { type: "release" } }), keepalive: true, signal: AbortSignal.timeout(5000) })).then(() => {}, () => {});
 }
 
@@ -223,7 +224,8 @@ watch([() => props.active, browserScope, () => session.value?.browserSessionId, 
     connectionMessage.value = "";
   }
   if (!active) { expanded.value = false; status.value = "paused"; return; }
-  // ACT: 同一浏览器可跨轮复用；旧轮只保留已收到的末帧，不重连获取后续轮次的画面。
+  // ACT: The same browser can be reused across turns;
+  // old turns keep only the last frame received and do not reconnect for later turns' frames.
   if (live === false) { expanded.value = false; status.value = "paused"; connectionMessage.value = ""; return; }
   if (closed || sessionEnded) { endSession(); return; }
   if (!scope || !sessionId) { status.value = "waiting"; return; }
@@ -329,7 +331,8 @@ function sendInput(input: BrowserInput) {
   const target = { ...scope, sessionId: current.browserSessionId, tabId: current.tabId };
   inputTarget = target;
   const queued = { input, target, controller: inputController };
-  // ACT: HTTP 慢于指针移动时只保留尚未发送的最新位置；按下、抬起和键盘事件仍严格排序。
+  // ACT: When HTTP is slower than pointer movement, keep only the latest unsent position;
+  // down, up and keyboard events stay strictly ordered.
   const previous = inputQueue.at(-1);
   if (input.type === "mouse" && input.event === "move" && previous?.input.type === "mouse" && previous.input.event === "move") inputQueue[inputQueue.length - 1] = queued;
   else inputQueue.push(queued);
@@ -453,7 +456,8 @@ function keyScreen(event: KeyboardEvent) {
   if (event.isComposing || composing.value || event.keyCode === 229 || ["Process", "Dead", "Unidentified", "AltGraph"].includes(event.key) || event.getModifierState("AltGraph")) return;
   if (((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v") || (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Insert")) return;
   const clipboard = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && ["c", "v", "x"].includes(event.key.toLowerCase());
-  // 非拉丁键盘及 IME 由原生 textarea 的新增文本输入，避免按 US 键位猜测字符。
+  // Non-Latin keyboards and IMEs input via text added to the native textarea,
+  // avoiding guessing characters from the US layout.
   if (event.key.length === 1 && event.key.charCodeAt(0) > 126 && !event.ctrlKey && !event.metaKey && !event.altKey) return;
   if (!clipboard) event.preventDefault();
   const key = pressedKeys.get(code) || (event.key === " " ? "Space" : event.key);

@@ -9,7 +9,7 @@ export { executeRemoteFfmpeg } from "@toonflow/ffmpeg";
 const directory = join(dirname(conf.path), "ffmpeg", target);
 let download: DownloadState = { phase: "idle", received: 0 };
 let downloadError: unknown;
-// ACT: 沿用 server 单进程模型，每次只下载一套程序；不持久化运行中的任务。
+// ACT: Follows the server's single-process model: only one binary set downloads at a time; running tasks are not persisted.
 let controller: AbortController | undefined;
 const requiredListeners = new Set<() => void>();
 
@@ -24,7 +24,7 @@ export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (!tools.ffmpeg.path || tools.ffmpeg.error || !tools.ffprobe.path || tools.ffprobe.error) {
     for (const listener of requiredListeners) listener();
-    throw Object.assign(new Error("当前操作需要 FFmpeg，请在插件市场下载安装或配置可用版本后重试。"), {
+    throw Object.assign(new Error("当前操作需要 FFmpeg，请在插件设置中下载安装或配置可用版本后重试。"), {
       name: "FfmpegRequiredError", code: "FFMPEG_REQUIRED", status: 424,
     });
   }

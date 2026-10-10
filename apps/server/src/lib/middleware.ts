@@ -5,7 +5,7 @@ import { t, translateMessage, validationOptions } from "./i18n";
 
 export function validateFields(
   shape: Record<string, z.ZodType>,
-  source: "body" | "query" | "params" = "body", // 默认校验 body
+  source: "body" | "query" | "params" = "body", // Validate body by default
 ) {
   const schema = z.object(shape);
 

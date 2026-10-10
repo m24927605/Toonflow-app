@@ -16,7 +16,8 @@ export const teamNamePattern = /^[a-z][a-zA-Z0-9]{0,95}$/;
 let pending = Promise.resolve();
 
 export function withTeamFiles<T>(operation: () => Promise<T>): Promise<T> {
-  // ACT: 团队目录最多 20 MB，短读写统一排队；规模增长时再拆分团队锁或读写锁。
+  // ACT: Team directories are at most 20 MB, so short reads/writes share
+  // one queue; split into per-team or read/write locks as they grow.
   const result = pending.then(async () => {
     const release = lockWorkspaceFiles([agentsDirectory]);
     try { return await operation(); }

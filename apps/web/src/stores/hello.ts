@@ -11,9 +11,10 @@ export const useHelloStore = defineStore("hello", () => {
     try {
       previouslyCompleted = JSON.parse(localStorage.getItem("toonflow.hello") ?? "null")?.completed === true;
     } catch {
-      // ACT: 旧缓存不可读时仍可从已配置的模型恢复；桌面随机端口之间无法迁移 localStorage。
+      // ACT: If the old cache is unreadable, fall back to configured models; localStorage can't migrate across
+      // random desktop ports.
     }
-    if (previouslyCompleted || customProviders.value.some(provider => typeof provider.apiKey === "string" && provider.apiKey.trim() && provider.models.length))
+    if (previouslyCompleted || customProviders.value.some(provider => provider.models.length))
       await complete();
     return completed.value;
   }

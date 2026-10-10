@@ -25,7 +25,8 @@ const runningChecker = join(nsisDir, "checkRunning.exe");
 const initializeInstallScript = join(nsisDir, "initializeInstall.js");
 
 mkdirSync(webViewDir, { recursive: true });
-// ACT: 安装脚本在临时目录执行，先打包文件层依赖，避免依赖开发目录的 node_modules。
+// ACT: The install script runs in a temp directory, so bundle the file-layer
+// dependency first instead of relying on the dev directory's node_modules.
 const initializeInstallBuild = await Bun.build({
   entrypoints: [join(installerDir, "initializeInstall.ts")],
   outdir: nsisDir,
@@ -67,9 +68,10 @@ const stagingDir = mkdtempSync(join(nsisDir, "payload"));
 const tarFile = join(stagingDir, "app.tar");
 try {
   const manifest = await file(join(artifactDir, "stable-win-x64-update.json")).json();
-  // ACT: 平台、通道和 Hash 由本机 SDK 生成，只检查独立打包时容易遗留的旧版本。
+  // ACT: Platform, channel and hash come from the local SDK; only check
+  // for stale versions easily left behind by standalone packaging.
   if (manifest.version !== desktopConfig.app.version) throw new Error("构建产物版本不一致，请重新构建。");
-  // ACT: NSIS 仅打包原始 tar，安装时释放应用并保留它作为增量更新基线。
+  // ACT: NSIS only bundles the raw tar; installation extracts the app and keeps the tar as the delta update baseline.
   const archive = await file(join(artifactDir, manifest.artifact.file)).arrayBuffer();
   await write(tarFile, Bun.zstdDecompressSync(archive));
   await $`${makensis} /INPUTCHARSET UTF8 /DwebView2Dir=${webViewDir} /DrunningChecker=${runningChecker} /DappIcon=${appIcon} /DappVersion=${

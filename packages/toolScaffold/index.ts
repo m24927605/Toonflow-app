@@ -100,7 +100,8 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
     plugins: [{
       name: "toolHost",
       setup(build) {
-        // ACT: Bun 1.3 的 external 会保留原始路径，用虚拟转发模块保证产物引用宿主。
+        // ACT: Bun 1.3 externals keep the original path;
+        // use a virtual forwarding module so the output references the host.
         build.onResolve({ filter: /^zod$/ }, () => ({ path: "zod", namespace: "toolHost" }));
         build.onLoad({ filter: /^zod$/, namespace: "toolHost" }, () => ({
           contents: 'module.exports = require("toonflow:tool-zod");',
@@ -112,7 +113,8 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
       setup(build) {
         build.onLoad({ filter: /[\\/]@deepseek-ai[\\/]dsh-llm[\\/]lib[\\/]index\.js$/ }, async ({ path }) => {
           const source = await file(path).text();
-          // ACT: DSH 0.1.5-rc.2 动态读取自身 package.json；改成静态读取供 Bun 内联版本信息。
+          // ACT: DSH 0.1.5-rc.2 reads its own package.json dynamically;
+          // switch to a static read so Bun can inline the version info.
           const contents = source.replace("createRequire(import.meta.url)(\"../package.json\")", "require(\"../package.json\")");
           return { contents, loader: "js" };
         });
@@ -128,12 +130,12 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
     minify: true,
   });
   if (!result.success) throw new AggregateError(result.logs, `工具构建失败：${metadata.name}`);
-  // Bun 会把 @bun 标记放在 banner 前，构建完成后再写入首行元数据。
+  // Bun puts the @bun marker before the banner, so write the first-line metadata after the build completes.
   const builtPath = resolve(outDir, fileName);
   await write(builtPath, `/*! toonflowTool:${metadataJson} */\n${clientBanner}${await result.outputs[0].text()}`);
   if (process.env.NODE_ENV === "dev") {
     await mkdir(dataDir, { recursive: true });
-    // ACT: Windows 的 bun --watch 占用已加载模块，开发同步直接复制覆盖，不使用 rename。
+    // ACT: bun --watch on Windows locks loaded modules, so dev sync overwrites by copying instead of using rename.
     await copyFile(builtPath, resolve(dataDir, fileName));
   }
 }

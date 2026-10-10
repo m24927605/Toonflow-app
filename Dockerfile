@@ -8,7 +8,7 @@ RUN apt-get update \
 
 COPY . .
 
-# ACT: 保留工作区与依赖以兼容运行时动态加载；需要缩减镜像时再拆分构建阶段。
+# ACT: Keep the workspace and dependencies for runtime dynamic loading; split build stages if the image needs to shrink.
 RUN bun install --frozen-lockfile
 
 RUN bun run build:server \

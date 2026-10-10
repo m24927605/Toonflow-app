@@ -155,7 +155,7 @@ function moveDrag(event: PointerEvent) {
   const angle = pointerAngle(event, drag.kind);
   if (angle == null) return;
   const value = angle + drag.offset;
-  // 高度弧只取朝前的半圆，拖出弧线后停在顶光或底光。
+  // The elevation arc uses only the front-facing half circle; dragging past it stops at top or bottom light.
   setAngle(drag.kind, drag.kind === "elevation" ? ((value + 540) % 360) - 180 : value);
 }
 

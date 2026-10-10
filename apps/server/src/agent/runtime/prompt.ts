@@ -73,7 +73,7 @@ export function buildSystemPrompt({ systemPrompt, tools, skills = [], platform, 
 
   const guidelines = [...new Set(tools.flatMap(tool => tool.promptGuidelines ?? []).map(text => text.trim()).filter(Boolean))];
   const values: Record<string, string | boolean> = {
-    // ACT: 技能目录由 SDK 注入，技能操作器启用时使用工具自身的规则。
+    // ACT: The SDK injects the skill catalog; when the skill operator is enabled, the tool's own rules apply.
     skills: !tools.some(tool => tool.name === "skillOperator") && skills.some(skill => !skill.disableModelInvocation) && tools.some(tool => tool.name === "read"),
     tools: toolLines.join("\n"),
     guidelines: guidelines.map(text => `- ${text}`).join("\n"),
@@ -83,7 +83,8 @@ export function buildSystemPrompt({ systemPrompt, tools, skills = [], platform, 
       platform,
     }),
   };
-  // ACT: 只支持单层条件块，需要嵌套时再使用模板库；先处理条件再插值，避免解析工具文案中的占位符。
+  // ACT: Only single-level conditional blocks are supported; use a template library if nesting
+  // is needed. Conditions run before interpolation so placeholders in tool text are not parsed.
   return (systemPrompt?.trim() ? systemPrompt : defaultSystemPrompt)
     .replace(/{{([#^])(\w+)}}([\s\S]*?){{\/\2}}/g, (_, condition, key, content) => Boolean(values[key]) === (condition === "#") ? content : "")
     .replace(/{{(\w+)}}/g, (_, key) => String(values[key] ?? ""));

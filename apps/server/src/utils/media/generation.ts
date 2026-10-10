@@ -189,7 +189,7 @@ export async function generateMedia(
     signal?.throwIfAborted();
     return result;
   } catch (err) {
-    // ACT: 只回滚本次创建的文件，保留目录中已有的节点资源。
+    // ACT: Only roll back files created in this run, keeping existing node assets in the directory.
     await Promise.all(written.map(path => unlink(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; })));
     throw err;
   }

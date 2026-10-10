@@ -76,7 +76,7 @@ export function createExtConfig(config: ExtMetadata, configUrl: string) {
           }
           const styleId = JSON.stringify(`toonflowExt-${config.id}`);
           const injectStyle = css ? `if(typeof document!=="undefined"){let style=document.getElementById(${styleId});if(!style){style=document.createElement("style");style.id=${styleId};document.head.appendChild(style)}style.textContent=${JSON.stringify(css)}}\n` : "";
-          // 压缩完成后加入元数据和样式，单个 JS 即可供扩展加载器使用。
+          // Add metadata and styles after minification so a single JS file is enough for the extension loader.
           chunk.code = `/*! toonflowExt:${JSON.stringify({ ...metadata, configRules, version, readme }).replaceAll("/", "\\u002f")} */\n${injectStyle}${chunk.code}`;
         },
         async writeBundle() {
@@ -96,7 +96,7 @@ export function createExtConfig(config: ExtMetadata, configUrl: string) {
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     build: {
       outDir,
-      // ACT: 多个扩展共享目录，构建单包时保留其他扩展产物。
+      // ACT: Multiple extensions share the directory, so building a single package keeps other extensions' outputs.
       emptyOutDir: false,
       cssCodeSplit: false,
       lib: {

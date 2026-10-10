@@ -9,7 +9,7 @@ if (process.argv.length !== 3 || !["build", "dev", "typecheck", "package"].inclu
 }
 const isMac = process.platform === "darwin";
 const isIntelMac = isMac && process.arch === "x64";
-// ACT: typecheck 只读取当前源码和已有 SDK 文件，不安装依赖或生成文件。
+// ACT: typecheck only reads current sources and existing SDK files; it does not install dependencies or generate files.
 if (mode === "typecheck") {
   await $`${process.execPath} run tsc --project ${isIntelMac ? "compat/macIntel/tsconfig.json" : "apps/desktop/tsconfig.json"}`.cwd(projectDir);
   process.exit(0);
@@ -41,7 +41,8 @@ if (!isMac) {
   await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /out:${resolve(protocolDir, "saveFileDialog.exe")} ${resolve(projectDir, "apps/desktop/native/saveFileDialog.cs")}`;
   await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Web.Extensions.dll /reference:System.Windows.Forms.dll /reference:Microsoft.CSharp.dll /out:${resolve(protocolDir, "updateHelper.exe")} ${resolve(projectDir, "apps/desktop/native/updateHelper.cs")}`;
 }
-// ACT: 团队暂不打包；恢复时也在 package.json 的 dev:plugins 中加回 --filter './packages/teams/*'。
+// ACT: Teams are not bundled for now; when restoring, also add
+// --filter './packages/teams/*' back to dev:plugins in package.json.
 for (const script of mode === "dev" ? ["dev:plugins"] : [
   "build:tools",
   "build:nodes",
@@ -58,7 +59,7 @@ const photonOutput = resolve(projectDir, "build/desktop/photon");
 rmSync(photonOutput, { recursive: true, force: true });
 cpSync(photonDirectory, photonOutput, { recursive: true });
 if (isIntelMac) {
-  // ACT: 共用插件和 Web 构建；Intel Mac 仅将 SDK 适配交给独立的 1.18.1。
+  // ACT: Plugin and web builds are shared; Intel Mac only hands SDK adaptation to the separate 1.18.1.
   await $`${process.execPath} ${resolve(projectDir, "compat/macIntel/build.ts")} ${mode === "package" ? "build" : mode}`.cwd(projectDir);
   process.exit(0);
 }

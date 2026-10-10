@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 internal static class checkWebView2
 {
-    // ACT: URL.canParse 需要 Chromium 120；同时覆盖 Map.groupBy 和 Promise.withResolvers。
+    // ACT: URL.canParse requires Chromium 120, which also covers Map.groupBy and Promise.withResolvers.
     private static readonly Version minimumVersion = new Version(120, 0, 0, 0);
 
     [DllImport("WebView2Loader.dll", EntryPoint = "GetAvailableCoreWebView2BrowserVersionString",

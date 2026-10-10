@@ -102,7 +102,7 @@ export default {
       images.forEach((url) => content.push({ role: "reference_image", type: "image_url", image_url: { url } }));
     }
 
-    // ACT: 单次生成最多等待 10 分钟。
+    // ACT: Wait at most 10 minutes per generation.
     const signal = AbortSignal.any([AbortSignal.timeout(10 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const submitResponse = await this.tool.fetch(`${baseUrl}/v2/video_generation`, {
       method: "POST",

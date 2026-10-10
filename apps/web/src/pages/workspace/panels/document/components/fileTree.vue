@@ -173,7 +173,7 @@ const treeRows = computed<TreeRow[]>(() => {
   return rows;
 });
 const rowIndexes = computed(() => new Map(treeRows.value.map((row, index) => [row.item.key, index])));
-// ACT: 数据与展开状态完整保留，只挂载可见行和少量缓冲；目录仍按需读取。
+// ACT: Keep all data and expand state but mount only visible rows and a small buffer; directories still load on demand.
 const treeVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(computed(() => {
   const sourceIndex = rowIndexes.value.get(draggedKey.value ?? "");
   return {
@@ -184,7 +184,7 @@ const treeVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(computed(
     overscan: 6,
     rangeExtractor: range => {
       const indexes = defaultRangeExtractor(range);
-      // 保留拖拽源行，避免滚出视口时 DOM 被回收而取消原生拖拽。
+      // Keep the drag source row so its DOM isn't recycled when scrolled out of view, cancelling the native drag.
       if (sourceIndex !== undefined && !indexes.includes(sourceIndex)) indexes.push(sourceIndex);
       return indexes.sort((left, right) => left - right);
     },
@@ -216,7 +216,7 @@ function loadTreeState() {
   try {
     const state = JSON.parse(settingsStorage.getItem(storageKey()) ?? "{}");
     if (Array.isArray(state.expandedKeys)) expandedKeys.value = state.expandedKeys.filter((key: unknown) => typeof key === "string");
-  } catch { /* 无效的本地状态不影响文件读取。 */ }
+  } catch { /* Invalid local state doesn't affect file reads. */ }
 }
 function expandNode(item: FileTreeItem) {
   if (searchTerm.value.trim() || item.isLeaf) return;
@@ -290,7 +290,7 @@ function startDrag(event: DragEvent, item: FileTreeItem) {
   if (!items.length) { event.preventDefault(); return; }
   locatingKey = undefined;
   menu.value?.handleClose();
-  // 使用路径快照，避免拖拽期间选中项或目录展开发生变化。
+  // Use a path snapshot so changes to the selection or expanded directories during drag don't affect it.
   dragged.value = { directory: directory.value, items: items.map(entry => ({ ...entry })), cut: true };
   draggedKey.value = item.key;
   event.dataTransfer.effectAllowed = "move";
@@ -445,7 +445,8 @@ async function handleCommand(command: string, item = menuItem.value, source = cl
       const { entries } = await useWorkspaceFiles(currentDirectory).list(destination);
       const names = new Set(entries.map(entry => pathIdentity(entry.name)));
       total = source.items.length;
-      // ACT: 批量文件操作逐项协调，已完成项保留；错误明确报告进度，剩余剪切项可继续粘贴。
+      // ACT: Batch file operations are coordinated per item and completed items are kept; errors report
+      // progress clearly, and remaining cut items can still be pasted.
       for (const entry of [...source.items]) {
         if (currentDirectory !== directory.value) throw new Error("工作目录已切换");
         const from = pathIdentity(entry.path);
@@ -656,7 +657,7 @@ function readNodeIndex(currentDirectory: string, signal: AbortSignal) {
   signal.throwIfAborted();
   const cached = assetNodes.get(signal);
   if (cached) return cached;
-  // ACT: 素材归属才扫描全部画布；搜索与树各自持有可取消的缓存，失败不缓存。
+  // ACT: Scan all canvases only for asset ownership; search and tree each keep a cancellable cache that skips failures.
   const pending = (props.params?.params.readNodes(currentDirectory, { signal, onError: (path, error) => {
     if (!signal.aborted && currentDirectory === directory.value) loadError.value = `无法读取“${path}”的节点，其余文件仍可使用：${error instanceof Error ? error.message : "请检查文件"}`;
   } }) ?? Promise.resolve([])).then(nodes => {
@@ -693,7 +694,7 @@ async function readDirectory(currentDirectory: string, path: string, signal: Abo
   }
   const items: FileTreeItem[] = [];
   let cursor = 0;
-  // 固定四个读取任务，避免大目录一次创建、排队成千上万个 JSON 请求。
+  // Use a fixed four read workers so a large directory doesn't create and queue thousands of JSON requests at once.
   await Promise.all(Array.from({ length: Math.min(4, entries.length) }, async () => {
     while (cursor < entries.length) {
       signal.throwIfAborted();
@@ -737,7 +738,8 @@ watch([searchTerm, directory, treeVersion], ([term, currentDirectory], _previous
     const results: FileTreeItem[] = [];
     const pending = [""];
     try {
-      // ACT: 搜索按目录逐层读取完整文件名和节点名，不缓存内容；大工作区可改为服务端索引。
+      // ACT: Search reads full file and node names directory by directory without caching content; large
+      // workspaces could use a server-side index.
       for (let index = 0; index < pending.length; index++) {
         let items: FileTreeItem[];
         try { items = await readDirectory(currentDirectory, pending[index]!, controller.signal); }

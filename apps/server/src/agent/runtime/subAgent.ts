@@ -40,7 +40,7 @@ export async function runSubAgent(options: SubAgentModel & {
   let session: AgentSession | undefined;
   const abort = () => { void session?.abort(); };
   signal.addEventListener("abort", abort, { once: true });
-  // A2A 继续任务复用内存历史；只汇总本次新增记录，避免重复计费。
+  // A2A task continuations reuse in-memory history; only sum records added this time to avoid double billing.
   const previousEntries = history?.getEntries().length ?? 0;
   try {
     signal.throwIfAborted();
@@ -48,10 +48,11 @@ export async function runSubAgent(options: SubAgentModel & {
       ...tool,
       async execute(...args: Parameters<ToolDefinition["execute"]>) {
         signal.throwIfAborted();
-        // ACT: SDK 在整批工具结束后才停轮；提出问题后不再执行本批后续操作。
+        // ACT: The SDK only stops the turn after the whole tool batch
+        // finishes; once a question is asked, skip the rest of the batch.
         if (inputRequired?.()) throw new Error("任务正在等待调用方补充输入，不能继续执行工具");
         if (tool.name !== "askUser" || !onTool) return tool.execute(...args);
-        // 子会话的模型调用 ID 可能重复，提问卡片与回答通道使用独立 ID。
+        // Sub-session model call IDs may repeat, so question cards and answer channels use separate IDs.
         const id = crypto.randomUUID();
         onTool({ id, name: tool.name, args: args[1] as Record<string, unknown>, status: "running" });
         try {

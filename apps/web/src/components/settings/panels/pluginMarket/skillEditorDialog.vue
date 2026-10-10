@@ -98,7 +98,7 @@ const dirtyPaths = ref(new Set<string>());
 const headers = { "x-toonflow-workspace": "1" };
 let controller = new AbortController();
 
-// 单文件技能只有主文件本身，没有可管理的附属文件目录。
+// A single-file skill has only its main file, with no directory of auxiliary files to manage.
 const isDirectorySkill = computed(() => files.value.length > 1 || files.value[0] !== mainPath.value);
 const treeRoot = computed<TreeNode>(() => {
   const root: TreeNode = { key: "", label: skill.displayName, type: "directory", children: [] };
@@ -201,7 +201,8 @@ function parentOf(path: string) {
 function allowDrop(draggingNode: { data: Record<string, unknown> }, dropNode: { data: Record<string, unknown> }, type: string) {
   const drop = dropNode.data as unknown as TreeNode;
   if (type === "inner") return drop.type === "directory";
-  // 仅允许拖到同目录内的兄弟文件前后调整顺序；跨目录移动统一走拖入目录节点。
+  // Only allow dropping before/after sibling files in the same directory to reorder; cross-directory moves go
+  // through dropping onto a directory node.
   if (drop.type !== "file") return false;
   const dragging = draggingNode.data as unknown as TreeNode;
   return parentOf(dragging.key) === parentOf(drop.key);
@@ -232,7 +233,7 @@ async function handleNodeDrop(draggingNode: { data: Record<string, unknown> }, d
     }
     return;
   }
-  // 同目录内调整顺序（dropType 为 before/after），不改变文件路径。
+  // Reorder within the same directory (dropType is before/after) without changing file paths.
   const siblings = files.value.filter(path => path !== mainPath.value && path !== sourcePath);
   const dropIndex = siblings.indexOf(drop.key);
   const insertIndex = dropIndex < 0 ? siblings.length : dropType === "before" ? dropIndex : dropIndex + 1;

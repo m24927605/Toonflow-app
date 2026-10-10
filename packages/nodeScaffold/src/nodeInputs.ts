@@ -24,7 +24,7 @@ export function getTargetSources(targetId: string, targetHandleId: string, nodes
 function readSourceValue(node: Node<NodeData>, handle: NodeHandle): NodeOutput | undefined {
   const outputs = node.data?.outputs;
   if (!outputs) return;
-  // 先读取 key，让端口首次新增输出时也能触发监听。
+  // Read the key first so the watcher also fires when a port adds its first output.
   const output = outputs[handle.id];
   if (output === undefined || !Object.hasOwn(outputs, handle.id)) return;
   if (!isNodeOutput(output) || !isTypeCompatible(output.dataType, handle.dataType)) {
@@ -56,7 +56,8 @@ const targetEdgesKey = Symbol.for("toonflow.targetEdges");
 export function useNodeInputs(canvas = useVueFlow()) {
   const flow = canvas as typeof canvas & { [targetEdgesKey]?: ComputedRef<Map<string, Connection[]>> };
   const { nodeLookup } = canvas;
-  // ACT: 按画布共享分组，保留重复边和原顺序；不依赖 VueFlow 会合并重复端点的连接索引。
+  // ACT: Group per shared canvas, keeping duplicate edges and original order;
+  // don't rely on VueFlow's connection index, which merges duplicate endpoints.
   const targetEdges = flow[targetEdgesKey] ?? computed(() => Map.groupBy(canvas.getEdges.value, edge => edge.target));
   if (!flow[targetEdgesKey]) Object.defineProperty(flow, targetEdgesKey, { value: targetEdges });
   return {
@@ -66,5 +67,5 @@ export function useNodeInputs(canvas = useVueFlow()) {
   };
 }
 
-/** @deprecated 使用 useNodeInputs；保留已发布节点源码的兼容入口。 */
+/** @deprecated Use useNodeInputs; kept as a compatibility entry for published node sources. */
 export const useNodeTools = useNodeInputs;

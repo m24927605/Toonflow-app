@@ -7,7 +7,7 @@ export interface ApiResponse<T = unknown> {
   message: string;
 }
 
-// 成功回调
+// Success response
 export function success<T = unknown>(data: T | null = null, message: string | MessageDescriptor = "成功"): ApiResponse<T> {
   return {
     code: 200,
@@ -16,7 +16,7 @@ export function success<T = unknown>(data: T | null = null, message: string | Me
   };
 }
 
-// 错误响应，默认客户端错误
+// Error response, defaults to a client error
 export function error<T = unknown>(message: string | MessageDescriptor = "", data: T | null = null, code: number = 400): ApiResponse<T> {
   return {
     code,

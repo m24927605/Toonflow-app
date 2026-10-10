@@ -21,7 +21,7 @@ export function useCanvasTools(options: {
   const getNodeTools = useNodeToolsContext();
   let nodeRevision = 0;
   let edgeRevision = 0;
-  // 只跟踪列表结构，不深读节点 data；批量更新合并到同一 tick。
+  // Track only the list structure without deep-reading node data; batch updates coalesce into one tick.
   watch(flow.nodes, () => nodeRevision++, { deep: 1 });
   watch(flow.edges, () => edgeRevision++, { deep: 1 });
   const readCanvas = createCanvasQueries({
@@ -58,7 +58,7 @@ export function useCanvasTools(options: {
     let redirected: CanvasContext | undefined;
     return {
       get id() { return redirected?.id ?? options.getCanvasBinding().id; },
-      // 函数定义通过 getNodeTools 按需发现，初始化消息不携带节点清单。
+      // Function definitions are discovered on demand via getNodeTools; the init message carries no node list.
       tools: [],
       getNodeLabel(nodeId) {
         if (redirected) return redirected.getNodeLabel?.(nodeId);
@@ -196,7 +196,7 @@ export function useCanvasTools(options: {
             throw new Error(`连接无效：${connection.source} -> ${connection.target}，请检查端口方向、数据类型以及目标节点的连接规则`);
           }
           const id = crypto.randomUUID();
-          // ACT: 候选边只参与本批校验，全部通过后再一次提交画布。
+          // ACT: Candidate edges only join this batch's validation; commit to the canvas once after all pass.
           edges.push({
             ...connection, id, type: "default", selected: false, data: {}, events: {}, sourceNode, targetNode,
             sourceX: sourceNode.computedPosition.x, sourceY: sourceNode.computedPosition.y,

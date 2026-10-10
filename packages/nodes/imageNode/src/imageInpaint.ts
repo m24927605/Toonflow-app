@@ -59,7 +59,8 @@ export function useImageInpaint() {
       const { directory } = await workspace.list();
       signal.throwIfAborted();
       requested = true;
-      // ACT: 供应商尚未统一支持原生 mask；使用涂色参考引导，再按本地蒙版合成，严格保留区域外像素。
+      // ACT: Providers don't uniformly support native masks yet; guide with a painted reference,
+      // then composite with the local mask, strictly keeping pixels outside the region.
       const [result] = await ai.generateImage({
         ...input,
         directory,

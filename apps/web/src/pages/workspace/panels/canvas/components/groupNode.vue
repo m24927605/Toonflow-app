@@ -142,7 +142,7 @@ onBeforeUnmount(() => finishResize());
 watch(
   () => flow.getNodes.value.filter(node => node.parentNode === props.id),
   children => {
-    // ACT: 拖动期间保持分组框不变，松手后由画布统一贴合内容。
+    // ACT: Keep the group frame unchanged while dragging; the canvas fits it to the content on release.
     children.forEach(node => { node.expandParent = false; });
   },
   { immediate: true },

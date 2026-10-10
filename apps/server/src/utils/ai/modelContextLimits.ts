@@ -1,10 +1,8 @@
-// ACT: 字符串优先精确匹配，正则按列表顺序匹配；两项上限均优先于用户配置和 Pi 内置模型目录。
-// 单位为 token；2026-09-20 核对官方标准 API 上限，不采用批处理或 Beta 专属上限。
+// ACT: Strings match exactly first, regexes match in list order; both
+// limits take precedence over user config and Pi's built-in model catalog.
+// Units are tokens; checked against official standard API limits on 2026-09-20, excluding batch- or beta-only limits.
 const modelContextLimits: { id: string | RegExp; contextWindow: number; maxTokens: number }[] = [
-  // TF-Router
-  { id: "deepseek-v4.1-flash", contextWindow: 1048576, maxTokens: 393216 },
-  { id: /^deepseek-v4\.1-flash-[0-9]+$/, contextWindow: 1048576, maxTokens: 393216 },
-  // DeepSeek：旧的 deepseek-chat / deepseek-reasoner 已停用，不覆盖中转站的同名模型。
+  // DeepSeek: the legacy deepseek-chat / deepseek-reasoner are retired; do not override same-named models on relay services.
   // https://api-docs.deepseek.com/quick_start/pricing/
   // https://api-docs.deepseek.com/api/create-chat-completion/
   // https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813/blob/main/config.json
@@ -12,7 +10,7 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "deepseek-v4-flash", contextWindow: 1048576, maxTokens: 393216 },
   { id: "deepseek-v4-pro", contextWindow: 1048576, maxTokens: 393216 },
 
-  // OpenAI：各型号页面 https://developers.openai.com/api/docs/models/{模型 ID}
+  // OpenAI: per-model pages at https://developers.openai.com/api/docs/models/{model ID}
   { id: "gpt-5.5", contextWindow: 1050000, maxTokens: 128000 },
   { id: "gpt-5.4", contextWindow: 1050000, maxTokens: 128000 },
   { id: "gpt-5.4-pro", contextWindow: 1050000, maxTokens: 128000 },
@@ -27,7 +25,7 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "gpt-4.1-nano", contextWindow: 1047576, maxTokens: 32768 },
   { id: "gpt-4o", contextWindow: 128000, maxTokens: 16384 },
 
-  // Claude：标准 Messages API，未采用 Batch API 的 300K 输出上限。
+  // Claude: standard Messages API; the Batch API's 300K output limit is not used.
   // https://platform.claude.com/docs/en/models/overview
   // https://platform.claude.com/docs/en/build-with-claude/context-windows
   // https://platform.claude.com/docs/en/models/sonnet-4-6/overview
@@ -42,7 +40,7 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "claude-haiku-4-5", contextWindow: 200000, maxTokens: 64000 },
   { id: "claude-haiku-4-5-20251001", contextWindow: 200000, maxTokens: 64000 },
 
-  // 通义千问：文档区分了总上下文、最大输入和最大输出，取总上下文及最大输出。
+  // Qwen: the docs distinguish total context, max input and max output; use total context and max output.
   // https://help.aliyun.com/zh/model-studio/qwen3-5-plus
   // https://help.aliyun.com/zh/model-studio/qwen3-5-397b-a17b
   // https://help.aliyun.com/zh/model-studio/qwen3-5-35b-a3b
@@ -53,11 +51,12 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "qwen3.5-35b-a3b", contextWindow: 262144, maxTokens: 65536 },
   { id: "qwen3.5-27b", contextWindow: 262144, maxTokens: 65536 },
 
-  // GLM：https://docs.z.ai/guides/llm/glm-5 、https://docs.z.ai/guides/llm/glm-4.7
+  // GLM: https://docs.z.ai/guides/llm/glm-5, https://docs.z.ai/guides/llm/glm-4.7
   { id: "glm-5", contextWindow: 200000, maxTokens: 128000 },
   { id: "glm-4.7", contextWindow: 200000, maxTokens: 128000 },
 
-  // Kimi：当前在售型号；输入与输出共用窗口，实际输出上限需扣除 prompt_tokens。
+  // Kimi: currently offered models; input and output share the window,
+  // so the effective output limit must subtract prompt_tokens.
   // https://platform.kimi.ai/docs/models
   // https://platform.kimi.ai/docs/api/models-overview
   // https://www.kimi.ai/help/kimi-api/api-troubleshooting
@@ -66,7 +65,7 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "kimi-k2.7-code-highspeed", contextWindow: 262144, maxTokens: 262144 },
   { id: "kimi-k2.6", contextWindow: 262144, maxTokens: 262144 },
 
-  // 火山方舟：按规格表的上下文窗口和最大回答填写，k 按 1024 换算，不叠加思维链。
+  // Volcengine Ark: context window and max response from the spec table, with k = 1024, not adding chain-of-thought.
   // https://docs.volcengine.com/docs/ark/model-list?lang=zh
   { id: "doubao-seed-evolving", contextWindow: 1048576, maxTokens: 262144 },
   { id: "doubao-seed-2-1-pro-260915", contextWindow: 1048576, maxTokens: 262144 },
@@ -100,7 +99,7 @@ const modelContextLimits: { id: string | RegExp; contextWindow: number; maxToken
   { id: "deepseek-v4-pro-260425", contextWindow: 1048576, maxTokens: 393216 },
   { id: "deepseek-v4-flash-260425", contextWindow: 1048576, maxTokens: 393216 },
 
-  // Agnes：当前正式版 API；512K / 1M 分别按 512 / 1024 个 1024 token 换算。
+  // Agnes: current GA API; 512K / 1M convert to 512 / 1024 units of 1024 tokens.
   // https://www.agnes-ai.com/zh-Hans/docs/agnes-30-flash
   // https://www.agnes-ai.com/zh-Hans/docs/agnes-25-flash
   // https://www.agnes-ai.com/zh-Hans/docs/agnes-25-pro

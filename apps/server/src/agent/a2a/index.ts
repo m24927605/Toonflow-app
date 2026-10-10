@@ -18,13 +18,15 @@ export function createA2aRouter() {
       const name = teamNameSchema.parse(req.params.name);
       const configurationSignal = getA2aSignal();
       let endpoint = endpoints.get(name);
-      // 已接收任务的查询和取消继续交给 SDK；禁用/卸载只阻止 execute 接收新消息。
+      // Queries and cancellation of accepted tasks still go to the SDK;
+      // disabling/uninstalling only stops execute from accepting new messages.
       if (endpoint?.signal === configurationSignal && req.method === "POST") { endpoint.router(req, res, next); return; }
       const team = await readTeam(name);
       if (!team.enabled) { res.sendStatus(404); return; }
       const card = createTeamAgentCard(team.manifest, `${getA2aUrl(req)}/${name}`);
       if (!endpoint || endpoint.signal !== configurationSignal) {
-        // ACT: 任务由 SDK 保存在单进程内存；仅等待补充的协调者额外保留 Pi 上下文，重启后需重新发起任务。
+        // ACT: The SDK keeps tasks in single-process memory; only coordinators awaiting
+        // more input also keep the Pi context. Tasks must be resubmitted after a restart.
         const pending = new Map<string, { runner: Awaited<ReturnType<typeof createTeamRunner>>; userId: string }>();
         const execute = async (request: TeamA2aRequest) => {
           try {
@@ -40,7 +42,8 @@ export function createA2aRouter() {
             if (!current) {
               const settings = getA2aSettings();
               const cwd = await resolveA2aWorkspace();
-              // 保存时已规范化目录；不允许运行前把该目录替换成指向其他位置的链接。
+              // The directory was normalized on save; do not allow it to be
+              // replaced with a link to another location before running.
               if (cwd !== settings.directory) throw new Error("A2A 工作目录已变化，请在设置中重新授权");
               const { runtime } = await createAgentModel(settings.providerId, settings.modelId, settings.thinkingLevel);
               const connection = getConnection(undefined, cwd);

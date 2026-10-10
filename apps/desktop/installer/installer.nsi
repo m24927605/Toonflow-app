@@ -17,7 +17,7 @@ Caption "${appName}"
 BrandingText " "
 OutFile "${outputFile}"
 InstallDir "$LOCALAPPDATA\${appIdentifier}\stable"
-; ACT: SDK 会把 InstallLocation 改成 app 子目录，NSIS 独立保存用户选择的安装根目录。
+; ACT: The SDK changes InstallLocation to the app subdirectory, so NSIS stores the user-selected install root separately.
 InstallDirRegKey HKCU "${uninstallKey}" "toonflowInstallDirectory"
 
 Icon "${appIcon}"
@@ -78,7 +78,7 @@ checkRunning:
 Function showFinishPage
   ShowWindow $mui.FinishPage.Image ${SW_HIDE}
   System::Store "S"
-  ; ACT: 保留 MUI 控件与完成行为，使用对话框单位适配字体和 DPI。
+  ; ACT: Keep MUI controls and finish behavior; use dialog units to adapt to font and DPI.
   !insertmacro moveFinishControl $mui.FinishPage.Title 12 10 300 28
   !insertmacro moveFinishControl $mui.FinishPage.Text 12 45 300 40
   !insertmacro moveFinishControl $mui.FinishPage.Run 12 90 300 12
@@ -118,7 +118,8 @@ Section "Install"
   ClearErrors
   CreateDirectory "$INSTDIR"
   IfErrors installFailed
-  ; ACT: NSIS 的 GetFullPathName 要求目录已存在；先创建，再通过临时变量保留失败时的原路径。
+  ; ACT: NSIS GetFullPathName requires an existing directory; create it
+  ; first and keep the original path in a temp variable for failures.
   StrCpy $installStep "确认安装目录"
   GetFullPathName $0 "$INSTDIR"
   IfErrors installFailed
@@ -132,7 +133,7 @@ Section "Install"
   ${EndIf}
 
 installApp:
-  ; NSIS 是 x86，Sysnative 指向系统 x64 tar，避免重定向到 SysWOW64。
+  ; NSIS is x86; Sysnative points to the system x64 tar, avoiding redirection to SysWOW64.
   IfFileExists "$WINDIR\Sysnative\tar.exe" tarReady 0
     MessageBox MB_OK|MB_ICONSTOP "未找到 Windows 系统 tar.exe，无法解压应用，请更新 Windows 后重试。" /SD IDOK
     SetErrorLevel 2
@@ -156,7 +157,8 @@ tarReady:
   StrCpy $installStep "释放应用压缩包"
   File "/oname=${appHash}.tar" "${appTar}"
   IfErrors installFailed
-  ; 重新解压前清理包内插件副本，避免旧构建的文件残留并在下次启动时被同步。
+  ; Clear bundled plugin copies before re-extracting so stale files
+  ; from older builds are not left behind and synced on next launch.
   StrCpy $installStep "更新内置插件文件"
   IfFileExists "$INSTDIR\app\Resources\app\nodes\*.*" 0 +2
     RMDir /r "$INSTDIR\app\Resources\app\nodes"
@@ -167,7 +169,7 @@ tarReady:
   IfFileExists "$INSTDIR\app\Resources\app\providers\*.*" 0 +2
     RMDir /r "$INSTDIR\app\Resources\app\providers"
   IfErrors installFailed
-  ; ACT: 仅打包一份 tar，释放应用后保留原文件作为增量更新基线。
+  ; ACT: Only one tar is bundled; after extracting the app, keep the original file as the delta update baseline.
   nsExec::ExecToStack '"$WINDIR\Sysnative\tar.exe" -xf "$INSTDIR\self-extraction\${appHash}.tar" -C "$INSTDIR\app" --strip-components=1'
   Pop $0
   Pop $1
@@ -191,7 +193,7 @@ tarReady:
     DetailPrint "$1"
     Goto installFailed
   ${EndIf}
-  ; SDK 将 uninstall.exe 当作原生更新助手，NSIS 卸载器必须使用不同名称。
+  ; The SDK treats uninstall.exe as the native update helper, so the NSIS uninstaller must use a different name.
   StrCpy $installStep "生成卸载程序"
   WriteUninstaller "$INSTDIR\UninstallNSIS.exe"
   IfErrors installFailed
@@ -212,7 +214,7 @@ tarReady:
   IfErrors installFailed
   CreateShortCut "$DESKTOP\${appName}.lnk" "$INSTDIR\app\bin\launcher.exe" "" "$INSTDIR\app\Resources\app.ico"
   IfErrors 0 installDone
-  ; ACT: 快捷方式不影响程序使用，失败时保留成功安装结果并告知手动启动路径。
+  ; ACT: Shortcuts do not affect app use; on failure keep the successful install and show the manual launch path.
   MessageBox MB_OK|MB_ICONEXCLAMATION "Toonflow 已安装，但无法创建桌面快捷方式。可以从以下位置启动：$\r$\n$INSTDIR\app\bin\launcher.exe" /SD IDOK
   Goto installDone
 
@@ -261,7 +263,7 @@ Section "Uninstall"
     IfErrors uninstallFailed
   ${EndIf}
   ClearErrors
-  ; ACT: 清理成功后才移除卸载入口；文件被占用时保留入口供用户重试。
+  ; ACT: Remove the uninstall entry only after cleanup succeeds; keep it for retries when files are in use.
   Delete "$INSTDIR\UninstallNSIS.exe"
   IfErrors uninstallFailed
   Delete "$INSTDIR\toonflow.ini"

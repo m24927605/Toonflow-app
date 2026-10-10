@@ -17,7 +17,8 @@ for (const [path, src] of Object.entries(iconFiles)) {
   if (!icons.has(name) || !monochrome) icons.set(name, { src, monochrome });
 }
 
-// 模型家族名与品牌图标不同的映射；同名品牌自动使用整个图标包中的资源。
+// Mappings for model families whose names differ from their brand icon;
+// same-named brands automatically use resources from the whole icon pack.
 const aliases: Record<string, string[]> = {
   openai: ["gpt", "chatgpt", "codex", "whisper", "tts", "o1", "o3", "o4"],
   claude: ["anthropic"],
@@ -56,7 +57,8 @@ for (const [brand, names] of Object.entries(aliases)) {
 modelNames.sort((left, right) => right.prefix.length - left.prefix.length);
 
 export function getModelIcon(model: string) {
-  // ACT: 无法凭任意名称可靠识别品牌；优先模型路径末段，未匹配再尝试服务商，最终由组件显示默认图标。
+  // ACT: Brands cannot be reliably identified from arbitrary names;
+  // try the last model path segment first, then the provider, and finally let the component show the default icon.
   const segments = model.trim().toLowerCase().replace(/[_.\s]+/g, "-").split("/").reverse();
   for (const name of segments) {
     const match = modelNames.find(({ prefix }) => name.startsWith(prefix)

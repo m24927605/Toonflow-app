@@ -79,7 +79,7 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
             if (error.code === "ENOENT") return "";
             throw error;
           });
-          // 压缩后再写入，防止元数据注释被移除。
+          // Write after minification so the metadata comment isn't stripped.
           chunk.code = `/*! toonflowNode:${JSON.stringify({ ...metadata, version, readme }).replaceAll("/", "\\u002f")} */\n${chunk.code}`;
         },
         async writeBundle() {
@@ -99,7 +99,7 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
     define: { "process.env.NODE_ENV": JSON.stringify("production") },
     build: {
       outDir,
-      // ACT: 单包构建不清公共产物目录，由根 build:nodes 在批量构建前统一清理。
+      // ACT: Single-package builds don't clean the shared output dir; the root build:nodes cleans it before batch builds.
       emptyOutDir: false,
       cssCodeSplit: true,
       lib: {

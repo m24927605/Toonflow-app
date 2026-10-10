@@ -25,7 +25,7 @@ export default Router().post("/", validateFields({
   try {
     res.set({ "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
     res.flushHeaders();
-    // ACT: JSON 允许前导空白，保活时保留现有 response.json() 契约。
+    // ACT: JSON allows leading whitespace, so keep-alive preserves the existing response.json() contract.
     heartbeat = setInterval(() => { if (!res.destroyed && !res.writableEnded && !res.writableNeedDrain) res.write("\n"); }, 20000);
     const files = await u.mediaGeneration.generateMedia(cwd, mediaType, parsed.data, controller.signal);
     if (!res.destroyed) res.write(JSON.stringify(success(files)));

@@ -40,13 +40,15 @@ function isWebUrl(value: string) {
 }
 
 function isBrowserPageUrl(value: string) {
-  // Chromium 为失败的 HTTP 导航生成此错误页；输入地址与导航请求仍仅允许 isWebUrl。
+  // Chromium generates this error page for failed HTTP navigations;
+  // entered addresses and navigation requests are still limited to isWebUrl.
   return isWebUrl(value) || value === "chrome-error://chromewebdata/";
 }
 
 async function findExecutable(configured: string) {
   if (configured && !isAbsolute(configured)) throw new Error("executablePath 必须是浏览器程序的绝对路径");
-  // Electrobun 启动器修改环境变量后，Bun Worker 按原始大小写保存 Windows 环境变量。
+  // After the Electrobun launcher modifies environment variables,
+  // Bun Workers keep Windows environment variables in their original case.
   const env = process.platform === "win32"
     ? Object.fromEntries(Object.entries(process.env).map(([key, value]) => [key.toUpperCase(), value])) : process.env;
   const candidates = configured ? [configured] : process.platform === "win32"
@@ -66,7 +68,7 @@ async function findExecutable(configured: string) {
     if (!existsSync(path)) continue;
     if (!(await stat(path)).isFile()) continue;
     try { await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK); return path; }
-    catch { /* 尝试下一个已安装浏览器。 */ }
+    catch { /* Try the next installed browser. */ }
   }
   throw new Error(configured ? "浏览器程序不存在或不可执行，请检查 executablePath" : "未找到 Chrome、Chromium 或 Edge，请先安装浏览器，或在工具配置中填写 executablePath");
 }
@@ -89,7 +91,8 @@ async function pressKey(page: Page, key: string, signal: AbortSignal) {
 async function readUserAgent(browser: Browser) {
   const page = await browser.newPage();
   try {
-    // ACT: 从浏览器自身的可信页面读取真实客户端提示，空白页拿不到这些信息；不访问外站或硬编码版本、平台。
+    // ACT: Read real client hints from the browser's own trusted page, since a blank page cannot get them;
+    // never visit external sites or hard-code versions or platforms.
     await page.goto("chrome://version/", { waitUntil: "domcontentloaded" });
     return await page.evaluate(async () => {
       const data = (navigator as Navigator & {
@@ -122,7 +125,8 @@ export function createBrowserRuntime() {
         try { subscriber.listener(event); } catch { session.subscribers.delete(subscriber); }
         continue;
       }
-      // ACT: 每个订阅者只保留最新一帧；HTTP 写入背压由宿主流接口继续合并。
+      // ACT: Each subscriber keeps only the latest frame;
+      // HTTP write backpressure is further coalesced by the host stream interface.
       subscriber.frame = event;
       if (subscriber.scheduled) continue;
       subscriber.scheduled = true;
@@ -155,7 +159,8 @@ export function createBrowserRuntime() {
   }
 
   function queueInputRelease(session: BrowserSession, tab: Tab) {
-    // 先作废尚未执行的手动事件，再排队释放已按下的输入，避免断流后迟到的 down 留在网页中。
+    // First invalidate pending manual events, then queue releases for pressed inputs,
+    // so a late down after the stream drops is not left in the page.
     tab.inputVersion++;
     const release = session.queue.then(() => releaseInput(tab));
     session.queue = release.catch(() => {});
@@ -614,7 +619,8 @@ export function createBrowserRuntime() {
                 checkTab();
                 if (input.type === "wheel") await current.page.mouse.wheel({ deltaX: input.deltaX, deltaY: input.deltaY });
                 else {
-                  // 当前 Puppeteer 的 down/up 原生支持 clickCount，但公开类型省略了它；保持每次按下/抬起各一个事件。
+                  // The current Puppeteer down/up natively supports clickCount, but the public types omit it;
+                  // keep one event per press/release.
                   const options = { button: input.button, clickCount: input.clickCount };
                   if (input.type === "click") {
                     try { await current.page.mouse.down(options); }

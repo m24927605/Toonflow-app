@@ -14,7 +14,7 @@ import { loadMarkdownImage, markdownDom, resolveMarkdownPath, type MarkdownFiles
 
 export const resolveDocumentPath = resolveMarkdownPath;
 
-// 兼容已保存的富文本 HTML 和普通 Markdown，始终保留原始图片 src。
+// Supports both saved rich-text HTML and plain Markdown; always keeps the original image src.
 export function parseMarkdownContent(text: string): string {
   const dom = markdownDom(text);
   for (const pre of dom.querySelectorAll<HTMLElement>("pre")) {
@@ -31,7 +31,7 @@ export function parseMarkdownContent(text: string): string {
     item.dataset.checked = String(checkbox ? checkbox.checked : item.dataset.checked === "true" || item.dataset.checked === "");
     if (checkbox?.parentElement?.tagName === "LABEL") checkbox.parentElement.remove();
     else checkbox?.remove();
-    // TaskItem 的解析器查找 div；明确直属容器，避免误取嵌套任务的内容。
+    // TaskItem's parser looks for a div; target the direct child container to avoid picking up nested task content.
     if (!item.querySelector(":scope > div")) {
       const content = document.createElement("div");
       content.append(...item.childNodes);
@@ -92,7 +92,8 @@ export default function markdownExtensions(context: { files?: MarkdownFiles; res
 }
 
 function needsHtml(node: JSONContent): boolean {
-  // Markdown 无法表达跨行/跨列、多个单元格段落或非首行表头，保留为可编辑 HTML。
+  // Markdown can't express row/col spans, multi-paragraph cells or headers outside the first row;
+  // keep these as editable HTML.
   if (node.type === "table") {
     const rows = node.content || [];
     const width = rows[0]?.content?.length;

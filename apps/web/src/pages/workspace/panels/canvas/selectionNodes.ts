@@ -69,7 +69,7 @@ export function finishGroupDrag(nodes: GraphNode[], draggedNodes: GraphNode[]) {
     }
     return result;
   }
-  // 所有归属判断使用松手时的矩形，避免先贴合的组吸收原本不相交的节点。
+  // All membership checks use drop-time rects so a group fitted first can't absorb originally non-intersecting nodes.
   const rectangles = new Map(nodes.map(node => {
     const parents = ancestors(node);
     const position = parents.reduce((point, parent) => ({ x: point.x + parent.position.x, y: point.y + parent.position.y }), { ...node.position });

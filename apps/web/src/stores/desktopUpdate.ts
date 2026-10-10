@@ -65,13 +65,15 @@ async function observeDownloadProgress(source: string, signal: AbortSignal) {
       await waitForUpdateRead(signal);
       await readUpdate(source, signal, 1);
     } catch {
-      // ACT: 下载请求负责最终结果；进度查询短暂失败只等下一次读取，不重发下载。
+      // ACT: The download request owns the final result; a transient progress query failure just waits for the
+      // next read, without resending the download.
     }
   }
 }
 
 async function observeUpdate(snapshot: updateSnapshot, source: string, signal: AbortSignal) {
-  // ACT: 仅重复读取状态，最多观察三分钟；短暂断连不代表宿主已成功退出，不重发更新请求。
+  // ACT: Only re-read the status, observing for at most three minutes; a brief disconnect doesn't mean the host
+  // exited successfully, so never resend the update request.
   const deadline = performance.now() + 180000;
   while (snapshot.updating && !snapshot.installFailure) {
     if (performance.now() >= deadline) throw new Error("暂时无法确认更新结果，请稍后重新读取状态，或重新打开客户端。");
@@ -94,7 +96,7 @@ export function checkDesktopUpdate(readFirst = false) {
 export function runDesktopUpdate(nextAction: NonNullable<typeof desktopUpdateAction.value>, readFirst = false) {
   if (isRemoteConnection) return Promise.reject(new Error("连接其他设备时无法更新本机客户端，请断开并独立运行后重试。"));
   if (pendingUpdate) return pendingUpdate;
-  // 上轮观察超时后只能重新读取，不能因客户端没有收到结果而再次提交安装。
+  // Once the last observation timed out, only re-read; never resubmit the install because the client saw no result.
   if (desktopUpdateSnapshot.value?.updating) nextAction = "read";
   const source = desktopUpdateKey.value;
   const controller = new AbortController();
@@ -125,7 +127,8 @@ export function runDesktopUpdate(nextAction: NonNullable<typeof desktopUpdateAct
       snapshot = publishUpdate(data.data, source);
     } catch (error) {
       if (controller.signal.aborted) throw error;
-      // POST 断连也可能已经交接，只读回查；请求随 App 存活，不随关于页卸载而取消。
+      // A dropped POST may still have been handed off, so only read back; the request lives with App and isn't
+      // cancelled when the About page unmounts.
       try { snapshot = await readUpdate(source, controller.signal); }
       catch (readError) {
         if (!desktopUpdateSnapshot.value?.updating || controller.signal.aborted) throw readError;
@@ -135,7 +138,8 @@ export function runDesktopUpdate(nextAction: NonNullable<typeof desktopUpdateAct
     }
     return observeUpdate(snapshot, source, controller.signal);
   })().catch(error => {
-    // 切源后丢弃旧源的检查错误，已经交接或核验失败的安装结果仍需显示。
+    // After switching sources, drop check errors from the old source; install results that were handed off or
+    // failed verification must still show.
     if (!controller.signal.aborted && (nextAction !== "check" || desktopUpdateKey.value === source
       || desktopUpdateSnapshot.value?.updating || desktopUpdateSnapshot.value?.installFailure))
       desktopUpdateError.value = desktopUpdateSnapshot.value?.installFailure?.message || getUpdateError(error);

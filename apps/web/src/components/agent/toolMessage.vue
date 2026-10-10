@@ -68,7 +68,7 @@ function formatToolData(value: unknown) {
   if (value === undefined) return;
   try {
     const content = JSON.stringify(typeof value === "string" ? JSON.parse(value) : value, null, 2) ?? "";
-    // ACT: 超过 16K 字符只渲染完整文本，限制高亮与 token DOM 开销；更大数据量可改为虚拟行。
+    // ACT: Over 16K chars render plain text only to cap highlight/token DOM cost; bigger data could use virtual rows.
     return { content, markdown: content.length <= 16_384 ? `~~~json\n${content}\n~~~` : undefined };
   } catch {
     return { content: String(value), markdown: undefined };

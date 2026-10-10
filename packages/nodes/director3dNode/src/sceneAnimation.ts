@@ -21,7 +21,7 @@ export const directorPlanSchema = z.strictObject({
   })).max(200),
   cameraFrames: cameraFramesSchema,
 }).superRefine((value, context) => {
-  // 最后一个镜头保持到结束，无需重复添加结束帧；单帧表示固定镜头。
+  // The last shot holds until the end, so no extra end frame is needed; a single frame means a static shot.
   if (value.cameraFrames[0]?.time !== 0 || value.cameraFrames.some(frame => frame.time > value.duration)) {
     context.addIssue({ code: "custom", path: ["cameraFrames"], message: "镜头时间必须从 0 开始，且不超过方案时长" });
   }
@@ -75,7 +75,7 @@ export function prepareSceneAnimation(runtime: SceneRuntime, value: DirectorPlan
   return {
     setTime(time: number) {
       if (!Number.isFinite(time)) throw new Error("场景动画时间无效");
-      // LoopOnce 到终点会自动暂停；再次定位到任意时间前恢复采样。
+      // LoopOnce auto-pauses at the end; resume sampling before seeking to any time again.
       action.paused = false;
       mixer.setTime(Math.min(animation.duration, Math.max(0, time)));
       updateSunShadow(runtime);

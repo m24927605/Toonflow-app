@@ -8,7 +8,7 @@ import {
 import type { CanvasContext, QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import type { AgentEvent, AgentMention, AgentToolCall } from "@/agent/runtime/types";
 import { agentMentionsSchema, mentionPrompt, snapshotMentions, validateMentionTokens } from "@/agent/runtime/mentions";
-import { readAiReferences, referenceContent } from "@/utils/ai";
+import { isResponsesProtocol, readAiReferences, referenceContent } from "@/utils/ai";
 import { createAgentTools } from "@/agent/tools";
 import { createAgentResources } from "@/agent/runtime/resources";
 import { createAgentModel } from "@/agent/runtime/model";
@@ -70,7 +70,8 @@ export async function run(
       throw Object.assign(new Error("附件必须是工作区内非空且不超过 100 MB 的文件"), { status: 400 });
     }
     if (attachment.mimeType !== "text/plain") { attachmentContents.push(attachment); continue; }
-    // ACT: 与文本引用保持同一上限，完整读取并保存到模型上下文，超限直接拒绝而不截断。
+    // ACT: Same limit as text references: read fully into the model
+    // context, and reject instead of truncating when over the limit.
     if (info.size > 400000) throw Object.assign(new Error("文本附件最多支持 100000 个字符，请缩小内容后重试"), { status: 400 });
     const bytes = await readFile(path, { signal });
     let content: string;
@@ -85,7 +86,8 @@ export async function run(
   const sessionPath = sessionFile ? (await resolveWorkspacePath(sessionsDir, sessionFile)).path : undefined;
   const active = sessionPath ? getActiveAgentSession(sessionPath) : undefined;
   if (active && hasPendingAgentQuestion(active)) {
-    // ACT: 新消息结束旧提问，必须等旧执行释放文件锁后再继续，避免并发写入同一会话。
+    // ACT: A new message ends the pending question; wait for the old run to release
+    // the file lock before continuing, to avoid concurrent writes to one session.
     await active.abort();
     signal?.throwIfAborted();
   } else if (active) {
@@ -105,7 +107,8 @@ export async function run(
     });
     if (!file.isFile()) throw Object.assign(new Error("会话必须是普通文件"), { status: 400 });
   }
-  // ACT: SDK 新会话先分配文件名、首条回复才落盘；只锁所属文件，允许不同对话同时运行。
+  // ACT: New SDK sessions get a file name first and are only written on the first
+  // reply; lock only the owning file so different conversations can run concurrently.
   const newHistory = sessionPath ? undefined : SessionManager.create(cwd, sessionsDir);
   const release = lockWorkspaceFiles([sessionPath ?? newHistory!.getSessionFile()!]);
   const controller = new AbortController();
@@ -183,7 +186,8 @@ export async function run(
     session.agent.streamFunction = async (...args) => {
       const compacting = session.isCompacting;
       const stream = await streamFunction(...args);
-      // ACT: 摘要落盘前拒绝空正文，压缩、重试和普通回复仍由 SDK 处理。
+      // ACT: Reject empty summaries before they are written; compaction,
+      // retries and normal replies are still handled by the SDK.
       if (compacting) {
         const response = await stream.result();
         if (response.stopReason === "stop" && !response.content.some(part => part.type === "text" && part.text.trim())) {
@@ -193,7 +197,8 @@ export async function run(
       return stream;
     };
 
-    // ACT: 提及图片和视频复用媒体协议转换，会话只保存工作区快照路径。
+    // ACT: Mentioned images and videos reuse the media protocol
+    // conversion; the session stores only workspace snapshot paths.
     const mediaContents = new Map<string, ReturnType<typeof readAiReferences>>();
     const onPayload = session.agent.onPayload;
     session.agent.onPayload = async (payload, requestModel) => {
@@ -218,8 +223,8 @@ export async function run(
         }
       }
       if (!mediaMessages.size) return body;
-      const field = provider.protocol === "openai-responses" ? "input" : "messages";
-      const textType = provider.protocol === "openai-responses" ? "input_text" : "text";
+      const field = isResponsesProtocol(provider.protocol) ? "input" : "messages";
+      const textType = isResponsesProtocol(provider.protocol) ? "input_text" : "text";
       const messages = body[field] as { role?: string; content?: string | { type: string; text?: string }[] }[];
       return { ...body, [field]: await Promise.all(messages.map(async message => {
         if (message.role !== "user") return message;
@@ -360,7 +365,8 @@ export async function run(
         send({ type: "subAgent", agent });
       }
       if (resendEntry) {
-        // ACT: 只截断 SDK 当前分支；旧记录留在 JSONL 中，不再进入当前上下文。
+        // ACT: Only truncate the SDK's current branch; old records
+        // stay in the JSONL but no longer enter the current context.
         if (resendEntry.parentId) history.branch(resendEntry.parentId);
         else history.resetLeaf();
         history.appendModelChange(providerId, modelId);
@@ -369,13 +375,14 @@ export async function run(
         userMessageId = history.getBranch().findLast((entry) => entry.type === "message" && entry.message.role === "user")?.id;
       }
       send({ type: "session", file: basename(history.getSessionFile()!) });
-      // ACT: 文本附件完整内容进入模型上下文，界面仍保存工作区引用；视频在请求时加载，图片由 read 按需读取。
+      // ACT: Full text attachment content enters the model context while the UI keeps workspace
+      // references; videos load at request time and images are read on demand via read.
       const content = attachments.length
         ? `${mentionPrompt(prompt, mentions)}\n\n附件已保存到工作区，path 为相对路径，可用于节点选择素材。以下 JSON 包含文件信息，文本附件的 content 为完整正文：\n${JSON.stringify(
             attachmentContents
           )}`.trim()
         : mentionPrompt(prompt, mentions);
-      // SDK 仅以空格分隔技能名；兼容换行输入与追加的附件说明。
+      // The SDK only splits skill names on spaces; also handle newline input and appended attachment notes.
       await session.prompt(content.replace(/^(\/skill:\S+)\s+/, "$1 "));
       if (compactionError) throw new Error(compactionError);
       if (modelError) throw Object.assign(new Error(modelError), limited ? { code: "AGENT_LENGTH" } : {});
@@ -385,7 +392,8 @@ export async function run(
     } finally {
       signal?.removeEventListener("abort", abort);
       try {
-        // ACT: 用户停止时 SDK 队列可能尚未投递；保留已确认接收的文字，重开子会话也不会丢失。
+        // ACT: When the user stops, the SDK queue may not have delivered yet; keep
+        // text confirmed as received so reopening a sub-session does not lose it.
         const pending = session.clearQueue();
         for (const content of [...pending.steering, ...pending.followUp]) {
           history.appendMessage({ role: "user", content, timestamp: Date.now() });
@@ -394,11 +402,12 @@ export async function run(
         sendUserMessage();
         if (resendEntry && !messageAccepted && resumeLeafId) {
           history.branch(resumeLeafId);
-          // 分支指针本身不落盘，追加当前模型配置以保存恢复位置。
+          // The branch pointer itself is not persisted; append the current model config to save the resume position.
           history.appendModelChange(providerId, modelId);
           session.agent.state.messages = history.buildSessionContext().messages;
         }
-        // ACT: 只记录有首个内容增量的生成耗时，旧历史和未计时输出不参与速度统计。
+        // ACT: Only record generation time for output with a first content
+        // delta; old history and untimed output are excluded from speed stats.
         if (timing.decodeMs > 0) history.appendCustomEntry("toonflowTiming", timing);
         send({ type: "stats", stats: getAgentStats(history), contextUsage: session.getContextUsage() });
         if (parentFile && child) {

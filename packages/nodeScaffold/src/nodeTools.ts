@@ -16,7 +16,7 @@ export interface NodeToolDefinition<Schema extends z.ZodType = z.ZodType> {
 type RegisteredNodeTool = NodeToolInfo & Pick<NodeToolDefinition, "execute">;
 type NodeToolsIndex = { nodes: Map<string, Map<string, RegisteredNodeTool>>; version: number };
 
-// 共享 Vue Flow 实例上的注册表供各 UMD 访问，不进入画布 JSON。
+// Registry on the shared Vue Flow instance for every UMD to access; not included in the canvas JSON.
 const nodeToolsKey = Symbol.for("toonflow.nodeTools");
 const nodeToolsIndexKey = Symbol.for("toonflow.nodeToolsIndex");
 
@@ -41,7 +41,8 @@ function getRegistry(flow: ReturnType<typeof useVueFlow>) {
       if (!node.size) index.nodes.delete(entry.nodeId);
     };
     for (const entry of registry.values()) add(entry);
-    // ACT: 旧 UMD 仍写原 Map；在共享 Map 上同步索引，避免每次读取扫描全部节点函数。
+    // ACT: Old UMDs still write to the original Map; keep the index in sync on the shared Map
+    // to avoid scanning all node functions on each read.
     Object.defineProperties(registry, {
       set: { value(this: Map<string, RegisteredNodeTool>, key: string, entry: RegisteredNodeTool) {
         const previous = this.get(key);
@@ -105,7 +106,7 @@ export const nodeTools = {
   },
 };
 
-// 在画布 setup 中创建，按需读取当前节点函数，不复制全量注册表。
+// Created in the canvas setup; reads current node functions on demand without copying the whole registry.
 export function useNodeToolsContext() {
   const flow = useVueFlow();
   const { registry, index } = getRegistry(flow);

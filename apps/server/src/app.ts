@@ -12,7 +12,7 @@ import initializePlugins from "@/utils/plugins/initialize";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 
-const autoInstallProviders = ["tfRouter.ts", "apiMart.ts", "metaso.ts", "compshare.ts"];
+const autoInstallProviders = ["openai.ts", "higgsfield.ts", "apiMart.ts", "metaso.ts", "compshare.ts"];
 
 export async function createApp({
   webRoot,
@@ -37,7 +37,7 @@ export async function createApp({
   agentsRoot?: string;
   pluginRevision?: string;
 }) {
-  // conf 由下方的路由动态加载，必须先确定整个进程共用的数据目录。
+  // conf is loaded dynamically by the routes below, so the process-wide data directory must be set first.
   if (dataDirectory) process.env.TOONFLOW_DATA_DIR = resolve(dataDirectory);
   const { default: conf } = await import("@/utils/conf");
   setLocaleFallback(() => normalizeLocale((conf.get("settings", {}).ui as { language?: unknown } | undefined)?.language)
@@ -49,7 +49,7 @@ export async function createApp({
     const { default: initializeExt } = await import("@/utils/plugins/initializeExt");
     await initializeExt(resolve(dataDirectory, "ext"), extRoot, pluginRevision);
   }
-  // ACT: 内置媒体供应商随构建同步，其他供应商文件和独立保存的配置保留。
+  // ACT: Built-in media providers sync with the build; other provider files and separately saved configs are kept.
   if (dataDirectory && providersRoot) {
     const sourceDirectory = resolve(providersRoot, "media");
     let providerRevision = pluginRevision;
@@ -66,7 +66,7 @@ export async function createApp({
     }
     await initializePlugins(resolve(dataDirectory, "providers"), sourceDirectory, autoInstallProviders, providerRevision);
   }
-  // ACT: 技能和团队只补首次安装，保留用户修改。
+  // ACT: Skills and teams are only installed on first run, preserving user edits.
   if (dataDirectory && skillsRoot) await initializePlugins(resolve(dataDirectory, "skills"), skillsRoot);
   if (dataDirectory && agentsRoot) await initializePlugins(resolve(dataDirectory, "agents"), agentsRoot);
   const app = express();
@@ -84,8 +84,6 @@ export async function createApp({
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
   app.use("/api/desktop", desktopRequest);
 
-  const { default: initializeProviderModels } = await import("@/utils/ai/initialize");
-  await initializeProviderModels();
   const router = await import("@/router");
   router.default(app);
   const [{ createMcpRouter }, { getMcpTools }, { authorizeMcp }, { skillResources }] = await Promise.all([
@@ -103,7 +101,7 @@ export async function createApp({
   app.use("/a2a", createA2aRouter());
   app.use(express.static(webRoot));
 
-  // 错误处理
+  // Error handling
   app.use((err: Error & { status?: number }, request: Request, response: Response, next: NextFunction) => {
     if (response.headersSent) return next(err);
     console.error(err);

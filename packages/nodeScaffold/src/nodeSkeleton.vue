@@ -234,7 +234,8 @@ function mountDocument(target: HTMLElement) {
   };
   const lease = Symbol();
   documentLease = lease;
-  // ACT: 只移动原节点的界面，保留画布中的运行实例和尺寸；同一节点仅允许一个文档显示位置。
+  // ACT: Move only the original node's UI, keeping the running instance and size on the canvas;
+  // each node allows only one document display target.
   documentContext.targets.set(nodeId, target);
   return () => {
     if (documentLease !== lease) return;
@@ -343,7 +344,7 @@ function zoomCanvas(event: WheelEvent) {
 }
 
 const slotsHiddenByInteraction = ref(false);
-// ACT: 多选只操作节点；未选中的节点仍可通过 v-model 主动打开槽位。
+// ACT: Multi-selection only operates on nodes; unselected nodes can still open slots explicitly via v-model.
 const slotsVisible = computed(() => !slotsHiddenByInteraction.value && (!node.selected || getSelectedNodes.value.length <= 1));
 onSelectionStart(() => {
   slotsHiddenByInteraction.value = true;
@@ -505,7 +506,7 @@ function moveHandle(event: PointerEvent) {
   const element = event.currentTarget as HTMLElement;
   const rect = element.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  // 以 Handle 中心为原点，按画布缩放还原距离，限制总偏移半径为 6px。
+  // Origin at the Handle center; distance is unscaled by canvas zoom, with the total offset radius capped at 6px.
   const x = ((event.clientX - rect.left - rect.width / 2) / rect.width) * 18;
   const y = ((event.clientY - rect.top - rect.height / 2) / rect.height) * 18;
   const strength = Math.min(0.3, 6 / (Math.hypot(x, y) || 1));
@@ -543,15 +544,15 @@ function getHandleStatus(item: NodeHandle) {
 
 watchEffect(() => {
   if (props.loading) return;
-  // 仅同步端口快照供跨节点校验；端口状态由具体 node 维护。
+  // Only sync a port snapshot for cross-node validation; port state is maintained by the concrete node.
   if (JSON.stringify(node.data.handles) !== JSON.stringify(props.handles)) node.data.handles = props.handles.map((item) => ({ ...item }));
 });
 watchEffect(() => {
   if (props.loading) return;
-  // 输出由 node 持有，画布仅共享当前值；不使用 JSON 比较或触发端口重测。
+  // Outputs are owned by the node and the canvas only shares the current value; no JSON comparison or port revalidation.
   node.data.outputs = props.outputs;
 });
-// 比较内容，避免内联数组的新引用触发渲染循环。
+// Compare contents so new references from inline arrays don't trigger a render loop.
 watch(
   () => JSON.stringify([props.label, props.handles]),
   () => {

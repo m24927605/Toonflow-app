@@ -40,7 +40,8 @@ export function createTeamAgentCard(manifest: TeamManifest, endpointUrl: string)
     securityRequirements: [{ schemes: { bearer: [] } }],
     defaultInputModes: ["text/plain"],
     defaultOutputModes: ["text/plain", "application/json"],
-    // 团队能力与团队私有 SKILL.md 是不同资源，Card 不发布成员提示词或私有资料。
+    // Team capabilities and the team's private SKILL.md are different resources;
+    // the Card does not publish member prompts or private material.
     skills: [{ id: team.name, name: team.displayName, description: team.description, tags: ["toonflow", "team"] }],
   });
 }
@@ -103,12 +104,14 @@ export function createTeamA2aRouter(options: {
         return;
       }
       running.controller.abort(new Error("任务已取消"));
-      // 等待宿主清理并发成员后，execute 才发布 CANCELED，不能把取消请求冒充执行已停止。
+      // execute publishes CANCELED only after the host cleans up concurrent members;
+      // a cancel request must not pass for execution having stopped.
       await running.done;
     },
   };
-  // ACT: SDK 的任务存储和 owner 隔离复用内存实现；服务重启后不恢复任务。
-  // INPUT_REQUIRED 结束当前流，下一条携带 taskId 的消息从 SDK 存储重新进入 execute。
+  // ACT: The SDK's task store and owner isolation reuse the in-memory implementation;
+  // tasks are not restored after a server restart.
+  // INPUT_REQUIRED ends the current stream; the next message carrying the taskId re-enters execute from the SDK store.
   const handler = new DefaultRequestHandler(options.card, new InMemoryTaskStore(), executor, undefined, undefined, undefined, undefined, undefined, { keepBusAliveStates: [] });
   const cancelTask = handler.cancelTask.bind(handler);
   handler.cancelTask = async (request, context) => {
@@ -117,7 +120,8 @@ export function createTeamA2aRouter(options: {
     await options.onCancel?.(task.id);
     return task;
   };
-  // 拒绝同一 owner 对运行中任务重复提交，避免 SDK 将重复执行异常记成原任务失败。
+  // Reject repeat submissions by the same owner for a running task,
+  // so the SDK does not record the duplicate-execution error as the original task failing.
   const pending = new Set<string>();
   function begin(taskId: string | undefined, userId: string | undefined) {
     if (!taskId) return;
@@ -138,7 +142,7 @@ export function createTeamA2aRouter(options: {
     try { yield* sendMessageStream(request, context); }
     finally { if (key) pending.delete(key); }
   };
-  // SDK 1.2 的 Card middleware 直接 stringify 内部 oneof；这里使用官方 ProtoJSON 序列化。
+  // SDK 1.2's Card middleware stringifies the internal oneof directly; use the official ProtoJSON serialization here.
   router.get("/.well-known/agent-card.json", async (_request, response, next) => {
     try { response.json(AgentCard.toJSON(await handler.getAgentCard())); }
     catch (error) { next(error); }

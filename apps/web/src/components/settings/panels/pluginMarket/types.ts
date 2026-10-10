@@ -5,8 +5,6 @@ export type PluginType = "node" | "skill" | "tool" | "agent" | "ext";
 
 export interface Plugin {
   key: string;
-  id?: number;
-  isCollected?: boolean;
   type: PluginType;
   name: string;
   displayName: string;
@@ -20,8 +18,6 @@ export interface Plugin {
   canManage?: boolean;
   configRules?: Raw<Rule[]>;
   config?: Record<string, unknown>;
-  url?: string;
-  fileName?: string;
   kind?: "local" | "remote";
   cardUrl?: string;
   loadError?: string;

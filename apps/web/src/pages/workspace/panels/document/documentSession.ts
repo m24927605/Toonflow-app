@@ -65,7 +65,7 @@ export function createDocumentSession(resource: ExtResource, extension: ExtDefin
         const currentRevision = revision;
         const text = context.text;
         queuedRevision = currentRevision;
-        // ACT: 保存始终绑定打开时的目录和文件，排队期间切换 Tab 不改变写入目标。
+        // ACT: Saves always target the open-time directory and file; switching tabs while queued won't redirect writes.
         saving = saving.catch(() => {}).then(async () => {
           if (disposed) return;
           if (!disk) throw new Error("文件尚未读取，不能保存");
@@ -85,7 +85,7 @@ export function createDocumentSession(resource: ExtResource, extension: ExtDefin
       }
       const pending = saving;
       await pending;
-      // 保存期间仍可继续输入；退出工作区前必须一并落盘等待期间产生的新版本。
+      // Typing continues during a save; before leaving the workspace, versions created meanwhile must also be saved.
       if (pending === saving && !context.dirty) return;
     }
   }

@@ -110,7 +110,7 @@ export default async function createDesktopConnection(app: express.Express, dire
     if (!current?.server) return;
     await new Promise<void>(resolve => {
       current.server.close(() => resolve());
-      // Bun 的 closeAllConnections 未可靠关闭 SSE，显式释放旧页面的全部连接。
+      // Bun's closeAllConnections does not reliably close SSE, so explicitly release all connections of old pages.
       for (const socket of current.sockets) socket.destroy();
     });
   }

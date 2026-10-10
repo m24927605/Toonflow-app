@@ -92,7 +92,8 @@ export async function queryMentionNodes(nodes: readonly MentionCanvasNode[], rev
   }
   const items: MentionNode[] = [];
   const end = Math.min(nodes.length, offset + 2000);
-  // ACT: 名称搜索每页最多扫描 2000 节点；不复制画布，不读输出正文，不为所有节点建立深响应对象。
+  // ACT: Name search scans at most 2000 nodes per page; it does not copy the
+  // canvas, read output bodies, or create deep reactive objects for all nodes.
   for (; offset < end && items.length < limit; offset++) {
     options.signal?.throwIfAborted();
     const node = nodes[offset];

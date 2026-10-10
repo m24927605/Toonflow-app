@@ -29,7 +29,8 @@ function requireFile(path: string, help: string) {
   return path;
 }
 
-// ACT: 使用仓库内公开的默认签名，保证不同 CI 构建可覆盖安装；商店发布需改用专用签名。
+// ACT: Use the public default signing key in the repo so different CI
+// builds can install over each other; store releases need a dedicated key.
 const keystore = requireFile(join(mobileRoot, "native/defaultSigning.keystore"), "请使用包含默认签名文件的完整源码。");
 const sdkTools = join(sdkRoot, "build-tools", buildToolsVersion);
 const androidJar = requireFile(join(sdkRoot, "platforms", platformVersion, "android.jar"), "请确认 ANDROID_HOME 和 ANDROID_PLATFORM。");
@@ -73,7 +74,7 @@ if (!result.success) throw new AggregateError(result.logs, "构建移动端服�
 for (const directory of ["web", "nodes", "tools", "ext", "providers", "skills", "mcp"]) {
   await cp(join(projectRoot, "build", directory), join(payload, directory), { recursive: true });
 }
-// ACT: Photon 按自身目录读取 WASM，沿用 server 的完整 external 包布局。
+// ACT: Photon reads its WASM relative to its own directory, so keep the server's full external package layout.
 await cp(join(projectRoot, "build/server/node_modules"), join(payload, "node_modules"), { recursive: true });
 const revision = new Bun.CryptoHasher("sha256");
 async function hashPayload(directory: string) {

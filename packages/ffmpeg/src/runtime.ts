@@ -14,7 +14,9 @@ type FfmpegInternals = ffmpeg.FfmpegCommand & {
 const require = createRequire(import.meta.url);
 const native = ffmpeg.prototype as FfmpegInternals;
 
-/** 原生 fluent 工厂；文件路径相对工作区解析，不修改库的全局原型。 */
+/**
+ * Native fluent factory; file paths resolve relative to the workspace without modifying the library's global prototype.
+ */
 export function createFfmpeg(directory: string): typeof ffmpeg {
   const root = realpathSync(directory);
   if (!statSync(root).isDirectory()) throw new Error("FFmpeg 工作区必须是目录");
@@ -45,7 +47,8 @@ export function createFfmpeg(directory: string): typeof ffmpeg {
         return actual;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-        // 悬空链接不能当作普通的待创建文件，缺失父目录则继续检查最近的已有祖先。
+        // A dangling link must not be treated as an ordinary file to create;
+        // if the parent directory is missing, keep checking the nearest existing ancestor.
         if (lstatSync(parent, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("FFmpeg 不能操作悬空符号链接");
         const ancestor = dirname(parent);
         if (ancestor === parent) throw error;
@@ -69,7 +72,8 @@ export function createFfmpeg(directory: string): typeof ffmpeg {
     for (const output of command._outputs) fileArgument(output.target);
   }
 
-  // ACT: 只保护显式文件入口；原始参数、滤镜、清单内的间接 I/O 仍是可信代码，不是进程沙箱。
+  // ACT: Only explicit file entry points are guarded;
+  // indirect I/O in raw arguments, filters and list files is still trusted code, not a process sandbox.
   const proto = Object.create(native) as FfmpegInternals;
   proto.input = proto.addInput = proto.mergeAdd = function(source) {
     return native.input.call(this, fileArgument(source));
@@ -78,7 +82,8 @@ export function createFfmpeg(directory: string): typeof ffmpeg {
     return native.output.call(this, fileArgument(target), options);
   };
   proto.clone = function() {
-    // ACT: fluent 2.3.3 已设置输出时 clone.output() 会抛错；用空输出保留原生“不复制输出”的语义。
+    // ACT: fluent 2.3.3 throws from clone.output() when an output is already set;
+    // use an empty output to keep the native "do not copy outputs" semantics.
     const source = Object.create(this) as FfmpegInternals;
     if (this._outputs[0] && "target" in this._outputs[0]) {
       const empty = factory() as FfmpegInternals;

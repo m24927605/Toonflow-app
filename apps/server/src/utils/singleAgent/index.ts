@@ -42,7 +42,8 @@ type SingleSession = {
   closing?: Promise<void>;
 };
 
-// ACT: 临时对话只保存在当前进程内，关闭后销毁；多进程部署需共享会话及回调通道。
+// ACT: Temporary conversations live only in the current process and are destroyed
+// on close; multi-process deployments need shared sessions and callback channels.
 const sessions = new Map<string, SingleSession>();
 
 function getSession(sessionId: string) {
@@ -335,7 +336,8 @@ export function getBrowserScope(sessionId: string, browserSessionId: string): st
 }
 
 export function assertWorkspaceBrowserAccess(browserSessionId: string) {
-  // ACT: 临时对话数量由打开的弹窗决定；若未来支持大量常驻任务，改用浏览器会话到任务的索引。
+  // ACT: The number of temporary conversations is bounded by open dialogs; if
+  // many long-lived tasks are supported later, index tasks by browser session.
   for (const session of sessions.values()) {
     if (browserRuntime.hasOwner(session.cwd, session.history.getSessionId(), browserSessionId)) throw Object.assign(new Error("请通过临时对话身份访问此浏览器"), { status: 403 });
   }

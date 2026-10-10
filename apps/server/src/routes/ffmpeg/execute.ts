@@ -24,7 +24,8 @@ const inputSchema = z.object({
   calls: z.array(callSchema).max(2048),
   operation: callSchema,
 });
-// ACT: Bun 的静默 SSE 不保证触发断开事件；显式取消复用本接口和单进程会话状态。
+// ACT: Bun's idle SSE does not reliably fire disconnect events; explicit
+// cancellation reuses this endpoint and the single-process session state.
 const requests = new Map<string, { controller: AbortController; finished: Promise<void> }>();
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {

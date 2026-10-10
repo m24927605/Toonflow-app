@@ -25,7 +25,7 @@ export function useCanvasHistory(flow: ReturnType<typeof useVueFlow>, binding: (
     const fields = (element: Node | Edge, runtimeFields: Set<string>) => Object.fromEntries(
       Object.entries(element).filter(([key]) => !runtimeFields.has(key)),
     );
-    // ACT: 只复制结构和名称；删除后恢复内容由上面的节点、连线引用保留。
+    // ACT: Copy only structure and names; the node/edge references above keep the content for restoring after deletion.
     const key = JSON.stringify({
       nodes: flow.getNodes.value.map(node => ({ ...fields(node, nodeRuntimeFields), data: { label: node.data?.label } })),
       edges: flow.getEdges.value.map(edge => fields(edge, edgeRuntimeFields)),
@@ -37,7 +37,7 @@ export function useCanvasHistory(flow: ReturnType<typeof useVueFlow>, binding: (
     if (!binding() || applying.value || grouping.value) return;
     const snapshot = capture();
     if (snapshot.key === snapshots.value[cursor.value]?.key) return;
-    // ACT: 最多保存 100 步画布结构；节点内部内容、生成结果和外部文件不属于撤销历史。
+    // ACT: Keep up to 100 canvas structure steps; node internals, generated output and external files aren't undoable.
     snapshots.value = [...snapshots.value.slice(0, cursor.value + 1), snapshot].slice(-101);
     cursor.value = snapshots.value.length - 1;
     const nodeIds = new Set(snapshots.value.flatMap(item => item.nodes.map(node => node.id)));

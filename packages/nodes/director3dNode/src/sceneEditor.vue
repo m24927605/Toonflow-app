@@ -445,7 +445,8 @@ function captureLightingReference() {
   exitControl();
   if (!runtime) return;
   const forward = runtime.camera.getWorldDirection(new Vector3());
-  // 俯拍或仰拍时从镜头右方向取水平朝向，避免正前方投影接近零。
+  // For high- or low-angle shots, take the horizontal heading from the camera's right vector,
+  // since the forward projection approaches zero.
   const right = new Vector3(1, 0, 0).applyQuaternion(runtime.camera.quaternion);
   const angle = Math.hypot(forward.x, forward.z) > 0.0001 ? Math.atan2(-forward.x, -forward.z) : Math.atan2(-right.z, right.x);
   lightingReference.value = (angle * 180 / Math.PI + 360) % 360;
@@ -464,7 +465,7 @@ watch(sceneSettings, value => {
   applySceneSettings(runtime, value);
   refreshThumbnails();
 });
-// 拖动时只更新灯光，松手后再保存参数并重新生成缩略图。
+// Update only the light while dragging; save params and regenerate the thumbnail on release.
 watch(() => [lightingDraft.value.azimuth, lightingDraft.value.elevation], ([azimuth, elevation]) => {
   if (runtime) applyLighting(runtime, { ...lighting.value, azimuth: azimuth!, elevation: elevation! });
 });

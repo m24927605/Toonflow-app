@@ -10,7 +10,7 @@ const splash = showWindowsSplash(workerData, () => {
 
 function close() {
   splash.close();
-  // Bun 的消息监听会保活线程，关闭端口前须移除监听才能自然退出。
+  // Bun's message listener keeps the thread alive; remove it before closing the port so the thread can exit naturally.
   port.off("message", onMessage);
   port.close();
 }
@@ -23,6 +23,7 @@ function onMessage(command: "finish" | "close") {
   }
 }
 port.on("message", onMessage);
-// 自然退出前在创建窗口的线程中释放 Win32/GDI/动画资源，不强制终止 Worker。
+// Before exiting naturally, free Win32/GDI/animation resources on the thread that created the window,
+// without force-terminating the Worker.
 process.on("exit", () => splash.close());
 port.postMessage("ready");

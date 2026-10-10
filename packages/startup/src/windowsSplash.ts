@@ -25,8 +25,9 @@ export function showWindowsSplash(assetDir: string, onClose: () => void) {
   const native = user32.symbols;
   const dialogClass = Buffer.from("#32770\0", "utf16le");
   const windowTitle = Buffer.from("Toonflow 启动中\0", "utf16le");
-  // ACT: 固定主显示器上的 Windows x64 原生动画窗口；不创建第二个 WebView。
-  // WS_EX_LAYERED | WS_EX_APPWINDOW + WS_POPUP | WS_SYSMENU：透明无边框，任务栏保留关闭入口。
+  // ACT: A fixed native Windows x64 animation window on the primary display; no second WebView is created.
+  // WS_EX_LAYERED | WS_EX_APPWINDOW + WS_POPUP | WS_SYSMENU: transparent and borderless,
+  // keeping a close entry in the taskbar.
   const window = native.CreateWindowExW(0xc0000, ptr(dialogClass), ptr(windowTitle), 0x80080000, 0, 0, 400, 160, 0, 0, 0, null);
   let player: ReturnType<typeof createSplashPlayer> | undefined;
   let messageTimer: ReturnType<typeof setInterval> | undefined;
@@ -53,7 +54,8 @@ export function showWindowsSplash(assetDir: string, onClose: () => void) {
 
   try {
     if (!window) throw new Error("无法创建原生启动窗口");
-    // 普通创建的 #32770 不自动响应关闭；交给系统默认窗口过程处理任务栏关闭和 Alt+F4。
+    // A plainly created #32770 does not handle close on its own;
+    // let the system default window procedure handle taskbar close and Alt+F4.
     const kernel32 = dlopen("kernel32.dll", {
       GetModuleHandleW: { args: ["ptr"], returns: "u64" },
       GetProcAddress: { args: ["u64", "ptr"], returns: "ptr" },
@@ -85,9 +87,9 @@ export function showWindowsSplash(assetDir: string, onClose: () => void) {
     player = createSplashPlayer(assetDir, width, height, pixels);
     const size = new Int32Array([width, height]);
     const origin = new Int32Array(2);
-    // AC_SRC_OVER、全局不透明度 255、AC_SRC_ALPHA；画布为预乘 Alpha。
+    // AC_SRC_OVER, global opacity 255, AC_SRC_ALPHA; the canvas uses premultiplied alpha.
     const blend = new Uint8Array([0, 0, 255, 1]);
-    // MSG 按 Windows x64 的 48 字节布局，只处理本窗口及其子窗口消息。
+    // MSG uses the 48-byte Windows x64 layout; only messages for this window and its children are handled.
     const message = new Uint8Array(48);
     const startedAt = performance.now();
 
@@ -97,9 +99,9 @@ export function showWindowsSplash(assetDir: string, onClose: () => void) {
       if (isEnded) finishAnimation();
     }
 
-    // 先准备首帧，再显示；避免启动器 SW_HIDE 影响首次 ShowWindow。
+    // Prepare the first frame before showing, so the launcher's SW_HIDE does not affect the first ShowWindow.
     draw();
-    // 启动期间置顶，避免透明 Logo 被资源管理器或开发控制台遮住。
+    // Stay topmost during startup so the transparent logo is not hidden behind Explorer or the dev console.
     if (!native.SetWindowPos(window, 0xffffffffffffffffn, 0, 0, 0, 0, 0x53)) throw new Error("无法显示启动窗口");
     messageTimer = setInterval(() => {
       try {

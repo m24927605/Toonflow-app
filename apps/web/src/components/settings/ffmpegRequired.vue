@@ -30,7 +30,7 @@ events.onmessage = async event => {
     });
     if (events.readyState !== EventSource.CLOSED) visible.value = true;
   } catch {
-    // 用户取消后保留当前操作的失败结果，不自动重新生成媒体。
+    // If the user cancels, keep the current operation's failure result; don't regenerate media automatically.
   } finally {
     pending = false;
   }

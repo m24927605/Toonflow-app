@@ -145,7 +145,8 @@ export async function queryAssets(options: MentionQuery & { path?: string }) {
   const directory = await getAssetsDirectory();
   const path = options.path || ".";
   const resolved = await resolveWorkspacePath(directory, path);
-  // ACT: 每页扫描期间复用业务锁，目录变更时拒绝新游标；分页间释放锁并保留至多四个短期迭代器。
+  // ACT: Reuse the business lock while scanning each page and reject new cursors when the
+  // directory changes; release the lock between pages and keep at most four short-lived iterators.
   const release = lockWorkspaceFiles([resolved.path]);
   try {
     const query = options.query?.trim().toLocaleLowerCase() ?? "";

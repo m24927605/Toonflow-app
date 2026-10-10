@@ -20,7 +20,8 @@ function invalid(message: string, status = 400): never {
 }
 
 export function requireNewerVersion(current: unknown, incoming: unknown, label: string) {
-  // ACT: Bun 的比较器接受宽松版本；先限定完整 SemVer，缺失版本不猜测更新顺序。
+  // ACT: Bun's comparator accepts loose versions; require full SemVer
+  // first and do not guess update order when a version is missing.
   const versions = [current, incoming].map(value => {
     if (typeof value !== "string" || value.length > 256) return;
     const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(value.trim());
@@ -117,7 +118,7 @@ export async function installNode(fileName: string, source: string, force = fals
   if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(source)) {
     invalid("节点文件实际是 HTML 网页，不是节点脚本，请重新上传构建生成的 .umd.js 文件");
   }
-  // ACT: 仅静态检查脚手架约定和语法，确认安装后由画布加载执行。
+  // ACT: Only statically check scaffold conventions and syntax; the canvas loads and runs it after the install is confirmed.
   if (!source.includes("toonflowNodeHost")) invalid("文件不是兼容的 Toonflow 节点，请使用节点脚手架构建生成的 .umd.js 文件");
   if (!source.includes(`toonflowNodes.${name}`)) invalid(t`文件名与节点导出名不一致：${fileName} 需要导出 toonflowNodes.${name}，请按实际节点名修改文件名`);
   try { new Bun.Transpiler({ loader: "js" }).scan(source); }
@@ -157,7 +158,7 @@ export async function installExt(fileName: string, source: string, force = false
     if (current && !force) {
       let version: string | undefined;
       try { if (current.size <= maxBytes) version = parseExt(await readFile(path, "utf8"), name).version; }
-      catch { /* 损坏的已安装版本只能由明确的强制安装覆盖。 */ }
+      catch { /* A corrupt installed version can only be overwritten by an explicit forced install. */ }
       requireNewerVersion(version, metadata.version, `文件扩展“${name}”`);
     }
     await writeWorkspaceFile(path, source, !current);
@@ -186,12 +187,12 @@ export async function installTool(fileName: string, source: string, force = fals
       let version: unknown;
       if (current.size <= maxBytes) {
         const previous = await readFile(path, "utf8");
-        try { version = parseTool(previous, name).metadata.version; } catch { /* 损坏元数据没有可比较的版本。 */ }
+        try { version = parseTool(previous, name).metadata.version; } catch { /* Corrupt metadata has no comparable version. */ }
       }
       requireNewerVersion(version, metadata.version, `工具“${name}”`);
     }
     await writeWorkspaceFile(path, source, !current);
-    // ACT: Bun 按文件路径缓存模块，URL query 不会使已加载的工具失效。
+    // ACT: Bun caches modules by file path, so a URL query does not invalidate an already loaded tool.
     delete require.cache[path];
   } finally { release(); }
   return { name };
@@ -241,7 +242,8 @@ export function skillZip(bytes: Uint8Array) {
   const entries: { path: string; directory: boolean; size: number; checksum: number; method: number; start: number; end: number; header: number }[] = [];
   let total = 0;
   let offset = start;
-  // ACT: 仅支持普通存储/Deflate ZIP；先验证目录和声明大小，再限量解压，不将压缩包直接释放到磁盘。
+  // ACT: Only stored/Deflate ZIPs are supported; validate the directory and declared
+  // sizes first, then extract within limits instead of unpacking straight to disk.
   for (let index = 0; index < count; index++) {
     if (offset + 46 > end || data.readUInt32LE(offset) !== 0x02014b50) invalid("ZIP 技能包目录无效");
     const flags = data.readUInt16LE(offset + 8);
@@ -308,7 +310,8 @@ async function skillArchive(bytes: Uint8Array) {
     const data = header.subarray(start, start + length);
     return decodeText(data.subarray(0, data.indexOf(0) < 0 ? data.length : data.indexOf(0)));
   }
-  // ACT: Bun.Archive.files() 会略过链接并合并重名；先检查普通 USTAR 头，复杂 PAX/GNU 扩展拒绝安装。
+  // ACT: Bun.Archive.files() skips links and merges duplicate names; check
+  // plain USTAR headers first and reject complex PAX/GNU extensions.
   for (let offset = 0; offset < tar.length;) {
     const header = tar.subarray(offset, offset + 512);
     if (header.every(byte => byte === 0)) {
@@ -359,7 +362,8 @@ export async function installSkill(fileName: string, bytes: Uint8Array, force = 
   catch { return invalid("SKILL.md 前言格式无效"); }
   const name = frontmatter?.name;
   const description = frontmatter?.description;
-  // ACT: 兼容本地创建的小驼峰名称与既有短横线名称，不修改包内标识。
+  // ACT: Accept both locally created lowerCamelCase names and existing
+  // kebab-case names without changing in-package identifiers.
   if (typeof name !== "string" || name.length > 64 || !/^[a-z0-9][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*$/.test(name)) invalid("技能 name 必须为不超过 64 字符的小驼峰或短横线名称");
   skillPath(name);
   if (typeof description !== "string" || !description.trim() || description.length > 1024) invalid("技能 description 必须为 1 至 1024 字符");
@@ -384,7 +388,7 @@ export async function installSkill(fileName: string, bytes: Uint8Array, force = 
         let version: unknown;
         if (current.size <= maxBytes) {
           const previous = await readFile(join(target, "SKILL.md"), "utf8");
-          try { version = (parseFrontmatter(previous).frontmatter.metadata as Record<string, unknown> | undefined)?.version; } catch { /* 损坏元数据没有可比较的版本。 */ }
+          try { version = (parseFrontmatter(previous).frontmatter.metadata as Record<string, unknown> | undefined)?.version; } catch { /* Corrupt metadata has no comparable version. */ }
         }
         requireNewerVersion(version, (frontmatter.metadata as Record<string, unknown> | undefined)?.version, `技能“${name}”`);
       }
@@ -398,7 +402,8 @@ export async function installSkill(fileName: string, bytes: Uint8Array, force = 
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, content, { flag: "wx", mode: 0o600 });
     }
-    // ACT: 单进程锁内切换完整目录；旧版留到新版就位，失败时原路恢复。
+    // ACT: Swap the whole directory under the single-process lock; the old
+    // version stays until the new one is in place and is restored on failure.
     const backup = join(temporary, "previous");
     if (existing) await rename(target, backup);
     try { await rename(staged, target); }

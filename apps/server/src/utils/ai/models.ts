@@ -1,5 +1,7 @@
 import { t } from "@/lib/i18n";
 import { z } from "zod";
+import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import { codexProviderId } from "@/utils/ai/codex";
 
 const modelSchema = z.object({
   id: z.string().optional(), name: z.string().optional(),
@@ -9,6 +11,10 @@ const modelSchema = z.object({
 });
 
 export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl: string; protocol: string; apiKey: string }) {
+  // The Codex subscription has no public model list endpoint; use Pi's built-in catalog, which ships with each release.
+  if (protocol === "openai-codex-responses") {
+    return getBuiltinModels(codexProviderId).map(model => ({ id: model.id, label: model.name, contextWindow: model.contextWindow, maxOutputTokens: model.maxTokens }));
+  }
   const url = new URL(apiUrl);
   if (url.pathname === "/") url.pathname = "/v1";
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/models`;

@@ -49,7 +49,10 @@ type Chain = { [K in Exclude<ChainMethod, PathMethod | OptionMethod>]: (...args:
 type PathChain = { [K in PathMethod]: (path: string) => BrowserFfmpegCommand };
 type OptionChain = { [K in OptionMethod]: (...options: string[] | [string[]]) => BrowserFfmpegCommand };
 
-/** 浏览器保留文件型 fluent API；Node.js Stream、子进程和执行程序路径由宿主管理。 */
+/**
+ * The browser keeps the file-based fluent API;
+ * Node.js streams, child processes and executable paths are managed by the host.
+ */
 export type BrowserFfmpegCommand = Chain & PathChain & OptionChain & Pick<FfmpegCommand, typeof queryMethods[number]> & {
   on<K extends keyof BrowserFfmpegEvents>(event: K, listener: (...args: BrowserFfmpegEvents[K]) => void): BrowserFfmpegCommand;
   once: BrowserFfmpegCommand["on"];

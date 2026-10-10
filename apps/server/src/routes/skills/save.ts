@@ -16,7 +16,8 @@ export default router.put("/", validateFields({
   const { name, path, content } = req.body as { name: string; path?: string; content: string };
   if (Buffer.byteLength(content, "utf8") > u.skillFile.maxBytes) return res.status(413).json(error("技能文件不能超过 20 MB", null, 413));
   if (content.includes("\u0000")) return res.status(400).json(error("内容不能包含空字符", null, 400));
-  // ACT: 锁住技能根目录以覆盖扫描与替换，避免同进程安装/文件操作交错；高并发时再细化锁范围。
+  // ACT: Lock the skills root across scan and replace to avoid interleaving with
+  // in-process installs/file operations; narrow the lock scope if concurrency grows.
   const release = u.workspaceFile.lockWorkspaceFiles([u.skillFile.directory()]);
   try {
     const { target, isMain } = await u.skillFile.locate(name, path);
@@ -26,7 +27,8 @@ export default router.put("/", validateFields({
         if (!/^---\n[\s\S]*?\n---(?:\n|$)/.test(normalized) || !/^---(?:\n|$)/.test(normalized.slice(normalized.indexOf("\n---", 3) + 1))) {
           throw new Error("frontmatter");
         }
-        // SDK 使用 yaml.parse 并向外抛错；不重新序列化，保留原文、注释和换行。
+        // The SDK uses yaml.parse and throws outward; do not re-serialize,
+        // preserving the original text, comments and line breaks.
         const { frontmatter } = parseFrontmatter(content);
         z.object({ name: z.literal(name), description: z.string().max(1024).refine(value => Boolean(value.trim())) }).parse(frontmatter);
       } catch {

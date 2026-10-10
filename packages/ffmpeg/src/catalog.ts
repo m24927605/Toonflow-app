@@ -111,7 +111,7 @@ export const downloadSources = [
   },
 ] as const;
 
-// SHA256 来自上游 b6.1.1 Release API，校验下载的 gzip 文件。
+// SHA256 values come from the upstream b6.1.1 Release API and verify the downloaded gzip files.
 export const builds = {
   "win32-x64": {
     version: "6.1.1",

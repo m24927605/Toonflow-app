@@ -154,7 +154,8 @@ export function stopMobileLinkRuntime(app: Application) {
 }
 
 export function suspendMobileLinkRuntime(app: Application) {
-  // 切为客户端后不自动恢复共享；回到独立运行时由用户重新开启。
+  // Sharing is not restored automatically after switching to client
+  // mode; the user re-enables it after returning to standalone.
   if (getMobileLinkConfig().enabled) conf.set("mobileLink", { ...getMobileLinkConfig(), enabled: false });
   stopMobileLinkRuntime(app);
 }
@@ -192,7 +193,8 @@ export async function configureMobileLink(app: Application, value: Omit<MobileLi
       closeListener(runtime.listener);
       runtime.listener = listener;
     } else {
-      // 共享范围变化时让已有流断开，下一次请求重新检查当前目录权限。
+      // Disconnect existing streams when the sharing scope changes; the
+      // next request rechecks permissions for the current directory.
       for (const socket of runtime.listener?.sockets.keys() ?? []) socket.destroy();
     }
     return getMobileLinkStatus(app);
@@ -240,7 +242,8 @@ export function pairMobileDevice(req: Request, code: string, name: string) {
   if (!pairing || !matchesHash(code, manual ? pairing.manualCodeHash : pairing.codeHash)) {
     throw Object.assign(new Error("配对码无效或已使用，请重新获取"), { status: 401 });
   }
-  // ACT: 配对码仅属于当前进程；同步消费和写入，重复及并发请求只能成功一次。
+  // ACT: Pairing codes belong to the current process only; consume and write
+  // synchronously so duplicate or concurrent requests succeed only once.
   runtime.pairing = undefined;
   const deviceToken = randomBytes(32).toString("base64url");
   const config = getMobileLinkConfig();

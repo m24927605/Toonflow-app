@@ -17,7 +17,8 @@ export async function readNode(name: string) {
     throw error;
   });
   if (!file.isFile()) throw Object.assign(new Error("节点文件无效"), { status: 400 });
-  // ACT: 当前整包读取，内存开销随节点总体积增长；节点变多或包变大时改为只读首行。
+  // ACT: Reads whole bundles for now, so memory grows with total
+  // node size; read only the first line once nodes or bundles grow.
   const source = await readFile(path, "utf8");
   let metadata: Record<string, unknown> = {};
   try {
@@ -25,7 +26,7 @@ export async function readNode(name: string) {
     const parsed = header ? JSON.parse(header) : null;
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) metadata = parsed;
   } catch {
-    // 旧节点或损坏的元数据继续使用文件名，不执行节点脚本。
+    // Legacy nodes or corrupt metadata fall back to the file name without executing the node script.
   }
   let github = "";
   if (typeof metadata.github === "string" && URL.canParse(metadata.github)) {
@@ -75,7 +76,7 @@ export function validateNodeConfig(rules: ConfigRule[], config: Record<string, u
     const required = rule.required === true || (Array.isArray(rule.validate) && rule.validate.some(validation =>
       validation && typeof validation === "object" && !Array.isArray(validation) && validation.required === true));
     if (!required || typeof rule.field !== "string" || !rule.field) continue;
-    // ACT: 条件控件由表单决定是否提交；隐藏且未提交的字段不触发必填校验。
+    // ACT: The form decides whether conditional controls are submitted; hidden, unsubmitted fields skip required validation.
     if (conditional && !Object.hasOwn(config, rule.field)) continue;
     const value = Object.hasOwn(parsed, rule.field) ? parsed[rule.field] : undefined;
     if (value == null || (typeof value === "string" && !value.trim()) || (Array.isArray(value) && !value.length)) {

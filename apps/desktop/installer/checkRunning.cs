@@ -66,7 +66,7 @@ internal static class checkRunning
                         if (handle == IntPtr.Zero)
                         {
                             int errorCode = Marshal.GetLastWin32Error();
-                            if (errorCode == 87) continue; // 进程在枚举后已退出。
+                            if (errorCode == 87) continue; // The process exited after enumeration.
                             throw new Win32Exception(errorCode, "Cannot inspect " + processName + " (PID " + process.Id + ").");
                         }
                         try

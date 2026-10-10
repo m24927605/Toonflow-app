@@ -71,7 +71,8 @@ const imageMaterial = new three.MeshStandardMaterial({ color: 0xcbd5e1, side: th
 const imagePlane = new three.Mesh(new three.PlaneGeometry(1, 1), imageMaterial);
 imagePlane.castShadow = true;
 imagePlane.receiveShadow = true;
-// ACT: 原图仅表示正面参考，背面使用中性材质，避免镜像贴图误导光位判断。
+// ACT: The source image only represents the front reference; the back uses a neutral material
+// so a mirrored texture doesn't mislead light placement.
 const imageBack = new three.Mesh(new three.PlaneGeometry(1, 1), new three.MeshStandardMaterial({ color: 0x64748b, side: three.BackSide, roughness: 1 }));
 imageBack.castShadow = true;
 imageBack.receiveShadow = true;
@@ -130,7 +131,7 @@ function project(position: three.Vector3) {
 function render() {
   renderFrame = 0;
   if (!renderer || !viewport.value || unavailable.value || disposed) return;
-  // 使用布局尺寸，避免画布缩放变换让渲染缓冲区过小、放大后模糊。
+  // Use the layout size so canvas zoom transforms don't make the render buffer too small and blurry when zoomed in.
   const { clientWidth: width, clientHeight: height } = viewport.value;
   if (!width || !height) return;
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -170,7 +171,8 @@ function render() {
     positions.needsUpdate = true;
     line.geometry.computeBoundingSphere();
     if (isRim) {
-      // ACT: 参考图是平面，背光仅作少量透光和图框补偿；人物轮廓重打光需模型处理。
+      // ACT: The reference image is flat; backlight only adds slight translucency and frame compensation.
+      // Relighting subject silhouettes needs the model.
       const transmission = Math.max(0, -bulb.position.z / radius) * strength;
       imageMaterial.emissive.lerp(lamp.color, transmission * 0.5);
       imageMaterial.emissiveIntensity += transmission * 0.14;
@@ -216,7 +218,8 @@ function startDrag(event: PointerEvent, kind: "key" | "rim") {
 function moveDrag(event: PointerEvent) {
   if (!drag || drag.pointerId !== event.pointerId || props.disabled) return;
   event.preventDefault();
-  // ACT: 水平、垂直拖动直接调整两个角度，避免球体背面拾取跳到正面；视角旋转不改变角度约定。
+  // ACT: Horizontal and vertical drags adjust the two angles directly, avoiding jumps to the front when picking on
+  // the sphere's back; view rotation doesn't change the angle convention.
   setDirection(drag.kind, drag.azimuth + (event.clientX - drag.x) * 0.8, drag.elevation - (event.clientY - drag.y) * 0.6);
 }
 

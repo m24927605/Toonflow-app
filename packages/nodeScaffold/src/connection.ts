@@ -47,7 +47,8 @@ export const validateConnection: ValidConnectionFunc = (connection, context) => 
   if (!source || !target || !isTypeCompatible(source.dataType, target.dataType)) return false;
 
   try {
-    // VueFlow 已统一正向和反向拖线的端点；基础校验通过后，仅执行接收端的附加规则。
+    // VueFlow already normalizes endpoints for forward and reverse drags;
+    // after base validation passes, only run the target's extra rules.
     return !targetNode.isValidTargetPos || targetNode.isValidTargetPos(connection, context) === true;
   } catch (error) {
     console.error("节点连接校验失败", error);

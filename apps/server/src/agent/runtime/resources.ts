@@ -30,10 +30,12 @@ export async function createAgentResources(cwd: string, tools: ToolDefinition[],
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
-    // ACT: 仅自动载入工作区根目录的 AGENTS.md，关闭 SDK 向父目录和其他指令文件的自动扫描。
+    // ACT: Only auto-load AGENTS.md at the workspace root; disable the SDK's
+    // automatic scan of parent directories and other instruction files.
     noContextFiles: true,
     agentsFilesOverride: () => ({ agentsFiles: agentsContent.trim() ? [{ path: agentsPath, content: agentsContent.replace(/^\uFEFF/, "") }] : [] }),
-    // ACT: 技能正文按需读取；每个会话独立创建 loader，避免 SDK 的会话绑定互相覆盖。
+    // ACT: Skill bodies are read on demand; each session creates its own
+    // loader so the SDK's session bindings do not overwrite each other.
     skillsOverride: () => sdkSkills,
     systemPrompt: "",
     systemPromptOverride: () => [buildSystemPrompt({ systemPrompt, tools, skills: skills.skills, platform: process.platform }), instructions].filter(Boolean).join("\n\n"),

@@ -66,7 +66,8 @@ export async function copyCanvasFiles(files: Files, path: string, target: string
         copiedAssets.push(destination);
         paths.set(`assets/${id}`, destination);
       }
-      // ACT: 节点所属素材整体独立复制；未归属本画布节点的公共素材继续引用原文件。
+      // ACT: Node-owned assets are copied independently as a whole; shared assets not owned by this canvas's
+      // nodes keep referencing the originals.
       const remapPath = (value: string) => {
         const normalized = value.replaceAll("\\", "/");
         for (const [source, destination] of paths) if (normalized === source || normalized.startsWith(`${source}/`)) return destination + normalized.slice(source.length);
@@ -76,7 +77,7 @@ export async function copyCanvasFiles(files: Files, path: string, target: string
         try {
           const reference = JSON.parse(decodeURIComponent(value));
           if (Array.isArray(reference) && reference.length === 2 && ids.has(reference[0])) return encodeURIComponent(JSON.stringify([ids.get(reference[0]), reference[1]]));
-        } catch { /* 普通文本不是节点参考标识。 */ }
+        } catch { /* Plain text isn't a node reference identifier. */ }
         return value;
       };
       const remapData = (value: unknown): unknown => {
@@ -129,7 +130,7 @@ export async function copyCanvasFiles(files: Files, path: string, target: string
       canvas.id = target + suffix;
       canvas.name = canvas.id.split("/").at(-1)!.slice(0, -5);
     }
-    // 所有正文、素材和引用完成后才发布副本，目标已存在时仍由 rename 拒绝覆盖。
+    // Publish the copy only after content, assets and references finish; rename still won't overwrite existing targets.
     await files.rename(temporary, target);
     copied = false;
     return canvases.map(({ id, name }) => ({ id, name }));

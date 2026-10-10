@@ -41,7 +41,7 @@ export const skillResources: NonNullable<McpOptions["resources"]> = {
     let text: string | undefined;
     if (!bytes.includes(0)) {
       try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
-      catch { /* 二进制附属资料使用 MCP 的 blob 内容返回。 */ }
+      catch { /* Binary supporting files are returned as MCP blob content. */ }
     }
     return { contents: [text === undefined ? { uri, mimeType, blob: bytes.toString("base64") } : { uri, mimeType, text }] };
   },

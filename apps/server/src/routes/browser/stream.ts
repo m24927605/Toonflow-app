@@ -38,7 +38,7 @@ export default Router().get("/", validateFields(inputSchema.shape, "query"), asy
   const write = (event: BrowserStreamEvent) => {
     if (disposed || res.destroyed) return;
     if (blocked) {
-      // ACT: 慢客户端只保留最新状态和一帧，避免浏览器画面无限积压。
+      // ACT: Slow clients keep only the latest state and one frame so browser frames do not pile up indefinitely.
       if (event.type === "frame") pendingFrame = event;
       else {
         pendingState = event;
@@ -61,7 +61,7 @@ export default Router().get("/", validateFields(inputSchema.shape, "query"), asy
     if (frame) write(frame);
   };
   res.on("drain", drain);
-  // Bun 的客户端断连不一定触发 res.close，保留请求和 socket 的清理入口。
+  // Bun does not always fire res.close on client disconnect; keep cleanup hooks on the request and socket.
   res.once("close", close);
   req.once("aborted", close);
   req.socket.once("close", close);

@@ -23,14 +23,15 @@ export function createApp(publicDirectory: string) {
     }
     const name = req.path.slice(1);
     const filePath = join(publicDir, name);
-    // ACT: 只服务发布器生成的平铺 ASCII 文件名，不解码 URL，也不跟随符号链接。
+    // ACT: Only serve flat ASCII file names produced by the publisher; do not decode URLs or follow symlinks.
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name) || !lstatSync(filePath, { throwIfNoEntry: false })?.isFile()) {
       res.status(404).end();
       return;
     }
     const controller = new AbortController();
     const cancel = () => controller.abort();
-    // Bun 在响应头发出前断开只触发请求 aborted，不能只监听响应 close。
+    // A disconnect before headers are sent only fires the request's
+    // aborted in Bun, so listening for response close alone is not enough.
     req.once("aborted", cancel);
     res.once("close", cancel);
     try {

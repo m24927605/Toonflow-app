@@ -61,7 +61,7 @@ function rebuild() {
       onUpdate({ editor: current }) {
         if (!props.active || sourceMode.value) return;
         lastMarkdown = serializeMarkdown(current);
-        // 同步更新节点输出，关闭弹窗或保存画布时不等待防抖回调。
+        // Update node output synchronously; closing the dialog or saving the canvas doesn't wait for the debounce callback.
         emit("update:modelValue", lastMarkdown);
       },
     });

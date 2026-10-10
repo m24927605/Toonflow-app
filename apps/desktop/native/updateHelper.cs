@@ -86,7 +86,7 @@ internal static class updateHelper
             using (var parent = Process.GetProcessById(parentPid))
             using (var archiveStream = new FileStream(archive, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                // 保持句柄，避免 PID 复用；仅等待当前安装的宿主，不终止其他进程。
+                // Hold the handle to avoid PID reuse; only wait for this install's host and never terminate other processes.
                 IntPtr parentHandle = parent.Handle;
                 if (parent.HasExited || !inside(parent.MainModule.FileName, Path.Combine(root, "app", "bin")))
                     throw new InvalidOperationException("父进程不属于当前 Toonflow 安装。");
@@ -124,7 +124,8 @@ internal static class updateHelper
         {
             if (root != null)
             {
-                // 只有归属校验完成且持有安装锁的事务能撤销交接；结果写入失败也不能留下可退出的旧标记。
+                // Only a transaction that passed the ownership check and holds the install lock may
+                // revoke the handoff; a failed result write must not leave a stale exit marker either.
                 foreach (string path in new[] { Path.Combine(root, "self-extraction", "update-" + transaction + ".ready"), planPath })
                 {
                     try { File.Delete(path); }
@@ -160,7 +161,8 @@ internal static class updateHelper
 
     private static void spawnScheduledUpdate(string executable, string planPath, bool quiet)
     {
-        // ACT: breakaway 成功仍可能留在外层 Job，统一由当前用户的任务服务启动；不提权、不设置触发器，启动后删除任务。
+        // ACT: Even after a successful breakaway the process may stay in the outer Job, so always launch via
+        // the current user's Task Scheduler; no elevation, no triggers, and the task is deleted after launch.
         string taskName = scheduledTaskName(planPath);
         dynamic scheduler = Activator.CreateInstance(Type.GetTypeFromProgID("Schedule.Service", true));
         scheduler.Connect();
@@ -209,7 +211,8 @@ internal static class updateHelper
             catch (Exception error)
             {
                 int code = error.HResult & 0xffff;
-                // ACT: Windows 退出后的短暂占用只等待 10 秒；权限配置错误或持续占用仍交给事务回滚。
+                // ACT: Wait only 10 seconds for brief locks after exit on Windows; misconfigured
+                // permissions or persistent locks are still left to transaction rollback.
                 if (!(error is IOException || error is UnauthorizedAccessException) || (code != 5 && code != 32 && code != 33)
                     || timer.Elapsed.TotalSeconds >= 10) throw;
                 Thread.Sleep(200);
@@ -242,7 +245,7 @@ internal static class updateHelper
                     if (moved) moveDirectory(app, stage);
                     moveDirectory(backup, app);
                 }
-                // 已恢复的旧程序应照常启动，安装登记写入失败单独保留诊断。
+                // The restored old app should start normally; a failed install registration write keeps its own diagnostic.
                 try { restoreRegistration(root, identifier, channel, text(oldInfo, "version")); }
                 catch (Exception restoreError) { registrationError = "\n安装登记恢复未完成：" + restoreError.Message; }
                 Process previous = null;
@@ -280,11 +283,12 @@ internal static class updateHelper
         if (transaction != null) options.EnvironmentVariables["TOONFLOW_UPDATE_TRANSACTION"] = transaction;
         process = Process.Start(options);
         if (process == null) throw new InvalidOperationException("更新后无法启动 Toonflow。");
-        // 在应用确认就绪或清理完成前保持句柄，不能用进程名称定位本次启动。
+        // Hold the handle until the app confirms ready or cleanup finishes; never locate this launch by process name.
         IntPtr handle = process.Handle;
         if (transaction == null)
         {
-            // ACT: 回滚版本可能尚不支持就绪协议，保留旧启动器的短暂退出检查。
+            // ACT: A rolled-back version may not support the ready
+            // protocol yet, so keep the old launcher's brief exit check.
             if (process.WaitForExit(1000) && process.ExitCode != 0) throw new InvalidOperationException("恢复旧版本后无法启动 Toonflow。");
             return;
         }
@@ -311,7 +315,8 @@ internal static class updateHelper
 
     private static void stopApp(Process process)
     {
-        // ACT: 已退出的 launcher 由 SDK Job 清理子进程；残余占用交由有界 Move 失败保护备份，不按名称终止其他实例。
+        // ACT: The SDK Job cleans up children of an exited launcher; leftover locks are handled by the
+        // bounded Move failure that protects the backup, never by killing other instances by name.
         if (!process.HasExited)
         {
             string taskkill = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "taskkill.exe");

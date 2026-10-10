@@ -19,7 +19,7 @@
           :disabled="saving"
           :aria-pressed="selectedProvider === item.id"
           @click="selectedProvider = item.id">
-          <img v-if="item.icon" class="providerLogo" :class="{ monochrome: item.id === 'tfRouter' }" :src="item.icon" alt="" />
+          <img v-if="'icon' in item && item.icon" class="providerLogo" :src="item.icon" alt="" />
           <modelIcon v-else :model="item.id" :size="18" />
           <span>{{ item.label }}</span>
         </button>
@@ -105,7 +105,8 @@ import { mediaProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
-import tfRouterSource from "@toonflow/providers/media/tfRouter?raw";
+import openaiSource from "@toonflow/providers/media/openai?raw";
+import higgsfieldSource from "@toonflow/providers/media/higgsfield?raw";
 import apiMartSource from "@toonflow/providers/media/apiMart?raw";
 import metasoSource from "@toonflow/providers/media/metaso?raw";
 import compshareSource from "@toonflow/providers/media/compshare?raw";
@@ -117,7 +118,7 @@ import { writeClipboardText } from "@/lib/clipboard";
 const { mode = "custom" } = defineProps<{ mode?: "builtin" | "custom" }>();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ added: [provider: MediaProvider] }>();
-const providerSources: Record<string, string> = { tfRouter: tfRouterSource, apiMart: apiMartSource, metaso: metasoSource, compshare: compshareSource };
+const providerSources: Record<string, string> = { openai: openaiSource, higgsfield: higgsfieldSource, apiMart: apiMartSource, metaso: metasoSource, compshare: compshareSource };
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
 const models = computed<MediaProvider["models"]>(() => activeProvider.value?.models ?? []);
@@ -236,7 +237,7 @@ async function addProvider() {
     }
     if (values) {
       const providerId = addedProvider.value.id;
-      // ACT: 安装成功但配置保存失败时保留安装结果，重试只保存配置。
+      // ACT: If install succeeds but saving the config fails, keep the install; a retry only saves the config.
       await saveSettings(settings => {
         const configs = settings.mediaProviderConfigs as Record<string, Record<string, unknown>> | undefined;
         if (configs !== undefined && (!configs || typeof configs !== "object" || Array.isArray(configs))) throw new Error("媒体供应商配置格式无效");
@@ -303,10 +304,6 @@ async function copyPrompt() {
         width: 18px;
         height: 18px;
         object-fit: contain;
-
-        &.monochrome {
-          .dark & { filter: invert(1); }
-        }
       }
     }
   }

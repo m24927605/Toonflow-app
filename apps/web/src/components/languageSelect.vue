@@ -3,7 +3,7 @@
     v-if="popover"
     v-model:visible="visible"
     trigger="click"
-    :placement="rtl ? 'bottom-start' : 'bottom-end'"
+    placement="bottom-end"
     role="dialog"
     :aria-label="translate('语言')"
     :width="500"
@@ -67,10 +67,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { IconCheck, IconChevronDown, IconDeviceDesktop, IconLanguage, IconWorld, IconX } from "@tabler/icons-vue";
-import { detectLocale, isRtlLocale, supportedLocales, type Locale } from "@toonflow/i18n";
+import { detectLocale, supportedLocales, type Locale } from "@toonflow/i18n";
 import { locale, translate } from "@toonflow/i18n/vue";
 import { uiSettings, updateUiSettings } from "@/stores/settings";
-import languageFlags from "@/assets/languageFlags.svg?url";
+// <use> cannot reference symbols inside a data: URI, so keep the sprite a real file even though it is small.
+import languageFlags from "@/assets/languageFlags.svg?url&no-inline";
 
 defineProps<{ popover?: boolean }>();
 const emit = defineEmits<{ select: [] }>();
@@ -78,13 +79,9 @@ const visible = ref(false);
 const panel = ref<HTMLDivElement>();
 const triggerButton = ref<HTMLButtonElement>();
 const popoverPanel = ref<{ focusSelected: () => void }>();
-const flagIds: Record<Locale, string> = {
-  "zh-CN": "cn", "zh-TW": "cn", en: "us", ja: "jp", ru: "ru", vi: "vn", th: "th", ko: "kr", hi: "in",
-  id: "id", ms: "my", fil: "ph", bn: "bd", ur: "pk", ta: "in", te: "in", mr: "in", pa: "in", ar: "sa", fa: "ir", tr: "tr",
-};
+const flagIds: Record<Locale, string> = { "zh-CN": "cn", "zh-TW": "cn", en: "us" };
 const systemLanguageName = computed(() => supportedLocales.find(language => language.code === (uiSettings.value.language === "system" ? locale.value : detectLocale(navigator.languages)))?.name);
 const selectedName = computed(() => supportedLocales.find(language => language.code === locale.value)?.name);
-const rtl = computed(() => isRtlLocale(locale.value));
 
 function changeLanguage(language: Locale | "system") {
   if (uiSettings.value.language !== language) updateUiSettings({ language });
@@ -98,15 +95,14 @@ function focusLanguage(button?: HTMLButtonElement | null) {
   const popup = button.closest<HTMLElement>(".languagePopup");
   button.focus({ preventScroll: !!popup });
   if (!popup) return;
-  // ACT: 仅滚动语言弹层，避免聚焦时连带滚动 hello 页面。
+  // ACT: Scroll only the language popover so focusing doesn't also scroll the hello page.
   const cardRect = button.getBoundingClientRect();
   const popupRect = popup.getBoundingClientRect();
   if (cardRect.top < popupRect.top) popup.scrollTop += cardRect.top - popupRect.top;
   else if (cardRect.bottom > popupRect.bottom) popup.scrollTop += cardRect.bottom - popupRect.bottom;
 }
 function navigateLanguages(event: KeyboardEvent) {
-  let direction = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 0;
-  if (rtl.value && ["ArrowLeft", "ArrowRight"].includes(event.key)) direction *= -1;
+  const direction = ["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 0;
   if (!direction && !["Home", "End"].includes(event.key)) return;
   const buttons = [...(panel.value?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? [])];
   const current = buttons.findIndex(button => button === event.target);

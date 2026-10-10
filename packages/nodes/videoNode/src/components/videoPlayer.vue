@@ -119,7 +119,7 @@ function readPreview(event: Event) {
   if (poster.value || !source.videoWidth || !source.videoHeight) return;
   try {
     const canvas = document.createElement("canvas");
-    // ACT: 复用已解码帧，封面最长边限制为 640px；更高清画面由视频播放提供。
+    // ACT: Reuse the decoded frame and cap the cover's longest side at 640px; higher-res frames come from video playback.
     const scale = Math.min(1, 640 / Math.max(source.videoWidth, source.videoHeight));
     canvas.width = Math.max(1, Math.round(source.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(source.videoHeight * scale));
@@ -216,7 +216,8 @@ async function captureFrame(command: "current" | "first" | "last") {
       frameVideo = document.createElement("video");
       frameVideo.muted = true;
       frameVideo.preload = "auto";
-      // 用独立视频解码首尾帧，不改变播放器当前进度；尾帧定位到结束前。
+      // Decode first/last frames with a separate video so the player's position is unchanged;
+      // the last frame seeks to just before the end.
       await loadFrame(frameVideo, command === "first" ? 0 : Math.max(0, duration.value - 0.001), controller.signal);
       source = frameVideo;
     }

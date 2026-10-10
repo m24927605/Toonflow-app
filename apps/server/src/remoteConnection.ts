@@ -6,7 +6,6 @@ import { resolve } from "node:path";
 import { isIP } from "node:net";
 import { readFile, rm, writeAtomic } from "@toonflow/file";
 import { getLocale, languageRequest, translateError, translateMessage } from "./lib/i18n";
-import { isRtlLocale } from "@toonflow/i18n";
 
 type RemoteConnection = { url: string; name: string; deviceToken: string; appVersion?: string };
 
@@ -48,7 +47,8 @@ export async function createRemoteConnection(directory: string, options: {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  // ACT: 切换只写下一次启动配置，当前进程继续使用原目标；重启换端口隔离旧页面和未完成请求。
+  // ACT: Switching only writes the next-launch config and the current process keeps
+  // its target; restarting on a new port isolates old pages and pending requests.
   const active = connection;
   const appVersion = readAppVersion(options.appVersion);
   let remoteAppVersion = active?.appVersion;
@@ -92,7 +92,7 @@ export async function createRemoteConnection(directory: string, options: {
     if (next) await writeAtomic(path, next, { mode: 0o600 });
     else await rm(path, { force: true });
     try {
-      // 写入让出事件循环后也要复检，不能在配对期间开启共享后自动停掉它。
+      // Re-check after the write yields the event loop; sharing enabled during pairing must not be stopped automatically.
       if (value) options.validateTarget?.(value.url);
       await options.onChange?.(Boolean(value));
       savedText = next;
@@ -111,7 +111,7 @@ export async function createRemoteConnection(directory: string, options: {
         clearTimeout(timer);
         options.restart?.();
       };
-      // 已提交的切换必须完成；Bun 中请求被取消时可能不再触发 finish/close。
+      // A committed switch must complete; in Bun a canceled request may never fire finish/close.
       const timer = setTimeout(restartHost, 500);
       timer.unref();
       response.once("finish", restartHost);
@@ -161,7 +161,7 @@ export async function createRemoteConnection(directory: string, options: {
       await saveConnection({ url: pair.url, name: body.data.name.slice(0, 128), deviceToken: body.data.deviceToken, appVersion: readAppVersion(body.data.appVersion) });
       completeChange(response, { mode: "remote", url: pair.url, name: body.data.name });
     } catch (error) {
-      // 不将请求对象或设备凭据写入日志/错误页。
+      // Never write the request object or device credentials to logs/the error page.
       const status = (error as { status?: number })?.status;
       response.status(Number.isInteger(status) && status! >= 400 && status! <= 599 ? status! : 502).json({ message: error instanceof Error ? translateError(error) : translateMessage("无法连接服务器") });
     } finally {
@@ -185,7 +185,7 @@ function remoteProxy(connection: RemoteConnection): express.RequestHandler {
   return (request, response) => {
     const localOrigin = `http://${request.get("host")}`;
     const target = new URL(connection.url);
-    // 用 pathname/search 赋值，不让 //evil.example 这类路径替换目标主机。
+    // Assign pathname/search so paths like //evil.example cannot replace the target host.
     const queryStart = request.originalUrl.indexOf("?");
     target.pathname = queryStart < 0 ? request.originalUrl : request.originalUrl.slice(0, queryStart);
     target.search = queryStart < 0 ? "" : request.originalUrl.slice(queryStart);
@@ -238,7 +238,8 @@ function remoteProxy(connection: RemoteConnection): express.RequestHandler {
     request.once("aborted", close);
     request.socket.once("close", close);
     response.once("close", close);
-    // ACT: 原始请求/响应流直接管道传输，保留 Range、上传与 Agent/SSE 增量数据，并传播取消。
+    // ACT: Pipe raw request/response streams directly, preserving Range,
+    // uploads and incremental Agent/SSE data, and propagating cancellation.
     if (request.headers["content-length"] || request.headers["transfer-encoding"]) request.pipe(upstream);
     else upstream.end();
   };
@@ -252,6 +253,7 @@ function showConnectionError(response: express.Response, message: string, page =
   const retry = Bun.escapeHTML(translateMessage("重试"));
   const disconnect = Bun.escapeHTML(translateMessage("断开并独立运行"));
   const failure = Bun.escapeHTML(translateMessage("切换失败，请重试"));
-  // 错误页来自本机，远端离线时仍可主动独立运行。返回200避免原生HTTP错误遮住恢复按钮。
-  response.status(200).type("html").send(`<!doctype html><html lang="${locale}" dir="${isRtlLocale(locale) ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toonflow</title><style>body{font:16px system-ui;background:#fff;color:#303133;text-align:center;padding:8vh 24px}button{padding:12px 20px;margin:12px;border:1px solid #dcdfe6;border-radius:8px;background:#fff;color:#409eff;font:inherit}</style></head><body><h2>${title}</h2><p>${Bun.escapeHTML(message)}</p><button onclick="location.reload()">${retry}</button><button data-error="${failure}" onclick="this.disabled=true;fetch('/api/connection/disconnect',{method:'POST',headers:{'x-toonflow-workspace':'1','Accept-Language':'${locale}'}}).then(async r=>{if(!r.ok)throw Error();if((await r.json()).restart==='mobile')location.href='toonflow://restart'}).catch(()=>{this.disabled=false;alert(this.dataset.error)})">${disconnect}</button><script>if(new URLSearchParams(location.search).get("desktop")==="1")fetch("/api/desktop/ready",{method:"POST",headers:{"x-toonflow-desktop":"1","Content-Type":"application/json"},body:JSON.stringify({failed:true})}).catch(()=>{});</script></body></html>`);
+  // The error page is served locally, so the user can still switch to standalone while the
+  // remote is offline. Return 200 so a native HTTP error does not hide the recovery button.
+  response.status(200).type("html").send(`<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toonflow</title><style>body{font:16px system-ui;background:#fff;color:#303133;text-align:center;padding:8vh 24px}button{padding:12px 20px;margin:12px;border:1px solid #dcdfe6;border-radius:8px;background:#fff;color:#409eff;font:inherit}</style></head><body><h2>${title}</h2><p>${Bun.escapeHTML(message)}</p><button onclick="location.reload()">${retry}</button><button data-error="${failure}" onclick="this.disabled=true;fetch('/api/connection/disconnect',{method:'POST',headers:{'x-toonflow-workspace':'1','Accept-Language':'${locale}'}}).then(async r=>{if(!r.ok)throw Error();if((await r.json()).restart==='mobile')location.href='toonflow://restart'}).catch(()=>{this.disabled=false;alert(this.dataset.error)})">${disconnect}</button><script>if(new URLSearchParams(location.search).get("desktop")==="1")fetch("/api/desktop/ready",{method:"POST",headers:{"x-toonflow-desktop":"1","Content-Type":"application/json"},body:JSON.stringify({failed:true})}).catch(()=>{});</script></body></html>`);
 }

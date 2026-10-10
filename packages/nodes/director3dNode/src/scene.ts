@@ -7,7 +7,8 @@ import { createMannequin, mannequinJoints } from "./mannequin";
 const coordinate = z.number().min(-10000).max(10000);
 const vector = z.strictObject({ x: coordinate, y: coordinate, z: coordinate });
 const color = z.string().regex(/^#[\da-f]{6}$/i);
-// ACT: 场景只接入基础几何体和内置人偶，不接受可执行脚本、HTML 或外部资源配置。
+// ACT: Scenes accept only basic geometries and the built-in mannequin;
+// no executable scripts, HTML or external resource config.
 export const sceneSchema = z.strictObject({
   version: z.literal("next"),
   sceneConfig: z.strictObject({
@@ -62,7 +63,7 @@ export function applySceneSettings(runtime: SceneRuntime, settings: SceneSetting
     sky = new Sky();
     sky.scale.setScalar(450000);
     sky.material.uniforms.sunPosition!.value.set(10, 16, 12);
-    // 单独压缩天空的 HDR 高亮，保留模型原有的亮度。
+    // Compress the sky's HDR highlights separately, keeping the models' original brightness.
     sky.material.fragmentShader = sky.material.fragmentShader.replace(
       "#include <tonemapping_fragment>",
       "gl_FragColor.rgb = gl_FragColor.rgb / (gl_FragColor.rgb + vec3(2.0));",
@@ -199,7 +200,7 @@ export async function createStage(canvas: HTMLCanvasElement, document: SceneDocu
       next.scene.add(mannequin);
       registerObject(mannequin, object, { recursive: false }, next.scene);
     }
-    // 离屏 canvas 没有布局尺寸，不能依赖运行时从 clientWidth / clientHeight 推断。
+    // Offscreen canvases have no layout size, so don't rely on the runtime inferring it from clientWidth / clientHeight.
     next.renderer.setSize(width, height, false);
     next.camera.aspect = aspect;
     const { x, y, z } = document.sceneConfig.controls.target;
@@ -212,7 +213,7 @@ export async function createStage(canvas: HTMLCanvasElement, document: SceneDocu
         object.receiveShadow = true;
       }
     });
-    // 网格线无法接收阴影，用透明地面承接太阳光投影。
+    // Grid lines can't receive shadows, so a transparent ground catches the sun's shadows.
     const shadowGround = new Mesh(new PlaneGeometry(200, 200), new ShadowMaterial({ opacity: 0.35 }));
     shadowGround.rotation.x = -Math.PI / 2;
     shadowGround.position.y = -0.01;

@@ -44,7 +44,8 @@ const fontSize = computed(() => {
 });
 const matches = computed(() => {
   if (!searchVisible.value || !props.context.active || !query.value) return [];
-  // 转义后仅作字面量查找，索引来自原文，避免 Unicode 大小写转换改变字符长度。
+  // After escaping, search literally only;
+  // indices come from the original text so Unicode case conversion cannot change character lengths.
   const pattern = new RegExp(query.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), caseSensitive.value ? "g" : "gi");
   return Array.from(props.context.text.matchAll(pattern), match => ({ start: match.index, end: match.index + match[0].length }));
 });
@@ -78,7 +79,8 @@ function findNext(direction = 1) {
   selectedIndex.value = selectedIndex.value < 0 ? (direction < 0 ? matches.value.length - 1 : 0)
     : (selectedIndex.value + direction + matches.value.length) % matches.value.length;
   const match = matches.value[selectedIndex.value]!;
-  // textarea 的偏移以规范为 LF 的显示文本为准；替换仍使用原始偏移，保留其余 CRLF。
+  // textarea offsets refer to the displayed text normalized to LF;
+  // replacements still use the original offsets and keep the remaining CRLFs.
   const before = props.context.text.slice(0, match.start).replace(/\r\n?/g, "\n");
   const selected = props.context.text.slice(match.start, match.end).replace(/\r\n?/g, "\n");
   textarea.value.focus();

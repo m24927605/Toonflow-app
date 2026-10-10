@@ -26,7 +26,8 @@ export default async function initializePlugins(targetDirectory: string, sourceD
       await cp(source, target, { recursive: true, force: false });
       continue;
     }
-    // ACT: 版本同步仅覆盖匹配的内置单文件；同目录 rename 保留失败时的旧文件。
+    // ACT: Version sync only overwrites matching built-in single
+    // files; a same-directory rename keeps the old file on failure.
     const temporary = resolve(targetDirectory, `.pluginSync${crypto.randomUUID()}`);
     try {
       await copyFile(source, temporary);
@@ -38,7 +39,8 @@ export default async function initializePlugins(targetDirectory: string, sourceD
       throw error;
     }
   }
-  // 同一构建只同步一次；安装器移除标记以支持同版本重装，构建变化支持升级和降级。
+  // Sync once per build; the installer removes the marker to allow
+  // same-version reinstalls, and build changes allow upgrades and downgrades.
   await (revision === undefined ? writeFile(marker, "", { flag: "wx" }) : writeAtomic(marker, revision, { mode: 0o666 })).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "EEXIST") throw error;
   });

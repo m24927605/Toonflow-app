@@ -1,4 +1,4 @@
-// ACT: 此函数也会被序列化到原生壳的预检页面，必须保持自包含，不依赖模块变量。
+// ACT: This is also serialized into the native shell's preflight page; keep it self-contained, no module variables.
 export function getMissingBrowserFeatures(): string[] {
   const browser = globalThis as typeof globalThis & {
     ResizeObserver?: unknown;

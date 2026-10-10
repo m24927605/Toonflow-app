@@ -59,6 +59,8 @@ const inputSchema = z.object({
 });
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
+  // Only Toonflow pages may spend the configured model subscriptions and API keys.
+  u.mcpControl.assertAppRequest(req);
   const input = inputSchema.parse(req.body, validationOptions());
   const configured = u.ai.getConfiguredModel(input.providerId, input.modelId);
   const controller = new AbortController();
@@ -66,13 +68,14 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const close = () => { clearInterval(heartbeat); controller.abort(); };
   res.once("close", close);
   req.once("aborted", close);
-  // ACT: 兼容不同运行时的关闭事件；Bun 1.3.14 的静默 SSE 仍可能不通知，不能保证立即停止上游。
+  // ACT: Handle close events across runtimes; Bun 1.3.14's idle SSE may
+  // still not notify, so stopping upstream immediately is not guaranteed.
   req.socket.once("close", close);
   try {
     const directory = input.references?.some(item => item.dataType !== "STRING")
       ? await u.workspace.resolveWorkspace(req, input.directory ?? "") : undefined;
     const references = await u.ai.readAiReferences(directory, input.references ?? [], controller.signal);
-    const stream = u.ai.streamAi(configured, input.context, controller.signal, references);
+    const stream = await u.ai.streamAi(configured, input.context, controller.signal, references);
     res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
     res.flushHeaders();
     heartbeat = setInterval(() => {

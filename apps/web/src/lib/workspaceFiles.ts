@@ -15,7 +15,8 @@ function cachePath(path: string) {
 }
 
 function invalidateUrls(directory: string, path: string) {
-  // ACT: 仅失效时保守合并路径写法；实际读取仍交服务端校验，区分大小写的文件最多多读一次。
+  // ACT: Fold path spellings conservatively only for invalidation; reads are still validated server-side, so
+  // case-sensitive files are re-read at most once.
   directory = cachePath(directory);
   path = cachePath(path);
   for (const [key, entry] of fileUrls) {
@@ -69,7 +70,7 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
         released = true;
         if (--current.users) return;
         if (fileUrls.get(key) === current) fileUrls.delete(key);
-        // 等待中的读取也要在最后一个使用者离开后释放，不撤销其他节点仍使用的 URL。
+        // Pending reads must also be released once the last user leaves, without revoking URLs other nodes still use.
         void current.url.then(url => URL.revokeObjectURL(url), () => {});
       },
     };
@@ -152,6 +153,6 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
     await client.post("/mkdir", { directory: getDirectory(), path });
   }
 
-  // ACT: 当前目录逐次读取；跨 await 或防抖的操作传入目录字符串，固定本次目标。
+  // ACT: Current directory is read per call; ops spanning await or debounce pass a directory string to pin the target.
   return { list, read, importImage, acquireUrl, readText, readJson, readTextSnapshot, writeTextSnapshot, write, writeJson, rename, copy, reveal, remove, mkdir };
 }

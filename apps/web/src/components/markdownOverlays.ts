@@ -15,7 +15,7 @@ function withOverlayLayer(component: Component, isAlert = false) {
       const zIndex = ref(0);
       watch(() => props.open, (open, _previous, onCleanup) => {
         if (!open) return;
-        // Alert 的遮罩使用 zIndex - 1，两个层级一起分配，确保遮罩也高于父窗口。
+        // The Alert mask uses zIndex - 1; allocate both levels together so the mask also sits above the parent window.
         nextZIndex();
         zIndex.value = nextZIndex();
         openLayers.set(key, zIndex.value);
@@ -27,7 +27,7 @@ function withOverlayLayer(component: Component, isAlert = false) {
               .some(element => element.getClientRects().length && Number(getComputedStyle(element).zIndex) > zIndex.value);
             if (!closeOnKeyup) return;
           }
-          // 原组件在 keyup 关闭，Element Plus 在 keydown 关闭；同一次 Esc 只交给最上层。
+          // The original component closes on keyup, Element Plus on keydown; one Esc goes only to the topmost layer.
           event.stopImmediatePropagation();
           if (event.type !== "keyup" || !closeOnKeyup) return;
           if (props.close) props.close();

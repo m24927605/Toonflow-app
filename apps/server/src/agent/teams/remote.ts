@@ -43,7 +43,8 @@ export async function runRemoteTeam(options: {
     if (contextId) result.contextId = contextId;
   }
   function artifact(value: Artifact, append = false) {
-    // ACT: 工具只返回有界文本与文件说明，不下载 URL，也不把远端附件写进工作区。
+    // ACT: The tool returns only bounded text and file descriptions; it
+    // neither downloads URLs nor writes remote attachments into the workspace.
     if (!artifacts.has(value.artifactId) && artifacts.size >= 128) { truncated = true; return; }
     artifacts.set(value.artifactId, limit(`${append ? artifacts.get(value.artifactId) ?? "" : ""}${partsText(value.parts)}`));
   }
@@ -133,7 +134,7 @@ export async function runRemoteTeam(options: {
           result.status = "cancelled";
           result.result = `${description}；远端已确认取消`;
         } else {
-          // 断流只核对任务，不重发消息，避免重复执行有副作用的工作。
+          // On stream loss only check the task without resending the message, to avoid repeating work with side effects.
           snapshot(await client.getTask(GetTaskRequest.fromJSON({ id: result.taskId }), { signal: AbortSignal.timeout(15000) }));
           if (!finish()) result.result = `${description}；远端任务仍未结束，未自动重试或取消`;
         }

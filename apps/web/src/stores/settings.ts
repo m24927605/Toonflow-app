@@ -7,7 +7,7 @@ import { canvasShortcutFields, defaultCanvasShortcuts, getShortcutBindings, isSh
 import "element-plus/es/components/message/style/css";
 
 export const settings = ref<Record<string, unknown>>({});
-// ACT: 页面在 loadSettings 完成后才挂载，加载标记仅保留在设置初始化与自动保存内部。
+// ACT: Pages mount only after loadSettings completes; the loaded flag stays internal to settings init and auto-save.
 let settingsReady = false;
 let saveQueue = Promise.resolve();
 let applyingSettings = false;
@@ -16,7 +16,8 @@ export const settingsStorage = {
   getItem(key: string) {
     const stores = settings.value.stores as Record<string, unknown> | undefined;
     if (stores && Object.hasOwn(stores, key)) return JSON.stringify(stores[key]);
-    // ACT: 只迁移当前来源可读取的旧缓存，保留原值；不同端口的 localStorage 不能互读。
+    // ACT: Only migrate legacy cache readable from the current origin, keeping original values; localStorage
+    // can't be shared across ports.
     const value = localStorage.getItem(key);
     if (value !== null) settingsStorage.setItem(key, value);
     return value;
@@ -76,15 +77,6 @@ export function updateGeneralSettings(patch: Partial<typeof generalSettings.valu
   settings.value = { ...settings.value, general: { ...(current && typeof current === "object" && !Array.isArray(current) ? current : {}), ...patch } };
 }
 
-export const privacySettings = computed(() => {
-  const raw = settings.value.privacy;
-  const privacy = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
-  return {
-    dataCollectionEnabled: privacy.dataCollectionEnabled !== false,
-    anonymousId: typeof privacy.anonymousId === "string" ? privacy.anonymousId : "",
-  };
-});
-
 export type CustomProviderModel = { id: string; label: string; contextWindow?: number; maxOutputTokens?: number };
 export type CustomProvider = { id: string; label: string; icon?: string; version?: string; apiUrl: string; apiKey: string; protocol: string; models: CustomProviderModel[] };
 export const customProviders = computed<CustomProvider[]>(() => Array.isArray(settings.value.customProviders)
@@ -92,7 +84,10 @@ export const customProviders = computed<CustomProvider[]>(() => Array.isArray(se
     && item.models.every((model: CustomProviderModel) => !!model && typeof model.id === "string" && typeof model.label === "string"))
   : []);
 
-export const modelChoices = computed(() => customProviders.value.flatMap(provider => provider.models.map(model => ({
+// Claude Code only serves single-turn node generation, so agent model pickers leave it out.
+export const agentProviders = computed(() => customProviders.value.filter(provider => provider.protocol !== "claude-code"));
+
+export const modelChoices = computed(() => agentProviders.value.flatMap(provider => provider.models.map(model => ({
   value: JSON.stringify([provider.id, model.id]), providerId: provider.id, modelId: model.id, label: model.label, contextWindow: model.contextWindow,
 }))));
 
@@ -104,32 +99,27 @@ export async function loadSettings() {
     throw new Error("读取设置失败");
   }
   settings.value = data.data;
-  // 等初始化引发的监听执行完，再允许自动保存。
+  // Wait for watchers triggered by initialization to finish before allowing auto-save.
   await nextTick();
   settingsReady = true;
 }
 
 export function saveSettings(update?: (current: Record<string, unknown>) => Record<string, unknown> | undefined) {
-  // ACT: 队列内读取最新配置再计算变更，确认成功后发布；仅协调当前页面的保存。
+  // ACT: Read the latest settings inside the queue before computing changes and publish after confirmed success;
+  // only coordinates this page's saves.
   const saving = saveQueue.then(async () => {
     const patch = update?.(settings.value);
     if (update && !patch) return false;
-    const { data } = await axios.put<{ code: number; data: { customProviders?: CustomProvider[]; mediaProvider?: { id: string }; modelRefreshErrors?: string[] } | null }>(
+    const { data } = await axios.put<{ code: number }>(
       "/api/settings/save", { settings: { ...settings.value, ...patch } }, { headers: { "x-toonflow-workspace": "1" } },
     );
     if (data.code !== 200) throw new Error("保存设置失败");
-    const providers = data.data?.customProviders;
-    if ((patch && Object.hasOwn(patch, "customProviders")) || providers) invalidateNodeModels("language");
-    if (patch || providers) {
+    if (patch && Object.hasOwn(patch, "customProviders")) invalidateNodeModels("language");
+    if (patch) {
       applyingSettings = true;
-      try { settings.value = { ...settings.value, ...patch, ...(providers ? { customProviders: providers } : {}) }; }
+      try { settings.value = { ...settings.value, ...patch }; }
       finally { applyingSettings = false; }
     }
-    if (data.data?.mediaProvider) {
-      invalidateNodeModels("media");
-      window.dispatchEvent(new CustomEvent("toonflow:plugin-installed", { detail: { type: "provider", name: data.data.mediaProvider.id } }));
-    }
-    if (data.data?.modelRefreshErrors?.length) ElMessage.warning(`API Key 已保存，部分模型获取失败：${data.data.modelRefreshErrors.join("；")}`);
     return true;
   });
   saveQueue = saving.then(() => {}, () => {});

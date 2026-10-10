@@ -63,7 +63,8 @@ async function readResult<T>(response: Response): Promise<T> {
   return result.data;
 }
 
-// ACT: 独立 UMD 各有模块作用域，共用宿主缓存；模型设置保存后失效，不按节点重复请求。
+// ACT: Each standalone UMD has its own module scope, so they share a host cache;
+// it is invalidated when model settings are saved, avoiding repeated per-node requests.
 const modelCacheKey = Symbol.for("toonflow.nodeModels");
 const modelCacheHost = globalThis as typeof globalThis & { [modelCacheKey]?: Map<string, Promise<unknown[]>> };
 const modelCache = modelCacheHost[modelCacheKey] ??= new Map<string, Promise<unknown[]>>();
@@ -83,7 +84,7 @@ async function readModels<T>(url: string, signal: AbortSignal): Promise<T[]> {
     pending = request;
     modelCache.set(url, request);
   }
-  // 单个节点关闭只取消自己的等待，不能中断其他节点共用的请求。
+  // Closing one node only cancels its own wait and must not abort requests shared with other nodes.
   let cancel = () => {};
   try {
     const models = await Promise.race([
@@ -125,7 +126,8 @@ async function requestModel(input: NodeAiRequest, context: Context, model: Model
         if (message?.role !== "assistant" || !Array.isArray(message.content)) throw new Error("AI 返回消息不完整，请确认服务端已更新");
         if (message.stopReason === "deferred" || message.stopReason === "pending") throw new Error("AI 返回了未完成的任务");
         if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "AI 请求失败");
-        // ACT: 增量直接通知 UI；SDK 只消费完整单轮消息，避免每个 token 传输全量快照。
+        // ACT: Deltas notify the UI directly; the SDK only consumes complete per-turn messages,
+        // avoiding a full snapshot per token.
         stream.push({ type: "start", partial: { ...message, content: [], stopReason: "pending" } });
         stream.push({ type: "done", reason: message.stopReason, message });
         break;

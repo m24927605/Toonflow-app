@@ -169,7 +169,6 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import { generalSettings } from "@/stores/settings";
 import { getShortcutBindings, shortcutLabel, shortcutMatches, shortcutPressed } from "@/lib/canvasShortcuts";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
-import anonymousData from "@/lib/anonymousData";
 import { createClipboardMediaFile, dropCanvasFiles, getClipboardMediaFiles, importCanvasFiles, isCanvasFileDrag } from "./canvasDrop";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
@@ -227,9 +226,6 @@ const canvasSaveError = ref("");
 const documentObservers = new Set<() => void>();
 onScopeDispose(() => { for (const release of documentObservers) release(); });
 provide("nodeDocument", nodeDocument);
-onScopeDispose(anonymousData.observeCanvas(() => props.active && canvasId.value
-  ? { nodes: flow.nodes.value, edgeCount: flow.edges.value.length }
-  : undefined));
 let dragCopy: ReturnType<InstanceType<typeof selectionToolbar>["startDragCopy"]>;
 flow.onNodeDragStart(({ event, nodes }) => {
   dragCopy = undefined;
@@ -301,7 +297,8 @@ async function prepareCanvasDelete() {
   checkCanvas();
   await nextTick();
   checkCanvas();
-  // 宿主已暂停画布保存；这里只执行节点生命周期，文件删除成功后由宿主取消保存并卸载。
+  // The host has already paused canvas saving; only run node lifecycles here, and the host cancels saving and
+  // unmounts once the file is deleted.
   for (const node of nodes) {
     if (flow.findNode(node.id) !== node) throw new Error("画布节点已变化，请重新删除");
     await useNodeEvent(node.id, flow).emit("delete");
@@ -435,7 +432,8 @@ async function saveDocumentNode(directory: string, canvasPath: string, nodeId: s
     if (liveNode?.type === "remote-textNode") {
       await getNodeTools().call({ nodeId, name: "node:setText", args: { text } }, canvasController.signal);
       checkDocumentDirectory(directory);
-      // 节点工具已同步输出并排队保存；等待期间用户可能继续编辑，不能再写入旧文本快照。
+      // The node tool already synced its output and queued a save; the user may keep editing meanwhile, so
+      // don't write the old text snapshot again.
       return;
     }
     if (liveNode && canvasId.value === canvasPath && findNode(nodeId) === liveNode) {
@@ -536,7 +534,8 @@ let saveRevision = 0;
 const saveCanvas = debounce((directory: string, fileName: string) => {
   const flow = toObject();
   const revision = saveRevision;
-  // ACT: 同页保存按顺序完成，防止慢请求覆盖后续修改；不处理多个客户端的并发编辑。
+  // ACT: Saves from the same page complete in order so a slow request can't overwrite later edits; concurrent
+  // edits from multiple clients aren't handled.
   saving = saving.then(async () => {
     try {
       await useWorkspaceFiles(directory).writeJson(fileName, { toonflowCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
@@ -587,7 +586,8 @@ const nodeRuntimeFields = new Set([
   "events",
 ]);
 const edgeRuntimeFields = new Set(["data", "selected", "sourceNode", "targetNode", "sourceX", "sourceY", "targetX", "targetY", "events"]);
-// ACT: 仅增删、替换元素时扫描列表；位移与 data 各自监听，单个节点变化不遍历其余节点。
+// ACT: Scan the list only when elements are added, removed or replaced; position and data are watched separately, so
+// one node's change doesn't walk the rest.
 watch(
   () => [...flow.nodes.value, ...flow.edges.value],
   (elements) => {
@@ -600,7 +600,7 @@ watch(
     }
     for (const element of elements) {
       if (elementSaveWatchers.has(element)) continue;
-      // 与 toObject 排除的运行态字段保持一致，其他自定义持久字段仍参与自动保存。
+      // Match the runtime fields excluded by toObject; other custom persisted fields still take part in auto-save.
       const runtimeFields = isNode(element) ? nodeRuntimeFields : edgeRuntimeFields;
       const stopFields = watch(
         () =>
@@ -642,7 +642,7 @@ watch(
     dragCopy = undefined;
     pointerPosition = undefined;
     resetCanvasKeys();
-    // 同一实例只在重新装载画布时失效；重命名仅更新保存路径。
+    // The same instance is invalidated only when the canvas reloads; renaming just updates the save path.
     if (directory !== previousDirectory || !fileName || !previousFileName) {
       canvasController.abort(new Error("画布已重新加载，本次画布调用已停止"));
       canvasController = new AbortController();
@@ -652,7 +652,7 @@ watch(
   { flush: "sync" }
 );
 
-// ACT: 切换显示面板不会卸载画布；仅清理交互，不中断本轮工具调用。
+// ACT: Switching panels doesn't unmount the canvas; only clean up interactions, leaving this turn's tool calls running.
 watch(() => props.active, (active) => {
   if (!active) assetsVisible.value = false;
   edgeDisconnect.value = undefined;
@@ -662,7 +662,7 @@ watch(() => props.active, (active) => {
 }, { flush: "sync" });
 
 function flushCanvasSave(action?: () => Promise<void>): Promise<void> {
-  // ACT: 完整保存及其文件操作串行执行，重命名暂停期间的显式保存也必须等待。
+  // ACT: Full saves and their file operations run serially; explicit saves during a rename's save pause must wait too.
   const next = flushing.then(() => saveCanvasState(action)).then(() => { canvasSaveError.value = ""; }, error => {
     canvasSaveError.value = axios.isAxiosError<{ message?: string }>(error) ? error.response?.data.message || error.message : error instanceof Error ? error.message : "画布保存失败";
     throw error;
@@ -690,7 +690,7 @@ async function saveCanvasState(action?: () => Promise<void>) {
       saveCanvas.flush();
       await saving;
       if (saveError) throw saveError;
-      // 画布写入期间节点可能完成生成，等新增落盘后重新保存变化。
+      // Nodes may finish generating during the canvas write; resave the changes once the new output is persisted.
       await Promise.all(flow.getNodes.value.map((node) => useNodeEvent(node.id, flow).emit("save")));
       await nextTick();
     } while (revision !== saveRevision);
@@ -722,7 +722,7 @@ function canUseCanvasClipboard(event: Event) {
 function beforeClipboard(event: Event) {
   if (!canUseCanvasClipboard(event)) return;
   if (event.type === "beforecopy" && (!flow.getSelectedNodes.value.length || window.getSelection()?.toString())) return;
-  // ACT: WKWebView 通过 beforecopy/beforepaste 判定非输入区能否使用原生编辑菜单。
+  // ACT: WKWebView uses beforecopy/beforepaste to decide whether non-input areas can use the native edit menu.
   event.preventDefault();
 }
 
@@ -792,7 +792,7 @@ async function pasteNode(event: ClipboardEvent) {
   const canvasSignal = canvasController.signal;
   let files = getClipboardMediaFiles(event);
   if (files.length || text.trim()) event.preventDefault();
-  // ACT: 部分 WebView 不向 paste 事件暴露剪贴板文件，桌面端回退到原生剪贴板读取。
+  // ACT: Some WebViews don't expose clipboard files to paste events; desktop falls back to the native clipboard.
   if (!files.length && isDesktop) files = await readClipboardFiles().catch(() => []);
   if (canvasSignal.aborted) return;
   if (!files.length && text.trim()) files = [new File([text], "粘贴文本.txt", { type: "text/plain" })];
@@ -886,11 +886,11 @@ function zoomCanvas(event: WheelEvent | (Event & { scale: number })) {
     factor = event.type === "gesturechange" && gestureScale !== undefined ? event.scale / gestureScale : 1;
     gestureScale = event.type === "gestureend" ? undefined : event.scale;
   } else {
-    // ACT: Chromium 捏合发送 Ctrl+wheel，但不发送 Control 按键；WebKit 使用上方原生 gesture 事件。
+    // ACT: Chromium pinch sends Ctrl+wheel without a Control keypress; WebKit uses the native gesture events above.
     const pinching = event.ctrlKey && !pressedCodes.has("ControlLeft") && !pressedCodes.has("ControlRight");
     if (!pinching && !shortcutPressed(event, generalSettings.value.canvasShortcuts.zoom, pressedCodes)) {
       if (!event.ctrlKey) return;
-      // 实体 Ctrl 未绑定缩放时，阻止 Vue Flow 和节点骨架将它误判为捏合。
+      // When the physical Ctrl isn't bound to zoom, stop Vue Flow and the node skeleton from mistaking it for a pinch.
       factor = 1;
     } else {
       factor = pinching && gestureScale !== undefined ? 1 : 2 ** (pinching ? -event.deltaY * 0.02 : wheelDelta(event));
@@ -940,7 +940,8 @@ function updateCanvasKeys(event: KeyboardEvent) {
   }
   if (!canvasId.value || !project.value?.directory) return;
   if (action === "copy" && (!flow.getSelectedNodes.value.length || window.getSelection()?.toString())) return;
-  // 桌面快捷键直接复用原生剪贴板桥接；浏览器 Ctrl/Cmd+V 保留原生事件，避免额外读取权限。
+  // Desktop shortcuts reuse the native clipboard bridge directly; browser Ctrl/Cmd+V keeps the native event to
+  // avoid extra read permissions.
   if (!isDesktop && action === "paste" && event.code === "KeyV" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) return;
   event.preventDefault();
   if (event.repeat) return;
@@ -983,7 +984,7 @@ function refreshInstalled(event: WindowEventMap["toonflow:plugin-installed"]) {
 const refreshNodeConfig = () => { void loadRemoteNodes(); };
 
 onMounted(() => {
-  // 在捕获阶段同步修饰键，避免节点编辑器截断 keydown/keyup 后缩放状态丢失或卡住。
+  // Sync modifier keys in the capture phase so zoom state isn't lost or stuck when node editors swallow keydown/keyup.
   window.addEventListener("keydown", updateCanvasKeys, true);
   window.addEventListener("keyup", updateCanvasKeys, true);
   window.addEventListener("blur", resetCanvasKeys);
@@ -1044,7 +1045,8 @@ async function loadNode(name: string, url: string, force = false): Promise<void>
   if (!force && nodeTypes.value[nodeType] && !nodeErrors.value[nodeType]) return;
   if (force) {
     signal.throwIfAborted();
-    // ACT: 复用画布修订号收敛等待期间的编辑；持续修改画布时延后刷新，不额外维护节点修订状态。
+    // ACT: Reuse the canvas revision number to settle edits made while waiting; defer refresh while the canvas
+    // keeps changing, without extra node revision state.
     let revision: number;
     do {
       revision = saveRevision;
@@ -1058,7 +1060,7 @@ async function loadNode(name: string, url: string, force = false): Promise<void>
   delete nodeErrors.value[nodeType];
   const nodeLoad = loadNodeComponent(name, url, force)
     .then((remoteNode) => {
-      // 同类型节点共享组件，运行错误由每个节点自己的边界显示。
+      // Nodes of the same type share a component; runtime errors are shown by each node's own boundary.
       nodeTypes.value = { ...nodeTypes.value, [nodeType]: markRaw(remoteNode) };
     })
     .catch((error) => {
@@ -1091,10 +1093,11 @@ async function loadRemoteNodes(reloadName?: string) {
     });
     nodeConfigs.value = Object.fromEntries(nodes.map(node => [`remote-${node.name}`, node.config ?? {}]));
     const enabledNodes = nodes.filter(node => node.enabled !== false);
-    // 节点各自加载完成后即可出现在菜单中，不等待其他节点的脚本。
+    // Each node appears in the menu as soon as it loads, without waiting for other nodes' scripts.
     nodeOptions.value = enabledNodes.map(node => ({ type: `remote-${node.name}`, label: node.displayName }))
       .sort((left, right) => left.type.localeCompare(right.type));
-    // ACT: 安装事件合并到最新列表请求，避免连续更新不同节点时丢失较早的刷新名称。
+    // ACT: Merge install events into the latest list request so back-to-back updates of different nodes keep
+    // earlier reload names.
     const reloadNames = new Set(nodeReloads);
     nodeReloads.clear();
     await Promise.all(
@@ -1105,7 +1108,7 @@ async function loadRemoteNodes(reloadName?: string) {
           await loadNode(node.name, node.url, reloadNames.has(node.name));
         } catch (error) {
           console.error("加载远端节点失败", node, error);
-          // 保存拒绝时旧组件仍可用，不从节点菜单中移除；脚本加载错误仍排除。
+          // If saving is refused the old component still works and stays in the menu; script load errors stay excluded.
           if (nodeTypes.value[nodeType] && !nodeErrors.value[nodeType]) {
             if (reloadNames.has(node.name) && !signal.aborted) ElMessage.warning({
               message: `${node.displayName}已安装，但当前节点无法刷新。请等待任务结束后，点击节点右上角的刷新按钮。`,

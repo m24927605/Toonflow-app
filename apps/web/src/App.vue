@@ -46,10 +46,6 @@ import { ConfigProvider, type GlobalConfigProvider } from "tdesign-vue-next";
 import tdesignZhCn from "tdesign-vue-next/es/locale/zh_CN";
 import tdesignZhTw from "tdesign-vue-next/es/locale/zh_TW";
 import tdesignEn from "tdesign-vue-next/es/locale/en_US";
-import tdesignJa from "tdesign-vue-next/es/locale/ja_JP";
-import tdesignRu from "tdesign-vue-next/es/locale/ru_RU";
-import tdesignKo from "tdesign-vue-next/es/locale/ko_KR";
-import tdesignAr from "tdesign-vue-next/es/locale/ar_KW";
 import { locale } from "@toonflow/i18n/vue";
 import type { updateSnapshot } from "@toonflow/server/desktop";
 import { chatLocale } from "@/lib/i18n";
@@ -63,13 +59,10 @@ import "element-plus/theme-chalk/dark/css-vars.css";
 
 useMcpControl();
 
-// ACT: TDesign 缺少的语言使用英语基底，聊天控件由应用字典补齐。
-const tdesignLocales = {
-  "zh-CN": tdesignZhCn, "zh-TW": tdesignZhTw, en: tdesignEn, ja: tdesignJa, ru: tdesignRu, vi: tdesignEn, th: tdesignEn, ko: tdesignKo, hi: tdesignEn,
-  id: tdesignEn, ms: tdesignEn, fil: tdesignEn, bn: tdesignEn, ur: tdesignEn, ta: tdesignEn, te: tdesignEn, mr: tdesignEn, pa: tdesignEn, ar: tdesignAr, fa: tdesignEn, tr: tdesignEn,
-};
+// Chat controls are filled in from the app dictionary.
+const tdesignLocales = { "zh-CN": tdesignZhCn, "zh-TW": tdesignZhTw, en: tdesignEn };
 const elementLocale = computed(() => elementLocales[locale.value]);
-// ACT: TDesign 自带语言包声明为 readonly，而 ConfigProvider 的只读使用接口声明为可写。
+// ACT: TDesign's bundled locales are declared readonly, while ConfigProvider's read-only usage is typed as writable.
 const tdesignLocale = computed(() => ({ ...tdesignLocales[locale.value], chat: chatLocale.value }) as unknown as GlobalConfigProvider);
 
 const updateBoxVisible = ref(false);
@@ -88,12 +81,12 @@ watch(desktopUpdateSnapshot, snapshot => {
     const attemptId = snapshot.installFailure.attemptId;
     if (shownInstallAttempts.has(attemptId)) return;
     shownInstallAttempts.add(attemptId);
-    // ACT: 同一 WebView 刷新后仍不重复提醒；退出客户端后新会话可再次提醒。
+    // ACT: No repeat reminder on reloading the same WebView; a new session after quitting the client may remind again.
     try {
       const key = `desktopUpdateFailure:${attemptId}`;
       if (sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
-    } catch { /* 存储不可用时仍按当前页面去重。 */ }
+    } catch { /* When storage is unavailable, still dedupe within the current page. */ }
     installFailureVisible.value = true;
     return;
   }
@@ -114,7 +107,7 @@ watch(desktopUpdateSnapshot, snapshot => {
 function rememberUpdateBox() {
   if (!updateBoxBuild.value) return;
   const buildKey = `${updateBoxBuild.value.version}:${updateBoxBuild.value.hash}`;
-  // ACT: 桌面端启动端口会变化，复用应用设置；展示完成或提前关闭时记录，保存队列内去重。
+  // ACT: Desktop launch ports vary, so reuse app settings; record on display or early close, deduped in the save queue.
   void saveSettings(current => {
     const seenBuilds = Array.isArray(current.updateBoxSeenBuilds) ? current.updateBoxSeenBuilds.filter(value => typeof value === "string") : [];
     return seenBuilds.includes(buildKey) ? undefined : { updateBoxSeenBuilds: [...seenBuilds, buildKey] };
@@ -127,9 +120,9 @@ function preventPageZoom(event: WheelEvent) {
 function preventPageZoomShortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && !event.altKey && ["+", "=", "-", "0"].includes(event.key)) event.preventDefault();
 }
-// 仅取消浏览器默认缩放，继续传递事件供 Vue Flow 缩放画布。
+// Only cancel the browser's default zoom; keep passing the event on so Vue Flow can zoom the canvas.
 window.addEventListener("wheel", preventPageZoom, { capture: true, passive: false });
-// 画布在捕获阶段先处理自己的快捷键，再在冒泡阶段取消浏览器缩放。
+// The canvas handles its own shortcuts in the capture phase first; browser zoom is cancelled in the bubble phase.
 window.addEventListener("keydown", preventPageZoomShortcut);
 onBeforeUnmount(() => {
   stopDesktopUpdateObservation();
@@ -142,7 +135,7 @@ watchEffect(() => document.documentElement.style.setProperty("--markdown-tooltip
 
 watchEffect(() => {
   if (!isMobile) return;
-  // ACT: 使用 WebView 视口缩放，保持画布触摸坐标和弹出层在同一坐标系。
+  // ACT: Use WebView viewport scaling so canvas touch coordinates and popups share one coordinate system.
   document.querySelector('meta[name="viewport"]')?.setAttribute("content", `width=device-width, initial-scale=${uiSettings.value.mobileScale / 100}`);
 });
 
@@ -214,7 +207,7 @@ html {
   .failureHint { margin: 0; line-height: 1.7; }
 }
 
-// ACT: RTL 只改变界面阅读方向，画布坐标、代码和技术值保留从左到右。
+// ACT: RTL only changes the UI reading direction; canvas coordinates, code and technical values stay left-to-right.
 .vue-flow,
 pre,
 code,
@@ -230,7 +223,7 @@ input[inputmode="decimal"],
   unicode-bidi: isolate;
 }
 
-// 主题切换圆形扩散动效，坐标由触发点写入 --themeX/--themeY/--themeR。
+// Circular reveal animation for theme switching; the trigger point writes --themeX/--themeY/--themeR.
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

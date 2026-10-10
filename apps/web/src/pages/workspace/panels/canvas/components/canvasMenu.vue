@@ -162,7 +162,8 @@ async function refreshTree() {
   try {
     const loaded = await listCanvasEntries(directory);
     if (request !== treeRequest || directory !== props.directory) return;
-    // 共享画布列表由文件操作更新；目录扫描不能覆盖列表并卸载正在移动或生成的画布。
+    // The shared canvas list is updated by file operations; a directory scan must not overwrite it and unmount
+    // canvases being moved or generated.
     folders.value = loaded.folders;
   } catch (error) {
     if (request !== treeRequest || directory !== props.directory) return;
@@ -204,10 +205,11 @@ watch(() => props.directory, async (directory, _previous, onCleanup) => {
         loaded = [await createCanvasFile(directory, "画布1")];
       } catch (err) {
         if (!axios.isAxiosError<{ data?: { code?: string } }>(err) || err.response?.status !== 409 || err.response.data.data?.code !== "EEXIST") throw err;
-        // 同时打开工作区时，读取另一请求刚创建的默认画布，不覆盖同名文件。
+        // When the workspace is opened concurrently, read the default canvas another request just created
+        // instead of overwriting the same-named file.
         entries = await listCanvases(directory);
         const refreshed = entries.canvases;
-        // 画布1.json 若被其他 JSON 占用，则使用下一个空闲名称，保留原文件。
+        // If 画布1.json is taken by another JSON, use the next free name and keep the original file.
         loaded = refreshed.length ? refreshed : [await createCanvasFile(directory)];
       }
     }
@@ -261,17 +263,17 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
     checkCanvasDirectory(directory, signal);
     if (data?.toonflowCanvas !== true || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !data.viewport
       || ![data.viewport.x, data.viewport.y, data.viewport.zoom].every(Number.isFinite) || data.viewport.zoom <= 0) throw new Error("画布文件格式无效");
-    // 旧画布可能保存了临时导出进度，重新打开时任务已不存在。
+    // Old canvases may have saved transient export progress whose task no longer exists on reopen.
     for (const node of data.nodes) if (node.type === "remote-videoNode" && node.data) delete node.data.exportProgress;
     nextCanvas.flow = { nodes: data.nodes, edges: data.edges, viewport: data.viewport };
   }
   await props.flushSave();
   checkCanvasDirectory(directory, signal);
   if (currentCanvas) currentCanvas.flow = toObject();
-  // 应用画布数据时暂时清空文件名，避免初始化触发自动保存。
+  // Temporarily clear the file name while applying canvas data so initialization doesn't trigger auto-save.
   activeCanvasId.value = "";
   setNodes(nextCanvas.flow.nodes);
-  // 命中宽度由画布统一配置，不使用旧文件中的覆盖值。
+  // Hit width is configured canvas-wide; ignore overrides from old files.
   setEdges(nextCanvas.flow.edges.map(({ interactionWidth, ...edge }) => edge));
   await setViewport(nextCanvas.flow.viewport);
   await nextTick();
@@ -337,7 +339,8 @@ async function removeCanvas(canvas: Canvas) {
         await nextTick();
       }
     });
-    // coordinator 自己进入保存临界区，必须在上一次 flush 完成后调用，避免重入保存队列。
+    // The coordinator enters the save critical section itself, so call it after the previous flush completes to
+    // avoid re-entering the save queue.
     if (performFileAction) await performFileAction(directory, "delete", id);
     await props.flushSave(async () => {
       checkCanvasDirectory(directory);
@@ -379,7 +382,8 @@ async function listCanvasEntries(directory: string) {
   const files = useWorkspaceFiles(directory);
   const { entries } = await files.list();
   const folders: CanvasEntry[] = [];
-  // 文件接口只返回普通文件和目录，不跟随符号链接；素材和 Agent 目录不参与画布扫描。
+  // The file API returns only regular files and directories without following symlinks; asset and Agent
+  // directories are excluded from canvas scans.
   for (let index = 0; index < entries.length; index++) {
     checkCanvasDirectory(directory);
     const entry = entries[index]!;
@@ -569,7 +573,8 @@ async function handleItemCommand(command: string) {
     } else if (command === "delete") {
       await ElMessageBox.confirm(`确定删除文件夹“${entry.name}”？`, "删除文件夹", { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" });
       checkCanvasDirectory(directory);
-      // 只删除真实空目录；隐藏文件和普通文档也应阻止删除，不能依据过滤后的画布树递归删除。
+      // Only delete truly empty directories; hidden files and regular documents must also block deletion, so
+      // never delete recursively based on the filtered canvas tree.
       await useWorkspaceFiles(directory).remove(entry.path);
       checkCanvasDirectory(directory);
       await refreshTree();
@@ -613,7 +618,7 @@ async function renameCanvasFile(id: string, name: string, directory: string, sig
     checkCanvasDirectory(directory, signal);
     await useWorkspaceFiles(directory).rename(id, target);
     checkCanvasDirectory(directory);
-    // 文件已改名时先更新保存路径，再响应取消，避免自动保存重新创建旧文件。
+    // If already renamed, update the save path before honoring the cancel so auto-save doesn't recreate the old file.
     if (activeCanvasId.value === id) activeCanvasId.value = target;
     if (newCanvasId.value === id) newCanvasId.value = target;
     if (editingId.value === id) editingId.value = target;

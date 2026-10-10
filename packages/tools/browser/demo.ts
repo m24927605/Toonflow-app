@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createBrowserRuntime } from "./src/host";
 import type { BrowserAction, BrowserStreamEvent } from "./src/protocol";
 
-// ACT: 用内存网页演示真实浏览器调用，不依赖搜索网站、模型服务或已有登录状态。
+// ACT: Demonstrate real browser calls with in-memory pages,
+// without depending on search sites, model services or existing login state.
 const runtime = createBrowserRuntime();
 const cwd = process.cwd();
 const detect = process.argv.includes("--detect");
@@ -114,7 +115,8 @@ async function runDetection() {
   await waitFor(["popup"]);
   await execute({ action: "newTab", url: `${url}/detect?newTab=1` });
   await waitFor(["newTab"]);
-  // ACT: 独立 Worker、popup 首请求和首脚本几何瞬态仍有边界；逐项报告，不能把风险计为通过。
+  // ACT: Dedicated Workers, popup first requests and first-script geometry transients still have limits;
+  // report each item and never count a risk as passed.
   const knownLeaks = [
     ...profiles.filter(profile => profile.userAgent.includes("Headless")).map(profile => `${profile.kind}: navigator.userAgent`),
     ...requests.filter(request => request.headers["user-agent"]?.includes("Headless")).map(request => `${request.path}: HTTP User-Agent`),

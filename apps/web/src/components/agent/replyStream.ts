@@ -41,7 +41,7 @@ export function createReplyStream(reply: AgentMessage) {
   let thinkingStartedAt = 0;
   let thinkingDuration = 0;
   const pendingContent = new Map<Exclude<AgentMessagePart, { type: "tool" }>, string>();
-  // ACT: 合并 50 ms 内的文本增量，避免 Markdown 每个 token 都重新解析全文；结束时立即补齐。
+  // ACT: Merge text deltas within 50 ms so Markdown doesn't reparse everything per token; flush immediately on finish.
   const flushContent = throttle(() => {
     for (const [part, content] of pendingContent) part.content = content;
     pendingContent.clear();
@@ -105,7 +105,8 @@ export function createReplyStream(reply: AgentMessage) {
   return { receive, finish };
 }
 
-// 父会话请求和转发的子会话事件共用消息归并，切换界面不改变正在接收的回复。
+// Parent session requests and forwarded child session events share message merging; switching views doesn't change
+// the reply being received.
 export function createConversationStream(messages: Ref<AgentMessage[]>) {
   let reply: AgentMessage | undefined;
   let stream: ReturnType<typeof createReplyStream> | undefined;

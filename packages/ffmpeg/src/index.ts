@@ -119,7 +119,8 @@ export async function installFfmpeg(directory: string, sourceId: SourceId, signa
       await readVersion(binary, name, signal);
     }
     signal.throwIfAborted();
-    // ACT: 两个程序验证完毕再整体替换；提交开始后不响应取消，避免留下半套程序。
+    // ACT: Replace both binaries together only after both are verified;
+    // ignore cancellation once the commit starts to avoid leaving a half-installed set.
     report({ phase: "installing", received: 0 });
     const existed = await checkDirectory(destination);
     if (existed) await rename(destination, previous);
@@ -136,7 +137,7 @@ export async function installFfmpeg(directory: string, sourceId: SourceId, signa
       throw error;
     }
   } finally {
-    // 仅清理本次 mkdtemp 创建、且仍位于数据目录内的临时目录。
+    // Only clean up the temp directory created by this mkdtemp call that is still inside the data directory.
     if (!preserveBackup && dirname(temporary) === root) {
       await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(error => {
         console.warn(`FFmpeg 临时目录清理失败：${temporary}`, error);

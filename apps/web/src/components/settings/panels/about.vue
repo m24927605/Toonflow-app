@@ -63,16 +63,6 @@
       </a>
     </el-card>
 
-    <el-card class="infoCard repositoryCard" shadow="never">
-      <a class="repositoryLink" href="https://api.toonflow.net/" target="_blank" rel="noopener noreferrer">
-        <icon-world class="repositoryIcon" :size="22" aria-hidden="true" />
-        <div class="repositoryInfo">
-          <span class="repositoryTitle">官方中转平台 TF-Router</span>
-        </div>
-        <icon-external-link class="externalIcon" :size="16" aria-hidden="true" />
-      </a>
-    </el-card>
-
     <el-card class="infoCard" shadow="never">
       <div class="cardHeader">
         <div class="cardLabel">
@@ -227,7 +217,6 @@ import {
   IconQrcode,
 } from "@tabler/icons-vue";
 import logoUrl from "@toonflow/assets/logo.svg";
-import tf, { type TfSponsor } from "@/lib/tf";
 import { saveSettings } from "@/stores/settings";
 import {
   desktopUpdateSource as updateSource,
@@ -279,11 +268,16 @@ const resultMessage = computed(() => {
   return snapshot.value.canUpdate ? translate("有新的版本可用，下载完成后可重启更新。") : translate("当前客户端不支持应用内更新，请下载安装包。");
 });
 
-const sponsors = ref<TfSponsor[]>([]);
+const sponsors = ref<{ id: number; name: string; logoUrl: string; readme: string }[]>([]);
 
 onMounted(async () => {
   try {
-    sponsors.value = await tf.getSponsorList({ signal: controller.signal });
+    const { data } = await axios.post<{ code: number; data: typeof sponsors.value; message?: string }>(
+      "https://api.toonflow.net/web/sponsor/getSponsorList", null, { signal: controller.signal, timeout: 20000 });
+    if (data.code !== 200) throw new Error(data.message || "加载赞助商失败");
+    if (!Array.isArray(data.data) || data.data.some(item => !item || !Number.isSafeInteger(item.id) || item.id < 1
+      || typeof item.name !== "string" || typeof item.logoUrl !== "string" || typeof item.readme !== "string")) throw new Error("赞助商响应格式不正确");
+    sponsors.value = data.data;
   } catch (error) {
     if (!controller.signal.aborted) ElMessage.error(getUpdateError(error));
   }
@@ -299,7 +293,8 @@ onMounted(async () => {
     }
     await runDesktopUpdate("read");
   } catch {
-    // ACT: 本机版本读取失败不阻塞关于页；远程页面的构建版本不冒充客户端版本。
+    // ACT: Failing to read the local version doesn't block the About page; a remote page's build version doesn't
+    // pose as the client version.
   }
 });
 onBeforeUnmount(() => controller.abort());
@@ -353,7 +348,7 @@ async function runUpdate(nextAction: "read" | "check" | "download" | "apply") {
     await runDesktopUpdate(nextAction);
     if (snapshot.value?.channel === "dev") updateError.value = "开发版本不提供更新检查，请使用正式桌面客户端。";
   } catch {
-    // 错误与交接状态由全局 Store 保留，关闭面板不取消更新观察。
+    // Errors and handoff state are kept in the global Store; closing the panel doesn't cancel update observation.
   }
 }
 </script>

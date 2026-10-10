@@ -73,7 +73,7 @@ function loadExtension(extension: InstalledExtension) {
   const key = JSON.stringify([extension.id, extension.url, extension.version, extension.revision, requestedRevision]);
   let request = requests.get(key);
   if (!request) {
-    // 同一 ID 的脚本依次执行，避免旧网络请求最后到达时覆盖新版全局导出和样式。
+    // Scripts with the same ID run in order so a late stale request can't overwrite newer global exports and styles.
     request = (scriptQueues.get(extension.id) ?? Promise.resolve()).catch(() => {}).then(async () => {
       if (requestedRevision !== revision) throw new Error("文件扩展已更新，请重新打开");
       const url = new URL(extension.url, window.location.href);
@@ -171,6 +171,6 @@ import.meta.hot?.dispose(() => {
 
 export async function resolveExtension(resource: ExtResource, id: string): Promise<ExtDefinition> {
   const extension = (await extensionCandidates(resource)).find(extension => extension.id === id);
-  if (!extension) throw new Error(`尚未启用支持此文件的扩展，请到插件市场安装或启用：${resource.label}`);
+  if (!extension) throw new Error(`尚未启用支持此文件的扩展，请到插件设置中安装或启用：${resource.label}`);
   return defineExt({ ...extension, load: async () => (await loadExtension(extension)).load() });
 }

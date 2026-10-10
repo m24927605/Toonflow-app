@@ -10,7 +10,7 @@
           :disabled="saving"
           :aria-pressed="selectedProvider === item.id"
           @click="selectedProvider = item.id">
-          <img v-if="item.icon" class="providerLogo" :class="{ monochrome: item.id === 'tfRouter' }" :src="item.icon" alt="" />
+          <img v-if="'icon' in item && item.icon" class="providerLogo" :src="item.icon" alt="" />
           <modelIcon v-else :model="item.id" :size="18" />
           <span>{{ item.label }}</span>
         </button>
@@ -22,7 +22,8 @@
             <el-tag v-if="activeProvider.version" size="small" type="info" effect="plain">v{{ activeProvider.version }}</el-tag>
           </div>
           <messageMarkdown v-if="providerReadme" class="providerReadme" :content="providerReadme" />
-          <el-divider v-if="providerReadme" contentPosition="left">连接配置</el-divider>
+          <el-divider v-if="providerReadme && (isCodex || providerRules.length)" contentPosition="left">连接配置</el-divider>
+          <codexLogin v-if="isCodex" v-model:loggedIn="codexLoggedIn" :active="visible" />
           <form-create v-model="formValues" v-model:api="formApi" :rule="providerRules" :option="formOptions" />
           <div class="modelHeader">
             <el-text tag="strong">模型列表 <el-text type="info">{{ models.length }}</el-text></el-text>
@@ -37,7 +38,7 @@
               </template>
             </el-auto-resizer>
           </div>
-          <el-text v-else-if="!fetching" type="info" size="small">{{ activeProvider && isTfRouterProvider(activeProvider) ? '保存 API Key 后自动获取模型列表' : formValues.apiKey ? '未获取到模型' : '填写 API Key 后自动获取模型列表' }}</el-text>
+          <el-text v-else-if="!fetching" type="info" size="small">{{ isCodex ? '登录后自动获取模型列表' : formValues.apiKey ? '未获取到模型' : '填写 API Key 后自动获取模型列表' }}</el-text>
           <el-alert v-if="formError" :title="formError" type="error" :closable="false" showIcon />
         </section>
       </el-scrollbar>
@@ -59,7 +60,7 @@ import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import type { Column } from "element-plus";
 import { saveSettings, type CustomProviderModel } from "@/stores/settings";
-import { isTfRouterProvider } from "@/lib/tf";
+import codexLogin from "../../codexLogin.vue";
 
 const visible = defineModel<boolean>({ default: false });
 const selectedProvider = ref<string>(languageProviders[0]?.id ?? "");
@@ -80,6 +81,9 @@ watch(selectedProvider, () => {
   formValues.value = {};
 }, { flush: "sync" });
 const activeProvider = computed(() => languageProviders.find(provider => provider.id === selectedProvider.value));
+const isCodex = computed(() => activeProvider.value?.protocol === "openai-codex-responses");
+const needsApiKey = computed(() => activeProvider.value?.rules.some(rule => rule.field === "apiKey") === true);
+const codexLoggedIn = ref(false);
 const providerReadme = computed(() => {
   const provider = activeProvider.value;
   return provider && "readme" in provider && typeof provider.readme === "string" ? provider.readme : "";
@@ -90,22 +94,22 @@ const providerRules = computed(() =>
 );
 
 watch(
-  [visible, activeProvider, () => formValues.value.apiKey, modelRefresh],
-  ([isVisible, provider, key], _previous, onCleanup) => {
+  [visible, activeProvider, () => formValues.value.apiKey, modelRefresh, codexLoggedIn],
+  ([isVisible, provider, key, _refresh, loggedIn], _previous, onCleanup) => {
     models.value = [];
     modelError.value = "";
     fetching.value = false;
     if (!isVisible || !provider) return;
-    if (isTfRouterProvider(provider)) return;
     if (provider.models.length) {
       models.value = structuredClone(provider.models);
       return;
     }
     const apiKey = typeof key === "string" ? key.trim() : "";
-    if (!apiKey) return;
+    if (provider.protocol === "openai-codex-responses" ? !loggedIn : !apiKey) return;
     const controller = new AbortController();
     fetching.value = true;
-    // ACT: 输入停顿后自动获取；输入变化时立即取消旧请求，避免逐字请求和结果串到新密钥。
+    // ACT: Fetch automatically once typing pauses; cancel the old request on every input change to avoid
+    // per-keystroke requests and results leaking to the new key.
     const timer = setTimeout(async () => {
       try {
         const { data } = await axios.post("/api/providers/models", {
@@ -143,8 +147,12 @@ async function addProvider() {
   const provider = activeProvider.value;
   const values = formApi.value.formData();
   const apiKey = typeof values.apiKey === "string" ? values.apiKey.trim() : "";
-  if (!apiKey) {
+  if (needsApiKey.value && !apiKey) {
     formError.value = "请填写 API Key";
+    return;
+  }
+  if (isCodex.value && !codexLoggedIn.value) {
+    formError.value = "请先登录 ChatGPT";
     return;
   }
   saving.value = true;
@@ -152,11 +160,11 @@ async function addProvider() {
     const addedProvider = {
       id: provider.id,
       label: provider.label,
-      icon: provider.icon,
+      icon: "icon" in provider ? provider.icon : undefined,
       apiKey,
       apiUrl: "apiUrl" in provider ? provider.apiUrl : "",
       protocol: "protocol" in provider ? provider.protocol : "",
-      models: models.value.map(model => ({ ...model })),
+      models: models.value.map(({ id, label, contextWindow, maxOutputTokens }) => ({ id, label, contextWindow, maxOutputTokens })),
     };
     await saveSettings(settings => {
       const existing = settings.customProviders;
@@ -218,12 +226,6 @@ async function addProvider() {
         width: 18px;
         height: 18px;
         object-fit: contain;
-
-        &.monochrome {
-          .dark & {
-            filter: invert(1);
-          }
-        }
       }
     }
   }

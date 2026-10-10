@@ -33,7 +33,8 @@ internal static class protocolLauncher
                     if (!locked) throw new InvalidOperationException("Toonflow 正在启动，请稍后重试。");
                     if (sendUrl(args[0])) return 0;
 
-                    // ACT: SDK launcher 不转发 URL 参数；启动后通过本机服务交给待确认队列。
+                    // ACT: The SDK launcher does not forward URL arguments; after launch,
+                    // hand the URL to the pending-confirmation queue via the local service.
                     string launcher = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../bin/launcher.exe"));
                     if (!File.Exists(launcher)) throw new FileNotFoundException("未找到 Toonflow，请重新安装。");
                     Process.Start(new ProcessStartInfo(launcher)
@@ -116,7 +117,8 @@ internal static class protocolLauncher
         }
         catch (WebException error)
         {
-            // ACT: 只有无法连接才启动应用；已运行服务的拒绝或超时不会启动第二个实例。
+            // ACT: Launch the app only when the connection fails; a rejection
+            // or timeout from a running service never starts a second instance.
             if (error.Status == WebExceptionStatus.ConnectFailure) return false;
             using (var response = error.Response as HttpWebResponse)
             {
@@ -131,7 +133,8 @@ internal static class protocolLauncher
                             message = responseMessage(result, message);
                         }
                     }
-                    // ACT: 非 JSON 或读取失败时保留 HTTP 状态，不把整页错误 HTML 弹给用户。
+                    // ACT: For non-JSON bodies or failed reads, keep the HTTP
+                    // status instead of showing a full error HTML page to the user.
                     catch (Exception) { }
                     throw new InvalidOperationException("Toonflow 拒绝安装请求（HTTP " + (int)response.StatusCode + "）：" + message);
                 }

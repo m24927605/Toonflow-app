@@ -126,7 +126,7 @@ export function useMcpControl() {
             if (typeof directory !== "string" || !directory.trim()) throw new Error("缺少工作目录");
             await workspaceControl.value?.flushSave();
             callSignal.throwIfAborted();
-            // ACT: 切换项目会取消旧画布调用；当前打开项目命令属于应用层。
+            // ACT: Switching projects cancels old canvas calls; this openProject command belongs to the app layer.
             calls.delete(request.callId);
             await workspaceStore.openProject(directory, directory, callSignal);
             const openedDirectory = workspaceStore.project?.directory;

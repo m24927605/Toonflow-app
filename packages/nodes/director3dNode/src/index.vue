@@ -74,7 +74,8 @@ const promptModel = computed({ get: () => data.value.promptModel ?? [], set: (va
 const anchors = computed({ get: () => data.value.anchors ?? [], set: (value: CameraAnchor[]) => { data.value.anchors = value; } });
 const prompt = computed({ get: () => data.value.prompt ?? "", set: (value: string) => { data.value.prompt = value; } });
 const model = computed({ get: () => data.value.model ?? "", set: (value: string) => { data.value.model = value; } });
-// ACT: 场景和动画只在节点内部持有，画布数据仅保存文件引用，避免拖动时遍历大量关键帧。
+// ACT: Scene and animation are held only inside the node; canvas data stores just file references,
+// avoiding traversing many keyframes while dragging.
 const modelDocument = shallowRef<ModelDocument>({ version: 1, scene: createEmptyScene(), plans: [] });
 const plans = computed(() => modelDocument.value.plans);
 const selectedPlan = computed(() => plans.value.find(plan => plan.id === data.value.selectedPlanId));
@@ -121,7 +122,8 @@ async function loadModel() {
     if (modelPath && modelPath !== getModelPath()) throw new Error("导演台模型文件路径无效");
     const value = modelDocumentSchema.parse(modelSnapshot ?? await workspaceFiles.readJson(modelPath!));
     if (disposed) return;
-    // 复制、跨画布粘贴时只传递一次快照，写入新节点目录成功后才移除快照。
+    // On copy or cross-canvas paste, pass the snapshot only once;
+    // remove it only after writing to the new node directory succeeds.
     if (modelSnapshot) {
       const path = await writeModel(workspaceFiles, value);
       if (disposed) return;
@@ -227,7 +229,7 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
     workspaceFiles = files.getWorkspaceFiles();
     if (kind === "video") {
       exportNode = addExportNode(selectedPlan.value?.name ?? "视频");
-      // ACT: 导出进度只在当前运行中使用，不能写入画布或复制到另一个节点。
+      // ACT: Export progress only lives in the current run; never write it to the canvas or copy it to another node.
       Object.defineProperty(exportNode.data, "exportProgress", { value: 0, writable: true, configurable: true });
       stopWatching = watch([() => findNode(id), exportProgress], ([current, progress]) => {
         if (current !== exportNode) discarded = true;
@@ -243,7 +245,7 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
     if (discarded) return;
     if (findNode(node.id) !== node || !nodeTypes?.value?.[type]) throw new Error("画布节点已变化，请重新导出");
     exportNode ??= addExportNode(file.name.replace(/\.[^.]+$/, ""));
-    // 更新已有输出对象，让已挂载的视频节点及连接它的节点同步收到结果。
+    // Update the existing output object so mounted video nodes and nodes connected to them receive the result.
     (exportNode.data.outputs ??= {})[kind] = {
       dataType: kind === "image" ? "IMAGE" : "VIDEO", value: { url: path, mimeType: file.type },
     };
@@ -290,7 +292,7 @@ async function loadModels() {
     if (disposed) return;
     models.value = available;
     const first = models.value[0];
-    // ACT: 只给空配置选默认模型，保留暂时不可用的旧选择。
+    // ACT: Pick the default model only for empty config; keep a temporarily unavailable previous selection.
     if (!model.value) model.value = first ? JSON.stringify([first.providerId, first.modelId]) : "";
   } catch (error) {
     if (!disposed) ElMessage.error(error instanceof Error ? error.message : "模型加载失败");
@@ -340,7 +342,7 @@ async function generate() {
   const choice = selectedModel.value;
   const requirement = prompt.value.trim();
   if (!choice || !requirement) return;
-  // 首次创建基础模型期间只接收一个请求，后续动画可并行生成。
+  // Accept only one request while the base model is first created; later animations can generate in parallel.
   if (!scene.value.objectList.length && tasks.value.some(task => !task.error)) return;
   const baseScene = scene.value;
   const basePlanId = data.value.selectedPlanId ?? "";
@@ -379,12 +381,13 @@ async function generate() {
     const result = draft.read();
     const nextScene = draft.sceneChanged ? result.scene : baseScene;
     const plan = { ...result.plan, id: task.id, instruction: requirement };
-    // 工具仅编辑草稿；完成后验证实际渲染，成功落盘才替换当前方案。
+    // Tools only edit the draft; when done, verify the actual render, and replace the current plan only once persisted.
     const previewLighting = { ...getSceneLighting(nextScene), ...data.value.lighting };
     const previewSettings = sceneSettings.value;
     const image = await renderPreview(nextScene, plan, previewLighting, previewSettings);
     if (disposed) return;
-    // 动画请求可以并行生成，同一模型文件顺序保存，写入成功后才替换当前场景。
+    // Animation requests can generate in parallel; writes to the same model file are sequential,
+    // and the current scene is replaced only after a successful write.
     const saving = modelSaving.then(async () => {
       if (disposed) return;
       if (scene.value !== baseScene) throw new Error("基础模型已被另一条指令更新，请基于当前模型重试。");

@@ -86,7 +86,8 @@ export function createMcpRouter(options: McpOptions) {
     });
     return server;
   };
-  // ACT: 使用支持取消通知的 Streamable HTTP 会话；单进程宿主不持久化 MCP 会话。
+  // ACT: Use Streamable HTTP sessions that support cancellation notifications;
+  // the single-process host does not persist MCP sessions.
   const sessions = new Map<string, NodeStreamableHTTPServerTransport>();
   const router = Router();
   router.use((request, response) => (options.runInRequest ?? ((_request, operation) => operation()))(request, async () => {

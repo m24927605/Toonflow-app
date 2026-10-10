@@ -58,7 +58,8 @@ async function open() {
   let visited = 0;
   try {
     await listExtensions();
-    // ACT: 按需扫描并限制 10000 个条目；更大项目可接服务端文件索引，不在浏览器保存全量索引。
+    // ACT: Scan on demand, capped at 10000 entries; larger projects could use a server-side file index instead
+    // of a full index in the browser.
     for (let index = 0; index < pending.length; index++) {
       request.signal.throwIfAborted();
       const { entries: children } = await files.list(pending[index]!, request.signal);

@@ -1,6 +1,6 @@
 !include LogicLib.nsh
 
-; NSIS 是 x86，使用 x64 检测程序检查与应用相同架构的 Runtime。
+; NSIS is x86; use the x64 checker to inspect the Runtime of the same architecture as the app.
 Function ensureWebView2
   InitPluginsDir
   File "/oname=$PLUGINSDIR\checkWebView2.exe" "${webView2Dir}\checkWebView2.exe"
@@ -31,7 +31,8 @@ Function ensureWebView2
     SetDetailsPrint textonly
     DetailPrint "WebView2 版本过旧，请允许微软安装器获取管理员权限并完成更新…"
     SetDetailsPrint none
-    ; ACT: 普通用户模式可能把已有旧 Runtime 视为已安装；仅微软更新进程请求提权。
+    ; ACT: Per-user mode may treat an existing old Runtime as
+    ; installed; only the Microsoft updater process requests elevation.
     StrCpy $2 "管理员更新已结束，以版本检测为准"
     ExecShellWait "runas" "$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe"
   ${Else}
@@ -44,7 +45,7 @@ Function ensureWebView2
     StrCpy $2 "无法启动或已取消管理员授权"
   ${EndIf}
 
-  ; 安装返回码不能证明 Runtime 已更新，使用新进程再次检测实际版本。
+  ; The installer exit code does not prove the Runtime was updated; recheck the actual version in a new process.
   SetDetailsPrint textonly
   DetailPrint "正在验证 WebView2 运行时…"
   SetDetailsPrint none

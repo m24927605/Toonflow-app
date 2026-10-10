@@ -174,7 +174,6 @@ import attachmentList from "./attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "./textAttachments";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
-import anonymousData from "@/lib/anonymousData";
 import { modelChoices } from "@/stores/settings";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
@@ -222,7 +221,7 @@ const browserMessages = computed(() => {
   }
   return { tools: new Map([...groups.values()].map(group => [group.id, group.tools])), liveMessageId };
 });
-// 同轮浏览器调用共用该轮首条浏览器消息底部的画面，原始工具记录仍完整保留。
+// Browser calls in one turn share the view below that turn's first browser message; raw tool records are kept intact.
 const displayedMessages = computed(() => messages.value.filter(message => browserMessages.value.tools.has(message.id) || message.role === "user" || message.error || message.report || message.attachments?.length ||
   !message.parts?.length || message.parts.some(part => part.type !== "tool" || !isBrowserTool(part.tool))));
 const stream = createConversationStream(messages);
@@ -244,7 +243,8 @@ const atLatestMessage = ref(true);
 let messageListInitialized = false;
 let messageScrollOffset = 0;
 const messageKeys = computed(() => displayedMessages.value.map(item => item.id));
-// ACT: 只常驻当前轮的实时画面，历史浏览器消息仍按需挂载，避免长对话累积连接和 DOM。
+// ACT: Keep only the current turn's live view resident; past browser messages mount on demand so long chats don't
+// accumulate connections and DOM.
 const retainedMessages = computed(() => displayedMessages.value.flatMap((item, index) => item.streaming || item.id === editingId.value || item.id === browserMessages.value.liveMessageId ? [index] : []));
 const messageVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(computed(() => {
   const keys = messageKeys.value;
@@ -261,9 +261,10 @@ const messageVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(comput
     scrollEndThreshold: 48,
     useAnimationFrameWithResizeObserver: true,
     useCachedMeasurements: !props.active,
-    // ACT: 实时行读取当前高度，避免延后执行的观察记录覆盖本轮同步测量；历史行仍使用缓存。
+    // ACT: Live rows read their current height so deferred observer entries can't overwrite this turn's sync
+    // measurement; past rows still use the cache.
     measureElement: (element, entry, instance) => props.active && element.dataset.liveMessage ? element.offsetHeight : measureElement(element, entry, instance),
-    // ACT: v-show 隐藏时保留视口与行高，避免零尺寸清空正在输入的工具表单。
+    // ACT: Keep viewport and row heights while hidden by v-show so a zero size doesn't clear tool forms in progress.
     observeElementRect: (instance, onChange) => observeElementRect(instance, rect => { if (rect.height) onChange(rect); }),
     rangeExtractor: range => [...new Set([...defaultRangeExtractor(range), ...retained])].sort((left, right) => left - right),
     onChange(instance) {
@@ -286,7 +287,8 @@ function measureMessage(element: Element | ComponentPublicInstance | null) {
   const height = element.offsetHeight;
   const changed = instance.itemSizeCache.get(instance.options.getItemKey(index)) !== height;
   instance.measureElement(element);
-  // 自动滚动时库会跳过同步测量；在本次 DOM 提交内校正，避免画面随换行先下移再被拉回。
+  // The library skips sync measurement while auto-scrolling; correct within this DOM commit so the view doesn't
+  // shift down on wrap and get pulled back.
   instance.resizeItem(index, height);
   if (!changed || messageMeasurePending) return;
   messageMeasurePending = true;
@@ -638,7 +640,6 @@ async function sendMessage(source?: AgentMessage) {
   const handledCanvasCalls = new Set<string>();
   const pendingQuestions = new Map<string, string>();
   const activeChildFiles = new Set<string>();
-  const finishStats = anonymousData.startAgent();
   try {
     if (!source) await instance.reset();
     requestController.signal.throwIfAborted();
@@ -650,7 +651,7 @@ async function sendMessage(source?: AgentMessage) {
       signal: requestController.signal,
     });
     for await (const event of readAgentEvents(response, requestController.signal)) {
-      // 子任务复用发起委派时的画布与取消通道，界面切换不改变工具执行目标。
+      // Subtasks reuse the canvas and cancel channel from delegation time; switching views doesn't retarget tools.
       let toolEvent: AgentEvent = event;
       let scope = "";
       while (toolEvent.type === "subAgentEvent") {
@@ -700,10 +701,8 @@ async function sendMessage(source?: AgentMessage) {
       }
     }
     if (source && !accepted) throw new Error("服务端未确认重发，请重新打开对话后重试");
-    finishStats("success");
     emit("sent", mentionPlainText(prompt, mentions) || attachments[0]?.name || "新对话");
   } catch (error) {
-    finishStats(requestController.signal.aborted ? "cancelled" : "failed");
     const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
     const message = requestController.signal.aborted ? "已停止生成" : responseMessage || (error instanceof Error ? error.message : "发送失败，请重试");
     if ((source && !accepted) || !ownsStream) { userMessage.error = message; ElMessage.error(message); }
@@ -713,7 +712,7 @@ async function sendMessage(source?: AgentMessage) {
     }
   } finally {
     for (const file of activeChildFiles) emit("event", { type: "subAgentEvent", file, event: { type: "error", message: "委派连接已结束，请重新打开子会话查看结果" } });
-    // ACT: Bun 的流断开事件可能不触发；主动结束仍在等待的提问，不依赖断开通知。
+    // ACT: Bun's stream close event may not fire; actively end pending questions rather than relying on that notice.
     for (const callId of pendingQuestions.values()) {
       void fetch("/api/agent/answer", {
         method: "POST", headers: { "Accept-Language": locale.value, "Content-Type": "application/json", "x-toonflow-workspace": "1" },

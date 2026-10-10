@@ -90,7 +90,8 @@ function normalizeModel(value: AnyTagProps[][]): AnyTagProps[][] {
 }
 
 function releaseNodeFocus(instance: xSender) {
-  // ACT: 1.4.6 的排队输入回调仍会聚焦旧 Write；仅让即将移除的节点失效，库支持取消回调后可移除。
+  // ACT: Queued input callbacks in 1.4.6 still focus the old Write; only disable nodes about to be removed.
+  // Remove once the library can cancel callbacks.
   for (const grid of instance.chatEditor.NODES) {
     for (const node of grid.children) {
       if (node.type === "Write" || node.type === "Input") node.focus = () => {};
@@ -99,7 +100,7 @@ function releaseNodeFocus(instance: xSender) {
 }
 
 function syncModel(value = sender?.getModel() ?? model.value) {
-  // 输入法组字时只同步文本，等 compositionend 后再替换参考标签，保留正在编辑的 DOM。
+  // While the IME is composing, only sync text; replace reference tags after compositionend to keep the DOM being edited.
   const next = sender?.chatEditor.isComposition ? value : normalizeModel(value);
   if (sender && JSON.stringify(sender.getModel()) !== JSON.stringify(next)) {
     const instance = sender;
@@ -121,7 +122,8 @@ function syncModel(value = sender?.getModel() ?? model.value) {
     const task = instance.reset({ chatNode: next, clearHistory: false });
     resetTask = task;
     void task.finally(() => { if (resetTask === task) resetTask = undefined; });
-    // ACT: reset 同步重建 DOM，但下一帧会强制移到末尾；在此恢复选区，并在 reset 完成前抑制该次聚焦。
+    // ACT: reset rebuilds the DOM synchronously but forces the caret to the end next frame;
+    // restore the selection here and suppress that focus until reset finishes.
     const last = instance.chatEditor.NODES.at(-1)?.children.at(-1);
     if (last?.type === "Write") {
       Object.assign(instance.getCurrentNode(), { instance: last, node: last.$el.children[0].firstChild, offset: last.text.length || 1 });
@@ -169,7 +171,8 @@ watch(() => props.references, async (options) => {
   if (!instance) return;
   instance.bus.emit(xSender.EventSet.EVENT_COMMON_DIALOG_CLOSE);
   instance.updateConfig({ mentionConfig: { dialogTitle: "选择参考", callEvery: false, options } });
-  // 等库将本帧的输入 DOM 写回模型后再更新参考，避免用旧文本重建输入框。
+  // Update references only after the library writes this frame's input DOM back to the model,
+  // to avoid rebuilding the input with stale text.
   await instance.nextTick();
   if (sender === instance) syncModel();
 }, { deep: true });
@@ -191,7 +194,7 @@ watch(senderElement, (element, _previous, onCleanup) => {
     keyboardWrapFun: event => event.key === "Enter" && !event.isComposing,
   });
   sender = instance;
-  // ACT: 弹窗只移动现有编辑器，保留参考标签、光标与撤销记录。
+  // ACT: The dialog only moves the existing editor, keeping reference tags, caret and undo history.
   const stopExpandedWatch = watch([expanded, expandedTarget], async ([visible, target]) => {
     instance.bus.emit(xSender.EventSet.EVENT_COMMON_DIALOG_CLOSE);
     instance.updateConfig({ chatStyle: { minHeight: visible ? "100%" : "70px", maxHeight: visible ? "100%" : "180px" } });
@@ -201,7 +204,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
     popup.style.zIndex = String(nextZIndex());
   });
   const editor = instance.chatElement.richText;
-  // ACT: 1.4.6 未检查卸载节点和空 Range 矩形；只适配当前实例，升级到库内修复后可移除。
+  // ACT: 1.4.6 doesn't check for unmounted nodes or empty Range rects; patch only the current instance.
+  // Remove after upgrading to a library fix.
   const chatEditor = instance.chatEditor as typeof instance.chatEditor & {
     focusFirst(): void;
     focusLast(): void;
@@ -228,7 +232,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
   };
   const insertNodes = chatEditor.insertNodes.bind(chatEditor);
   chatEditor.insertNodes = async nodes => {
-    // 选区粘贴会先异步删除，再插入；关闭输入框后不再创建并聚焦新节点。
+    // Pasting over a selection deletes asynchronously before inserting;
+    // once the input is closed, don't create or focus new nodes.
     if (sender === instance && editor.isConnected) await insertNodes(nodes);
   };
   editor.setAttribute("role", "textbox");
@@ -236,7 +241,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
   editor.setAttribute("aria-multiline", "true");
   instance.bus.on("textPrompt", xSender.EventSet.EVENT_COMMON_CHANGE, () => syncModel());
   syncModel(initialModel);
-  // ACT: XSender 1.4.6 默认复制标签名称；复用库截取的选区模型，仅覆盖纯文本，保留富文本粘贴。
+  // ACT: XSender 1.4.6 copies tag names by default; reuse the library's captured selection model
+  // and override only plain text, keeping rich-text paste.
   const copyText = (event: ClipboardEvent) => {
     const copied = event.clipboardData?.getData("application/chat-nodes");
     if (copied) event.clipboardData?.setData("text/plain", getPromptText(JSON.parse(copied)));
@@ -256,7 +262,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
       instance.bus.emit(xSender.EventSet.EVENT_COMMON_DIALOG_CLOSE);
     }
   };
-  // ACT: XSender 1.4.6 的候选默认插入 Mention；捕获选择事件改用公开 setHtml，库支持自定义渲染后可替换。
+  // ACT: XSender 1.4.6 suggestions insert a Mention by default; capture the select event and use the public setHtml.
+  // Replace once the library supports custom rendering.
   popup.addEventListener("click", selectReference, true);
   document.addEventListener("pointerdown", closeOutside, true);
   onCleanup(() => {
@@ -268,7 +275,8 @@ watch(senderElement, (element, _previous, onCleanup) => {
     editor.removeEventListener("cut", copyText);
     document.removeEventListener("pointerdown", closeOutside, true);
     popup.removeEventListener("click", selectReference, true);
-    // ACT: 1.4.6 的 destroy 会删除排队回调仍需用到的字段；先走公开清理事件，库修复后可直接 destroy。
+    // ACT: destroy in 1.4.6 deletes fields queued callbacks still need; go through the public cleanup events first.
+    // Call destroy directly once the library is fixed.
     instance.bus.offKeyEvent("textPrompt");
     instance.bus.emit(xSender.EventSet.EVENT_COMMON_DIALOG_CLOSE);
     instance.updateConfig({ mentionConfig: { dialogTitle: "选择参考", callEvery: false, options: [] } });
@@ -300,7 +308,8 @@ function handleMentionKey(event: KeyboardEvent) {
     sender.bus.emit(xSender.EventSet.EVENT_COMMON_DIALOG_CLOSE);
     return;
   }
-  // ACT: 1.4.6 的候选键盘监听在 window，会被骨架截断；只适配当前实例，库支持局部键盘 API 后可替换。
+  // ACT: In 1.4.6 the suggestion keyboard listener is on window and gets cut off by the skeleton;
+  // patch only the current instance. Replace once the library has a scoped keyboard API.
   const items = Array.from(dialog.querySelectorAll<HTMLElement>(".chat-mention-dialog-item")).filter(item => item.getClientRects().length);
   if (!items.length) return;
   const active = Math.max(0, items.findIndex(item => item.classList.contains("active")));

@@ -75,7 +75,8 @@ const columns = ref(3);
 const splitting = ref(false);
 const completed = ref(0);
 const imageSize = ref({ width: 0, height: 0 });
-// ACT: 每轴最多 10 格（100 张），逐张编码上传以控制内存；更大批量需加入分批任务后再放开。
+// ACT: At most 10 cells per axis (100 images), encoded and uploaded one by one to bound memory;
+// larger batches need a batched task before lifting this.
 const validGrid = computed(() => [rows.value, columns.value].every(value => Number.isInteger(value) && value >= 1 && value <= 10));
 const canSplit = computed(() => validGrid.value && rows.value * columns.value > 1 && imageSize.value.width >= columns.value && imageSize.value.height >= rows.value);
 let splitController: AbortController | undefined;
@@ -134,7 +135,7 @@ async function splitImage() {
     for (let row = 0; row < rowCount; row++) {
       for (let column = 0; column < columnCount; column++) {
         controller.signal.throwIfAborted();
-        // 使用相邻整数边界，不能整除的尺寸也不会丢失或重复边缘像素。
+        // Use adjacent integer boundaries so non-divisible sizes neither lose nor duplicate edge pixels.
         const left = Math.floor(column * width / columnCount);
         const top = Math.floor(row * height / rowCount);
         canvas.width = Math.floor((column + 1) * width / columnCount) - left;

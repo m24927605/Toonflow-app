@@ -37,7 +37,8 @@ watch([content, () => props.modelValue, () => props.path, () => props.files, () 
       const dom = markdownDom(props.modelValue);
       for (const checkbox of dom.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) checkbox.disabled = true;
       for (const image of dom.querySelectorAll<HTMLImageElement>("img")) nextReleases.push(loadMarkdownImage(image, image.getAttribute("src") || "", props.path || "", props.files));
-      // 新批次先持有图片，再释放旧预览，避免同一路径的共享缓存归零后重取。
+      // Retain images for the new batch before releasing the old preview,
+      // so the shared cache for the same path doesn't drop to zero and refetch.
       clearPreview();
       element.replaceChildren(...dom.childNodes);
       releases = nextReleases;

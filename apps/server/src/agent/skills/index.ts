@@ -13,7 +13,7 @@ export function loadAgentSkills(cwd: string, scope?: SkillScope) {
     cwd,
     agentDir: join(cwd, ".agent"),
     includeDefaults: false,
-    // 同名技能由工作区优先，列表与运行时共用 SDK 的扫描规则。
+    // Workspace skills win over same-named ones; listing and runtime share the SDK's scan rules.
     skillPaths: [
       ...(scope !== "global" ? [join(cwd, "skill")] : []),
       ...(scope !== "workspace" ? [join(dirname(conf.path), "skills")] : []),

@@ -37,17 +37,20 @@ type ProviderConfig<TRules extends readonly ProviderFormRule[]> = {
 interface ProviderContext<TConfig = Record<string, unknown>> {
   config: TConfig;
   signal?: AbortSignal;
-  /** 宿主直接注入工具，供应商无需 import；FFmpeg 为按需安装的插件能力。 */
+  /**
+   * Tools injected directly by the host, so providers need no imports;
+   * FFmpeg is a plugin capability installed on demand.
+   */
   tool: ProviderTools;
 }
 
 interface MediaRequest {
   model: string;
-  /** 仅放供应商专属参数；公共字段的映射与支持范围由供应商校验。 */
+  /** Provider-specific parameters only; providers validate the mapping and supported range of common fields. */
   other?: Record<string, unknown>;
 }
 
-/** 抽象层的媒体来源；供应商负责转换为平台需要的 URL、文件或字节。 */
+/** Media source in the abstraction layer; providers convert it to the URL, file or bytes the platform needs. */
 type MediaInput =
   | { type: "url"; url: string; mimeType?: string; name?: string }
   | { type: "base64"; data: string; mimeType: string; name?: string }
@@ -60,17 +63,20 @@ type MediaImageResizeOptions = { width?: number; height?: number; format?: "jpeg
 
 interface AudioConvertOptions {
   format: "wav" | "mp3";
-  /** 裁剪起点，单位秒，含边界；缺省为 0。 */
+  /** Trim start in seconds, inclusive; defaults to 0. */
   startSeconds?: number;
-  /** 裁剪终点，单位秒，不含边界；缺省为音频末尾。 */
+  /** Trim end in seconds, exclusive; defaults to the end of the audio. */
   endSeconds?: number;
-  /** 目标采样率；缺省保持原采样率。 */
+  /** Target sample rate; defaults to the original sample rate. */
   sampleRate?: number;
-  /** mp3 比特率，单位 kbps；缺省 128，仅 format 为 mp3 时生效。 */
+  /** mp3 bitrate in kbps; defaults to 128 and only applies when format is mp3. */
   bitrateKbps?: number;
 }
 
-/** 缺少可用 FFmpeg 时抛出；由宿主前端询问下载安装，供应商应继续向上抛出。 */
+/**
+ * Thrown when no usable FFmpeg is available;
+ * the host frontend prompts to download and install it, so providers should rethrow it.
+ */
 interface FfmpegRequiredError extends Error {
   name: "FfmpegRequiredError";
   code: "FFMPEG_REQUIRED";
@@ -79,106 +85,146 @@ interface FfmpegRequiredError extends Error {
 
 interface ProviderTools {
   fetch: typeof globalThis.fetch;
-  /** 提取供应商错误正文中的可读原因，并隐藏配置中的密钥和 URL 查询参数。 */
+  /** Extracts a readable reason from a provider error body, hiding configured keys and URL query parameters. */
   errorMessage(value: unknown): string;
   hash: typeof Bun.hash;
   image: typeof Bun.Image;
-  /** 公共图片基础处理工具；供应商可在 processMedia 中按自身模型能力使用。 */
+  /**
+   * Shared basic image processing tools;
+   * providers can use them in processMedia according to their models' capabilities.
+   */
   media: {
     inspectImage(input: MediaInput): Promise<MediaImageInfo>;
     resizeImage(input: MediaInput, options: MediaImageResizeOptions): Promise<MediaInput>;
   };
   /**
-   * 音频裁剪转码；仅接受 WAV 格式的内存字节并返回处理后的内存字节，不支持文件路径、URL 或其他压缩格式输入。
+   * Audio trimming and transcoding; accepts only in-memory WAV bytes and returns processed in-memory bytes.
+   * File paths, URLs and other compressed formats are not supported as input.
    */
   audio: {
     convert(input: Uint8Array, options: AudioConvertOptions): Promise<{ data: Uint8Array; mimeType: string }>;
   };
   /**
-   * 获取绑定当前工作区的原生 @renmu/fluent-ffmpeg 工厂，沿用链式调用、事件、流和 ffprobe 回调。
-   * 仅显式文件路径经过工作区边界检查；原始参数、滤镜及清单中的间接 I/O 不是沙箱。
-   * 宿主始终注入此入口，调用时检查 FFmpeg/FFprobe；没有工作目录的调试上下文不能使用。
-   * 缺失时抛出 FfmpegRequiredError，并通知在线前端询问下载；不会后台自动安装。
-   * 安装后由用户重新发起操作，供应商不要捕获此错误后自动重试完整生成请求。
-   * 输出覆盖行为沿用原生库；调用方负责文件命名、处理 end/error 及通过 command.kill 取消运行。
-   * @throws {FfmpegRequiredError} 未安装或当前设置未找到可用的 FFmpeg。
+   * Gets the native @renmu/fluent-ffmpeg factory bound to the current workspace,
+   * keeping chained calls, events, streams and ffprobe callbacks.
+   * Only explicit file paths go through workspace boundary checks;
+   * indirect I/O in raw arguments, filters and list files is not sandboxed.
+   * The host always injects this entry and checks FFmpeg/FFprobe when called;
+   * debug contexts without a working directory cannot use it.
+   * Throws FfmpegRequiredError when missing and notifies the online frontend to prompt a download;
+   * it never auto-installs in the background.
+   * After installation the user retries the operation;
+   * providers must not catch this error and automatically retry the full generation request.
+   * Output overwrite behavior follows the native library;
+   * callers handle file naming, end/error events and cancellation via command.kill.
+   * @throws {FfmpegRequiredError} FFmpeg is not installed or no usable FFmpeg is found with the current settings.
    * @example const ffmpeg = await this.tool.ffmpeg(); const command = ffmpeg("assets/input.mp4").videoCodec("libx264");
    */
   ffmpeg(): Promise<import("@toonflow/ffmpeg/types").FfmpegFactory>;
+  /**
+   * Runs one job with the Higgsfield CLI installed and signed in on the host (`higgsfield generate create <jobType> --wait --json`).
+   * `params` are the job type's schema params (`higgsfield model get <jobType>`); media inputs are written to temporary
+   * files that the CLI uploads. Resolves with the finished job's result URL. The host never exposes the CLI credentials.
+   */
+  higgsfield(request: {
+    jobType: string;
+    prompt: string;
+    params?: Record<string, string | number | boolean>;
+    media?: Partial<Record<"image-references" | "video-references" | "audio-references" | "start-image" | "end-image", MediaInput[]>>;
+  }): Promise<{ url: string }>;
 }
 
 interface ImageRequest extends MediaRequest {
   prompt: string;
-  /** 参考图。 */
+  /** Reference images. */
   images?: MediaInput[];
   mask?: MediaInput;
-  /** 生成数量。 */
+  /** Number of results to generate. */
   n?: number;
-  /** 画面宽高比，如 16:9。 */
+  /** Aspect ratio, e.g. 16:9. */
   ratio?: string;
-  /** 输出尺寸，如 1K、2K、4K 或 1024x1024；具体格式由供应商转换。 */
+  /** Output size, e.g. 1K, 2K, 4K or 1024x1024; providers convert the exact format. */
   size?: string;
-  /** 画质档位，如 low、medium、high，由供应商映射。 */
+  /** Quality tier, e.g. low, medium, high; mapped by the provider. */
   quality?: string;
-  /** 输出编码格式，如 png、jpeg、webp。 */
+  /** Output encoding format, e.g. png, jpeg, webp. */
   outputFormat?: string;
 }
 
 interface VideoRequest extends MediaRequest {
   prompt: string;
-  /** 当前生成模式；参考模式数组声明各类参考媒体数量上限。 */
+  /** Current generation mode; reference mode arrays declare the count limit for each kind of reference media. */
   mode?: VideoMode;
-  /** 参考图；首尾帧通过 firstFrame、lastFrame 单独传入。 */
+  /** Reference images; first/last frames are passed separately via firstFrame and lastFrame. */
   images?: MediaInput[];
   videos?: MediaInput[];
   audios?: MediaInput[];
   firstFrame?: MediaInput;
   lastFrame?: MediaInput;
-  /** 输出时长，单位秒；支持范围由供应商按模型校验。 */
+  /** Output duration in seconds; providers validate the supported range per model. */
   duration?: number;
-  /** 画面宽高比，如 16:9。 */
+  /** Aspect ratio, e.g. 16:9. */
   ratio?: string;
-  /** 分辨率档位，如 720p、1080p。 */
+  /** Resolution tier, e.g. 720p, 1080p. */
   resolution?: string;
   generateAudio?: boolean;
   watermark?: boolean;
 }
 
-/** 基础音频生成参数；text、prompt 至少提供一项，非空校验与模型能力检查由供应商负责。 */
+/**
+ * Basic audio generation parameters;
+ * at least one of text or prompt is required, and providers handle non-empty validation and model capability checks.
+ */
 type AudioRequest = MediaRequest & {
-  /** 待朗读的文本，用于文本转语音。 */
+  /** Text to read aloud, for text-to-speech. */
   text?: string;
-  /** 音频创作或语音风格提示词，可与待朗读的 text 分开传入。 */
+  /** Prompt for audio creation or voice style, which can be passed separately from the text to read. */
   prompt?: string;
-  /** 参考音频，可附带该段音频的准确转写文本；上传或复刻流程由供应商处理。 */
+  /** Reference audio, optionally with an exact transcript of the clip; providers handle the upload or cloning flow. */
   audios?: (MediaInput & { text?: string })[];
-  /** 音频创作参考图；数量以及能否与参考音频同传，由供应商按模型校验。 */
+  /**
+   * Reference images for audio creation;
+   * providers validate per model the count and whether they can be sent with reference audio.
+   */
   images?: MediaInput[];
-  /** 系统或已复刻的音色标识，由供应商映射到平台的音色参数。 */
+  /** System or cloned voice ID, mapped by the provider to the platform's voice parameter. */
   voice?: string;
-  /** 语速倍率，1 为正常语速；供应商负责转换平台的语速刻度。 */
+  /** Speed multiplier, 1 is normal speed; providers convert it to the platform's speed scale. */
   speed?: number;
-  /** 音量增益，单位 dB，0 为原始音量；供应商负责转换平台的音量刻度。 */
+  /** Volume gain in dB, 0 is the original volume; providers convert it to the platform's volume scale. */
   volume?: number;
-  /** 抽象层以半音表示音调偏移，0 为原音调；供应商负责映射平台刻度并校验支持范围。 */
+  /**
+   * Pitch shift in semitones at the abstraction layer, 0 is the original pitch;
+   * providers map it to the platform scale and validate the supported range.
+   */
   pitch?: number;
-  /** 情绪，如 happy、sad、angry；由供应商映射并校验模型及音色是否支持。 */
+  /** Emotion, e.g. happy, sad, angry; providers map it and validate whether the model and voice support it. */
   emotion?: string;
-  /** 合成语言或方言，如 zh-CN、en、yue；由供应商映射，缺省沿用模型默认行为。 */
+  /**
+   * Synthesis language or dialect, e.g. zh-CN, en, yue;
+   * mapped by the provider, defaulting to the model's default behavior.
+   */
   language?: string;
-  /** 是否规范化数字等文本的读法；支持语种与处理规则由供应商按模型校验。 */
+  /**
+   * Whether to normalize how numbers and similar text are read;
+   * providers validate supported languages and rules per model.
+   */
   normalizeText?: boolean;
-  /** 输出编码格式，如 mp3、wav、pcm、flac、opus；由供应商映射平台的格式名称。 */
+  /** Output encoding format, e.g. mp3, wav, pcm, flac, opus; providers map it to the platform's format name. */
   format?: string;
-  /** 输出采样率，单位 Hz。 */
+  /** Output sample rate in Hz. */
   sampleRate?: number;
-  /** 输出编码码率，单位 kbps；仅适用于支持配置码率的格式，由供应商转换平台单位。 */
+  /**
+   * Output bitrate in kbps;
+   * only for formats with a configurable bitrate, converted by the provider to the platform's unit.
+   */
   bitrateKbps?: number;
 } & ({ text: string } | { prompt: string });
 
 /**
- * 三种生成函数统一返回最终媒体数组，不能返回任务 ID 或原始平台响应。
- * ACT: 本层只约定完整结果；供应商内部处理轮询/流读取，失败时抛出异常。
+ * All three generate functions return the final media array; they must not return task IDs or raw platform responses.
+ * ACT: This layer only defines complete results;
+ * providers handle polling/stream reading internally and throw on failure.
  */
 type GenerateMedia<TRequest, TConfig = Record<string, unknown>> = (
   this: ProviderContext<TConfig>,
@@ -194,31 +240,36 @@ interface ProviderUpdateInfo {
 interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readonly ProviderFormRule[]> {
   id: string;
   label: string;
-  /** 供应商品牌图标，支持图片 URL 或 data:image/...;base64,...。 */
+  /** Provider brand icon; supports an image URL or a data:image/...;base64,... URI. */
   icon?: string;
-  /** 适配文件版本，独立于模型版本；新增供应商应填写，缺省仅兼容旧文件。 */
+  /**
+   * Adapter file version, independent of model versions;
+   * new providers should set it, and omitting it is only for compatibility with old files.
+   */
   version?: string;
   apiUrl?: string;
   /**
-   * 媒体模型列表 GET 地址，使用配置的 apiKey 作为 Bearer 凭据，返回 { data: 模型数组 }。
-   * 模型须含 id，type 可由 URL 的 type 参数或同名已有模型补全。
-   * 可选 modelInfo 对象提供模型能力（如 mode、audio、durationResolutionMap、imageSizes、imageRatios），获取时合并至模型顶层。
-   * 提供此字段后可手动获取；TF-Router 手动获取图片、视频、音频，并在有 key 的程序启动时自动更新。
+   * GET URL of the media model list;
+   * uses the configured apiKey as the Bearer credential and returns { data: <model array> }.
+   * Models must include id; type can be filled from the URL's type parameter or an existing model with the same name.
+   * An optional modelInfo object provides model capabilities
+   * (e.g. mode, audio, durationResolutionMap, imageSizes, imageRatios), merged into the model's top level when fetched.
+   * When set, models can be fetched manually.
    */
   modelsUrl?: string;
-  protocol?: "openai-completions" | "openai-responses" | "anthropic-messages";
-  /** 厂商说明的 Markdown 内容。 */
+  protocol?: "openai-completions" | "openai-responses" | "anthropic-messages" | "openai-codex-responses" | "claude-code";
+  /** Markdown content of the vendor description. */
   readme?: string;
   rules: TRules;
   models: ProviderModel[];
-  /** 检查供应商适配文件是否有更新。 */
+  /** Checks whether the provider adapter file has an update. */
   checkForUpdates?: (this: ProviderContext<ProviderConfig<TRules>>) => Promise<ProviderUpdateInfo>;
-  /** 获取更新文件的完整源码；写入与应用由宿主负责。 */
+  /** Gets the full source of the updated file; the host handles writing and applying it. */
   updateVendor?: (this: ProviderContext<ProviderConfig<TRules>>) => Promise<string>;
-  /** 未实现的方法保持缺省，调用方据此判断能力是否可用。 */
+  /** Leave unimplemented methods undefined; callers use that to tell whether a capability is available. */
   generateImage?: GenerateMedia<ImageRequest, ProviderConfig<TRules>>;
   generateVideo?: GenerateMedia<VideoRequest, ProviderConfig<TRules>>;
   generateAudio?: GenerateMedia<AudioRequest, ProviderConfig<TRules>>;
-  /** 可选的供应商媒体预处理；未实现时保持原请求。 */
+  /** Optional provider media preprocessing; the request is unchanged when not implemented. */
   processMedia?: (this: ProviderContext<ProviderConfig<TRules>>, request: ImageRequest | VideoRequest | AudioRequest) => Promise<ImageRequest | VideoRequest | AudioRequest>;
 }

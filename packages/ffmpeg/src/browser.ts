@@ -20,7 +20,7 @@ function snapshot<T>(value: T): T {
 }
 
 function createCall(method: string, args: unknown[]): FfmpegCall {
-  // JSON 会把位置参数 undefined 变成 null；保留原生可选参数的含义。
+  // JSON turns undefined positional arguments into null; keep the native optional-argument semantics.
   return snapshot({ method, args, undefinedArgs: args.flatMap((value, index) => value === undefined ? [index] : []) });
 }
 
@@ -38,7 +38,10 @@ async function request(input: BrowserFfmpegRequest, signal?: AbortSignal) {
   return response;
 }
 
-/** 只传输 fluent 调用，执行库和媒体文件始终留在宿主。目录在创建工厂时固定。 */
+/**
+ * Only fluent calls are transmitted; the executing library and media files always stay on the host.
+ * The directory is fixed when the factory is created.
+ */
 export async function createBrowserFfmpeg(directory: string, signal?: AbortSignal): Promise<BrowserFfmpegFactory> {
   signal?.throwIfAborted();
   const prepared = await request({ directory, requestId: crypto.randomUUID(), options: {}, calls: [], operation: { method: "prepare", args: [] } }, signal);
@@ -70,7 +73,8 @@ export async function createBrowserFfmpeg(directory: string, signal?: AbortSigna
       let cancellation: Promise<void> | undefined;
       const cancel = () => {
         if (!ready || finished || cancellation) return;
-        // Bun 不总是把 fetch.abort 传递给 Express；显式取消，并等响应头保证任务已注册。
+        // Bun does not always pass fetch.abort through to Express;
+        // cancel explicitly and wait for the response headers to ensure the task is registered.
         cancellation = request({ ...input, options: {}, calls: [], operation: { method: "cancel", args: [] } })
           .then(() => {})
           .catch(error => console.error("FFmpeg 取消请求失败", error))
@@ -109,7 +113,8 @@ export async function createBrowserFfmpeg(directory: string, signal?: AbortSigna
           reader.releaseLock();
         }
       })().catch(async error => {
-        // 事件流可能先收到心跳或断开；取消握手完成前不让调用方清理仍在使用的文件。
+        // The event stream may first receive a heartbeat or disconnect;
+        // until the cancel handshake completes, the caller must not clean up files still in use.
         if (requestSignal.aborted) await cancellation;
         if (active === controller) active = undefined;
         if (finished) queueMicrotask(() => { throw error; });
@@ -161,7 +166,8 @@ export async function createBrowserFfmpeg(directory: string, signal?: AbortSigna
           }
           return name === "run" ? undefined : command;
         };
-        // 不伪装 Promise、Node.js Stream 或子进程，未知属性按普通对象返回 undefined。
+        // Do not masquerade as a Promise, Node.js Stream or child process;
+        // unknown properties return undefined like a plain object.
         return undefined;
       },
     });

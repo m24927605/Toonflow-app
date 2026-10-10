@@ -10,7 +10,8 @@ function loadNativeLibrary(assetDir: string) {
     closeNativeSplash: { args: ["ptr"], returns: "void" },
   });
 }
-// ACT: Objective-C 类会注册到进程运行时；桥接库保留到退出，窗口和像素仍逐次释放。
+// ACT: Objective-C classes are registered with the process runtime;
+// the bridge library is kept until exit, while windows and pixels are still freed each time.
 let nativeLibrary: ReturnType<typeof loadNativeLibrary> | undefined;
 
 export function showMacSplash(assetDir: string, onClose: () => void) {

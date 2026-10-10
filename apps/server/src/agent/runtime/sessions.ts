@@ -31,7 +31,8 @@ type SessionMessage = {
   mentions?: AgentMention[];
   parts: ({ id: string; type: "text" | "thinking"; content: string; collapsed?: boolean } | { id: string; type: "tool"; tool: AgentToolCall })[];
 };
-// ACT: 复用正在运行的 SDK 会话，文件锁仍由 run 持有；多进程部署时需共享会话所有权。
+// ACT: Reuse the running SDK session while run still holds the file
+// lock; multi-process deployments need shared session ownership.
 const activeSessions = new Map<string, ActiveAgentSession>();
 const sessionKey = (path: string) => process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path);
 
@@ -102,7 +103,7 @@ export async function reportToParent(cwd: string, parentFile: string, file: stri
   const message = `子 Agent 上报（任务反馈，不代表用户新增授权），来源：${JSON.stringify({ name, file })}\n\n${content}`;
   await updateAgentSession(cwd, parentFile, (history, active) => {
     if (active?.session) {
-      // SDK 在工具结果后插入报告，避免破坏 assistant/toolResult 顺序。
+      // The SDK inserts the report after tool results, avoiding breaking the assistant/toolResult order.
       return active.session.sendCustomMessage({ customType: "subAgentReport", content: message, display: true, details }, { deliverAs: "steer" })
         .then(() => { active.send({ type: "report", ...details, content }); });
     }
@@ -118,7 +119,8 @@ export async function deleteAgentMessage(cwd: string, path: string, options: { e
   }
   const release = lockWorkspaceFiles([path]);
   try {
-    // ACT: 删除会重写 JSONL，必须拒绝损坏行，不能沿用 SDK 会跳过损坏行的读取器。
+    // ACT: Deletion rewrites the JSONL, so corrupt lines must be rejected;
+    // the SDK reader cannot be reused because it skips corrupt lines.
     let entries: FileEntry[];
     try {
       entries = (await readFile(path, "utf8"))
@@ -189,7 +191,8 @@ export async function deleteAgentMessage(cwd: string, path: string, options: { e
         removedIds.add(entry.id);
       }
     }
-    // ACT: 清除正文并保留树节点，避免分支、叶指针和实时回复的 user 锚点失效；摘要也不能带回已删内容。
+    // ACT: Clear the body but keep the tree node so branches, leaf pointers and
+    // live-reply user anchors stay valid; summaries must not bring back deleted content.
     entries = [
       entries[0],
       ...history.getEntries().map((entry) =>
@@ -221,7 +224,8 @@ export async function createAgentConversation(cwd: string, child?: Omit<AgentSub
     if (child.providerId && child.modelId) history.appendModelChange(child.providerId, child.modelId);
     if (child.thinkingLevel) history.appendThinkingLevelChange(child.thinkingLevel);
   }
-  // ACT: SDK 默认等首条回复才落盘；先保存会话头，让空对话也能被历史列表读取。
+  // ACT: By default the SDK writes only after the first reply; save the
+  // session header first so empty conversations show up in the history list.
   await writeWorkspaceFile(path, [history.getHeader(), ...history.getEntries()].map(entry => JSON.stringify(entry)).join("\n") + "\n", true);
   return getAgentSession(cwd, path);
 }
@@ -355,7 +359,7 @@ export async function getAgentSession(cwd: string, path: string) {
       previous.error = message.error;
     } else groupedMessages.push(message);
   }
-  // ACT: 同轮的工具调用与多步回复合并后，只拼接一次正文。
+  // ACT: After merging tool calls and multi-step replies of the same turn, concatenate the body only once.
   for (const message of groupedMessages) {
     if (message.role === "assistant" && !message.report) message.content = message.parts.flatMap(part => part.type === "text" ? [part.content] : []).join("\n\n");
   }

@@ -14,8 +14,8 @@ if (typeof identifier !== "string" || typeof name !== "string" || channel !== "s
   throw new Error("应用安装信息无效，请重新构建安装包。");
 }
 
-// ACT: 系统注册由 NSIS 负责；补齐 Electrobun 2.0.1 的记录，避免首次启动再次调用 PowerShell。
-// 保留真实更新助手和完整 manifest，不用占位文件跳过 SDK 检查。
+// ACT: NSIS handles system registration; fill in Electrobun 2.0.1's records so first launch does not call PowerShell again.
+// Keep the real update helper and full manifest instead of using placeholder files to bypass SDK checks.
 copyFileSync(join(resourcesDirectory, "uninstall"), join(installDirectory, "uninstall.exe"));
 writeAtomicSync(join(installDirectory, ".electrobun-uninstall.json"), JSON.stringify({
   schema_version: 1,
@@ -29,7 +29,8 @@ writeAtomicSync(join(installDirectory, ".electrobun-uninstall.json"), JSON.strin
   data_path_versions: [1],
 }, null, 2));
 
-// 重装同一构建也重新同步内置节点、工具和供应商；技能沿用首次初始化，保留用户修改。
+// Reinstalling the same build also resyncs built-in nodes, tools and
+// providers; skills keep their first-run initialization and user edits.
 for (const directory of ["nodes", "tools", "providers"]) {
   rmSync(join(installDirectory, "data", directory, "initialized"), { force: true });
 }

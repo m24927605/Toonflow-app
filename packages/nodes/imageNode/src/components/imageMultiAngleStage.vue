@@ -159,7 +159,8 @@ function render() {
     { text: "原图左 · −90°", style: project(new three.Vector3(-distance - 0.25, -0.3, 0)) },
     { text: "原图右 · 90°", style: project(new three.Vector3(distance + 0.25, -0.3, 0)) },
   ];
-  // ACT: 单张图片只表示参考平面，背面用纯色避免镜像误导；主体的新视角仍由生成模型补全。
+  // ACT: A single image only represents a reference plane, so the back is a solid color to avoid misleading mirroring;
+  // new views of the subject are still filled in by the generation model.
   renderer.render(scene, overview ? overviewCamera : targetCamera);
 }
 
@@ -184,7 +185,8 @@ function startDrag(event: PointerEvent) {
 function moveDrag(event: PointerEvent) {
   if (!drag || drag.pointerId !== event.pointerId || props.disabled) return;
   event.preventDefault();
-  // ACT: 拖动直接映射角度，避免在轨道背面拾取时跳到正面；总览旋转不改变角度约定。
+  // ACT: Dragging maps directly to angles, avoiding jumps to the front when picking on the back of the orbit;
+  // overview rotation doesn't change the angle convention.
   setDirection(drag.azimuth + (event.clientX - drag.x) * 0.8, drag.elevation - (event.clientY - drag.y) * 0.6);
 }
 

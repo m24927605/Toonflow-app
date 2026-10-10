@@ -1,17 +1,22 @@
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { getConfiguredModel } from "@/utils/ai";
+import { createCodexRuntime } from "@/utils/ai/codex";
 
 export async function createAgentModel(providerId: string, modelId: string, thinkingLevel = "off") {
   const configured = getConfiguredModel(providerId, modelId);
   const { provider, model, baseUrl } = configured;
+  if (provider.protocol === "claude-code") throw Object.assign(new Error("Claude Code 仅用于节点的单轮文本生成，请为 Agent 选择其他模型"), { status: 400 });
+  // ACT: Codex uses Pi's built-in provider so the OAuth credential in auth.json is refreshed per request and long
+  // conversations do not outlive the access token.
+  if (provider.protocol === "openai-codex-responses") return { ...configured, runtime: await createCodexRuntime() };
   const runtime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false });
   runtime.registerProvider(providerId, {
     api: provider.protocol,
     baseUrl,
     models: [{
       id: model.id, name: model.label, reasoning: thinkingLevel !== "off",
-      // ACT: 保留图片输入，由实际供应方判断该模型是否支持。
+      // ACT: Keep image input and let the actual provider decide whether the model supports it.
       input: ["text", "image"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: model.contextWindow, maxTokens: model.maxOutputTokens,

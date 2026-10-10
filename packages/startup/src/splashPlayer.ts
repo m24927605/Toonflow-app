@@ -66,18 +66,19 @@ export function createSplashPlayer(assetDir: string, width: number, height: numb
     const loading = getSegment("loading"), ready = getSegment("ready");
     const frameDelay = 1000 / definition.fr;
     const loopDuration = loading.dr * frameDelay;
-    // ACT: 页面已就绪时保留完整收尾帧，但最多播放 600ms，避免额外等待原动画的 2.2 秒。
+    // ACT: Once the page is ready, keep the full closing frames but play at most 600ms,
+    // avoiding an extra wait for the original 2.2-second animation.
     const readyDuration = Math.min(ready.dr * frameDelay, 600);
     const readyFrameDelay = readyDuration / ready.dr;
     let readyAt = Infinity;
     const canvas = tvg.tvg_swcanvas_create(1);
     if (!canvas) throw new Error("无法创建 Lottie 画布");
     disposals.push(() => { tvg.tvg_canvas_destroy(canvas); });
-    // ARGB8888 在小端平台内存中为预乘 BGRA；stride 单位是像素。
+    // ARGB8888 is premultiplied BGRA in memory on little-endian platforms; stride is in pixels.
     check(tvg.tvg_swcanvas_set_target(canvas, ptr(pixels), width, width, height, 1));
     check(tvg.tvg_canvas_add(canvas, picture));
 
-    // ACT: 播放时间仅由平台层的 performance.now() 差值传入。
+    // ACT: Playback time is passed in only as performance.now() deltas from the platform layer.
     function draw(elapsedMs: number) {
       if (isClosed) throw new Error("启动动画已关闭");
       const readyElapsed = elapsedMs - readyAt;
@@ -85,18 +86,19 @@ export function createSplashPlayer(assetDir: string, width: number, height: numb
         ? loading.tm + elapsedMs % loopDuration / frameDelay
         : Math.min(ready.tm + readyElapsed / readyFrameDelay, ready.tm + ready.dr - 1);
       const status = tvg.tvg_animation_set_frame(animation, frameIndex);
-      if (status !== 2) check(status); // 同帧或差值不足 0.001 时返回 InsufficientCondition。
+      if (status !== 2) check(status); // Returns InsufficientCondition for the same frame or a delta under 0.001.
       check(tvg.tvg_canvas_update(canvas));
       check(tvg.tvg_canvas_draw(canvas, true));
       check(tvg.tvg_canvas_sync(canvas));
       return readyElapsed >= readyDuration;
     }
     return {
-      pixels, // 保持调用方画布的引用，直到播放器释放原生画布。
+      pixels, // Keep a reference to the caller's canvas until the player frees the native canvas.
       draw,
       finish(elapsedMs: number) {
         if (isClosed) return;
-        // 与原 loading 页一致：就绪后立即停止描边并填充，重复通知不重播。
+        // Matches the original loading page: once ready, stop stroking and fill immediately;
+        // repeated notifications do not replay.
         if (readyAt === Infinity) readyAt = elapsedMs;
       },
       close,

@@ -73,7 +73,7 @@ type SavedLayout = { layout: ReturnType<DockviewApi["toJSON"]>; tabs: SavedTab[]
 const closedTabs: SavedTab[] = [];
 const extensionVersions = new Map<string, string | undefined>();
 let savedLayout: SavedLayout | undefined;
-try { savedLayout = JSON.parse(settingsStorage.getItem(layoutKey) ?? "null") ?? undefined; } catch { /* 旧布局损坏时从空工作区开始。 */ }
+try { savedLayout = JSON.parse(settingsStorage.getItem(layoutKey) ?? "null") ?? undefined; } catch { /* Start from an empty workspace if the old layout is corrupt. */ }
 if (savedLayout?.treeWidth && Number.isFinite(savedLayout.treeWidth)) treeWidth = Math.max(180, Math.min(600, savedLayout.treeWidth));
 
 function editorParams(id: string, session: DocumentSession): EditorParams {
@@ -110,12 +110,12 @@ function saveLayout() {
   clearTimeout(layoutTimer);
   if (restoring || changingFiles || !editorApi.value) return;
   const layout = editorApi.value.toJSON();
-  // 仅保存布局与文件身份，不序列化运行中的组件、闭包或未保存正文。
+  // Save only the layout and file identities; never serialize running components, closures or unsaved content.
   const panels = Object.fromEntries(Object.entries(layout.panels).map(([id, panel]) => [id, { ...panel, params: undefined }]));
   try {
     settingsStorage.setItem(layoutKey, JSON.stringify({ layout: { ...layout, panels }, treeWidth,
       tabs: [...sessions].map(([id, session]) => ({ id, preview: views.get(id)?.preview, selection: selectionOf(session.context.resource), extensionId: session.extension.id })) }));
-  } catch { /* 存储满或被禁用时仍允许正常编辑。 */ }
+  } catch { /* Still allow normal editing when storage is full or disabled. */ }
 }
 
 function scheduleLayoutSave() {
@@ -131,7 +131,7 @@ async function restoreLayout() {
   try {
     for (const tab of saved.tabs) {
       try { await openSelection(tab.selection, lifetime.signal, false, tab.extensionId, tab.preview, tab.id); }
-      catch { /* 已删除的文件或扩展不阻止其余标签恢复。 */ }
+      catch { /* Deleted files or extensions don't block restoring the remaining tabs. */ }
     }
     const api = editorApi.value!;
     if (saved.layout && Object.keys(saved.layout.panels).length === sessions.size && Object.keys(saved.layout.panels).every(id => sessions.has(id))) {
@@ -146,7 +146,7 @@ async function restoreLayout() {
 
 async function chooseExtension(resource: ExtResource, force: boolean) {
   const options = await extensionCandidates(resource);
-  if (!options.length) throw new Error(`尚未启用支持此文件的扩展，请到插件市场安装或启用：${resource.label}`);
+  if (!options.length) throw new Error(`尚未启用支持此文件的扩展，请到插件设置中安装或启用：${resource.label}`);
   const key = resource.kind === "canvasNode" ? "canvasNode" : resource.path.split(".").at(-1)!.toLowerCase();
   const associations = settings.value.documentExtensions as Record<string, string> | undefined;
   const defaultId = options.find(option => option.id === associations?.[key])?.id;
@@ -233,7 +233,8 @@ function pathIdentity(path: string) {
 
 function openSelection(selection: TreeSelection, signal = lifetime.signal, forceChoice = false, extensionId?: string, preview = false, restoredId?: string) {
   const request = ++openRevision;
-  // 打开方式选择、关闭旧扩展和登记视图共用顺序队列，避免异步保存时同一资源重复登记。
+  // Choosing an opener, closing old extensions and registering views share a sequential queue, so async saves
+  // can't register a resource twice.
   const result = opening.then(() => openSelectionNow(selection, signal, forceChoice, extensionId, preview, restoredId, request));
   opening = result.then(() => {}, () => {});
   return result;
@@ -280,10 +281,11 @@ async function openSelectionNow(selection: TreeSelection, signal: AbortSignal, f
   if (!extension) return;
   if (preview && request !== openRevision) return;
   const olderSession = [...sessions.values()].find(session => session.extension.id === extension!.id && session.extensionChanged && session.component);
-  // 同一扩展的旧标签仍打开时共用旧组件，避免新版样式提前替换旧编辑器的样式。
+  // While old tabs of the same extension are still open, share the old component so new styles don't replace the
+  // old editor's styles early.
   if (olderSession) extension = { ...olderSession.extension, load: async () => ({ default: olderSession.component! }) };
   if (changingFiles || revision !== fileRevision) throw new Error("文件已变更，请重新打开");
-  // 等待选择期间可能已从其他入口打开同一文件。
+  // The same file may have been opened from another entry point while awaiting the choice.
   const concurrent = [...sessions].find(([, session]) => session.context.resource.kind === resource.kind
     && pathIdentity(session.context.resource.path) === pathIdentity(resource.path)
     && (resource.kind === "file" || session.context.resource.kind === "canvasNode" && session.context.resource.nodeId === resource.nodeId));
@@ -313,7 +315,7 @@ async function openSelectionNow(selection: TreeSelection, signal: AbortSignal, f
     nodeResource ? onState => props.observeNode(nodeResource.directory, nodeResource.path, nodeResource.nodeId, onState) : undefined,
     () => {
       editorApi.value?.getPanel(id)?.api.close();
-      // 节点删除先落盘，再重读 JSON 文件树，避免立即刷新读到删除前的节点。
+      // Persist node deletions before rereading the JSON file tree, so an immediate refresh can't see deleted nodes.
       if (!changingFiles && !lifetime.signal.aborted) void props.flushNodes().then(refreshFileTree).catch(reportError);
     }, async path => {
       await openSelection({ filePath: path, label: path.split("/").at(-1)! });
@@ -366,7 +368,7 @@ async function tabAction(id: string, action: TabAction) {
     const session = sessions.get(id)!;
     keepOpen(id);
     if (session.context.resource.kind === "canvasNode") {
-      // ACT: 画布节点保留唯一运行实例，分屏只移动，不能复制 Teleport 的挂载目标。
+      // ACT: Canvas nodes keep one live instance; splitting only moves them as a Teleport target can't be duplicated.
       if (panel.group.panels.length < 2) { ElMessage.info("画布节点只有一个视图，请先打开另一标签再移动到分屏"); return; }
       panel.api.moveTo({ group: panel.group, position: action === "splitRight" ? "right" : "bottom" });
     } else {
@@ -570,7 +572,7 @@ async function executeFileAction(action: FileAction, item: FileTreeItem, target?
   }
   const remappedIds = new Map(renamed.map(entry => [entry.id, entry.nextId]));
   const expectedIds = previousLayout && Object.keys(previousLayout.panels).map(id => remappedIds.get(id) ?? id);
-  // 重开期间用户可能继续关闭或打开标签，此时以当前布局为准，不恢复过时的布局快照。
+  // Users may close or open tabs during reopen; the current layout then wins over the stale layout snapshot.
   if (renamed.length && previousLayout && expectedIds?.length === sessions.size && expectedIds.every(id => sessions.has(id))) {
     const layout: SavedLayout["layout"] = JSON.parse(JSON.stringify({ ...previousLayout, panels: {} }, (_key, value) => typeof value === "string" ? remappedIds.get(value) ?? value : value));
     layout.panels = Object.fromEntries(Object.entries(previousLayout.panels).map(([oldId, panel]) => {
@@ -597,7 +599,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 function drainRefreshQueue() {
   if (!active.value || lifetime.signal.aborted) { refreshQueue.clear(); return; }
-  // ACT: 只检查可见分组中的文档，最多同时读两个文件；隐藏标签切回来时再读取。
+  // ACT: Only check documents in visible groups, at most two file reads at once; hidden tabs read when switched back.
   for (const session of refreshQueue) {
     if (refreshing.size >= 2) break;
     refreshQueue.delete(session);

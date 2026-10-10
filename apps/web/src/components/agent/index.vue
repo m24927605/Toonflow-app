@@ -47,11 +47,11 @@ import conversation from "./conversation.vue";
 
 const visible = defineModel<boolean>({ default: false });
 type OpenConversation = { key: number; name: string; file?: string; parentFile?: string; subAgents: AgentSubAgent[]; session: AgentConversation | null };
-// ACT: 会话实例保留到工作区关闭，让切换后的回复继续接收流式内容。
+// ACT: Conversation instances live until the workspace closes so replies keep streaming after switching.
 const conversations = ref<OpenConversation[]>([]);
 const conversationKey = ref(0);
 const selectedConversation = computed(() => conversations.value.find(item => item.key === conversationKey.value));
-// ACT: 新对话是现有自动命名逻辑使用的保留值；仅翻译显示，不改变存储或比较值。
+// ACT: "新对话" is reserved by the existing auto-naming logic; translate only the display, not the stored or compared value.
 const name = computed(() => {
   const value = selectedConversation.value?.name;
   return value && value !== "新对话" ? value : translate("新对话");
@@ -191,7 +191,7 @@ async function loadHistory(openLatest = false) {
     if (data.code !== 200) throw new Error(data.message || "读取历史对话失败");
     if (currentRequest !== requestId) return;
     history.value = data.data;
-    // 首条回复结束前会话可能尚未落盘，仍允许从历史菜单切回。
+    // The session may not be on disk before the first reply ends; still allow switching back from the history menu.
     for (const item of conversations.value) if (item.file) setSessionFile(item, item.file);
     if (openLatest) {
       const session = !workspaceStore.pendingAgentMessage && data.data[0] ? await readConversation(directory, data.data[0].file) : null;

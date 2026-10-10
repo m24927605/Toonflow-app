@@ -11,7 +11,8 @@ export default {
   },
   build: {
     mainProcess: "bun",
-    // ACT: Photon 按包所在目录读取 WASM，保留原包，避免内联后引用构建机路径。
+    // ACT: Photon reads WASM from its package directory, so keep the package
+    // intact to avoid referencing build-machine paths after inlining.
     bun: { entrypoint: "apps/desktop/src/index.ts", minify: true, external: ["@silvia-odwyer/photon-node"] },
     copy: {
       "build/desktop/photon": "bun/node_modules/@silvia-odwyer/photon-node",
@@ -24,7 +25,7 @@ export default {
       "build/web": "views/mainview",
       "build/mcp": "mcp",
       "build/tools": "tools",
-      // ACT: 团队暂不打包，恢复时取消注释。
+      // ACT: Teams are not bundled for now; uncomment to restore.
       // "build/agents": "agents",
       "build/nodes": "nodes",
       "build/ext": "ext",
@@ -41,15 +42,16 @@ export default {
     },
     mac: {
       icons: "packages/assets/logo.iconset",
-      // ACT: CI 为 ARM 同时开启签名与公证；本地未配置凭据时仍可构建测试包。
+      // ACT: CI enables both signing and notarization for ARM; test builds still work locally without credentials.
       codesign: process.env.macCodesign === "1",
       notarize: process.env.macCodesign === "1",
     },
   },
   release: {
-    // ACT: 构建基线和补丁固定取 GitHub；客户端更新源由设置单独控制，默认官方源。
+    // ACT: Build baselines and patches always come from GitHub; the client
+    // update source is set separately in settings and defaults to official.
     baseUrl: `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "HBAI-Ltd/Toonflow-app"}/releases/latest/download`,
-    // ACT: 常规构建不访问更新服务器；release:desktop 显式开启增量构建。
+    // ACT: Regular builds do not contact the update server; release:desktop explicitly enables delta builds.
     generatePatch: process.env.generateUpdatePatch === "1",
   },
   ...(process.platform === "darwin" ? {

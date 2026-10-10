@@ -58,7 +58,8 @@ function protectHtmlCode(text: string) {
       copied = to;
     }
   }
-  // ACT: 只保护顶层 HTML token 内开始的 pre；代码围栏及引用代码中的字面 HTML 不参与转换。
+  // ACT: Only protect pre that starts inside a top-level HTML token;
+  // literal HTML in code fences and quoted code is not converted.
   return segments.length ? segments.join("") + source.slice(copied) : text;
 }
 

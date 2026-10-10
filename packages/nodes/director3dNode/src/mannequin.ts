@@ -12,7 +12,8 @@ export function createMannequin(id: string, color = "#c7a77b", hiddenParts: read
   root.userData.threeJsonId = id;
   const material = new MeshStandardMaterial({ color, roughness: 0.75 });
 
-  // ACT: 用少量椭圆截面表现人体体积，保留刚性关节预演，不引入蒙皮或外部模型。
+  // ACT: Represent body volume with a few elliptical cross-sections, keeping rigid-joint previz
+  // without skinning or external models.
   function bodyPart(parent: Group, rings: [height: number, width: number, depth: number, forward?: number][]) {
     if (!parent.visible) return;
     const segments = 16;
@@ -56,7 +57,7 @@ export function createMannequin(id: string, color = "#c7a77b", hiddenParts: read
     return group;
   }
 
-  // 单位为米，脚底在 y=0；面向 +Z，自身左侧为 +X。关节零旋转即自然下垂站姿。
+  // Units in meters, feet at y=0; faces +Z with its own left at +X. Zero joint rotation is a natural relaxed standing pose.
   const hips = joint(root, "hips", [0, 0.95, 0]);
   bodyPart(hips, [[-0.12, 0.06, 0.065], [-0.07, 0.145, 0.095], [0.015, 0.175, 0.105], [0.1, 0.125, 0.085], [0.15, 0.115, 0.075]]);
   const spine = joint(hips, "spine", [0, 0.15, 0]);

@@ -6,10 +6,10 @@ import config from "../../../electrobun.config";
 const projectDir = resolve(import.meta.dirname, "../../..");
 const agentDirectory = dirname(await realpath(Bun.resolveSync("@earendil-works/pi-coding-agent", resolve(projectDir, "apps/server"))));
 const photonDirectory = dirname(Bun.resolveSync("@silvia-odwyer/photon-node", agentDirectory));
-// ACT: 团队暂不打包，恢复时取消注释。
+// ACT: Teams are not bundled for now; uncomment to restore.
 // await $`${process.execPath} run build:teams`.cwd(projectDir);
 await $`${process.execPath} run build`.cwd(resolve(projectDir, "packages/mcp"));
-// ACT: Photon 的 JS 与 WASM 一起分发，运行时不依赖源码目录或启动位置。
+// ACT: Ship Photon's JS together with its WASM so the runtime does not depend on the source directory or launch location.
 await $`${process.execPath} build src/index.ts --target=bun --minify --external @silvia-odwyer/photon-node --define ${`process.env.appVersion:${JSON.stringify(config.app.version)}`} --outdir ../../build/server`.cwd(resolve(projectDir, "apps/server"));
 const photonOutput = resolve(projectDir, "build/server/node_modules/@silvia-odwyer/photon-node");
 await rm(photonOutput, { recursive: true, force: true });

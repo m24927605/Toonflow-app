@@ -43,7 +43,7 @@ async function resolveTarget(target: z.infer<typeof targetSchema> = {}, requireD
 }
 
 function wrapTool(name: string, description: string, schema: object, execute: (args: Record<string, unknown>, target: z.infer<typeof targetSchema>, signal: AbortSignal) => Promise<unknown>): McpTool {
-  // 插件 JSON Schema 的根引用在包裹后仍指向原来的参数对象。
+  // Root references in the plugin JSON Schema still point to the original parameter object after wrapping.
   const argsSchema = JSON.parse(JSON.stringify(schema).replace(/"\$ref":"#(?=\/|")/g, '"$ref":"#/properties/args'));
   return {
     name, description,
@@ -117,7 +117,7 @@ export async function getMcpTools(): Promise<McpTool[]> {
     }));
   }
   const canvasStub: CanvasContext = { id: "mcp", tools: [], async call() { throw new Error("尚未绑定画布"); } };
-  // ACT: 插件损坏时仍保留应用管理工具，允许读取错误并修复插件。
+  // ACT: Keep the app management tools when a plugin is broken so errors can be read and the plugin fixed.
   const definitions = await createAgentTools(dirname(conf.path), canvasStub).catch(error => {
     pluginError = error instanceof Error ? error.message : String(error);
     return [];
@@ -133,7 +133,8 @@ export async function getMcpTools(): Promise<McpTool[]> {
       } : undefined;
       const current = (await createAgentTools(directory!, canvas)).find(tool => tool.name === definition.name);
       if (!current) throw new Error("工具已禁用，或所需 Toonflow 页面未连接，请重新读取工具列表");
-      // ACT: 现有插件依赖 createTools 注入的宿主能力；MCP 没有 Pi 对话，访问会话能力时明确报错。
+      // ACT: Existing plugins rely on host capabilities injected by createTools; MCP
+      // has no Pi conversation, so session capabilities throw an explicit error.
       const context = new Proxy({ cwd: directory, mode: "rpc", hasUI: false, model: undefined, signal }, {
         get(value, key) { if (Reflect.has(value, key)) return Reflect.get(value, key); throw new Error(t`MCP 不提供内置 Agent 会话能力：${String(key)}`); },
       }) as unknown as ExtensionContext;

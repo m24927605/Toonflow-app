@@ -40,7 +40,7 @@ export default async function generateRouter(): Promise<void> {
     if (error.code === "ENOENT") return "";
     throw error;
   });
-  // ACT: 比较完整产物，路由模板变化时也重新生成。
+  // ACT: Compare the full output so route template changes also trigger regeneration.
   if (current !== content) await writeAtomic(routerPath, content, { mode: 0o666 });
 }
 

@@ -6,9 +6,9 @@ import { promisify } from "node:util";
 import { PATHS } from "electrobun/main";
 
 const execFileAsync = promisify(execFile);
-// ACT: 同一桌面进程只显示一个保存对话框；后续若支持多窗口，可按窗口分别加锁。
+// ACT: Only one save dialog per desktop process; if multiple windows are supported later, lock per window.
 let dialogOpen = false;
-// 选好路径到实际写入之间用一次性 token 中转，不把绝对路径回传给前端。
+// A one-time token bridges path selection and the actual write, so the absolute path is never returned to the frontend.
 const pendingSaves = new Map<string, { path: string; expiresAt: number }>();
 const tokenTtlMs = 5 * 60 * 1000;
 

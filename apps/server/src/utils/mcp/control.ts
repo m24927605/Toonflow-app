@@ -18,7 +18,8 @@ export const controlStateSchema = z.object({
 type ControlState = z.infer<typeof controlStateSchema>;
 type ControlResult = { result?: unknown; error?: string };
 type Connection = { id: string; state: ControlState; revision: number; response: Response; pending?: { id: string; finish(result: ControlResult): void } };
-// ACT: 控制连接只属于当前单进程，重连重新注册，不持久化运行中的命令。
+// ACT: The control connection belongs to the current single process;
+// reconnects re-register and running commands are not persisted.
 const connections = new Map<string, Connection>();
 
 export function getMcpSettings() {

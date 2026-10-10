@@ -233,7 +233,8 @@ function openMatch(path: string, match: SearchMatch) {
 
 function onClosed() {
   cancelSearch();
-  // 关闭弹窗的焦点捕获后再定位编辑器，避免新建的原文输入框被弹窗夺回光标。
+  // Locate the editor after the dialog's focus trap closes, so the dialog doesn't take the cursor back from the
+  // newly created source input.
   if (pendingTarget && props.active) emit("open", pendingTarget);
   pendingTarget = undefined;
 }

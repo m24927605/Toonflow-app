@@ -40,7 +40,7 @@ function runCommand(command: BrowserFfmpegCommand, signal?: AbortSignal) {
   }).finally(() => signal?.removeEventListener("abort", cancel));
 }
 
-/** 调用方负责输出目录、唯一文件名和失败清理，处理结果不会覆盖原音频。 */
+/** Caller owns the output directory, unique file names and failure cleanup; output never overwrites the original audio. */
 export async function processAudio(ffmpeg: BrowserFfmpegFactory, source: string, options: AudioProcessingOptions, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (normalizePath(source) === normalizePath(options.outputPath)) throw new Error("输出文件不能覆盖原音频");
@@ -64,7 +64,7 @@ export async function processAudio(ffmpeg: BrowserFfmpegFactory, source: string,
   if (options.action === "speed") {
     let tempo = options.speed;
     const filters: string[] = [];
-    // ACT: 每级保持在 0.5–2 倍，避免高倍 atempo 跳过采样，并覆盖最低 0.1 倍速度。
+    // ACT: Keep each stage within 0.5–2x so high-ratio atempo doesn't skip samples, while reaching speeds down to 0.1x.
     while (tempo < 0.5) { filters.push("atempo=0.5"); tempo /= 0.5; }
     while (tempo > 2) { filters.push("atempo=2"); tempo /= 2; }
     command.audioFilters([...filters, `atempo=${tempo}`]).outputOptions("-map", "0:a:0");

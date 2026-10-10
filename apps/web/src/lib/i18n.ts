@@ -1,34 +1,16 @@
 import axios, { type AxiosInstance } from "axios";
 import { computed, watch } from "vue";
-import { detectLocale, isRtlLocale } from "@toonflow/i18n";
+import { detectLocale } from "@toonflow/i18n";
 import { locale, setLocale, translate } from "@toonflow/i18n/vue";
 import { uiSettings } from "@/stores/settings";
 import type { LocaleConfig } from "vue-stream-markdown";
 import "dayjs/locale/zh-cn";
 import "dayjs/locale/zh-tw";
-import "dayjs/locale/ja";
-import "dayjs/locale/ru";
-import "dayjs/locale/vi";
-import "dayjs/locale/th";
-import "dayjs/locale/ko";
-import "dayjs/locale/hi";
-import "dayjs/locale/id";
-import "dayjs/locale/ms";
-import "dayjs/locale/tl-ph";
-import "dayjs/locale/bn";
-import "dayjs/locale/ur";
-import "dayjs/locale/ta";
-import "dayjs/locale/te";
-import "dayjs/locale/mr";
-import "dayjs/locale/pa-in";
-import "dayjs/locale/ar";
-import "dayjs/locale/fa";
-import "dayjs/locale/tr";
 
 export function registerApiLanguage(client: AxiosInstance) {
   const interceptor = client.interceptors.request.use(config => {
     const url = new URL(client.getUri(config), window.location.href);
-    // ACT: 仅本应用 API 接收界面语言，不改变供应商等外部请求。
+    // ACT: Only this app's API receives the UI language; external requests such as providers are left unchanged.
     if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) config.headers.set("Accept-Language", locale.value);
     return config;
   });
@@ -38,10 +20,7 @@ export function registerApiLanguage(client: AxiosInstance) {
 export function registerLanguage() {
   const applyLanguage = () => setLocale(uiSettings.value.language === "system" ? detectLocale(navigator.languages) : uiSettings.value.language);
   const stopSettings = watch(() => uiSettings.value.language, applyLanguage, { immediate: true, flush: "sync" });
-  const stopDocument = watch(locale, value => {
-    document.documentElement.lang = value;
-    document.documentElement.dir = isRtlLocale(value) ? "rtl" : "ltr";
-  }, { immediate: true });
+  const stopDocument = watch(locale, value => { document.documentElement.lang = value; }, { immediate: true });
   const stopRequests = registerApiLanguage(axios);
   window.addEventListener("languagechange", applyLanguage);
   return () => {
@@ -52,7 +31,7 @@ export function registerLanguage() {
   };
 }
 
-// ACT: 只翻译 Markdown 控件，用户输入和模型生成的正文原样显示。
+// ACT: Only translate Markdown controls; user input and model-generated content are shown as-is.
 export const markdownLocale = computed<LocaleConfig>(() => ({
   button: {
     zoomIn: translate("放大"), zoomOut: translate("缩小"), resetZoom: translate("重置缩放"),

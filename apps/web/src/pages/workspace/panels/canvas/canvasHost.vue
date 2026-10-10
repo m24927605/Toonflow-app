@@ -49,7 +49,7 @@ watch(canvases, (current, previous) => {
   entries.value = entries.value.filter(entry => {
     const panel = instances.get(entry.key);
     if (!removed.has(panel?.canvasId || entry.fileName || "")) return true;
-    // 卸载会刷新待保存内容，删除文件后必须先取消，避免重新创建 JSON。
+    // Unmounting flushes pending saves, so cancel first after deleting the file to avoid recreating the JSON.
     panel?.cancelSave();
     return false;
   });
@@ -91,7 +91,8 @@ async function ensureCanvas(fileName: string, signal?: AbortSignal, activate = f
   const previousKey = activeKey.value;
   let entry = entries.value.find(item => instances.get(item.key)?.canvasId === fileName || (!instances.get(item.key)?.canvasId && item.fileName === fileName));
   if (!entry) {
-    // ACT: 已打开的画布保留至退出工作区，避免卸载后台节点任务；大量画布时可按任务引用回收空闲实例。
+    // ACT: Opened canvases live until leaving the workspace so background node tasks aren't unmounted; with many
+    // canvases, idle instances could be reclaimed by task references.
     entry = { key: crypto.randomUUID(), fileName };
     entries.value = [...entries.value, entry];
   }
@@ -157,7 +158,7 @@ async function readDocumentCanvases(directory: string, options: DocumentNodeOpti
   const identity = (path: string) => windowsPath ? path.replaceAll("\\", "/").toLowerCase() : path.replaceAll("\\", "/");
   const path = options.canvasPath ? relativePath(options.canvasPath) : "";
   const live = [...instances.values()].filter(panel => panel.canvasId && (!path || identity(panel.canvasId) === identity(path)));
-  // 已加载画布直接取实时节点；展开单个 JSON 不再扫描其余画布和素材目录。
+  // Loaded canvases provide live nodes directly; expanding one JSON no longer scans other canvases or asset dirs.
   if (path && live.length) return new Map(live.map(panel => [identity(panel.canvasId), { path: panel.canvasId, nodes: panel.getMentionNodes() }]));
   const stored = await readCanvasFiles(useWorkspaceFiles(directory), path, { signal, onError: options.onError });
   checkDirectory(directory);
@@ -190,7 +191,7 @@ async function flushSave(action?: () => Promise<void>) {
     await Promise.all(panels.map(panel => panel.flushSave()));
     return;
   }
-  // 重命名文件期间暂停所有实例自动保存，目标实例同步新路径后再恢复。
+  // Pause auto-save on all instances while renaming the file; resume once the target instance syncs the new path.
   const run = (index: number): Promise<void> => index < panels.length ? panels[index]!.flushSave(() => run(index + 1)) : action();
   await run(0);
 }
@@ -220,7 +221,8 @@ function checkNodeResources(path: string) {
       for (const reference of references) {
         if (typeof reference !== "string" || !reference || /^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(reference)) continue;
         const resource = reference.replaceAll("\\", "/").split("/").filter(part => part && part !== ".").join("/").toLowerCase();
-        // ACT: 包含撤销历史，并保守合并大小写；节点资源仍被运行时持有时拒绝移动，避免后台生成写回旧路径。
+        // ACT: Includes undo history and conservatively folds case; refuse to move while the runtime still
+        // holds node resources so background generation can't write back to old paths.
         if (containsPath(requested, resource) || containsPath(resource, requested)) throw new Error(`“${path}”仍被画布“${panel.canvasId}”中的节点使用，无法重命名或移动`);
       }
     }
@@ -300,10 +302,11 @@ async function performFileAction(directory: string, action: "copy" | "rename" | 
         }
         await files.remove(path, true);
         checkDirectory(directory);
-        // 共享列表移除会同步取消匹配实例的保存；只删除所选路径，不连带清理画布的素材。
+        // Removing from the shared list also cancels saves of matching instances; only delete the selected
+        // paths, not the canvas's assets.
         canvases.value = canvases.value.filter(canvas => !affected.includes(canvas));
         if (!entries.value.length) {
-          // ACT: 空字符串表示已删除最后一个画布，只保留菜单，不自动创建替代 JSON。
+          // ACT: Empty string means the last canvas was deleted; keep only the menu, no auto-created replacement JSON.
           const entry = { key: crypto.randomUUID(), fileName: "" };
           entries.value = [entry];
           activeKey.value = entry.key;

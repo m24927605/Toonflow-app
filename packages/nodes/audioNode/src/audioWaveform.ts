@@ -5,7 +5,8 @@ export function getWaveformPeaks(channels: readonly Float32Array[], barCount = 1
   let maximum = 0;
   for (let bar = 0; bar < barCount && sampleCount > 0; bar++) {
     const start = Math.floor(bar * sampleCount / barCount);
-    // ACT: 极短音频复用当前样本填满显示条数，不插值或合并声道，避免反相抵消。
+    // ACT: For very short audio, reuse current samples to fill the bar count;
+    // no interpolation or channel merging, to avoid phase cancellation.
     const end = Math.max(start + 1, Math.floor((bar + 1) * sampleCount / barCount));
     for (const channel of channels) {
       for (let sample = start; sample < Math.min(end, channel.length); sample++) {

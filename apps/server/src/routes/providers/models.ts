@@ -11,7 +11,7 @@ export default router.post("/", validateFields({
     const url = new URL(value);
     return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
   }, "请填写不含查询参数的 HTTP API 基础地址"),
-  protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages"]),
+  protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages", "openai-codex-responses"]),
   apiKey: z.string().max(8192),
 }), async (req, res) => {
   const { apiUrl, protocol, apiKey } = req.body as { apiUrl: string; protocol: string; apiKey: string };

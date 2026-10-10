@@ -41,7 +41,7 @@ function runCommand(command: BrowserFfmpegCommand, signal?: AbortSignal) {
   }).finally(() => signal?.removeEventListener("abort", cancel));
 }
 
-/** 目录创建、唯一文件名和失败清理由调用方负责，原视频始终保留。 */
+/** Directory creation, unique file names and failure cleanup are the caller's job; the original video is always kept. */
 export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string, options: VideoProcessingOptions, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const sourcePath = normalizePath(source);
@@ -71,7 +71,8 @@ export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string,
       .outputOptions("-map", "0:a:0", "-movflags", "+faststart");
   }
   if (needsVideo) {
-    // ACT: 重编码到 H.264，按帧精度截取并兼容播放器；奇数边长只补齐到偶数，不拉伸画面。
+    // ACT: Re-encode to H.264 for frame-accurate cuts and player compatibility;
+    // odd dimensions are only padded to even, never stretched.
     command.output(options.videoPath!).videoCodec("libx264").format("mp4")
       .videoFilters("pad=ceil(iw/2)*2:ceil(ih/2)*2")
       .outputOptions("-map", `0:${video.index}`, "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart");

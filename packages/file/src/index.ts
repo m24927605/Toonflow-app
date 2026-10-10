@@ -11,7 +11,7 @@ export type { FileHandle } from "node:fs/promises";
 
 const retryOptions = { timeout: 5000, interval: 100 };
 
-// 元数据查询不持有长期句柄；保留标准 API 的重载和错误语义。
+// Metadata queries hold no long-lived handles; keep the standard API's overloads and error semantics.
 export const access = promises.access;
 export const stat = promises.stat;
 export const lstat = promises.lstat;
@@ -114,7 +114,7 @@ function createPathStream<T extends native.ReadStream | native.WriteStream>(
     },
   });
   const construct = stream._construct!.bind(stream);
-  // 等待放在打开文件之前；排队期间 destroy 不能迟到地打开并截断目标。
+  // Wait before opening the file; a destroy while queued must not later open and truncate the target.
   stream._construct = callback => {
     acquireFileAccess([path], openKind(settings?.flags ?? defaultFlags), signal).then(dispose => {
       release = dispose;
@@ -167,7 +167,7 @@ export async function writeAtomic(path: string, content: string | Uint8Array, op
     } finally {
       if (created) await promises.unlink(temporary).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return;
-        // 清理失败不能覆盖原错误，也不能将已提交的保存报告为失败。
+        // A cleanup failure must not mask the original error or report a committed save as failed.
         console.warn(`临时文件清理失败：${temporary}`, error);
       });
     }

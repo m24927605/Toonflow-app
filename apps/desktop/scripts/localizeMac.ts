@@ -13,7 +13,7 @@ if (process.env.ELECTROBUN_OS === "macos") {
 
   const plistPath = join(bundlePath, "Contents", "Info.plist");
   let plist = readFileSync(plistPath, "utf8");
-  // ACT: 两套 SDK 当前生成 XML；如果改为二进制 plist，应改用 macOS 的 plutil。
+  // ACT: Both SDKs currently emit XML; if they switch to binary plist, use macOS plutil instead.
   if (!/<\/dict>\s*<\/plist>\s*$/.test(plist)) throw new Error(`不支持的 Info.plist 格式：${plistPath}`);
   const bundleName = plist.match(/<key>CFBundleName<\/key>\s*<string>([^<]+)<\/string>/)?.[1];
   if (!bundleName) throw new Error(`无法读取应用名称：${plistPath}`);

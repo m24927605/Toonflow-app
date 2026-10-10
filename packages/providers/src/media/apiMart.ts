@@ -47,7 +47,9 @@ function wait(signal: AbortSignal, ms: number) {
   });
 }
 
-/** 上传图片素材换取平台可访问的 URL；已是 URL 的输入直接透传，无需重新上传。 */
+/**
+ * Upload image assets to get a platform-accessible URL; inputs that are already URLs pass through without re-uploading.
+ */
 async function uploadImage(context: ProviderContext, apiKey: string, baseUrl: string, input: MediaInput, signal: AbortSignal): Promise<string> {
   if (input.type === "url") return input.url;
   const bytes = input.type === "binary" ? input.data : Buffer.from(input.data, "base64");
@@ -70,7 +72,7 @@ async function uploadImage(context: ProviderContext, apiKey: string, baseUrl: st
   return result.url;
 }
 
-/** Seedance 私有素材需先提交审核，通过后才能作为参考素材使用。 */
+/** Seedance private assets must be submitted for review first and can be used as references only after approval. */
 async function reviewSeedanceAssets(context: ProviderContext, apiKey: string, baseUrl: string, urls: string[], signal: AbortSignal): Promise<string[]> {
   if (urls.length > 20) throw new Error(`单次最多提交20个素材，当前提交了${urls.length}个`);
   const assets = urls.map((url) => ({ url, name: `image_${Date.now()}` }));
@@ -226,7 +228,7 @@ export default {
     if (!apiKey) throw new Error("请填写 API Key");
     const baseUrl = getBaseUrl(this.config.isOverseas);
     const lowerName = request.model.toLowerCase();
-    // ACT: 单次生成最多等待 10 分钟。
+    // ACT: Wait at most 10 minutes per generation.
     const signal = AbortSignal.any([AbortSignal.timeout(10 * 60_000), ...(this.signal ? [this.signal] : [])]);
 
     const imageUrls: string[] = [];
@@ -271,7 +273,7 @@ export default {
     if (!apiKey) throw new Error("请填写 API Key");
     const baseUrl = getBaseUrl(this.config.isOverseas);
     const lowerName = request.model.toLowerCase();
-    // ACT: 单次生成最多等待 30 分钟。
+    // ACT: Wait at most 30 minutes per generation.
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
 
     const imageUrls: string[] = [];

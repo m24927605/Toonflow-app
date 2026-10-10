@@ -5,7 +5,7 @@ import conf from "@/utils/conf";
 import { isWithin, writeWorkspaceFile } from "@/utils/workspace/files";
 
 export const maxBytes = 20 * 1024 * 1024;
-// 记录附属文件的手动排序；不改动真实文件名，避免影响 SKILL.md 内部的相对链接。
+// Record the manual order of supporting files without renaming real files, so relative links inside SKILL.md are unaffected.
 const orderFileName = ".toonflowOrder.json";
 
 export function directory() {
@@ -49,7 +49,7 @@ async function verifyChain(actualRoot: string, start: string, target: string, fi
   }
 }
 
-// ACT: 安装/导出与编辑器共用段名规则，各自保留路径规范化方式。
+// ACT: Install/export and the editor share segment-name rules but keep their own path normalization.
 export function isSafeSegment(part: string) {
   return !!part && part !== "." && part !== ".."
     && !/[\\/<>:"|?*\x00-\x1f]/.test(part) && !/[. ]$/.test(part)
@@ -72,7 +72,8 @@ async function resolveSkill(name: string) {
   if (mainTarget === root || !isWithin(root, mainTarget)) throw Object.assign(new Error("技能文件超出目录范围"), { status: 403 });
   await verifyChain(actualRoot, root, mainTarget);
   const baseDir = dirname(mainTarget);
-  // 仅当技能是 skills 根目录下一级的独占文件夹（安装流程始终如此创建）时，才浏览/编辑该目录内的附属文件；避免暴露根目录或其他技能。
+  // Only browse/edit supporting files when the skill is a dedicated folder directly under the
+  // skills root (as installs always create it); avoids exposing the root or other skills.
   const isDirectorySkill = basename(mainTarget) === "SKILL.md" && dirname(baseDir) === root;
   return { root, actualRoot, mainTarget, baseDir, isDirectorySkill };
 }
@@ -85,7 +86,7 @@ export async function uninstall(name: string) {
       throw Object.assign(new Error("目录中包含其他技能，不能整体卸载"), { status: 409 });
     }
   }
-  // ACT: 非标准目录布局仅删除主文件，保留可能与其他技能共享的目录。
+  // ACT: For non-standard layouts only delete the main file, keeping a directory that may be shared with other skills.
   await rm(isDirectorySkill ? baseDir : mainTarget, { recursive: isDirectorySkill });
   conf.set("disabledSkills", conf.get("disabledSkills", []).filter(item => item !== name));
 }
@@ -104,7 +105,7 @@ export async function locate(name: string, path?: string) {
   return { target, isMain: target === mainTarget };
 }
 
-// 供新增文件与移动的目标路径复用：父目录须已存在，目标本身不能已存在。
+// Shared by new-file and move targets: the parent directory must exist and the target itself must not.
 export async function resolveNewFile(name: string, path: string) {
   const { actualRoot, baseDir, isDirectorySkill } = await resolveSkill(name);
   if (!isDirectorySkill) throw Object.assign(new Error("该技能没有可编辑的附属文件"), { status: 400 });

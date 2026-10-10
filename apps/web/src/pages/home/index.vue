@@ -340,15 +340,12 @@ async function createProject(fromPrompt = true) {
         inset-inline-end: calc(100% + 12px);
         height: 100%;
 
-        &:dir(rtl) svg { transform: scaleX(-1); }
-
         @media (max-width: 560px) {
           top: calc(100% + 6px);
           inset-inline-end: 0;
           height: auto;
 
           svg { transform: rotate(-45deg); }
-          &:dir(rtl) svg { transform: scaleX(-1) rotate(-45deg); }
         }
       }
     }

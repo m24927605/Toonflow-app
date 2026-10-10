@@ -39,7 +39,8 @@ export default async function initializeExt(targetDirectory: string, sourceDirec
         let newer = false;
         try { requireNewerVersion(version, incoming.version, name); newer = true; }
         catch (error) { if ((error as { status?: number }).status !== 409) throw error; }
-        // 同版本只更新仍与上次内置包一致的文件，市场安装或本地修改的包保留。
+        // On the same version, only update files still matching the last built-in
+        // package; marketplace-installed or locally modified packages are kept.
         const bundled = state[name];
         if (!newer && !(version === incoming.version && bundled?.hash === Bun.hash(previous).toString(16) && bundled.revision !== revision)) continue;
       }

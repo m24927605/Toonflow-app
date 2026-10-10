@@ -23,7 +23,8 @@ export function pcmToWav(buffer: ArrayBuffer, options: PcmOptions): Blob {
   const padding = dataSize % 2;
   if (36 + dataSize + padding > 0xffffffff) throw new RangeError("PCM 数据超出 RIFF 4 GiB 范围");
 
-  // ACT: u8/s16le 直接封装，其他格式降为 16 位；整文件内存转换，大文件需改为流式转码。
+  // ACT: u8/s16le are wrapped directly and other formats downconverted to 16-bit;
+  // the whole file is converted in memory, so large files need streaming transcoding.
   const wave = new ArrayBuffer(44 + dataSize + padding);
   const output = new DataView(wave);
   output.setUint32(0, 0x52494646); // RIFF

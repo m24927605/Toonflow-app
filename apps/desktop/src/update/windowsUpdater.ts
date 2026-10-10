@@ -25,18 +25,20 @@ export function confirmWindowsUpdateStartup(resourcesDirectory: string, failed =
   if (!lstatSync(extractionDirectory).isDirectory() || lstatSync(extractionDirectory).isSymbolicLink()) throw new Error(t`更新缓存目录不能是链接`);
   const { version, hash } = JSON.parse(readFileSync(join(resourcesDirectory, "version.json"), "utf8"));
   if (typeof version !== "string" || !versionPattern.test(version) || typeof hash !== "string" || !hashPattern.test(hash)) throw new Error(t`桌面安装标识无效，请重新安装`);
-  // ACT: 只有本次主界面首次就绪才确认更新；后续页面重载不覆盖事务结果。
+  // ACT: Only the main UI's first ready in this run confirms the
+  // update; later page reloads do not overwrite the transaction result.
   writeAtomicSync(join(extractionDirectory, `update-${transactionId}.started.json`), JSON.stringify({ transactionId, version, hash, success: !failed }), { exclusive: true });
   delete process.env.TOONFLOW_UPDATE_TRANSACTION;
 }
 
-// ACT: 单人桌面单进程使用一个下载任务；保留现有发布协议和 bspatch，不修改 SDK 缓存。
+// ACT: A single-user, single-process desktop uses one download task; keep
+// the existing release protocol and bspatch without modifying the SDK cache.
 export default function createWindowsUpdater(resourcesDirectory: string, lifecycle: updateLifecycle) {
   const installDirectory = realpathSync(resolve(resourcesDirectory, "../.."));
   const extractionDirectory = join(installDirectory, "self-extraction");
   const preparedPath = join(extractionDirectory, "preparedUpdate.json");
   const resultPath = join(extractionDirectory, "updateResult.json");
-  // ACT: Electrobun 在 Worker 中加载应用，环境变量区分大小写，不能只读取 WINDIR。
+  // ACT: Electrobun loads the app in a Worker where env vars are case-sensitive, so reading only WINDIR is not enough.
   const tarExecutable = join(process.env.SystemRoot ?? process.env.windir ?? process.env.WINDIR!, "System32", "tar.exe");
   let localInfo: versionInfo;
   let manifest: { version: string; hash: string; artifact: { file: string } } | undefined;
@@ -67,7 +69,7 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
     let result;
     if (regularFile(resultPath)) {
       try { result = JSON.parse(readFileSync(resultPath, "utf8")); }
-      catch { /* 损坏的旧结果不影响本次计划校验。 */ }
+      catch { /* A corrupt old result does not affect validating this plan. */ }
     }
     if (result?.transactionId === transactionId && result.success === false) throw new Error(String(result.error || "本次更新失败，已保留旧版本"));
     if (!regularFile(planPath)) throw new Error(t`更新已取消，请重新准备更新`);
@@ -78,7 +80,8 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
       || !Number.isSafeInteger(ready.quitDeadline) || ready.quitDeadline - Date.now() < 5000 || ready.quitDeadline - Date.now() > 65000) {
       throw new Error(t`更新助手就绪状态无效或已过期，请重新准备更新`);
     }
-    // ACT: 文件删除也可能被锁阻止；退出前同时确认本次助手存活，不能仅依赖遗留 .ready。
+    // ACT: File deletion can also be blocked by locks; before exiting also confirm
+    // this run's helper is alive instead of relying only on a leftover .ready.
     try { process.kill(ready.helperPid, 0); }
     catch { throw new Error(t`更新助手已退出，请重新准备更新`); }
     return ready.quitDeadline - Date.now();
@@ -91,7 +94,7 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
       if (typeof record.version === "string" && typeof record.hash === "string" && typeof record.archiveSha256 === "string"
         && versionPattern.test(record.version) && hashPattern.test(record.hash) && /^[a-f0-9]{64}$/.test(record.archiveSha256)
         && regularFile(join(extractionDirectory, `${record.hash}.tar`))) return record;
-    } catch { /* ACT: 缓存损坏可重新下载，不影响用户数据。 */ }
+    } catch { /* ACT: A corrupt cache can be re-downloaded without affecting user data. */ }
   }
 
   async function getLocalInfo() {
@@ -106,7 +109,8 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
     }
     if (existsSync(extractionDirectory)) {
       ensureDirectory();
-      // 新版成功启动后才清理旧 app，崩溃或启动失败时保留恢复副本。
+      // Clean up the old app only after the new version starts
+      // successfully; keep the recovery copy on crash or launch failure.
       if (regularFile(resultPath)) {
         const result = await file(resultPath).json().catch(() => null);
         if (typeof result?.transactionId !== "string" || !/^[a-f0-9]{32}$/.test(result.transactionId) || result.transactionId === observedResult) return localInfo;
@@ -114,7 +118,8 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
         const targetMatches = result.version === localInfo.version && result.hash === localInfo.hash;
         const superseded = (result.success === true || result.success === false) && typeof result.version === "string" && versionPattern.test(result.version)
           && typeof result.hash === "string" && hashPattern.test(result.hash) && Bun.semver.order(localInfo.version, result.version) > 0;
-        // 完整安装会保留旧结果；已达到目标或运行更高版时，仅忽略旧故障，不删除该事务备份。
+        // A full install keeps old results; once the target is reached or a newer version
+        // runs, only ignore the old failure without deleting that transaction's backup.
         if (superseded || (result.success === false && targetMatches)) {
           installError = "";
           return localInfo;
@@ -242,7 +247,7 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
       try {
         if (!regularFile(archivePath)) throw new Error(t`缺少旧版本更新缓存`);
         const visited = new Set([currentHash]);
-        // ACT: 最多追溯 8 跳；更老的安装直接使用全量包，避免无限补丁链。
+        // ACT: Trace back at most 8 hops; older installs use the full package directly to avoid unbounded patch chains.
         for (let count = 0; currentHash !== target.hash && count < 8; count++) {
           const patchPath = temporaryFile(".patch");
           await download(`${localInfo.channel}-win-x64-${currentHash}.patch`, patchPath);
@@ -304,7 +309,8 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
       if (!approval) throw new Error(t`更新重启已取消`);
       installError = "";
       copyFileSync(join(resourcesDirectory, "app/updateHelper.exe"), helperPath);
-      // 等待外层 launcher 退出，避免它仍占用 app；普通 Bun 验证或无 launcher 时等待当前宿主。
+      // Wait for the outer launcher to exit so it no longer holds app; for plain
+      // Bun verification or without a launcher, wait for the current host.
       const launcherPid = Number(process.env.ELECTROBUN_LAUNCHER_PID);
       const parentPid = Number.isSafeInteger(launcherPid) && launcherPid > 0 && launcherPid <= 0x7fffffff ? launcherPid : process.pid;
       writeAtomicSync(planPath, JSON.stringify({ schemaVersion: 1, transactionId, installDirectory, parentPid,
@@ -318,7 +324,8 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
         const ready = regularFile(readyPath);
         const remaining = assertUpdatePending(transactionId, planPath, ready ? readyPath : undefined);
         if (ready) {
-          // 首次读取 ready 前也可能回拨时钟；扣除回拨量，不把解压耗时计入助手的退出等待。
+          // The clock may also be set back before ready is first read; subtract the
+          // rollback so extraction time does not count toward the helper's exit wait.
           const elapsed = performance.now() - handoffStarted;
           const clockRollback = Math.max(0, elapsed - (Date.now() - handoffUtc));
           quitDeadline = handoffStarted + elapsed + Math.min(remaining! - clockRollback, 60000);
@@ -327,14 +334,16 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
         if (Date.now() >= deadline) throw new Error(t`更新助手未就绪，已取消本次更新`);
         await Bun.sleep(100);
       }
-      // 退出已获批准，留出 HTTP 响应时间后消费同一次批准。
+      // Exit is approved; leave time for the HTTP response, then consume the same approval.
       applyingTransaction = transactionId;
       pendingQuitApproval = approval;
       setTimeout(() => {
         if (applyingTransaction !== transactionId) return;
         try {
-          // ACT: .ready 可能早于助手超时；退出前重读本次结果，不依赖状态轮询是否已消费它。
-          // 同时保留单调时钟预算，系统时间回拨不能延长助手实际的 60 秒等待。
+          // ACT: .ready may predate the helper timeout; reread this run's result
+          // before exiting instead of relying on whether status polling consumed it.
+          // Also keep a monotonic clock budget so setting the system
+          // time back cannot extend the helper's actual 60-second wait.
           if (quitDeadline - performance.now() < 5000) throw new Error(t`更新交接已超时，已保留旧版本，请重试`);
           assertUpdatePending(transactionId, planPath, readyPath);
           lifecycle.quitAfterApproval(approval);

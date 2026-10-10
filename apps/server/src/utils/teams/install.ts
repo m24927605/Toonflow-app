@@ -14,7 +14,7 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
   }
   if (!bytes.byteLength || bytes.byteLength > maxBytes) throw Object.assign(new Error("团队包不能为空且不能超过 20 MB"), { status: 413 });
   const name = checkName(fileName.slice(0, -10));
-  // ACT: 与技能安装共用 ZIP 校验，不执行包内工具或解压到不受控路径。
+  // ACT: Shares ZIP validation with skill installs; never runs bundled tools or extracts to uncontrolled paths.
   const archive = skillZip(bytes);
   const prefix = archive.has("team.json") ? "" : `${name}/`;
   if (!archive.has(`${prefix}team.json`) || [...archive.keys()].some(path => !path.startsWith(prefix))) {
@@ -41,13 +41,13 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
         const info = await lstat(recordPath).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
         let saved: unknown;
         if (info?.isFile() && info.size < 4096) {
-          try { saved = JSON.parse(await readFile(recordPath, "utf8")).fingerprint; } catch { /* 无有效安装指纹时不能确认本地内容未修改。 */ }
+          try { saved = JSON.parse(await readFile(recordPath, "utf8")).fingerprint; } catch { /* Without a valid install fingerprint, local content cannot be confirmed unmodified. */ }
         }
         if (saved !== fingerprint(previous.files)) {
           throw Object.assign(new Error("团队存在本地修改或缺少安装记录，请先导出备份；确定覆盖时使用开发者强制安装"), { status: 409 });
         }
         let version: unknown;
-        try { version = JSON.parse(decodeText(previous.files.get("team.json")!)).version; } catch { /* 版本缺失由共用升级检查提示。 */ }
+        try { version = JSON.parse(decodeText(previous.files.get("team.json")!)).version; } catch { /* A missing version is reported by the shared upgrade check. */ }
         requireNewerVersion(version, manifest.version, `团队“${name}”`);
       }
       temporary = await mkdtemp(resolve(root, ".agentInstall"));

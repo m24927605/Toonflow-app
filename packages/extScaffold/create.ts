@@ -113,9 +113,11 @@ function updateText(event: Event) {
 };
 
 await mkdir(extRoot, { recursive: true });
-// mkdir 的排他语义保证目录已存在时直接失败，绝不覆盖已有扩展。
+// mkdir's exclusive semantics make it fail immediately if the directory exists,
+// never overwriting an existing extension.
 await mkdir(target);
-// ACT: 生成失败保留已创建文件，避免目录级回滚误删期间加入的文件或链接。
+// ACT: Keep already-created files when generation fails,
+// so a directory-level rollback cannot wrongly delete files or links added meanwhile.
 await mkdir(resolve(target, "src"));
 for (const [path, content] of Object.entries(files)) await writeFile(resolve(target, path), content, { flag: "wx" });
 console.log(`已创建 packages/ext/${name}。修改 src/metadata.ts 与 src/index.vue 后，执行 bun install 和 bun run --cwd packages/ext/${name} build。`);

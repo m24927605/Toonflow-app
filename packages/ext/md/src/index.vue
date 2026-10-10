@@ -319,7 +319,8 @@ watch([() => props.context.text, () => props.context.active, () => props.context
   const editable = active && !loading && currentMode === "rich";
   if (editor.value && editor.value.isEditable !== editable) editor.value.setEditable(editable, false);
   if (!ready || !active || loading || currentMode !== "rich") return;
-  // ACT: 可见富文本仍同步解析完整正文，确保输入前没有陈旧副本；大文档默认原文，手动开启富文本仍有全文解析成本。
+  // ACT: Visible rich text still parses the full body synchronously so there is no stale copy before input;
+  // large documents default to source view, and manually enabling rich text still costs a full parse.
   if (!editor.value) {
     editor.value = new Editor({ ...editorOptions, content: parseMarkdownContent(text) });
     displayedText = text;
@@ -334,9 +335,11 @@ function setMode(value: "rich" | "source") {
   if (value === "rich") richRequested = true;
   searchVisible.value = false;
   editor.value?.commands.clearSearch();
-  // Tiptap 的 blur 命令会在下一帧清除全局选区，不能让它覆盖原文视图刚设置的定位。
+  // Tiptap's blur command clears the global selection on the next frame;
+  // it must not override the position the source view just set.
   editor.value?.view.dom.blur();
-  // 模式切换仅读取当前正文，不触发富文本序列化，保留原文的空白和自定义语法。
+  // Mode switching only reads the current body without triggering rich-text serialization,
+  // preserving the source's whitespace and custom syntax.
   mode.value = value;
 }
 function handleShortcut(event: KeyboardEvent) {
@@ -396,14 +399,15 @@ function queueImages(files: File[]) {
         const to = path.split("/");
         while (from.length && to.length && from[0] === to[0]) { from.shift(); to.shift(); }
         const src = "../".repeat(from.length) + to.join("/");
-        // ACT: 使用完成时的正文和光标保留并发输入；关闭后保留已落盘附件，不自动清理可能被其他文档引用的文件。
+        // ACT: Use the body and cursor at completion time to keep concurrent input;
+        // after closing, keep attachments already on disk and do not auto-clean files other documents may reference.
         if (mode.value === "source") {
           const input = sourceInput.value;
           if (!input) throw new Error(translate("原文编辑器尚未就绪"));
           const start = input.selectionStart;
           const end = input.selectionEnd;
           const text = `![](${src})`;
-          // textarea 将 CRLF 规范为 LF，光标偏移必须对应当前控件的原文。
+          // textarea normalizes CRLF to LF, so cursor offsets must match the current control's source text.
           props.context.updateText(input.value.slice(0, start) + text + input.value.slice(end));
           await nextTick();
           input.setSelectionRange(start + text.length, start + text.length);
@@ -500,7 +504,7 @@ async function editLink() {
       inputValue: currentEditor.getAttributes("link").href || "",
       inputValidator: (value) => {
         if (!value?.trim() || /^(https?:\/\/|mailto:)\S+$/i.test(value.trim())) return true;
-        try { if (resolveDocumentPath(value.trim(), props.context.resource.path)) return true; } catch { /* 表单保留输入供修正。 */ }
+        try { if (resolveDocumentPath(value.trim(), props.context.resource.path)) return true; } catch { /* The form keeps the input for correction. */ }
         return translate("请输入网址或工作区内的相对文件路径");
       },
       get confirmButtonText() { return translate("确定"); },
@@ -511,7 +515,7 @@ async function editLink() {
     if (value?.trim()) chain.setLink({ href: value.trim() }).run();
     else chain.unsetLink().run();
   } catch {
-    // 关闭弹窗时保留原有内容。
+    // Keep the existing content when the dialog is closed.
   }
 }
 
@@ -528,7 +532,7 @@ async function insertContent(command: "image" | "table" | "divider") {
     });
     if (!currentEditor.isDestroyed && props.context.active && mode.value === "rich") currentEditor.chain().focus().setImage({ src: value.trim() }).run();
   } catch {
-    // 关闭弹窗时保留原有内容。
+    // Keep the existing content when the dialog is closed.
   }
 }
 

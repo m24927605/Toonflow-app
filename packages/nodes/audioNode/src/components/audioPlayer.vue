@@ -75,13 +75,14 @@ watch(() => src, async (value, _previous, onCleanup) => {
     if (!response.ok) throw new Error("无法读取音频");
     const content = await response.arrayBuffer();
     controller.signal.throwIfAborted();
-    // ACT: 使用浏览器完整解码后仅保留 128 个峰值；超长素材的解码内存开销可通过服务端分段提取优化。
+    // ACT: Fully decode in the browser and keep only 128 peaks;
+    // decode memory for very long assets can be optimized via server-side segmented extraction.
     const context = new OfflineAudioContext(1, 1, 48000);
     const buffer = await context.decodeAudioData(content);
     controller.signal.throwIfAborted();
     peaks.value = getWaveformPeaks(Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index)));
   } catch {
-    // ACT: 浏览器能播放但不能解码的格式仍保留播放和定位，波形区域提示不可用。
+    // ACT: Formats the browser can play but not decode keep playback and seeking; the waveform area shows it as unavailable.
   } finally {
     if (!controller.signal.aborted) waveformLoading.value = false;
   }
@@ -217,7 +218,7 @@ function mediaError() {
         margin: 0;
         opacity: 0;
         appearance: none;
-        // ACT: 只让位置线附近的滑块接收拖动，波形其余区域交给节点拖拽。
+        // ACT: Only the slider near the position line accepts drags; the rest of the waveform is left to node dragging.
         pointer-events: none;
         touch-action: none;
         &::-webkit-slider-thumb { appearance: none; width: 12px; height: 96px; pointer-events: auto; cursor: ew-resize; }

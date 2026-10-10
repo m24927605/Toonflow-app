@@ -48,7 +48,7 @@ function renderLink(link: LinkNodeRendererProps) {
   let url: URL;
   try { url = new URL(link.node.url.startsWith("//") ? `https:${link.node.url}` : link.node.url); }
   catch { return renderedLink; }
-  // ACT: 只预览带图片后缀的纯文字链接；普通网页和已含缩略图的链接保持原样。
+  // ACT: Only preview plain-text links with image extensions; regular web pages and links with thumbnails stay as-is.
   if (!/^https?:$/.test(url.protocol) || !/\.(?:png|jpe?g|webp|gif|avif|bmp)$/i.test(url.pathname)
     || !link.node.children.every(node => node.type === "text")) return renderedLink;
   return h("span", { class: "imageLink" }, [renderedLink, h("br"), renderImage({
@@ -84,7 +84,7 @@ const chunks = computed(() => {
   if (blocks.value.length < 2) return blocks.value;
   const groups: string[] = [];
   let current = "";
-  // ACT: 不拆语法块，稳定组不重渲染；单个语法块仍完整交给库处理。
+  // ACT: Syntax blocks aren't split and stable groups don't re-render; each block still goes whole to the library.
   for (const block of blocks.value) {
     if (isDefinition(block)) continue;
     if (current && current.length + block.length > 8192) {
@@ -94,7 +94,7 @@ const chunks = computed(() => {
     current += block;
   }
   if (current) groups.push(current);
-  // 定义放在组前，避免落入末尾尚未闭合的代码块。
+  // Put definitions before the group so they don't fall into a trailing unclosed code block.
   return definitions.value ? groups.map(group => `${definitions.value}\n\n${group}`) : groups;
 });
 </script>

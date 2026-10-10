@@ -16,7 +16,7 @@ type NodeEventListeners = {
   [name in "delete" | "save" | "copy" | "canConnect"]: Set<NodeEventCallbacks[name]>;
 };
 
-// 挂在共享画布实例上，让独立 UMD 共用注册表；不会进入画布 JSON。
+// Attached to the shared canvas instance so standalone UMDs share the registry; never included in the canvas JSON.
 const nodeEventsKey = Symbol.for("toonflow.nodeEvents");
 
 export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
@@ -79,7 +79,7 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
     return (async () => {
       if (args[0] === "delete") {
         const node = canvas.findNode(nodeId);
-        // 删除前完成已有文件写入，保证立即撤销时能读回最新内容。
+        // Finish pending file writes before deletion so an immediate undo reads back the latest content.
         for (const callback of [...events?.save ?? []]) await callback();
         if (canvas.findNode(nodeId) !== node || registry.get(nodeId) !== events) throw new Error("节点已切换，请重新操作");
       }

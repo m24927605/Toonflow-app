@@ -1,7 +1,8 @@
 import { dlopen, FFIType, ptr, read } from "bun:ffi";
 import { getSystemErrorName } from "node:util";
 
-// ACT: APK 仅包含 arm64/x64；用基础 syscall 导出兼容 API 26，避免依赖 API 30 的 renameat2 符号。
+// ACT: The APK only ships arm64/x64;
+// use the basic syscall export for API 26 compatibility instead of depending on the API 30 renameat2 symbol.
 const syscallNumber = process.arch === "arm64" ? 276 : process.arch === "x64" ? 316 : undefined;
 if (syscallNumber === undefined) throw Object.assign(new Error(`不支持的 Android 架构：${process.arch}`), { code: "ENOTSUP" });
 const library = dlopen("libc.so", {
@@ -16,7 +17,8 @@ export function renameExclusive(source: string, target: string) {
   const sourceBytes = Buffer.from(source + "\0");
   const targetBytes = Buffer.from(target + "\0");
   const errnoAddress = library.symbols.__errno()!;
-  // RENAME_NOREPLACE 在内核中同时保证不覆盖及完整发布，不能降级为先检查再 rename 或复制。
+  // RENAME_NOREPLACE guarantees both no-overwrite and complete publication in the kernel;
+  // never downgrade to check-then-rename or copying.
   if (library.symbols.syscall(syscallNumber!, -100, ptr(sourceBytes), -100, ptr(targetBytes), 1) === 0) return;
   const errno = -read.i32(errnoAddress);
   const code = getSystemErrorName(errno);

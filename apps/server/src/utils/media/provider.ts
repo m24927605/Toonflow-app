@@ -5,12 +5,12 @@ import { lstat, mkdir, readFile, readdir, unlink } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
-import tfRouter from "@toonflow/providers/media/tfRouter";
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
 import { convertAudio } from "@/utils/media/audioProcessor";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import { runHiggsfield } from "@/utils/media/higgsfield";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
 
 type Expression = Extract<ReturnType<typeof parseExpression>, { type: "ParenthesizedExpression" }>["expression"];
@@ -38,7 +38,7 @@ function mediaErrorMessage(value: unknown, config: Record<string, unknown>, dept
     message = value.trim();
     if (/^[\[{]/.test(message)) {
       try { message = mediaErrorMessage(JSON.parse(message), config, depth + 1); }
-      catch { /* ACT: 非 JSON 错误正文按纯文本显示。 */ }
+      catch { /* ACT: Non-JSON error bodies are shown as plain text. */ }
     }
   } else if (Array.isArray(value)) {
     message = value.slice(0, 10).map(item => mediaErrorMessage(item, config, depth + 1)).filter(Boolean).join("；");
@@ -103,7 +103,8 @@ async function responseErrorMessage(response: Response, config: Record<string, u
   let text = "";
   let size = 0;
   try {
-    // ACT: 错误正文最多读取 16 KB / 3 秒；大响应须由供应商在标准错误字段中提供摘要。
+    // ACT: Read at most 16 KB / 3 s of an error body; for large responses
+    // the provider must put a summary in the standard error fields.
     while (size < 16000) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -215,8 +216,7 @@ function parseProvider(source: string) {
 function metadata(fileName: string, source: string) {
   const { id, label, icon, version, readme, modelsUrl, rules, models } = parseProvider(source);
   if (fileName !== `${id}.ts`) invalid("供应商 ID 与文件名不一致");
-  // ACT: 兼容旧 TF-Router 文件，缺少列表地址时使用内置定义。
-  return { fileName, id, label, icon, version, readme, modelsUrl: modelsUrl ?? (id === tfRouter.id ? tfRouter.modelsUrl : undefined), rules, models,
+  return { fileName, id, label, icon, version, readme, modelsUrl, rules, models,
     revision: createHash("sha256").update(source).digest("hex"), loadError: "" };
 }
 
@@ -268,7 +268,8 @@ export async function listMediaProviders() {
         current = await readProvider(path, file.name);
         return metadata(current.fileName, current.source);
       } catch (error) {
-        // ACT: 元数据损坏不影响其他供应商；仍保留原文版本，允许用户明确删除。
+        // ACT: Corrupt metadata does not affect other providers; still
+        // list the raw version so the user can explicitly delete it.
         const { source, ...file } = current;
         return { ...file, label: current.id, version: "", readme: "", rules: [], models: [], loadError: translateMessage(error instanceof Error ? error.message : "供应商文件无法读取") };
       }
@@ -305,7 +306,7 @@ export async function saveMediaProvider(fileName: string, models: z.infer<typeof
     const start = modelProperty?.type === "ObjectProperty" ? modelProperty.value.start! : object.start! + 1;
     const end = modelProperty?.type === "ObjectProperty" ? modelProperty.value.end! : start;
     const replacement = modelProperty ? formatted : `${newline}  models: ${formatted},`;
-    // ACT: 只替换 models 源码区间，保留供应商函数及其余用户编辑。
+    // ACT: Only replace the models source range, keeping provider functions and other user edits.
     const source = current.source.slice(0, start) + replacement + current.source.slice(end);
     const result = metadata(fileName, source);
     if (expectedApiKey !== undefined && getMediaProviderApiKey(result.id) !== expectedApiKey) invalid("供应商配置已变更，请重试", 409);
@@ -319,48 +320,42 @@ export function getMediaProviderApiKey(id: string) {
   return typeof value === "string" ? value.trim().replace(/^Bearer(?:\s+|$)/i, "").trim() : "";
 }
 
-export async function refreshMediaProviderModels(fileName: string, revision?: string, modelType?: ModelType, expectedApiKey?: string) {
+export async function refreshMediaProviderModels(fileName: string, revision?: string) {
   if (!mediaProviderFileSchema.safeParse(fileName).success) invalid("供应商文件名无效");
   const provider = await getMediaProvider(fileName.slice(0, -3));
   if (revision !== undefined && revision !== provider.revision) invalid("供应商文件已被修改，请刷新页面后再获取", 409);
   if (!provider.modelsUrl) invalid("供应商未配置 modelsUrl");
   const apiKey = getMediaProviderApiKey(provider.id);
-  if (expectedApiKey !== undefined && apiKey !== expectedApiKey) invalid("供应商配置已变更，请重试", 409);
-  const modelTypes = provider.id === tfRouter.id && !modelType ? ["video", "image", "audio"] : [modelType];
-  // ACT: 各类型只并行获取，汇总后保存一次，避免同一供应商文件发生版本冲突。
-  const models = (await Promise.all(modelTypes.map(async requestedModelType => {
-    const modelsUrl = new URL(provider.modelsUrl!);
-    if (requestedModelType) modelsUrl.searchParams.set("type", requestedModelType);
-    const response = await fetch(modelsUrl, {
-      headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
-      signal: AbortSignal.timeout(30000), redirect: "error",
-    });
-    if (!response.ok) throw new Error(t`获取媒体模型列表失败（HTTP ${response.status}）`);
-    const result = z.object({ data: z.array(mediaModelsSchema.element.partial({ label: true, type: true }).extend({
-      modelInfo: z.object({
-        mode: z.array(z.union([z.string().min(1), z.array(z.string().min(1))])).optional(),
-        audio: z.union([z.literal("optional"), z.boolean()]).optional(),
-        durationResolutionMap: z.array(z.object({ duration: z.array(z.number().positive()), resolution: z.array(z.string().min(1)) })).optional(),
-        imageSizes: z.array(z.string().min(1)).optional(),
-        imageRatios: z.array(z.string().min(1)).optional(),
-      }).catchall(z.json()).optional(),
-    })).max(2000) }).parse(await response.json());
-    if (!result.data.length) throw new Error("未获取到媒体模型，保留原有列表");
-    const requestedType = z.enum(["text", "image", "video", "audio"]).safeParse(modelsUrl.searchParams.get("type"));
-    return result.data.map(({ modelInfo, ...model }) => {
-      const id = model.id.trim();
-      const previous = provider.models.find(item => item.id === id)
-        ?? (provider.id === tfRouter.id ? tfRouter.models.find(item => item.id === id) : undefined);
-      const type = model.type ?? (requestedType.success ? requestedType.data : previous?.type);
-      if (!type) invalid(t`模型 ${id} 缺少 type，请在返回数据或 modelsUrl 的 type 参数中指定`);
-      if (requestedType.success && type !== requestedType.data) invalid(t`模型 ${id} 的 type 与请求类型不一致`);
-      // ACT: modelInfo 覆盖已有能力；缺省字段沿用同名配置，新模型不猜测生成能力。
-      const merged = { ...previous, ...model, ...modelInfo, id, label: model.label ?? previous?.label
-        ?? (typeof model.display_name === "string" ? model.display_name : typeof model.displayName === "string" ? model.displayName : id), type };
-      Reflect.deleteProperty(merged, "modelInfo");
-      return merged;
-    });
-  }))).flat();
+  const modelsUrl = new URL(provider.modelsUrl);
+  const response = await fetch(modelsUrl, {
+    headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+    signal: AbortSignal.timeout(30000), redirect: "error",
+  });
+  if (!response.ok) throw new Error(t`获取媒体模型列表失败（HTTP ${response.status}）`);
+  const result = z.object({ data: z.array(mediaModelsSchema.element.partial({ label: true, type: true }).extend({
+    modelInfo: z.object({
+      mode: z.array(z.union([z.string().min(1), z.array(z.string().min(1))])).optional(),
+      audio: z.union([z.literal("optional"), z.boolean()]).optional(),
+      durationResolutionMap: z.array(z.object({ duration: z.array(z.number().positive()), resolution: z.array(z.string().min(1)) })).optional(),
+      imageSizes: z.array(z.string().min(1)).optional(),
+      imageRatios: z.array(z.string().min(1)).optional(),
+    }).catchall(z.json()).optional(),
+  })).max(2000) }).parse(await response.json());
+  if (!result.data.length) throw new Error("未获取到媒体模型，保留原有列表");
+  const requestedType = z.enum(["text", "image", "video", "audio"]).safeParse(modelsUrl.searchParams.get("type"));
+  const models = result.data.map(({ modelInfo, ...model }) => {
+    const id = model.id.trim();
+    const previous = provider.models.find(item => item.id === id);
+    const type = model.type ?? (requestedType.success ? requestedType.data : previous?.type);
+    if (!type) invalid(t`模型 ${id} 缺少 type，请在返回数据或 modelsUrl 的 type 参数中指定`);
+    if (requestedType.success && type !== requestedType.data) invalid(t`模型 ${id} 的 type 与请求类型不一致`);
+    // ACT: modelInfo overrides existing capabilities; missing fields fall back
+    // to the same-named config, and new models get no guessed capabilities.
+    const merged = { ...previous, ...model, ...modelInfo, id, label: model.label ?? previous?.label
+      ?? (typeof model.display_name === "string" ? model.display_name : typeof model.displayName === "string" ? model.displayName : id), type };
+    Reflect.deleteProperty(merged, "modelInfo");
+    return merged;
+  });
   const types = new Set(models.map(model => model.type));
   return saveMediaProvider(fileName, [...provider.models.filter(model => !types.has(model.type)), ...models], provider.revision, apiKey);
 }
@@ -382,7 +377,8 @@ export async function deleteMediaProvider(fileName: string, revision: string) {
 export async function loadMediaProviderSource(source: string, config: Record<string, unknown> = {}, signal?: AbortSignal, fetchRequest = fetch, cwd?: string) {
   signal?.throwIfAborted();
   const { id } = parseProvider(source);
-  // ACT: VM 只隔离可信供应商的全局上下文；不可信代码需要独立进程等更强隔离。
+  // ACT: The VM only isolates the global context of trusted providers;
+  // untrusted code needs stronger isolation such as a separate process.
   const context = createContext({
     Buffer, URL, URLSearchParams, TextEncoder, TextDecoder, Blob,
     AbortController, AbortSignal, setTimeout, clearTimeout,
@@ -418,6 +414,7 @@ export async function loadMediaProviderSource(source: string, config: Record<str
         if (!cwd) throw new Error("当前操作没有工作目录，无法使用 FFmpeg");
         return createWorkspaceFfmpeg(cwd, signal);
       },
+      higgsfield: request => runHiggsfield(request, signal),
     } satisfies ProviderTools,
   };
   for (const [name, generate] of [
@@ -461,7 +458,8 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       const context = { ...provider, tool };
       try {
         const prepared = definition.processMedia ? await definition.processMedia.call(context, request) : request;
-        // ACT: 预处理沿用原生成类型，在动态分发边界按对应方法收窄请求。
+        // ACT: Preprocessing keeps the original generation type and
+        // narrows the request per method at the dynamic dispatch boundary.
         if (name === "generateImage") return await generate.call(context, prepared as ImageRequest);
         if (name === "generateVideo") return await generate.call(context, prepared as VideoRequest);
         return await generate.call(context, prepared as AudioRequest);
@@ -471,7 +469,8 @@ export async function loadMediaProviderSource(source: string, config: Record<str
         if (signal?.aborted || info?.name === "AbortError") throw error;
         let message = mediaErrorMessage(error, provider.config);
         if (!message) throw error;
-        // ACT: 只补充串行请求中匹配的错误；并发时无法精确关联响应，由适配器使用 errorMessage 提取。
+        // ACT: Only enrich matching errors for serial requests; concurrent responses
+        // cannot be matched precisely, so adapters extract them via errorMessage.
         const matchesFailure = failure?.status !== undefined
           ? new RegExp(`\\b(?:HTTP|status(?: code)?)\\s*[:：]?\\s*${failure.status}[)）.。\\s]*$`, "i").test(message)
           : failure?.message.includes(message) || /(?:未返回任务\s*ID|^(?:图片|视频)?生成失败|^素材审核失败)$/.test(message);

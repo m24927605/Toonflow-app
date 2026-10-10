@@ -28,7 +28,8 @@ export function useNodePreviewReady() {
     host[previewObserverKey] = { observer, targets };
   }
   const { observer, targets } = host[previewObserverKey];
-  // ACT: 首次靠近视口才挂载预览，之后保留尺寸、播放器及插件 UI 状态；不卸载节点运行时。
+  // ACT: Mount the preview only when first near the viewport, then keep size, player and plugin UI state;
+  // never unmount the node runtime.
   watch(nodeEl, (element, _previous, onCleanup) => {
     if (!element || ready.value) return;
     const subscribers = targets.get(element) ?? new Set<Ref<boolean>>();

@@ -21,7 +21,7 @@ export function loadNodeComponent(name: string, url: string, force = false): Pro
     return Promise.resolve(cached);
   }
   components.delete(name);
-  // ACT: 同名节点只加载一份脚本，所有画布共享进行中的重载，避免互相清除全局导出。
+  // ACT: One script per node name; canvases share in-flight reloads so they don't clear each other's global exports.
   const request = (async () => {
     const scriptUrl = force ? `${url}${url.includes("?") ? "&" : "?"}reload=${crypto.randomUUID()}` : url;
     const response = await fetch(scriptUrl);

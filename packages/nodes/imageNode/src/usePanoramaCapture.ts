@@ -57,7 +57,8 @@ export function usePanoramaCapture(source: () => string) {
       const columns = grouped ? payload.columns : 1;
       const rows = Math.ceil(createdNodes.length / columns);
       const nodeWidth = Math.max(...payload.images.map(image => 240 * image.width / image.height + 18));
-      // ACT: 图片节点预览高 240，预留 300 高含标题；最多 12 张，按整体矩形向下避让已有节点。
+      // ACT: Image node preview is 240 high; reserve 300 including the title.
+      // At most 12 images, shifted down as one rectangle to avoid existing nodes.
       const nodeHeight = 300;
       const paddingX = grouped ? 24 : 0;
       const paddingTop = grouped ? 40 : 0;

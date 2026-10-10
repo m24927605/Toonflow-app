@@ -52,7 +52,7 @@ export async function runProviderSource(
     if (id > 200) return fetch(request);
     const start = performance.now();
     const log = { id, method: request.method, url: redact(request.url), request: [redact(Object.fromEntries(request.headers)), bodyText(init?.body)].filter(Boolean).join("\n") };
-    // ACT: 日志最多展示 200 次请求和 16 KB 响应正文，避免轮询和媒体数据撑满调试界面。
+    // ACT: Logs show at most 200 requests and 16 KB of response body so polling and media data do not flood the debug view.
     const report = (data: Record<string, unknown>) => { send({ type: "log", log: { ...log, ...data } }); };
     report({ state: "running" });
     try {

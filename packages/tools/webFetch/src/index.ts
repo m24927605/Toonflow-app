@@ -19,7 +19,8 @@ function parseUrl(value: string, base?: URL) {
 async function fetchText(value: string, signal: AbortSignal) {
   let url = parseUrl(value);
   for (let redirects = 0; ; redirects++) {
-    // ACT: 交给运行环境处理 DNS/代理以兼容 Fake-IP；本工具不提供内网隔离，需由部署环境限制网络边界。
+    // ACT: Leave DNS/proxy to the runtime for Fake-IP compatibility;
+    // this tool provides no intranet isolation, so the deployment must restrict the network boundary.
     const response = await fetch(url, {
       redirect: "manual",
       signal,
@@ -74,7 +75,7 @@ async function fetchText(value: string, signal: AbortSignal) {
 
 function htmlText(html: string) {
   const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-  // ACT: 只提取静态 HTML 正文；需要 JavaScript 渲染的网页应另接浏览器工具。
+  // ACT: Only extract static HTML body text; pages that need JavaScript rendering should use the browser tool instead.
   return html
     .replace(/<(script|style|head|noscript|svg|template)\b[^<>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
     .replace(/<!--[\s\S]*?(?:-->|$)/g, "")

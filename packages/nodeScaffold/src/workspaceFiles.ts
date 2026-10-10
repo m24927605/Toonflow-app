@@ -45,13 +45,14 @@ export function useNodeFiles() {
   }
 
   function uploadFile(nodeId: string, file: File) {
-    // ACT: 多步上传共用开始时的工作区，避免切换项目后写入另一目录。
+    // ACT: Multi-step uploads share the workspace captured at start,
+    // avoiding writes to another directory after switching projects.
     return uploadNodeFile(getWorkspaceFiles(), nodeId, file);
   }
 
   async function removeNodeFiles(nodeId: string) {
     const directory = getNodeDirectory(nodeId);
-    // ACT: 支持撤销的画布保留节点素材，不随节点删除物理文件。
+    // ACT: Undo-capable canvases keep node assets; deleting a node doesn't delete physical files.
     if (retainNodeFiles) return;
     await getWorkspaceFiles().remove(directory, true).catch((error: { response?: { data?: { data?: { code?: string } } } }) => {
       if (error.response?.data?.data?.code !== "ENOENT") throw error;

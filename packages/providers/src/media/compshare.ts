@@ -1,12 +1,15 @@
 ﻿/**
- * 优云智算 ModelVerse 媒体模型适配器
+ * Compshare ModelVerse media model adapter
  *
- * 依据（开发者提供的平台文档：https://www.compshare.cn/docs/modelverse/models/quick-start 及各模型页）：
- * - 认证鉴权：请求头 Authorization: Bearer <API Key>，主地址 https://api.modelverse.cn
- * - 图片：OpenAI 生图 /v1/images/generations、OpenAI 编辑 /v1/images/edits、Gemini /v1beta/models/{id}:generateContent
- * - 视频：任务提交 /v1/tasks/submit + 状态查询 /v1/tasks/status?task_id=
+ * Based on (platform docs provided by the developer:
+ * https://www.compshare.cn/docs/modelverse/models/quick-start and each model page):
+ * - Authentication: request header Authorization: Bearer <API Key>, base URL https://api.modelverse.cn
+ * - Images: OpenAI generation /v1/images/generations,
+ *   OpenAI edits /v1/images/edits, Gemini /v1beta/models/{id}:generateContent
+ * - Video: task submission /v1/tasks/submit + status query /v1/tasks/status?task_id=
  *
- * 代码按「协议」而不是按模型名分支，因此同一协议的模型以后可在界面里直接新增。
+ * The code branches by protocol rather than model name,
+ * so models on an existing protocol can later be added directly in the UI.
  */
 
 type MediaType = "image" | "video" | "audio";
@@ -80,31 +83,33 @@ type Context = {
 };
 
 const API_BASE = "https://api.modelverse.cn";
-/** MiniMax H3 视频工作台（优云智算）的接口地址。 */
+/** API base URL of the MiniMax H3 video studio (Compshare). */
 const H3_BASE = "https://cp.compshare.cn";
-/** MiniMax H3 任务轮询间隔（文档建议 3 秒一次）。 */
+/** MiniMax H3 task polling interval (the docs suggest every 3 seconds). */
 const H3_POLL_INTERVAL = 3000;
-/** MiniMax H3 任务总等待上限（毫秒）。 */
+/** MiniMax H3 total task wait limit (ms). */
 const H3_TOTAL_TIMEOUT = 1800000;
 
 const IMAGE_RATIOS = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "21:9"];
 
-/** 图片生成总超时（毫秒）。 */
+/** Total image generation timeout (ms). */
 const IMAGE_TIMEOUT = 300000;
-/** 视频提交请求超时（毫秒）。 */
+/** Video submission request timeout (ms). */
 const SUBMIT_TIMEOUT = 120000;
-/** 单个状态查询请求超时（毫秒）。 */
+/** Timeout of a single status query request (ms). */
 const STATUS_TIMEOUT = 60000;
-/** 视频任务总等待上限（毫秒）。 */
+/** Total video task wait limit (ms). */
 const VIDEO_TOTAL_TIMEOUT = 1800000;
-/** 状态轮询间隔（毫秒）。 */
+/** Status polling interval (ms). */
 const POLL_INTERVAL = 5000;
 
 /**
- * gpt-image-2 尺寸归一化表：界面选「比例 + 1K/2K/4K」，这里换算成平台支持的像素尺寸。
- * 换算规则：长边取该档基准（1K=1024、2K=2048、4K=3840），另一边按比例换算并对齐 16；
- * 若超过平台限制（长边 ≤ 3840、像素 655360~8294400、宽高比 ≤ 3:1），再按比例收一档。
- * 例：4K 的 1:1 收为 2880x2880，21:9 收为 3808x1632。
+ * gpt-image-2 size normalization table: the UI picks "ratio + 1K/2K/4K",
+ * converted here to pixel sizes the platform supports.
+ * Rule: the long side takes the tier base (1K=1024, 2K=2048, 4K=3840),
+ * the other side is scaled by the ratio and aligned to 16; if that exceeds platform limits
+ * (long side ≤ 3840, pixels 655360~8294400, aspect ratio ≤ 3:1), shrink proportionally by one step.
+ * E.g. 4K 1:1 shrinks to 2880x2880 and 21:9 to 3808x1632.
  */
 const GPT_IMAGE_SIZE_MAP: Record<string, Record<string, string>> = {
   "1K": {
@@ -145,7 +150,7 @@ const GPT_IMAGE_SIZE_MAP: Record<string, Record<string, string>> = {
   },
 };
 
-/** 保留 HTTP 状态码，便于外层给出可读文案而不暴露原始响应体。 */
+/** Keep the HTTP status code so outer layers can give readable messages without exposing the raw response body. */
 class RequestError extends Error {
   status: number;
 
@@ -156,10 +161,10 @@ class RequestError extends Error {
   }
 }
 
-/** MiniMax H3 走视频工作台接口，使用单独的一份密钥。 */
+/** MiniMax H3 goes through the video studio API and uses a separate key. */
 function isH3Model(model: string): boolean {
   const lower = model.toLowerCase();
-  // 注意：ModelVerse 里也有 MiniMax-Hailuo 这样的模型，不能按 minimax 前缀判断
+  // Note: ModelVerse also has models like MiniMax-Hailuo, so the minimax prefix alone cannot decide
   if (lower.indexOf("hailuo") !== -1) {
     return false;
   }
@@ -176,7 +181,7 @@ function normalizeKey(value: unknown): string {
     .trim();
 }
 
-/** ModelVerse 模型用的密钥。 */
+/** Key for ModelVerse models. */
 function requireModelVerseKey(context: Context): string {
   const apiKey = normalizeKey(context.config.apiKey);
   if (!apiKey) {
@@ -185,7 +190,7 @@ function requireModelVerseKey(context: Context): string {
   return apiKey;
 }
 
-/** MiniMax H3 用的密钥，与 ModelVerse 的 API Key 分开填写。 */
+/** Key for MiniMax H3, entered separately from the ModelVerse API Key. */
 function requireH3Key(context: Context): string {
   const apiKey = normalizeKey(context.config.minimaxApiKey);
   if (!apiKey) {
@@ -202,8 +207,8 @@ function authHeaders(apiKey: string): Record<string, string> {
 }
 
 /**
- * 合并超时与外部取消信号。宿主提供 AbortSignal，
- * 但这里不依赖 AbortSignal.any，避免不同运行时的差异。
+ * Combine the timeout with the external cancel signal. The host provides an AbortSignal,
+ * but AbortSignal.any is not relied on here, to avoid differences between runtimes.
  */
 function createSignal(context: Context, timeoutMs: number): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -298,7 +303,7 @@ async function requestJson(
   return parseJsonBody(response);
 }
 
-/** 保留本地校验文案（例如「请填写 API Key」）。 */
+/** Keep local validation messages (e.g. "please enter the API Key"). */
 function friendlyError(error: unknown): Error {
   if (error instanceof RequestError) {
     return new Error(error.message);
@@ -388,7 +393,7 @@ function bytesToBase64(data: Uint8Array): string {
   return btoa(binary);
 }
 
-/** 把任何来源的素材统一成可上传字节。 */
+/** Normalize assets from any source into uploadable bytes. */
 async function toBinaryBytes(
   context: Context,
   input: MediaInput,
@@ -416,7 +421,9 @@ async function toBinaryBytes(
   return { data: new Uint8Array(buffer), mimeType };
 }
 
-/** 参考图统一成 URL 或 Data URL（文档要求 data:image/xxx;base64,... 且格式小写）。 */
+/**
+ * Normalize reference images to a URL or Data URL (the docs require data:image/xxx;base64,... with a lowercase format).
+ */
 function toImageUrl(input: MediaInput, fallbackMime: string): string {
   if (input.type === "url") {
     const url = ensureHttpUrl(input.url);
@@ -433,7 +440,7 @@ function toImageUrl(input: MediaInput, fallbackMime: string): string {
   return "data:" + (input.mimeType || fallbackMime) + ";base64," + bytesToBase64(input.data);
 }
 
-/** 参考音频：优先直接给地址，否则按文档包成 Data URL。 */
+/** Reference audio: pass the URL directly when possible, otherwise wrap it as a Data URL per the docs. */
 async function toAudioUrl(context: Context, input: MediaInput): Promise<string> {
   if (input.type === "url") {
     const url = ensureHttpUrl(input.url);
@@ -447,7 +454,7 @@ async function toAudioUrl(context: Context, input: MediaInput): Promise<string> 
   return "data:" + declared + ";base64," + bytesToBase64(source.data);
 }
 
-/** 极简 multipart/form-data 构造，避免依赖宿主不保证存在的 FormData / File。 */
+/** Minimal multipart/form-data builder, avoiding FormData / File, which the host does not guarantee. */
 class MultipartBody {
   readonly boundary: string;
   private chunks: Uint8Array[] = [];
@@ -540,7 +547,7 @@ function validateGptImagePixels(size: string): string {
   return width + "x" + height;
 }
 
-/** 把「比例 + 1K/2K/4K」折算成 gpt-image-2 支持的像素尺寸。 */
+/** Convert "ratio + 1K/2K/4K" into a pixel size gpt-image-2 supports. */
 function resolveGptImageSize(rawSize: string, rawRatio: string): string {
   const size = rawSize.trim();
   const ratio = rawRatio.trim();
@@ -567,7 +574,7 @@ function resolveGptImageSize(rawSize: string, rawRatio: string): string {
   return GPT_IMAGE_SIZE_MAP[tier][ratioKey];
 }
 
-/** Qwen 图片接口的尺寸格式是「宽*高」。 */
+/** The Qwen image API uses the size format "width*height". */
 function resolveQwenSize(rawSize: string, rawRatio: string): string {
   const size = rawSize.trim();
   const ratio = rawRatio.trim();
@@ -602,7 +609,7 @@ function ensureNoUnsupportedImageOptions(protocol: string, request: ImageRequest
   }
 }
 
-/** 图片协议：gemini / gpt-image 系列 / Qwen Image 3.0 / 其它 OpenAI 兼容图片模型。 */
+/** Image protocols: gemini / gpt-image series / Qwen Image 3.0 / other OpenAI-compatible image models. */
 function imageProtocolOf(model: string): string {
   const lower = model.toLowerCase();
   if (lower.indexOf("gemini") !== -1) {
@@ -617,7 +624,7 @@ function imageProtocolOf(model: string): string {
   return "openai";
 }
 
-/** 视频协议：seedance / hailuo / vidu / wan。 */
+/** Video protocols: seedance / hailuo / vidu / wan. */
 function videoProtocolOf(model: string): string {
   const lower = model.toLowerCase();
   if (lower.indexOf("seedance") !== -1) {
@@ -707,7 +714,7 @@ function collectGeminiImageAssets(payload: Record<string, unknown>): MediaAsset[
         continue;
       }
       const entry = part as Record<string, unknown>;
-      // 思考过程里的中间图要跳过
+      // Skip intermediate images from the thinking process
       if (entry.thought === true) {
         continue;
       }
@@ -782,7 +789,7 @@ async function generateGptImage(context: Context, request: ImageRequest, apiKey:
   if (outputFormat !== "png" && outputFormat !== "jpeg") {
     throw new Error("这类模型只支持 png 或 jpeg 输出格式");
   }
-  // 画质默认 medium
+  // Quality defaults to medium
   let quality = "medium";
   if (request.quality !== undefined && request.quality.trim()) {
     quality = request.quality.trim().toLowerCase();
@@ -859,9 +866,9 @@ async function generateGptImage(context: Context, request: ImageRequest, apiKey:
 }
 
 /**
- * 豆包 Seedream 系的 size 写法归一：
- * 官网示例里档位大小写混用（2k / 2K），像素值也允许 2048x2048、2048*2048 等写法，
- * 这里统一成平台推荐的 2K / 2048x2048；其它写法（例如 auto）原样透传。
+ * Normalize size notation for the Doubao Seedream family:
+ * official examples mix tier case (2k / 2K), and pixel values also allow forms like 2048x2048 and 2048*2048;
+ * normalize them to the platform-recommended 2K / 2048x2048; other values (e.g. auto) pass through unchanged.
  */
 function normalizeSeedreamSize(size: string): string {
   const trimmed = size.trim();
@@ -874,14 +881,16 @@ function normalizeSeedreamSize(size: string): string {
 }
 
 /**
- * 豆包 Seedream 系「分辨率档位 + 画面比例」对应的官方像素尺寸。
- * 来源：火山方舟「图片生成 API」→ size 参数里“采用方式 1 时，模型实际映射的宽高像素参考值”。
- * 平台的图片接口只认 size，不能单独传比例，所以只要选了比例，就换成这里对应的宽高像素值提交（方式 2），
- * 否则比例会被平台忽略、出图和所选比例不符。
+ * Official pixel sizes for Doubao Seedream "resolution tier + aspect ratio" combinations.
+ * Source: Volcano Ark "Image Generation API" → the size parameter's
+ * "reference width/height pixels the model actually maps to with method 1".
+ * The platform's image API only accepts size and cannot take a ratio separately,
+ * so whenever a ratio is chosen, submit the matching pixel size from here (method 2);
+ * otherwise the platform ignores the ratio and the output does not match the chosen ratio.
  */
 const SEEDREAM_RATIO_TABLES: { pattern: RegExp; defaultTier: string; tiers: Record<string, Record<string, string>> }[] = [
   {
-    // Seedream 5.0 pro（doubao-seedream-5-0-pro-260628）：档位 1K、1.5K、2K，默认 2K
+    // Seedream 5.0 pro (doubao-seedream-5-0-pro-260628): tiers 1K, 1.5K, 2K; default 2K
     pattern: /seedream-5-0-pro/,
     defaultTier: "2K",
     tiers: {
@@ -918,7 +927,7 @@ const SEEDREAM_RATIO_TABLES: { pattern: RegExp; defaultTier: string; tiers: Reco
     },
   },
   {
-    // Seedream 5.0 / 5.0 lite（doubao-seedream-5-0-260128）：档位 2K、3K、4K，默认 2K
+    // Seedream 5.0 / 5.0 lite (doubao-seedream-5-0-260128): tiers 2K, 3K, 4K; default 2K
     pattern: /seedream-5-0/,
     defaultTier: "2K",
     tiers: {
@@ -955,7 +964,7 @@ const SEEDREAM_RATIO_TABLES: { pattern: RegExp; defaultTier: string; tiers: Reco
     },
   },
   {
-    // Seedream 4.5（doubao-seedream-4.5）：档位 2K、4K
+    // Seedream 4.5 (doubao-seedream-4.5): tiers 2K, 4K
     pattern: /seedream-4[.\-]?5/,
     defaultTier: "2K",
     tiers: {
@@ -982,7 +991,7 @@ const SEEDREAM_RATIO_TABLES: { pattern: RegExp; defaultTier: string; tiers: Reco
     },
   },
   {
-    // Seedream 4.0：档位 1K、2K、4K
+    // Seedream 4.0: tiers 1K, 2K, 4K
     pattern: /seedream-4/,
     defaultTier: "2K",
     tiers: {
@@ -1030,7 +1039,7 @@ function seedreamRatioTableOf(model: string): (typeof SEEDREAM_RATIO_TABLES)[num
   return undefined;
 }
 
-/** 像素值落在哪个档位：按各档 1:1 的像素总量取最接近的一档。 */
+/** Which tier a pixel size falls into: pick the tier whose 1:1 total pixel count is closest. */
 function closestSeedreamTier(entry: (typeof SEEDREAM_RATIO_TABLES)[number], width: number, height: number): string {
   const target = width * height;
   let best = entry.defaultTier;
@@ -1050,9 +1059,10 @@ function closestSeedreamTier(entry: (typeof SEEDREAM_RATIO_TABLES)[number], widt
 }
 
 /**
- * 豆包 Seedream：把「档位（可选）+ 比例」折算成官方像素尺寸。
- * 比例可能放在 request.ratio，也可能被宿主塞进 request.size（界面上比例和尺寸是同一个位置），两处都认。
- * 返回空串表示“没选比例、不需要换算”，此时按档位或原样像素值提交。
+ * Doubao Seedream: convert "tier (optional) + ratio" into the official pixel size.
+ * The ratio may be in request.ratio or put into request.size by the host (ratio and size share one control in the UI);
+ * both are accepted.
+ * An empty string means "no ratio chosen, no conversion needed"; the tier or the pixel size is then submitted as-is.
  */
 function resolveSeedreamRatioSize(model: string, rawSize: string, rawRatio: string): string {
   const entry = seedreamRatioTableOf(model);
@@ -1070,7 +1080,7 @@ function resolveSeedreamRatioSize(model: string, rawSize: string, rawRatio: stri
   }
   let tier = entry.defaultTier;
   if (pixelSize) {
-    // 同时给了像素值和比例：保留像素值所在的档位，只把比例换成官方值
+    // Both pixel size and ratio given: keep the pixel size's tier and only map the ratio to the official value
     tier = closestSeedreamTier(entry, pixelSize.width, pixelSize.height);
   } else {
     const wanted = rawSize.trim().toUpperCase();
@@ -1082,10 +1092,11 @@ function resolveSeedreamRatioSize(model: string, rawSize: string, rawRatio: stri
 }
 
 /**
- * 其它 OpenAI 兼容图片模型：
- * - seedream：size 支持分辨率档位或像素值；参考图上限 5.0 pro / flash 为 10 张，其余（5.0 lite / 4.5 / 4.0）为 14 张
- * - Qwen/Qwen-Image-Edit、stepfun-ai/step1x-edit：单张参考图，走 image 字段
- * - Qwen/Qwen-Image：纯文生图
+ * Other OpenAI-compatible image models:
+ * - seedream: size accepts a resolution tier or pixel size;
+ *   the reference image limit is 10 for 5.0 pro / flash and 14 for the rest (5.0 lite / 4.5 / 4.0)
+ * - Qwen/Qwen-Image-Edit, stepfun-ai/step1x-edit: a single reference image via the image field
+ * - Qwen/Qwen-Image: text-to-image only
  */
 async function generateOpenAiImage(context: Context, request: ImageRequest, apiKey: string): Promise<MediaAsset[]> {
   const prompt = request.prompt.trim();
@@ -1101,7 +1112,8 @@ async function generateOpenAiImage(context: Context, request: ImageRequest, apiK
   if (singleOnly && images.length > 1) {
     throw new Error("这类模型只支持传入 1 张参考图");
   }
-  // 官网「图片生成 API」：Seedream 5.0 pro / flash 最多 10 张参考图，5.0 lite / 4.5 / 4.0 最多 14 张
+  // Official "Image Generation API": Seedream 5.0 pro / flash allow at most 10 reference images,
+  // 5.0 lite / 4.5 / 4.0 at most 14
   const seedreamMaxReferences = /seedream-5-0-(pro|flash)/.test(lower) ? 10 : 14;
   if (isSeedream && images.length > seedreamMaxReferences) {
     throw new Error("这类模型最多支持 " + seedreamMaxReferences + " 张参考图");
@@ -1119,7 +1131,8 @@ async function generateOpenAiImage(context: Context, request: ImageRequest, apiK
   const rawSize = request.size !== undefined ? request.size.trim() : "";
   const rawRatio = request.ratio !== undefined ? request.ratio.trim() : "";
   if (isSeedream) {
-    // 选了比例就换成官方像素尺寸，否则平台的 size 只认档位/像素值，比例会被丢掉
+    // Map a chosen ratio to the official pixel size;
+    // otherwise the platform's size only accepts tiers/pixel sizes and the ratio is dropped
     const mapped = resolveSeedreamRatioSize(lower, rawSize, rawRatio);
     const size = mapped || normalizeSeedreamSize(rawSize);
     if (size) {
@@ -1149,7 +1162,7 @@ async function generateOpenAiImage(context: Context, request: ImageRequest, apiK
   return collectImageAssets(payload, "image/png");
 }
 
-/** Qwen Image 3.0：同步生图，支持 1-3 张参考图与反向提示词。 */
+/** Qwen Image 3.0: synchronous image generation with 1-3 reference images and a negative prompt. */
 async function generateQwen3Image(context: Context, request: ImageRequest, apiKey: string): Promise<MediaAsset[]> {
   const prompt = request.prompt.trim();
   if (!prompt) {
@@ -1190,7 +1203,7 @@ type VideoSkeleton = {
   parameters: Record<string, unknown>;
 };
 
-/** 豆包 Seedance 系列：content 数组 + parameters。 */
+/** Doubao Seedance series: content array + parameters. */
 async function buildSeedanceBody(context: Context, request: VideoRequest): Promise<VideoSkeleton> {
   const mode = normalizeMode(request.mode);
   const images = request.images ?? [];
@@ -1259,7 +1272,7 @@ async function buildSeedanceBody(context: Context, request: VideoRequest): Promi
   return { input: { content }, parameters };
 }
 
-/** MiniMax Hailuo 2.3：first_frame_image + prompt。 */
+/** MiniMax Hailuo 2.3: first_frame_image + prompt. */
 async function buildHailuoBody(context: Context, request: VideoRequest): Promise<VideoSkeleton> {
   const mode = normalizeMode(request.mode);
   const input: Record<string, unknown> = { prompt: request.prompt.trim() };
@@ -1282,7 +1295,7 @@ async function buildHailuoBody(context: Context, request: VideoRequest): Promise
   return { input, parameters };
 }
 
-/** Vidu 系列：按 vidu_type 区分接口类型。 */
+/** Vidu series: vidu_type selects the API type. */
 async function buildViduBody(context: Context, request: VideoRequest): Promise<VideoSkeleton> {
   const mode = normalizeMode(request.mode);
   const lower = request.model.toLowerCase();
@@ -1292,9 +1305,11 @@ async function buildViduBody(context: Context, request: VideoRequest): Promise<V
   const videos = request.videos ?? [];
   const audios = request.audios ?? [];
   const isLipSync = lower.indexOf("lip-sync") !== -1;
-  // 视频延长：模型名带 extend，或只给了参考视频（对口型要同时给音频/文字）
+  // Video extension: the model name contains extend,
+  // or only a reference video is given (lip sync also needs audio/text)
   const isExtend = lower.indexOf("extend") !== -1 || (!isLipSync && videos.length > 0 && audios.length === 0 && modeLower.indexOf("video") !== -1);
-  // 参考图模式：模式串里出现 imageReference，或模型名带 reference 且确实给了参考图
+  // Reference image mode: the mode string contains imageReference,
+  // or the model name contains reference and reference images are actually given
   const isReference = modeLower.indexOf("imagereference") !== -1 || (lower.indexOf("reference") !== -1 && (request.images ?? []).length > 0);
   if (isExtend) {
     if (!request.videos || request.videos.length === 0) {
@@ -1371,8 +1386,8 @@ async function buildViduBody(context: Context, request: VideoRequest): Promise<V
 }
 
 /**
- * 阿里 Wan 系列：i2v 用首尾帧字段，t2v 按型号用尺寸字段；
- * 2.5/2.6 部分型号支持参考音频。
+ * Alibaba Wan series: i2v uses the first/last frame fields, t2v uses the size field per model;
+ * some 2.5/2.6 models support reference audio.
  */
 async function buildWanBody(context: Context, request: VideoRequest): Promise<VideoSkeleton> {
   const mode = normalizeMode(request.mode);
@@ -1392,7 +1407,8 @@ async function buildWanBody(context: Context, request: VideoRequest): Promise<Vi
   if (request.audios && request.audios.length > 0) {
     input.audio_url = await toAudioUrl(context, request.audios[0]);
   }
-  // 文生视频型号按尺寸选择画面：优先用扩展参数里的 size，否则按清晰度档位取常用尺寸。
+  // Text-to-video models pick the frame by size: prefer size from the extra parameters,
+  // otherwise use a common size for the resolution tier.
   if (!isI2V) {
     const explicitSize = typeof request.other?.size === "string" ? (request.other.size as string).trim() : "";
     const resolution = (request.resolution ?? "").trim().toUpperCase();
@@ -1421,7 +1437,7 @@ type TaskHandle = {
   apiKey: string;
 };
 
-/** 提交通用异步任务（图片任务与视频任务共用）。 */
+/** Submit a generic async task (shared by image and video tasks). */
 async function submitTask(context: Context, body: unknown, apiKey: string): Promise<TaskHandle> {
   const payload = await requestJson(context, API_BASE + "/v1/tasks/submit", {
     method: "POST",
@@ -1437,7 +1453,7 @@ async function submitTask(context: Context, body: unknown, apiKey: string): Prom
   return { taskId, apiKey };
 }
 
-/** 轮询任务直到完成，返回结果地址列表。 */
+/** Poll the task until done and return the list of result URLs. */
 async function waitForTask(context: Context, handle: TaskHandle, totalTimeout: number): Promise<string[]> {
   const deadline = Date.now() + totalTimeout;
   while (true) {
@@ -1472,8 +1488,8 @@ async function waitForTask(context: Context, handle: TaskHandle, totalTimeout: n
     if (status === "Cancelled" || status === "Canceled") {
       throw new Error("任务已被取消");
     }
-    // 除上述终态外都按「还在处理中」继续轮询（例如平台新增的 moderating 之类状态），
-    // 避免因为状态名不认识就提前报错；真正的失败仍由 Failure/Expired 分支处理。
+    // Non-terminal statuses keep polling as still processing (e.g. new platform statuses like moderating),
+    // so an unknown status name does not fail early; real failures are still handled by the Failure/Expired branches.
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, POLL_INTERVAL);
       context.signal?.addEventListener(
@@ -1494,7 +1510,7 @@ async function runVideoTask(context: Context, request: VideoRequest, apiKey: str
   return urls.map((url) => ({ mediaType: "video" as MediaType, type: "url" as const, url, mimeType: "" }));
 }
 
-/** MiniMax H3：https://cp.compshare.cn/minimax/v2，content 数组 + 顶层参数。 */
+/** MiniMax H3: https://cp.compshare.cn/minimax/v2, content array + top-level parameters. */
 async function buildH3Content(context: Context, request: VideoRequest, content: Record<string, unknown>[]): Promise<void> {
   const mode = normalizeMode(request.mode);
   const modeLower = mode.toLowerCase();
@@ -1533,7 +1549,7 @@ async function buildH3Content(context: Context, request: VideoRequest, content: 
     }
     return;
   }
-  // 首尾帧模式：最多一张首帧 + 一张尾帧，且不能与参考素材混用
+  // First/last frame mode: at most one first frame + one last frame, and it cannot be mixed with reference assets
   if (request.firstFrame) {
     content.push({ type: "image_url", image_url: { url: toImageUrl(request.firstFrame, "image/png") }, role: "first_frame" });
   }
@@ -1588,7 +1604,8 @@ async function generateH3Video(context: Context, request: VideoRequest, apiKey: 
   if (ratio) {
     body.ratio = ratio;
   }
-  // 提示词优化、Skill、静音、水印等按平台默认；如需开启可通过扩展参数传入
+  // Prompt optimization, Skill, mute, watermark, etc. use platform defaults;
+  // pass them via extra parameters to enable them
   if (other.use_context_ir === true) {
     body.use_context_ir = true;
     if (typeof other.skill_id === "string" && other.skill_id) {
@@ -1664,8 +1681,8 @@ async function generateH3Video(context: Context, request: VideoRequest, apiKey: 
       const reason = blocked && typeof blocked.message === "string" ? blocked.message : "内容未通过审核";
       throw new Error("MiniMax H3 任务被审核拦截：" + reason);
     }
-    // 其余状态（queued、running、moderating 等，含平台后续新增的排队/审核阶段）继续轮询，
-    // 直到成功、失败、被拦截，或到达总等待上限。
+    // Other statuses (queued, running, moderating, etc., including queue/review stages the platform adds later)
+    // keep polling until success, failure, blocking, or the total wait limit is reached.
   }
 }
 

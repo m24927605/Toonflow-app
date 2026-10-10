@@ -26,7 +26,9 @@ function invoke(command: FfmpegCommand, call: FfmpegCall, extra: unknown[] = [])
   return Reflect.apply((command as unknown as Record<string, (...args: unknown[]) => unknown>)[call.method]!, command, [...args, ...extra]);
 }
 
-/** 浏览器只传链式调用数据，执行及显式路径检查仍使用原生工作区工厂。 */
+/**
+ * The browser only sends chained-call data; execution and explicit path checks still use the native workspace factory.
+ */
 export async function executeRemoteFfmpeg(
   factory: FfmpegFactory,
   request: BrowserFfmpegRequest,
@@ -60,11 +62,13 @@ export async function executeRemoteFfmpeg(
       };
       const fail = (error: unknown, ...args: unknown[]) => finish("error", [serializeError(error), ...args]);
       const cancel = () => {
-        // ACT: kill 只发送信号；等原生完成事件再返回，调用方才能安全清理输出文件。
+        // ACT: kill only sends a signal;
+        // return after the native completion event so the caller can safely clean up output files.
         if (!queryNames.has(operation.method)) command.kill("SIGKILL");
       };
       signal.addEventListener("abort", cancel, { once: true });
-      // ACT: 取消可能早于 spawn；保留监听，准备阶段结束后立即终止，且接住迟到的 error。
+      // ACT: Cancellation may precede spawn;
+      // keep listening, terminate right after the preparation phase, and catch late errors.
       command.on("start", (...args) => {
         if (signal.aborted) command.kill("SIGKILL");
         else send("start", args);
@@ -77,7 +81,8 @@ export async function executeRemoteFfmpeg(
       try {
         signal.throwIfAborted();
         if (queryNames.has(operation.method)) {
-          // ACT: fluent 未公开查询子进程；取消后等查询回调释放文件，不等待查询不会触发的 start。
+          // ACT: fluent does not expose the query child process;
+          // after cancelling, wait for the query callback to release files, not for a start that queries never emit.
           invoke(command, operation, [(error: unknown, data: unknown) => error ? fail(error) : finish("result", [data])]);
         } else {
           invoke(command, operation);

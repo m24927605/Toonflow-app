@@ -4,7 +4,7 @@ import { WaveFile } from "wavefile";
 import type { AudioConvertOptions } from "@toonflow/providers";
 
 const maxInputBytes = 100 * 1024 * 1024;
-// ACT: 上限按 48kHz 立体声 30 分钟估算，防止畸形 WAV 头声称超长时长耗尽内存。
+// ACT: The limit assumes 30 minutes of 48kHz stereo, so malformed WAV headers claiming huge durations cannot exhaust memory.
 const maxSamplesPerChannel = 48000 * 60 * 30;
 const mimeTypes = { wav: "audio/wav", mp3: "audio/mpeg" } as const;
 const mp3BlockSize = 1152;
@@ -14,12 +14,13 @@ function invalid(message: string): never {
 }
 
 /**
- * 仅接受内存中的 WAV 字节并返回处理后的内存字节，不读写文件、不解析路径或 URL。
- * ACT: 只支持 WAV 输入（wavefile 无法解码 mp3/aac 等压缩格式），转码到 mp3 通过 lamejs 编码实现。
+ * Accepts in-memory WAV bytes and returns processed in-memory bytes; never reads/writes files or resolves paths or URLs.
+ * ACT: Only WAV input is supported (wavefile cannot decode compressed
+ * formats like mp3/aac); mp3 output is encoded with lamejs.
  */
 export async function convertAudio(input: Uint8Array, options: AudioConvertOptions, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string }> {
   signal?.throwIfAborted();
-  // 供应商代码运行在独立 VM realm，TypedArray 跨 realm 不满足 instanceof，须用 util.types 判断。
+  // Provider code runs in a separate VM realm where cross-realm TypedArrays fail instanceof, so check with util.types.
   if (!types.isUint8Array(input)) invalid("音频输入必须是 Uint8Array");
   if (input.byteLength === 0 || input.byteLength > maxInputBytes) invalid("音频输入大小无效");
   if (options.format !== "wav" && options.format !== "mp3") invalid("输出格式仅支持 wav 或 mp3");

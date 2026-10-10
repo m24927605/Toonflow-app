@@ -8,7 +8,7 @@ import config from "../../../electrobun.config";
 
 if (Bun.semver.order(Bun.version, "1.4.2") < 0) throw new Error("移动端验证需使用 Bun 1.4.2 或更新版本，与 APK 运行时保持一致；旧版本有请求体读完后丢失断连通知的问题。");
 
-// ACT: 显式检查真实构建产物，不连接模型供应商，不读取已有用户数据。
+// ACT: Explicitly check the real build output without connecting to model providers or reading existing user data.
 const buildRoot = resolve(import.meta.dirname, "../../../build/mobile");
 await mkdir(buildRoot, { recursive: true });
 const directory = await mkdtemp(resolve(buildRoot, "verification"));

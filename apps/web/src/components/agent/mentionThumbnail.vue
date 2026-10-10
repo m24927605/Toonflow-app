@@ -33,7 +33,8 @@ watch([inView, () => props.thumbnail?.url, () => props.thumbnail?.mimeType, () =
   }
   if (!directory) return;
   let cancelled = false;
-  // ACT: 仅加载可见项并复用文件缓存；视频仍读取完整 Blob，大文件可改为服务端缩略图。
+  // ACT: Load only visible items, reusing the file cache; videos still read the whole Blob, big files could use
+  // server thumbnails.
   const preview = useWorkspaceFiles(directory).acquireUrl(path, mimeType);
   onCleanup(() => { cancelled = true; preview.release(); });
   try {

@@ -128,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # ACT: 签名只使用触发工作流的代码，避免额外 ref 引入未审查的 PR 代码。
+          # ACT: Signing uses only the code that triggered the workflow, so extra refs cannot pull in unreviewed PR code.
           ref: ${{ matrix.target == 'macArm64' && github.sha || needs.prepare.outputs.commit }}
           persist-credentials: false
       - name: 校验签名来源
@@ -187,7 +187,7 @@ jobs:
           "NSIS_PATH=$nsisPath" >> $env:GITHUB_ENV
       - name: 构建 Windows 安装包及更新文件
         if: matrix.target == 'windowsX64'
-        # ACT: 使用原生环境，避免 Git Bash 的 GNU tar 将 Windows 盘符识别为远程主机。
+        # ACT: Use the native environment so Git Bash's GNU tar does not treat Windows drive letters as remote hosts.
         shell: pwsh
         run: bun run release:desktop "$env:appVersion" "$env:releaseMode"
       - name: 下载 Android Bun 与 TBS SDK
@@ -235,7 +235,7 @@ jobs:
           identity="$(security find-identity -v -p codesigning "$keychainPath" | awk '/"Developer ID Application: / { print $2 }')"
           if [[ ! "$identity" =~ ^[[:xdigit:]]{40}$ ]]; then
             echo '::error::未找到唯一有效的 Developer ID Application 身份。请检查下方证书类型、有效期及系统信任诊断；不会输出私钥或密码。'
-            # ACT: 身份列表保留系统错误码、隐藏证书姓名。
+            # ACT: The identity listing keeps system error codes and hides certificate names.
             security find-identity -p codesigning "$keychainPath" | sed -E 's/"[^"]*"/"<certificate name hidden>"/g'
             security find-certificate -a -p "$keychainPath" | bun -e '
             import { X509Certificate } from "node:crypto";
