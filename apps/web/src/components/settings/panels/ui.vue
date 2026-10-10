@@ -109,7 +109,7 @@
     </el-card>
 
     <div class="settingsFooter">
-      <el-button :icon="IconRestore" @click="updateUiSettings({ ...defaultUiSettings, language: uiSettings.language, startupAnimation: uiSettings.startupAnimation })">恢复界面默认设置</el-button>
+      <el-button :icon="IconRestore" @click="updateUiSettings({ ...defaultUiSettings, language: uiSettings.language })">恢复界面默认设置</el-button>
     </div>
   </div>
 </template>

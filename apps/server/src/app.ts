@@ -2,17 +2,38 @@ import logger from "morgan";
 import express from "express";
 import cors from "cors";
 import { createHash } from "node:crypto";
-import { resolve } from "node:path";
-import { readFile } from "@toonflow/file";
+import { basename, resolve } from "node:path";
+import { readFile, readdir } from "@toonflow/file";
 import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { errorFromCause } from "@/lib/responseFormat";
-import desktopRequest from "@/lib/desktop";
 import initializePlugins from "@/utils/plugins/initialize";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 
 const autoInstallProviders = ["openai.ts", "higgsfield.ts", "gemini.ts", "metaso.ts"];
+
+/** Hashes the given files so built-in plugins sync once per build, including upgrades that keep the data directory. */
+async function contentRevision(files: string[]) {
+  const hash = createHash("sha256");
+  for (const file of files) {
+    const source = await readFile(file).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return Buffer.alloc(0);
+      throw error;
+    });
+    hash.update(basename(file)).update("\0").update(source).update("\0");
+  }
+  return hash.digest("hex");
+}
+
+async function listFiles(directory?: string) {
+  if (!directory) return [];
+  const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+  return entries.filter(entry => entry.isFile()).map(entry => resolve(directory, entry.name)).sort();
+}
 
 export async function createApp({
   webRoot,
@@ -24,7 +45,6 @@ export async function createApp({
   providersRoot,
   skillsRoot,
   agentsRoot,
-  pluginRevision,
 }: {
   webRoot: string;
   appVersion?: string;
@@ -35,13 +55,13 @@ export async function createApp({
   providersRoot?: string;
   skillsRoot?: string;
   agentsRoot?: string;
-  pluginRevision?: string;
 }) {
   // conf is loaded dynamically by the routes below, so the process-wide data directory must be set first.
   if (dataDirectory) process.env.TOONFLOW_DATA_DIR = resolve(dataDirectory);
   const { default: conf } = await import("@/utils/conf");
   setLocaleFallback(() => normalizeLocale((conf.get("settings", {}).ui as { language?: unknown } | undefined)?.language)
     ?? detectLocale([Intl.DateTimeFormat().resolvedOptions().locale]));
+  const pluginRevision = dataDirectory ? await contentRevision([...await listFiles(toolsRoot), ...await listFiles(nodesRoot), ...await listFiles(extRoot)]) : undefined;
   if (dataDirectory && toolsRoot)
     await initializePlugins(resolve(dataDirectory, "tools"), toolsRoot, /^[a-z][a-zA-Z0-9]*\.tool\.js$/, pluginRevision);
   if (dataDirectory && nodesRoot) await initializePlugins(resolve(dataDirectory, "nodes"), nodesRoot, /^[a-z][a-zA-Z0-9]*\.umd\.js$/, pluginRevision);
@@ -52,18 +72,7 @@ export async function createApp({
   // ACT: Built-in media providers sync with the build; other provider files and separately saved configs are kept.
   if (dataDirectory && providersRoot) {
     const sourceDirectory = resolve(providersRoot, "media");
-    let providerRevision = pluginRevision;
-    if (providerRevision === undefined) {
-      const hash = createHash("sha256");
-      for (const name of autoInstallProviders) {
-        const source = await readFile(resolve(sourceDirectory, name)).catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return Buffer.alloc(0);
-          throw error;
-        });
-        hash.update(name).update("\0").update(source).update("\0");
-      }
-      providerRevision = hash.digest("hex");
-    }
+    const providerRevision = await contentRevision(autoInstallProviders.map(name => resolve(sourceDirectory, name)));
     await initializePlugins(resolve(dataDirectory, "providers"), sourceDirectory, autoInstallProviders, providerRevision);
   }
   // ACT: Skills and teams are only installed on first run, preserving user edits.
@@ -82,7 +91,6 @@ export async function createApp({
   app.use(["/api/workspaces/files/write", "/api/assets/save"], express.raw({ type: "application/octet-stream", limit: "100mb" }));
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
-  app.use("/api/desktop", desktopRequest);
 
   const router = await import("@/router");
   router.default(app);

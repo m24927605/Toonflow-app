@@ -21,4 +21,4 @@ Bun file methods `file` and `write` are imported from `@toonflow/file/bun`. Retu
 
 `write` and `file(...).write` only accept non-stream data; for `Response`, `Request`, and `ReadableStream`, use the standard `pipeline` with `createWriteStream`, passing the cancellation signal to both the stream and `pipeline`. In Bun 1.3.14, some failing input streams make native `Bun.write` never finish, so this package rejects those inputs outright to avoid holding the file queue.
 
-This package does not take over third-party libraries' internal file systems, external processes, C#/NSIS, or operating system file locks; SDK persistence, configuration, HTTP, FFmpeg, and the installer keep their own module boundaries. Do not introduce business SDKs here, and do not globally modify `node:fs`.
+This package does not take over third-party libraries' internal file systems, external processes, or operating system file locks; SDK persistence, configuration, HTTP, and FFmpeg keep their own module boundaries. Do not introduce business SDKs here, and do not globally modify `node:fs`.

@@ -82,7 +82,7 @@ export async function resolveWorkspacePath(root: string, path: string, allowMiss
   return { directory: root, path: actual };
 }
 
-// ACT: Desktop and the standalone server are both single-process; the
+// ACT: The server is single-process; the
 // lock keeps concurrent file operations from overwriting each other.
 const busyFiles = new Set<string>();
 export function lockWorkspaceFiles(paths: string[]) {

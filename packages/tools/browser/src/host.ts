@@ -47,8 +47,7 @@ function isBrowserPageUrl(value: string) {
 
 async function findExecutable(configured: string) {
   if (configured && !isAbsolute(configured)) throw new Error("executablePath 必须是浏览器程序的绝对路径");
-  // After the Electrobun launcher modifies environment variables,
-  // Bun Workers keep Windows environment variables in their original case.
+  // Bun Workers keep Windows environment variables in their original case, so look them up case-insensitively.
   const env = process.platform === "win32"
     ? Object.fromEntries(Object.entries(process.env).map(([key, value]) => [key.toUpperCase(), value])) : process.env;
   const candidates = configured ? [configured] : process.platform === "win32"

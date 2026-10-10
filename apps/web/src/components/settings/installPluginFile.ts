@@ -1,5 +1,11 @@
 import axios from "axios";
 
+declare global {
+  interface WindowEventMap {
+    "toonflow:plugin-installed": CustomEvent<{ type: "node" | "tool" | "skill" | "provider" | "agent" | "ext"; name: string }>;
+  }
+}
+
 export async function installPluginFile(type: "node" | "tool" | "skill" | "agent" | "ext", file: File, force = false) {
   if (!file.size || file.size > 20 * 1024 * 1024) throw new Error("请选择非空且不超过 20 MB 的插件文件");
   const payload = type === "skill" || type === "agent"

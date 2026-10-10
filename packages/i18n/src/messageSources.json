@@ -1,20 +1,8 @@
 {
-  "通知桌面就绪失败（{0}）": [
-    "apps/web/src/main.ts"
-  ],
-  "当前 Microsoft Edge WebView2 Runtime 版本过旧。请以管理员身份运行微软最新版安装器；若仍提示已安装，请修复 WebView2 或联系管理员检查更新服务。更新完成后，请完全退出 Toonflow 再重新打开。": [
-    "apps/web/src/main.ts"
-  ],
-  "需要更新 WebView2": [
-    "apps/web/src/main.ts"
-  ],
   "启动失败": [
     "apps/web/src/main.ts"
   ],
   "无法加载应用，请重试。": [
-    "apps/web/src/main.ts"
-  ],
-  "前往微软官网更新": [
     "apps/web/src/main.ts"
   ],
   "重试": [
@@ -84,18 +72,6 @@
   ],
   "关于": [
     "apps/web/src/components/settings/index.vue"
-  ],
-  "开发者工具": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "查看页面结构、控制台与网络请求。": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "打开 DevTools": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "浏览器模式请从浏览器菜单打开开发者工具。": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "首次使用引导": [
     "apps/web/src/components/settings/panels/developer/index.vue"
@@ -218,7 +194,6 @@
     "apps/web/src/components/settings/panels/personalization.vue",
     "apps/web/src/components/agent/conversation.vue",
     "apps/web/src/components/agent/menu.vue",
-    "apps/web/src/lib/desktopProtocol.ts",
     "apps/web/src/lib/i18n.ts",
     "apps/web/src/pages/home/index.vue",
     "apps/web/src/pages/home/workspacePicker.vue",
@@ -276,7 +251,6 @@
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
     "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/web/src/lib/desktopProtocol.ts",
     "apps/server/src/utils/plugins/install.ts"
   ],
   "选择脚手架打包的 .umd.js 文件。": [
@@ -285,7 +259,6 @@
   "文件扩展": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/lib/desktopProtocol.ts",
     "apps/web/src/pages/workspace/panels/document/components/openWithDialog.vue",
     "apps/server/src/utils/plugins/install.ts"
   ],
@@ -295,7 +268,6 @@
   "技能": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/lib/desktopProtocol.ts",
     "apps/server/src/utils/plugins/install.ts"
   ],
   "支持包含技能与资源的 .zip 包、SKILL.md，以及 .tar、.tar.gz、.tgz 包。": [
@@ -304,7 +276,6 @@
   "工具": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/lib/desktopProtocol.ts",
     "apps/server/src/utils/plugins/install.ts"
   ],
   "选择脚手架打包的 .tool.js 文件。": [
@@ -338,9 +309,6 @@
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "安装失败，请检查网络后重试": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "打开开发者工具失败，请重试。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "正在读取系统提示词…": [
@@ -532,7 +500,7 @@
   "请选择不超过 2 MB 的 .ts 文件": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
   ],
-  "当前环境不支持文件授权，请使用 HTTPS／localhost 下的 Chrome、Edge 或桌面端": [
+  "当前环境不支持文件授权，请使用 HTTPS／localhost 下的 Chrome 或 Edge": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
   ],
   "请选择图片、视频或音频，参考素材总量不能超过 32 MB": [
@@ -572,12 +540,6 @@
   ],
   "供应商已安装，可在媒体模型设置中配置使用": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
-  ],
-  "启动动画": [
-    "apps/web/src/components/settings/panels/general/index.vue"
-  ],
-  "启动时播放动画。关闭可加快启动速度，可能出现闪屏，下次启动生效。": [
-    "apps/web/src/components/settings/panels/general/index.vue"
   ],
   "画布合成优化": [
     "apps/web/src/components/settings/panels/general/index.vue"
@@ -695,8 +657,7 @@
     "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "安装插件": [
-    "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/lib/desktopProtocol.ts"
+    "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "连接远程 Agent": [
     "apps/web/src/components/settings/panels/plugins/index.vue",
@@ -748,7 +709,6 @@
     "apps/web/src/components/settings/panels/languageModel/index.vue",
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/personalization.vue",
-    "apps/desktop/src/index.ts",
     "packages/nodes/textNode/src/index.vue"
   ],
   "，有必填配置未填写": [
@@ -812,8 +772,7 @@
     "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "{0}已安装": [
-    "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/lib/desktopProtocol.ts"
+    "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "安装插件失败，请重试": [
     "apps/web/src/components/settings/panels/plugins/index.vue"
@@ -1182,8 +1141,7 @@
     "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue"
   ],
   "保存文件失败": [
-    "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue",
-    "apps/web/src/lib/saveFile.ts"
+    "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue"
   ],
   "保存文件失败，请重试": [
     "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue"
@@ -1257,8 +1215,7 @@
   "复制": [
     "apps/web/src/components/settings/panels/mcp/index.vue",
     "apps/web/src/lib/i18n.ts",
-    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue",
-    "apps/desktop/src/index.ts"
+    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "导出 Skill": [
     "apps/web/src/components/settings/panels/mcp/index.vue"
@@ -2120,8 +2077,7 @@
     "apps/web/src/components/settings/installPluginFile.ts"
   ],
   "安装插件失败": [
-    "apps/web/src/components/settings/installPluginFile.ts",
-    "apps/web/src/lib/desktopProtocol.ts"
+    "apps/web/src/components/settings/installPluginFile.ts"
   ],
   "安装接口未返回有效的插件名称": [
     "apps/web/src/components/settings/installPluginFile.ts"
@@ -2794,7 +2750,6 @@
   "撤销": [
     "apps/web/src/lib/canvasShortcuts.ts",
     "apps/web/src/pages/workspace/panels/canvas/components/nodeMenu.vue",
-    "apps/desktop/src/index.ts",
     "packages/nodes/audioNode/src/components/audioClipEditor.vue",
     "packages/nodes/textNode/src/markdownEditor.vue",
     "packages/nodes/imageNode/src/components/imageEditor.vue"
@@ -2802,7 +2757,6 @@
   "重做": [
     "apps/web/src/lib/canvasShortcuts.ts",
     "apps/web/src/pages/workspace/panels/canvas/components/nodeMenu.vue",
-    "apps/desktop/src/index.ts",
     "packages/nodes/textNode/src/markdownEditor.vue"
   ],
   "画布节点搜索": [
@@ -2847,25 +2801,11 @@
   "读取字节数必须为正整数": [
     "apps/web/src/lib/workspaceFiles.ts"
   ],
-  "读取剪贴板失败": [
-    "apps/web/src/lib/clipboard.ts"
-  ],
-  "读取剪贴板图片失败": [
-    "apps/web/src/lib/clipboard.ts"
-  ],
   "当前环境不支持读取剪贴板图片": [
-    "apps/web/src/lib/clipboard.ts"
-  ],
-  "读取剪贴板文件失败": [
     "apps/web/src/lib/clipboard.ts"
   ],
   "当前环境不支持读取剪贴板文件": [
     "apps/web/src/lib/clipboard.ts"
-  ],
-  "图片读取失败": [
-    "apps/web/src/lib/clipboard.ts",
-    "packages/nodes/imageGenerationNode/src/index.vue",
-    "packages/nodeShared/src/markdownContent.ts"
   ],
   "当前环境无法处理图片": [
     "apps/web/src/lib/clipboard.ts"
@@ -2873,52 +2813,8 @@
   "图片转换失败": [
     "apps/web/src/lib/clipboard.ts"
   ],
-  "写入剪贴板图片失败": [
-    "apps/web/src/lib/clipboard.ts"
-  ],
   "当前环境不支持写入剪贴板图片": [
     "apps/web/src/lib/clipboard.ts"
-  ],
-  "写入剪贴板失败": [
-    "apps/web/src/lib/clipboard.ts"
-  ],
-  "供应商": [
-    "apps/web/src/lib/desktopProtocol.ts",
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "待确认的安装请求过多，请稍后重试": [
-    "apps/web/src/lib/desktopProtocol.ts",
-    "apps/desktop/src/index.ts"
-  ],
-  "插件可能执行代码并访问本地文件，请仅安装信任来源的插件。": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "确认安装": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "正在安装插件…": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "安装接口返回了无效响应，请重启或更新 Toonflow 后重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "安装接口未返回有效的插件名称，请先检查插件列表，再重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "安装失败，请稍后重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "安装请求等待超时，请先查看插件是否已安装，再重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "无法连接 Toonflow 本机服务，请确认应用正常运行后重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "安装接口返回异常（HTTP {0}），请重启或更新 Toonflow 后重试": [
-    "apps/web/src/lib/desktopProtocol.ts"
-  ],
-  "{0}“{1}”安装失败：{2}": [
-    "apps/web/src/lib/desktopProtocol.ts"
   ],
   "重置缩放": [
     "apps/web/src/lib/i18n.ts"
@@ -3045,9 +2941,6 @@
   ],
   "分享": [
     "apps/web/src/lib/i18n.ts"
-  ],
-  "选择保存位置失败": [
-    "apps/web/src/lib/saveFile.ts"
   ],
   "工作区已切换，本次调用已停止": [
     "apps/web/src/lib/mcpControl.ts",
@@ -3504,8 +3397,7 @@
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "剪切": [
-    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue",
-    "apps/desktop/src/index.ts"
+    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "工作区文件树": [
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
@@ -3532,8 +3424,7 @@
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "粘贴": [
-    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue",
-    "apps/desktop/src/index.ts"
+    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "复制画布相对路径": [
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
@@ -4798,7 +4689,7 @@
   "example.zip、SKILL.md、example.tar、example.tar.gz 或 example.tgz": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "不支持此插件类型，可选值为 node、ext、tool、skill、provider、agent": [
+  "不支持此插件类型，可选值为 node、ext、tool、skill、agent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
   "下载地址缺少文件名，请使用指向文件的地址，例如 {0}": [
@@ -4953,19 +4844,6 @@
   ],
   "不能修改工作区根目录": [
     "apps/server/src/utils/workspace/files.ts"
-  ],
-  "请选择 .ts 供应商文件": [
-    "apps/server/src/utils/desktop/index.ts"
-  ],
-  "请重新选择并授权供应商文件": [
-    "apps/server/src/utils/desktop/index.ts"
-  ],
-  "供应商文件已被移动或删除，请重新选择": [
-    "apps/server/src/utils/desktop/index.ts"
-  ],
-  "供应商文件不能超过 2 MB": [
-    "apps/server/src/utils/desktop/index.ts",
-    "apps/server/src/utils/media/provider.ts"
   ],
   "技能资源地址无效": [
     "apps/server/src/utils/mcp/resources.ts"
@@ -5187,7 +5065,7 @@
   "列出连接的 Toonflow 页面及其 connectionId、工作目录、画布、项目列表和节点能力。多个页面时必须用 target.connectionId 明确操作对象；无页面连接时只有显式 target.directory 的服务端工具可用。": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "请先打开 Toonflow 桌面或网页": [
+  "请先打开 Toonflow 网页": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
   "尚未绑定画布": [
@@ -5629,6 +5507,9 @@
     "apps/server/src/utils/media/provider.ts"
   ],
   "供应商元数据和 models 必须直接使用字面量": [
+    "apps/server/src/utils/media/provider.ts"
+  ],
+  "供应商文件不能超过 2 MB": [
     "apps/server/src/utils/media/provider.ts"
   ],
   "供应商 TypeScript 语法错误：{0}": [
@@ -6193,12 +6074,6 @@
   "只能读取普通文件": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "此接口仅在桌面客户端中可用": [
-    "apps/server/src/lib/desktop.ts"
-  ],
-  "仅允许桌面页面发起操作。": [
-    "apps/server/src/lib/desktop.ts"
-  ],
   "字段 {0} {1}": [
     "apps/server/src/lib/middleware.ts"
   ],
@@ -6237,7 +6112,7 @@
   "FFmpeg 请求已在执行": [
     "apps/server/src/routes/ffmpeg/execute.ts"
   ],
-  "请在桌面端或服务器本机管理工具": [
+  "请在服务器本机管理工具": [
     "apps/server/src/routes/tools/setEnabled.ts",
     "apps/server/src/routes/tools/install.ts",
     "apps/server/src/routes/tools/uninstall.ts",
@@ -6278,7 +6153,7 @@
   "节点文件无法读取": [
     "apps/server/src/routes/nodes/get.ts"
   ],
-  "请在桌面端或服务器本机安装节点": [
+  "请在服务器本机安装节点": [
     "apps/server/src/routes/nodes/install.ts"
   ],
   "节点已安装": [
@@ -6290,13 +6165,13 @@
   "节点已禁用": [
     "apps/server/src/routes/nodes/files.ts"
   ],
-  "请在桌面端或服务器本机管理节点配置": [
+  "请在服务器本机管理节点配置": [
     "apps/server/src/routes/nodes/save.ts"
   ],
   "节点配置已保存": [
     "apps/server/src/routes/nodes/save.ts"
   ],
-  "请在桌面端或服务器本机导出插件": [
+  "请在服务器本机导出插件": [
     "apps/server/src/routes/plugins/export.ts"
   ],
   "团队 ZIP 文件不能超过 20 MB": [
@@ -6343,20 +6218,20 @@
   "文件扩展已禁用": [
     "apps/server/src/routes/ext/read.ts"
   ],
-  "请在桌面端或服务器本机管理文件扩展": [
+  "请在服务器本机管理文件扩展": [
     "apps/server/src/routes/ext/setEnabled.ts"
   ],
   "文件扩展状态文件无效": [
     "apps/server/src/routes/ext/setEnabled.ts",
     "apps/server/src/routes/ext/uninstall.ts"
   ],
-  "请在桌面端或服务器本机安装文件扩展": [
+  "请在服务器本机安装文件扩展": [
     "apps/server/src/routes/ext/install.ts"
   ],
   "文件扩展已安装": [
     "apps/server/src/routes/ext/install.ts"
   ],
-  "请在桌面端或服务器本机卸载文件扩展": [
+  "请在服务器本机卸载文件扩展": [
     "apps/server/src/routes/ext/uninstall.ts"
   ],
   "文件扩展已卸载": [
@@ -6365,62 +6240,44 @@
   "文件扩展无法读取": [
     "apps/server/src/routes/ext/list.ts"
   ],
-  "请在桌面端或服务器本机管理文件扩展配置": [
+  "请在服务器本机管理文件扩展配置": [
     "apps/server/src/routes/ext/save.ts"
   ],
   "文件扩展配置已保存": [
     "apps/server/src/routes/ext/save.ts"
   ],
-  "请在桌面端或服务器本机读取团队文件": [
+  "请在服务器本机读取团队文件": [
     "apps/server/src/routes/agents/read.ts"
   ],
-  "请在桌面端或服务器本机管理团队": [
+  "请在服务器本机管理团队": [
     "apps/server/src/routes/agents/setEnabled.ts"
   ],
-  "请在桌面端或服务器本机安装团队": [
+  "请在服务器本机安装团队": [
     "apps/server/src/routes/agents/install.ts"
   ],
   "团队已安装": [
     "apps/server/src/routes/agents/install.ts"
   ],
-  "请在桌面端或服务器本机读取 A2A 设置": [
+  "请在服务器本机读取 A2A 设置": [
     "apps/server/src/routes/agents/a2a/get.ts"
   ],
-  "请在桌面端或服务器本机管理 A2A 设置": [
+  "请在服务器本机管理 A2A 设置": [
     "apps/server/src/routes/agents/a2a/save.ts"
   ],
-  "请在桌面端或服务器本机卸载团队": [
+  "请在服务器本机卸载团队": [
     "apps/server/src/routes/agents/uninstall.ts"
   ],
   "团队已卸载": [
     "apps/server/src/routes/agents/uninstall.ts"
   ],
-  "请在桌面端或服务器本机连接远端团队": [
+  "请在服务器本机连接远端团队": [
     "apps/server/src/routes/agents/connect.ts"
   ],
   "远端团队已连接": [
     "apps/server/src/routes/agents/connect.ts"
   ],
-  "请在桌面端或服务器本机编辑团队文件": [
+  "请在服务器本机编辑团队文件": [
     "apps/server/src/routes/agents/save.ts"
-  ],
-  "插件已安装": [
-    "apps/server/src/routes/desktop/plugins/install.ts"
-  ],
-  "请提供要保存的文件内容": [
-    "apps/server/src/routes/desktop/saveFile.ts"
-  ],
-  "剪贴板文件“{0}”超过 100 MB": [
-    "apps/server/src/routes/desktop/clipboard/read.ts"
-  ],
-  "剪贴板文件“{0}”不是支持的图片、视频或音频": [
-    "apps/server/src/routes/desktop/clipboard/read.ts"
-  ],
-  "缺少图片数据": [
-    "apps/server/src/routes/desktop/clipboard/write.ts"
-  ],
-  "缺少剪贴板内容": [
-    "apps/server/src/routes/desktop/clipboard/write.ts"
   ],
   "查询已取消": [
     "apps/server/src/routes/agent/mentionSource.ts"
@@ -6444,7 +6301,7 @@
   "文件不是受支持的 UTF-8 或带 BOM 的 UTF-16 文本，请先用原编辑器转换编码后再打开，原文件未修改": [
     "apps/server/src/routes/workspaces/files/read.ts"
   ],
-  "仅支持桌面客户端或本机开发页面打开文件所在位置": [
+  "仅支持本机开发页面打开文件所在位置": [
     "apps/server/src/routes/workspaces/files/reveal.ts"
   ],
   "请发送文件原始内容": [
@@ -6494,10 +6351,10 @@
     "apps/server/src/routes/browser/input.ts",
     "apps/server/src/routes/browser/stream.ts"
   ],
-  "浏览器操作仅在桌面客户端中可用": [
+  "浏览器操作仅在本机开发模式中可用": [
     "apps/server/src/routes/browser/input.ts"
   ],
-  "浏览器画面仅在桌面客户端中可用": [
+  "浏览器画面仅在本机开发模式中可用": [
     "apps/server/src/routes/browser/stream.ts"
   ],
   "浏览器会话不存在或已关闭": [
@@ -6515,7 +6372,7 @@
   "模型上下文不能超过 8 MB": [
     "apps/server/src/routes/ai/generate.ts"
   ],
-  "请在桌面端或服务器本机读取技能": [
+  "请在服务器本机读取技能": [
     "apps/server/src/routes/skills/read.ts"
   ],
   "该文件不是文本内容，无法在编辑器中打开": [
@@ -6524,43 +6381,43 @@
   "该文件不是有效的 UTF-8 文本，无法在编辑器中打开": [
     "apps/server/src/routes/skills/read.ts"
   ],
-  "请在桌面端或服务器本机管理技能": [
+  "请在服务器本机管理技能": [
     "apps/server/src/routes/skills/setEnabled.ts"
   ],
-  "请在桌面端或服务器本机安装技能": [
+  "请在服务器本机安装技能": [
     "apps/server/src/routes/skills/install.ts"
   ],
   "技能已安装": [
     "apps/server/src/routes/skills/install.ts"
   ],
-  "请在桌面端或服务器本机移动技能文件": [
+  "请在服务器本机移动技能文件": [
     "apps/server/src/routes/skills/move.ts"
   ],
   "文件已移动": [
     "apps/server/src/routes/skills/move.ts"
   ],
-  "请在桌面端或服务器本机卸载技能": [
+  "请在服务器本机卸载技能": [
     "apps/server/src/routes/skills/uninstall.ts"
   ],
   "技能已卸载": [
     "apps/server/src/routes/skills/uninstall.ts"
   ],
-  "请在桌面端或服务器本机调整技能文件顺序": [
+  "请在服务器本机调整技能文件顺序": [
     "apps/server/src/routes/skills/order.ts"
   ],
   "顺序已保存": [
     "apps/server/src/routes/skills/order.ts"
   ],
-  "请在桌面端或服务器本机新增技能文件": [
+  "请在服务器本机新增技能文件": [
     "apps/server/src/routes/skills/create.ts"
   ],
   "文件已创建": [
     "apps/server/src/routes/skills/create.ts"
   ],
-  "请在桌面端或服务器本机查看技能文件": [
+  "请在服务器本机查看技能文件": [
     "apps/server/src/routes/skills/list.ts"
   ],
-  "请在桌面端或服务器本机编辑技能": [
+  "请在服务器本机编辑技能": [
     "apps/server/src/routes/skills/save.ts"
   ],
   "内容不能包含空字符": [
@@ -6568,136 +6425,6 @@
   ],
   "SKILL.md 必须包含合法 YAML、与原技能相同的字符串 name，以及非空且不超过 1024 字符的 description": [
     "apps/server/src/routes/skills/save.ts"
-  ],
-  "保存文件名无效，不能包含路径或控制字符": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "已有保存窗口正在操作，请先完成或取消": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "当前系统不支持桌面另存为": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "另存为": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "另存为窗口返回了无效的文件路径": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "选择保存位置失败：{0}": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "保存位置已过期，请重新选择保存位置": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "保存文件失败：{0}": [
-    "apps/desktop/src/saveFile.ts"
-  ],
-  "安装链接不能超过 8192 个字符": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接不能包含换行或控制字符": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接不是有效 URL，应为 toonflow://install?type=node&url=编码后的下载地址": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接格式错误，应为 toonflow://install?type=node&url=编码后的下载地址": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接不能包含账号、密码、端口或 # 片段": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接只能包含 type 和 url 参数；下载地址若带有签名或 & 参数，请先用 encodeURIComponent 编码整个下载地址，再放入 url 参数": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接缺少 {0} 参数": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接的 {0} 参数不能重复；请先用 encodeURIComponent 编码完整下载地址": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接的 {0} 参数不能为空": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "skill.zip、SKILL.md、skill.tar、skill.tar.gz 或 skill.tgz": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "不支持此插件类型；type 仅支持 node（节点）、ext（文件扩展）、tool（工具）、skill（技能）、provider（供应商）或 agent（团队）": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址不能超过 4096 个字符": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址不能包含换行或控制字符": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址无效，应为完整的 HTTP / HTTPS 文件直链，例如 https://example.com/imageNode.umd.js；url 参数只需编码一次": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址仅支持 HTTP / HTTPS 协议": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址不能包含账号密码": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件下载地址不能包含 # 片段，请提供文件直链": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "下载地址中的文件名编码无效，请检查 % 转义是否完整": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "下载地址缺少文件名，请提供文件直链，例如 {0}": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件文件名不能超过 128 个字符": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件文件名或扩展名与 {0} 类型不符；支持 {1}": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "插件文件名或扩展名与 {0} 类型不符；须使用小驼峰命名，例如 {1}": [
-    "apps/desktop/src/protocol.ts"
-  ],
-  "安装链接无效": [
-    "apps/desktop/src/protocol.ts",
-    "apps/desktop/src/index.ts"
-  ],
-  "无法打开安装链接": [
-    "apps/desktop/src/index.ts"
-  ],
-  "恢复桌面安装注册信息失败：": [
-    "apps/desktop/src/index.ts"
-  ],
-  "读取启动设置失败，使用默认启动动画：": [
-    "apps/desktop/src/index.ts"
-  ],
-  "全选": [
-    "apps/desktop/src/index.ts"
-  ],
-  "原生启动画面创建失败：": [
-    "apps/desktop/src/index.ts"
-  ],
-  "应用构建标识缺失，无法同步内置插件": [
-    "apps/desktop/src/index.ts"
-  ],
-  "打开链接失败": [
-    "apps/desktop/src/index.ts"
-  ],
-  "请检查默认浏览器设置后重试。": [
-    "apps/desktop/src/index.ts"
-  ],
-  "无法加载主窗口图标": [
-    "apps/desktop/src/index.ts"
-  ],
-  "桌面服务关闭失败：": [
-    "apps/desktop/src/index.ts"
-  ],
-  "浏览器关闭失败：": [
-    "apps/desktop/src/index.ts"
-  ],
-  "桌面启动失败：": [
-    "apps/desktop/src/index.ts"
   ],
   "toonflow-mcp --url <MCP URL> --token-env <环境变量名>\ntoonflow-mcp --runtime <运行信息文件>\n": [
     "packages/mcp/src/stdio.ts"
@@ -8461,8 +8188,7 @@
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
   ],
   "正在保存…": [
-    "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue",
-    "packages/nodeScaffold/src/nodeSkeleton.vue"
+    "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
   ],
   "正在截图…": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
@@ -8810,7 +8536,7 @@
   "关键帧渲染失败": [
     "packages/nodes/director3dNode/src/renderMedia.ts"
   ],
-  "当前浏览器不支持 MP4 导出，请更新浏览器或桌面 WebView2 运行时": [
+  "当前浏览器不支持 MP4 导出，请更新浏览器": [
     "packages/nodes/director3dNode/src/renderMedia.ts"
   ],
   "请在当前窗口保持可见时导出视频": [
@@ -8948,6 +8674,10 @@
   ],
   "图片生成失败": [
     "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "图片读取失败": [
+    "packages/nodes/imageGenerationNode/src/index.vue",
+    "packages/nodeShared/src/markdownContent.ts"
   ],
   "图片替换失败": [
     "packages/nodes/imageGenerationNode/src/index.vue"

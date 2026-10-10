@@ -213,7 +213,6 @@ const handMode = computed(() => props.active && !props.settingsVisible && (selec
 let pointerPosition: XYPosition | undefined;
 const pressedCodes = new Set<string>();
 let gestureScale: number | undefined;
-const isDesktop = new URLSearchParams(window.location.search).get("desktop") === "1";
 let copyingNodes = false;
 const showEdges = ref(true);
 const assetsVisible = ref(false);
@@ -792,8 +791,6 @@ async function pasteNode(event: ClipboardEvent) {
   const canvasSignal = canvasController.signal;
   let files = getClipboardMediaFiles(event);
   if (files.length || text.trim()) event.preventDefault();
-  // ACT: Some WebViews don't expose clipboard files to paste events; desktop falls back to the native clipboard.
-  if (!files.length && isDesktop) files = await readClipboardFiles().catch(() => []);
   if (canvasSignal.aborted) return;
   if (!files.length && text.trim()) files = [new File([text], "粘贴文本.txt", { type: "text/plain" })];
   if (!files.length) return;
@@ -940,9 +937,8 @@ function updateCanvasKeys(event: KeyboardEvent) {
   }
   if (!canvasId.value || !project.value?.directory) return;
   if (action === "copy" && (!flow.getSelectedNodes.value.length || window.getSelection()?.toString())) return;
-  // Desktop shortcuts reuse the native clipboard bridge directly; browser Ctrl/Cmd+V keeps the native event to
-  // avoid extra read permissions.
-  if (!isDesktop && action === "paste" && event.code === "KeyV" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) return;
+  // Ctrl/Cmd+V keeps the native paste event, which needs no extra clipboard read permission.
+  if (action === "paste" && event.code === "KeyV" && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) return;
   event.preventDefault();
   if (event.repeat) return;
   if (action === "delete") {

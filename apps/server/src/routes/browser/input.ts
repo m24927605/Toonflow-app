@@ -12,7 +12,7 @@ const inputSchema = z.strictObject({
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
-  if (!req.app.locals.desktop && process.env.NODE_ENV !== "dev") throw Object.assign(new Error("浏览器操作仅在桌面客户端中可用"), { status: 404 });
+  if (process.env.NODE_ENV !== "dev") throw Object.assign(new Error("浏览器操作仅在本机开发模式中可用"), { status: 404 });
   const input = inputSchema.parse(req.body);
   if (!input.toolSessionId) u.singleAgent.assertWorkspaceBrowserAccess(input.sessionId);
   const cwd = input.toolSessionId

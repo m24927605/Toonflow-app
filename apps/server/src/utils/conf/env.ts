@@ -8,7 +8,7 @@ const envReference = /^env:([A-Za-z_][A-Za-z0-9_]*)$/;
 
 /**
  * Resolves a user setting written as `env:NAME`, so secrets can stay out of settings.json. The Toonflow process
- * environment wins, then `~/.env`, because desktop apps launched from the GUI do not inherit shell variables.
+ * environment wins, then `~/.env`, because servers started by a service manager do not inherit shell variables.
  * Any other value is returned unchanged. The file is read on every call so edits apply without a restart.
  */
 export async function resolveEnvReference(value: unknown) {

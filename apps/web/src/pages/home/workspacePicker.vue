@@ -50,7 +50,6 @@ type DirectoryListing = {
 
 const selectedDirectory = defineModel<string>({ default: "" });
 const props = defineProps<{ disabled?: boolean; hideTrigger?: boolean }>();
-const isDesktop = new URLSearchParams(window.location.search).get("desktop") === "1";
 const dialogVisible = ref(false);
 const selecting = ref(false);
 const loading = ref(false);
@@ -65,11 +64,6 @@ async function chooseDirectory(): Promise<string | null> {
   if (selecting.value || loading.value || props.disabled) return null;
   selecting.value = true;
   try {
-    if (isDesktop) {
-      const { data } = await axios.post<{ data: { directory: string | null } }>("/api/desktop/selectDirectory", null, { headers: { "x-toonflow-desktop": "1" } });
-      if (data.data.directory) selectedDirectory.value = data.data.directory;
-      return data.data.directory;
-    }
     const { data } = await axios.post<{ code: number; data: { native: boolean; directory: string | null } }>("/api/workspaces/selectDirectory", null, { headers: { "x-toonflow-workspace": "1" } });
     if (data.data.native) {
       if (data.data.directory) selectedDirectory.value = data.data.directory;

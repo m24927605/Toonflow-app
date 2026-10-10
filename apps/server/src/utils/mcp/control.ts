@@ -31,7 +31,7 @@ export function getMcpSettings() {
 }
 
 function allowedHost(req: Request) {
-  const local = process.env.toonflowDesktop === "1" || (process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform));
+  const local = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform);
   return !local || ["localhost", "127.0.0.1", "[::1]"].includes(req.hostname);
 }
 

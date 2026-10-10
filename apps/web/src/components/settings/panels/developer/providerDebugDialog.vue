@@ -134,7 +134,6 @@ const formRules = shallowRef<ReturnType<typeof formCreate.copyRules>>([]);
 const formApi = shallowRef<Api>();
 const config = ref<Record<string, unknown>>({});
 const handle = shallowRef<FileHandle>();
-const desktopToken = ref("");
 const fileName = ref("");
 const modifiedAt = ref("");
 const source = ref("");
@@ -171,8 +170,6 @@ const statusLabel = computed(() => ({
   "已停止": translate("已停止"),
 })[status.value]);
 const elapsed = ref(0);
-const isDesktop = new URLSearchParams(window.location.search).get("desktop") === "1";
-const desktopHeaders = { "x-toonflow-desktop": "1" };
 let controller: AbortController | undefined;
 
 function showError(error: unknown) {
@@ -181,10 +178,6 @@ function showError(error: unknown) {
 }
 
 async function readSource(): Promise<SourceFile> {
-  if (isDesktop) {
-    const { data } = await axios.post<{ data: SourceFile }>("/api/desktop/providerFile/read", { token: desktopToken.value }, { headers: desktopHeaders, signal: controller?.signal });
-    return data.data;
-  }
   if (!handle.value) throw new Error("请先选择供应商文件");
   if (handle.value.requestPermission && await handle.value.requestPermission({ mode: "read" }) !== "granted") throw new Error("请允许读取供应商文件");
   const file = await handle.value.getFile();
@@ -216,19 +209,12 @@ async function selectFile() {
   errorMessage.value = "";
   controller = new AbortController();
   try {
-    if (isDesktop) {
-      const { data } = await axios.post<{ data: { token: string; name: string } | null }>("/api/desktop/providerFile/select", {}, { headers: desktopHeaders, signal: controller.signal });
-      if (!data.data) return;
-      desktopToken.value = data.data.token;
-      fileName.value = data.data.name;
-    } else {
-      const picker = (window as Window & { showOpenFilePicker?: (options: unknown) => Promise<FileHandle[]> }).showOpenFilePicker;
-      if (!picker) throw new Error("当前环境不支持文件授权，请使用 HTTPS／localhost 下的 Chrome、Edge 或桌面端");
-      const [selected] = await picker.call(window, { multiple: false, types: [{ description: "TypeScript 供应商", accept: { "text/plain": [".ts"] } }] });
-      if (!selected) return;
-      handle.value = selected;
-      fileName.value = (await selected.getFile()).name;
-    }
+    const picker = (window as Window & { showOpenFilePicker?: (options: unknown) => Promise<FileHandle[]> }).showOpenFilePicker;
+    if (!picker) throw new Error("当前环境不支持文件授权，请使用 HTTPS／localhost 下的 Chrome 或 Edge");
+    const [selected] = await picker.call(window, { multiple: false, types: [{ description: "TypeScript 供应商", accept: { "text/plain": [".ts"] } }] });
+    if (!selected) return;
+    handle.value = selected;
+    fileName.value = (await selected.getFile()).name;
     provider.value = undefined;
     formRules.value = [];
     config.value = {};
@@ -395,7 +381,7 @@ function reset() {
   formApi.value = undefined;
   config.value = {};
   handle.value = undefined;
-  desktopToken.value = fileName.value = modifiedAt.value = source.value = modelId.value = prompt.value = "";
+  fileName.value = modifiedAt.value = source.value = modelId.value = prompt.value = "";
   ratio.value = size.value = resolution.value = voice.value = extraParameters.value = "";
   duration.value = undefined;
   generateAudio.value = false;

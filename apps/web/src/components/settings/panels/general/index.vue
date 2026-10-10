@@ -1,17 +1,5 @@
 <template>
   <div class="general">
-    <section class="settingSection" aria-labelledby="startupTitle">
-      <div class="settingHeader">
-        <div class="settingInfo">
-          <h3 id="startupTitle">启动动画</h3>
-          <p class="description">启动时播放动画。关闭可加快启动速度，可能出现闪屏，下次启动生效。</p>
-        </div>
-        <el-switch
-          :modelValue="uiSettings.startupAnimation"
-          aria-label="启动动画"
-          @change="(value) => updateUiSettings({ startupAnimation: value === true })" />
-      </div>
-    </section>
     <section class="settingSection" aria-labelledby="canvasCompositingTitle">
       <div class="settingHeader">
         <div class="settingInfo">
@@ -65,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { defaultUiSettings, generalSettings, uiSettings, updateGeneralSettings, updateUiSettings } from "@/stores/settings";
+import { defaultUiSettings, generalSettings, updateGeneralSettings } from "@/stores/settings";
 import canvasShortcuts from "./canvasShortcuts.vue";
 </script>
 

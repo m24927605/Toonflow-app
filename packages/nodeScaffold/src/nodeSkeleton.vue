@@ -51,12 +51,9 @@
             :download="downloadName"
             :icon="IconDownload"
             :disabled="!downloadUrl"
-            :loading="downloading"
-            :aria-busy="downloading"
             text
-            :title="downloading ? '正在保存…' : '下载'"
+            title="下载"
             aria-label="下载"
-            @downloadstate="downloading = $event.detail"
             @click.stop />
           <el-button
             v-if="fullscreenVisible"
@@ -191,7 +188,6 @@ defineOptions({ inheritAttrs: false });
 const topVisible = defineModel<boolean>("topVisible", { default: false });
 const bottomVisible = defineModel<boolean>("bottomVisible", { default: false });
 const emit = defineEmits<{ fullscreen: [] }>();
-const downloading = ref(false);
 const props = withDefaults(
   defineProps<
     NodeData & {

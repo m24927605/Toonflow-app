@@ -84,7 +84,7 @@ const props = defineProps<{ context: ExtContext }>();
 | `saveConfig(config)` | Saves the configuration declared by the current extension and updates host state; throws on failure. The Plugins settings use the same persistence entry. |
 | `updateText(text)` | Updates the current tab's text; the host manages the save queue, so do not start a separate autosave. |
 | `flushSave()` | Waits for the current tab's changes to finish saving; throws on failure. |
-| `writeClipboardText(text)` | Copies text through the host's desktop or browser clipboard capability. |
+| `writeClipboardText(text)` | Copies text through the browser clipboard. |
 | `openFile(path)` | Opens a relative path in the same workspace; the host manages file associations, node mapping, and tab deduplication. |
 | `location` | An optional positioning request for the current view, containing 1-based `line` and `column`, a `query` to select, and a change marker `revision`. The extension watches it and positions its own editor; it is not part of the saved content. |
 | `mountNode(element)` | Canvas nodes only. Renders the original node UI into the element and returns a function that releases the view; it must be called on unmount. |
@@ -95,7 +95,7 @@ The same file can be shown in several split views, and the content and save stat
 
 Binary previews obtain `{ url: Promise<string>, release() }` through `context.files.acquireUrl(path)`. Call `release()` when the resource changes or the component unmounts, whether or not loading has finished. Do not revoke the shared URL yourself. File operation failures must be surfaced in the UI, and paths must be relative paths within the current workspace.
 
-`files.copy(path, target)` copies only within this workspace and refuses to overwrite an existing target. Directory copies disallow symbolic links; a failure may leave partial target content, which `partial` and `target` in the error data describe. `files.reveal(path)` is only supported in the desktop client or a local Windows/macOS development page; remote access is refused.
+`files.copy(path, target)` copies only within this workspace and refuses to overwrite an existing target. Directory copies disallow symbolic links; a failure may leave partial target content, which `partial` and `target` in the error data describe. `files.reveal(path)` is only supported on a local Windows/macOS development page; remote access is refused.
 
 ## Shared Markdown Editing Dependencies
 

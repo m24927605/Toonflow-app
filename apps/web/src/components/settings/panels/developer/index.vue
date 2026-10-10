@@ -3,15 +3,6 @@
     <div class="developer" :class="{ blurred: developerLocked }" :inert="developerLocked">
       <div class="developerRow">
         <div class="toolDescription">
-          <h3>开发者工具</h3>
-          <p>查看页面结构、控制台与网络请求。</p>
-        </div>
-        <el-button type="primary" :icon="IconTerminal2" :loading="opening" :disabled="!isDesktop" @click="openDevTools">打开 DevTools</el-button>
-      </div>
-      <el-text v-if="!isDesktop" type="info">浏览器模式请从浏览器菜单打开开发者工具。</el-text>
-      <el-text v-if="requestError" type="danger" role="alert">{{ requestError }}</el-text>
-      <div class="developerRow">
-        <div class="toolDescription">
           <h3>首次使用引导</h3>
           <p>当前{{ hello.completed ? '已完成' : '未完成' }}。重置后打开引导页，保留已配置的模型。</p>
         </div>
@@ -102,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { locale, msg, translate, type MessageDescriptor } from "@toonflow/i18n/vue";
+import { msg, translate, type MessageDescriptor } from "@toonflow/i18n/vue";
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useDeveloperStore } from "@/stores/developer";
@@ -111,7 +102,7 @@ import saveFile from "@/lib/saveFile";
 import { installPluginFile } from "../../installPluginFile";
 import { ElMessage } from "element-plus";
 import axios from "axios";
-import { IconCode, IconTerminal2, IconFileUpload, IconDownload, IconRefresh, IconEdit, IconTrash } from "@tabler/icons-vue";
+import { IconCode, IconFileUpload, IconDownload, IconRefresh, IconEdit, IconTrash } from "@tabler/icons-vue";
 
 const developerStore = useDeveloperStore();
 const hello = useHelloStore();
@@ -295,24 +286,6 @@ async function installPlugin(sourceType: "file" | "url", file?: File) {
     installError.value = axios.isAxiosError<{ message?: string }>(err) ? err.response?.data.message || "安装失败，请检查网络后重试" : err instanceof Error ? err.message : "安装失败";
   } finally {
     installing.value = "";
-  }
-}
-
-const isDesktop = new URLSearchParams(window.location.search).get("desktop") === "1";
-const opening = ref(false);
-const requestError = ref("");
-
-async function openDevTools() {
-  if (!isDesktop || opening.value) return;
-  opening.value = true;
-  requestError.value = "";
-  try {
-    const response = await fetch("/api/desktop/devtools", { method: "POST", headers: { "x-toonflow-desktop": "1", "Accept-Language": locale.value } });
-    if (!response.ok) throw new Error((await response.json()).message || "打开开发者工具失败，请重试。");
-  } catch (error) {
-    requestError.value = error instanceof Error ? error.message : "打开开发者工具失败，请重试。";
-  } finally {
-    opening.value = false;
   }
 }
 </script>

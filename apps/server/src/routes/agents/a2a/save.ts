@@ -12,7 +12,7 @@ export default Router().put("/", validateFields({
   modelId: z.string().max(256),
   thinkingLevel: z.enum(["off", "low", "medium", "high"]).optional(),
 }), async (req, res) => {
-  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在桌面端或服务器本机管理 A2A 设置", null, 403));
+  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在服务器本机管理 A2A 设置", null, 403));
   const { enabled, providerId, modelId, thinkingLevel = "off" } = req.body;
   let directory = req.body.directory as string;
   // ACT: Disabling the endpoint does not require the old directory

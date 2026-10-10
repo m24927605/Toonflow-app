@@ -7,8 +7,6 @@ dist/
 .playwright-mcp/
 playwright-report/
 test-results/
-/packages/startup/assets/macArm64/
-/.hutch/
 /.cottontail-tmp/
 coverage/
 *.tsbuildinfo

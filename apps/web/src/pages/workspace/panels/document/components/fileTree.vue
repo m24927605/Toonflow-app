@@ -61,7 +61,8 @@
           <template v-if="menuItem.type !== 'node'">
             <el-dropdown-item command="newFile" :disabled="busy">新建文件…</el-dropdown-item>
             <el-dropdown-item command="newFolder" :disabled="busy">新建文件夹…</el-dropdown-item>
-            <el-dropdown-item command="reveal" :disabled="busy">以资源管理器打开</el-dropdown-item>
+            <!-- The server opens the system file manager, which only makes sense when it runs on this computer in development. -->
+            <el-dropdown-item v-if="revealAvailable" command="reveal" :disabled="busy">以资源管理器打开</el-dropdown-item>
             <el-dropdown-item command="copy" :disabled="busy || !menuItem.path" divided>复制</el-dropdown-item>
             <el-dropdown-item command="cut" :disabled="busy || !menuItem.path">剪切</el-dropdown-item>
             <el-dropdown-item command="paste" :disabled="busy || !clipboard?.items.length">粘贴</el-dropdown-item>
@@ -125,6 +126,7 @@ const props = defineProps<{
   }>;
 }>();
 const emit = defineEmits<{ selectNode: [selection: TreeSelection]; open: [selection: TreeSelection, preview?: boolean]; quickOpen: []; search: [] }>();
+const revealAvailable = import.meta.env.DEV;
 const directory = computed(() => props.directory ?? props.params?.params.directory);
 const activeSelection = computed(() => props.activeSelection ?? props.params?.params.selection.value);
 const treeContent = ref<HTMLDivElement>();

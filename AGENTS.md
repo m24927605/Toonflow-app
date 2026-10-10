@@ -99,7 +99,6 @@ The following rules apply to `apps/server` and are followed together with the ge
 - Use Bun, TypeScript, ES Modules, and Express; keep using the existing dependencies and tools, and do not build another server framework.
 - `src/index.ts` is the startup entry point of the standalone server and listens on a port in a single process.
 - `createApp({ webRoot, dataDirectory?, ... })` in `src/app.ts` creates the application, wires up middleware, static assets, routes, and unified error handling, and returns the application. The data directory passed in must be set before routes are loaded dynamically. Do not start listening or create workers here.
-- The desktop app reuses the application through `@toonflow/server/app`. It does not import the standalone server's startup entry point and does not start an additional cluster.
 
 ### Directory Structure
 
@@ -150,7 +149,7 @@ apps/server/
 
 - In the server, `@/` points to `apps/server/src/`, and business code should prefer this alias, for example `@/utils`, `@/lib/middleware`. Do not treat `@/` as the repository root, and do not use local absolute paths or long `../../` chains to import business modules.
 - Import common utilities with `import u from "@/utils"`, for example `u.conf`. `utils.ts` manages importing and exporting the individual utilities; endpoints must not bypass the unified entry point to initialize utilities again.
-- Cross-workspace packages use the package name and its declared exports, for example `@toonflow/server/app`; do not reach directly into another package's `src/` path.
+- Cross-workspace packages use the package name and its declared exports, for example `@toonflow/server/agent/types`; do not reach directly into another package's `src/` path.
 - Third-party libraries are imported by package name. New imports of Node built-in modules use the `node:` prefix; type-only imports use `import type`.
 - Use the original export names of third-party functions and classes directly, for example `import { Router } from "express"`, `import conf from "conf"`. Do not add `as` aliases to convert to lowerCamelCase; use aliases only when truly necessary, such as for name conflicts. Type names keep TypeScript's type naming conventions.
 - Use double quotes, semicolons, and two-space indentation, and keep the existing file format. Organize files in the order imports, required declarations, endpoint registration, and export; remove unused imports and variables.
@@ -167,8 +166,7 @@ apps/server/
 
 - `conf` is initialized only in `src/utils/conf/index.ts`, exported through `src/utils.ts`, and used by endpoints as `u.conf`. Do not create instances in each endpoint or on each request.
 - Configuration is stored as `settings.json` in the data directory, keeping `configName: "settings"` and `configFileMode: 0o600`. Development uses `data/` at the repository root, which must be ignored by Git; production uses `data/` in the installation directory and no longer uses the default user configuration directory.
-- The startup entry point determines `TOONFLOW_DATA_DIR` through `createApp` before routes are loaded, and reads and writes must use the same directory. The standalone server locates the application root from where the source or `build/server` is located; the desktop development script explicitly passes `data/` at the repository root. Do not rely on `process.cwd()` at startup.
-- The Windows desktop app uses `data/` in the actual installation root (next to the updatable `app/`), and macOS uses `data/` in the directory containing the `.app`. Do not write into program resources that can be replaced by updates or inside the app bundle.
+- The startup entry point determines `TOONFLOW_DATA_DIR` through `createApp` before routes are loaded, and reads and writes must use the same directory. The standalone server locates the application root from where the source or `build/server` is located. Do not rely on `process.cwd()` at startup.
 - The current save endpoint accepts `{ settings: { ... } }` and validates the settings object with `z.record(z.string(), z.json())`. It saves by full overwrite; reads return `settings`, or `{}` when nothing has been saved.
 - Do not change full overwrite into partial merging without a related requirement. Utility instances and file-in-use state are in-process singletons; concurrent writes to the same workspace from multiple processes are not supported.
 

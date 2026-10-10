@@ -25,8 +25,8 @@ async function resolveDirectory(directory?: string) {
   if (!directory || !isAbsolute(directory)) throw new Error("请在 target.directory 指定绝对工作目录，或先打开项目");
   const path = await realpath(directory);
   if (!(await stat(path)).isDirectory()) throw new Error("工作目录不是文件夹");
-  const desktop = ["win32", "darwin"].includes(process.platform) && (process.env.NODE_ENV === "dev" || process.env.toonflowDesktop === "1");
-  if (!desktop) {
+  const local = ["win32", "darwin"].includes(process.platform) && process.env.NODE_ENV === "dev";
+  if (!local) {
     const root = await realpath(resolve(dirname(conf.path), "workspaces"));
     if (!isWithin(root, path)) throw new Error("服务器部署只能使用 data/workspaces 内的工作区");
   }
@@ -110,7 +110,7 @@ export async function getMcpTools(): Promise<McpTool[]> {
     tools.push(wrapTool(name, uiDescriptions[name as keyof typeof uiSchemas], z.toJSONSchema(schema), async (input, target, signal) => {
       const args = schema.parse(input);
       const { connection, directory } = await resolveTarget(target, !["openProject", "getSettings", "updateSettings"].includes(name));
-      if (!connection) throw new Error("请先打开 Toonflow 桌面或网页");
+      if (!connection) throw new Error("请先打开 Toonflow 网页");
       if (name === "openProject") await resolveDirectory((args as { directory: string }).directory);
       const result = await callControl(connection.id, name, args, signal, directory);
       return name === "getSettings" || name === "updateSettings" ? redactSecrets(result) : result;

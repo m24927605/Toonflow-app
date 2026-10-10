@@ -22,7 +22,7 @@ export async function renderImage(scene: SceneDocument, anchor: CameraAnchor, as
 export async function renderVideo(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, onProgress: (value: number) => void, lighting?: LightingSettings, settings?: SceneSettings) {
   signal.throwIfAborted();
   const mimeType = typeof MediaRecorder !== "undefined" && ["video/mp4;codecs=avc1.420028", "video/mp4"].find(type => MediaRecorder.isTypeSupported(type));
-  if (!mimeType) throw new Error("当前浏览器不支持 MP4 导出，请更新浏览器或桌面 WebView2 运行时");
+  if (!mimeType) throw new Error("当前浏览器不支持 MP4 导出，请更新浏览器");
   if (document.hidden) throw new Error("请在当前窗口保持可见时导出视频");
   const runtime = await createStage(document.createElement("canvas"), scene, undefined, aspect, lighting, settings);
   let player: ReturnType<typeof prepareSceneAnimation> | undefined;

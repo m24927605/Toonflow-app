@@ -40,7 +40,7 @@ export async function resolveA2aWorkspace(path = getA2aSettings().directory) {
     throw error;
   });
   if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("A2A 工作目录必须是文件夹"), { status: 400 });
-  const localWorkspace = ["win32", "darwin"].includes(process.platform) && (process.env.NODE_ENV === "dev" || process.env.toonflowDesktop === "1");
+  const localWorkspace = ["win32", "darwin"].includes(process.platform) && process.env.NODE_ENV === "dev";
   if (localWorkspace) return directory;
   const root = await realpath(resolve(dirname(conf.path), "workspaces")).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return;
@@ -53,7 +53,7 @@ export async function resolveA2aWorkspace(path = getA2aSettings().directory) {
 export function authenticateA2a(req: Request) {
   const { enabled, token } = getA2aSettings();
   if (!enabled || token.length < 32) return;
-  const local = process.env.toonflowDesktop === "1" || (process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform));
+  const local = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform);
   if (local && !["localhost", "127.0.0.1", "[::1]"].includes(req.hostname)) return;
   if (req.get("origin")) {
     try { getAppOrigin(req); } catch { return; }

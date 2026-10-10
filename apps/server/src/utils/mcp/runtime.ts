@@ -8,7 +8,7 @@ import type { Express } from "express";
 import conf from "@/utils/conf";
 import { getMcpSettings } from "@/utils/mcp/control";
 
-let runtime: { app: Express; appOrigin: string; requestHeaders: Record<string, string>; server?: Server; sockets?: Set<Socket>; url?: string; port?: number; preferredPort?: number; file?: string; command: string; entry: string; error?: string } | undefined;
+let runtime: { app: Express; appOrigin: string; server?: Server; sockets?: Set<Socket>; url?: string; port?: number; preferredPort?: number; file?: string; command: string; entry: string; error?: string } | undefined;
 let reloadQueue = Promise.resolve();
 
 function removeRuntime(file?: string) {
@@ -30,27 +30,9 @@ function saveRuntime(value = runtime) {
   } else removeRuntime(value.file);
 }
 
-export function initializeMcpRuntime(app: Express, url: string, entry: string, command = process.execPath, requestHeaders: Record<string, string> = {}) {
-  runtime = { app, appOrigin: new URL(url).origin, entry, command, requestHeaders: { ...requestHeaders } };
+export function initializeMcpRuntime(app: Express, url: string, entry: string) {
+  runtime = { app, appOrigin: new URL(url).origin, entry, command: process.execPath };
   return reloadMcpRuntime();
-}
-
-export function getAppRequestHeaders() {
-  return { ...runtime?.requestHeaders };
-}
-
-export function stopMcpRuntime() {
-  reloadQueue = reloadQueue.catch(() => {}).then(async () => {
-    const current = runtime;
-    runtime = undefined;
-    removeRuntime(current?.file);
-    if (!current?.server) return;
-    await new Promise<void>(resolve => {
-      current.server!.close(() => resolve());
-      for (const socket of current.sockets ?? []) socket.destroy();
-    });
-  });
-  return reloadQueue;
 }
 
 export function reloadMcpRuntime() {

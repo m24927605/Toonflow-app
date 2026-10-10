@@ -18,7 +18,7 @@ Toonflow is an open-source AI creation platform for short dramas, animated comic
 
 | Capability | Description |
 | --- | --- |
-| 🏠 **Local deployment** | Keep projects and assets on your own device or server, with desktop, Docker, and server deployment options. |
+| 🏠 **Local deployment** | Keep projects and assets on your own device or server, with Docker and server deployment options. |
 | 🖼️ **Infinite canvas** | Organize scripts, characters, scenes, and video clips on the same canvas. |
 | 🔌 **MCP** | Connect external tools and services through MCP. |
 | 🧩 **Plugins** | Extend Toonflow with node, tool, skill, agent, and editor extension plugins, installed from local packages and managed under Settings → Plugins. |
@@ -54,13 +54,7 @@ Toonflow is an open-source AI creation platform for short dramas, animated comic
 
 ## 3. 🚀 Install
 
-### 3.1 Desktop App
-
-Build the desktop app from source on the target system; see “Desktop build preparation” in the [development guide](./docs/development.md). Windows needs the WebView2 runtime, which the installer detects and installs; if the app closes right after installation, install it manually from the [WebView2 download page](https://developer.microsoft.com/microsoft-edge/webview2/).
-
----
-
-### 3.2 Docker Installation
+### 3.1 Docker Installation
 
 Install Git, [Docker Engine](https://docs.docker.com/engine/install/), and Docker Compose first. On Windows and macOS, you can use Docker Desktop in Linux container mode. The repository includes a [Dockerfile](./Dockerfile), [Compose configuration](./compose.yaml), and [build exclusions](./.dockerignore). The image is built with Bun 1.3.14 and includes FFmpeg.
 
@@ -104,7 +98,7 @@ docker compose start
 
 ---
 
-### 3.3 Server Installation
+### 3.2 Server Installation
 
 Use this option to run Web and Server directly on a Linux server. The example below uses Ubuntu / Debian and the project's pinned version, [Bun 1.3.14](https://bun.sh/docs/installation).
 
@@ -140,7 +134,7 @@ When the log shows `[服务启动成功]` (service started), open `http://127.0.
 
 ---
 
-### 3.4 Access and Data
+### 3.3 Access and Data
 
 - The service uses the fixed port `3000`. The web interface and API have no separate login authentication. For server installations, restrict access to port `3000` with a firewall or security group. Public access requires a reverse proxy with authentication.
 - For personal remote access, run `ssh -N -L 3000:127.0.0.1:3000 username@server-address` on your own computer, keep the connection open, then visit `http://127.0.0.1:3000`. You do not need to expose the server's port `3000` to the internet.
@@ -175,7 +169,7 @@ Credentials stay in your local data directory and are only sent to the provider 
 
 You can also add a custom media provider under Settings → Media models.
 
-To keep a media provider's API key out of Toonflow's settings, enter `env:VARIABLE_NAME` in its key field. Toonflow then reads that variable each time it is needed, first from its own process environment and then from `~/.env`, so the desktop app works without shell variables.
+To keep a media provider's API key out of Toonflow's settings, enter `env:VARIABLE_NAME` in its key field. Toonflow then reads that variable each time it is needed, first from its own process environment and then from `~/.env`, so it also works when the server is started without your shell variables.
 
 ---
 

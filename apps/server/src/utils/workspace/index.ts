@@ -19,7 +19,7 @@ export async function resolveWorkspace(req: Request, path: string) {
     throw err;
   });
   if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("工作目录不是文件夹，请重新选择"), { status: 404 });
-  const localWorkspace = ["win32", "darwin"].includes(process.platform) && (process.env.NODE_ENV === "dev" || process.env.toonflowDesktop === "1");
+  const localWorkspace = ["win32", "darwin"].includes(process.platform) && process.env.NODE_ENV === "dev";
   if (localWorkspace && isLocalWorkspaceRequest(req)) return directory;
 
   const root = await realpath(resolve(dirname(conf.path), "workspaces")).catch((err: NodeJS.ErrnoException) => {
