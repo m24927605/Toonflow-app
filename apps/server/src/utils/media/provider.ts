@@ -8,6 +8,7 @@ import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/pro
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
+import { resolveEnvReference } from "@/utils/conf/env";
 import { convertAudio } from "@/utils/media/audioProcessor";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { runHiggsfield } from "@/utils/media/higgsfield";
@@ -325,10 +326,12 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
   const provider = await getMediaProvider(fileName.slice(0, -3));
   if (revision !== undefined && revision !== provider.revision) invalid("供应商文件已被修改，请刷新页面后再获取", 409);
   if (!provider.modelsUrl) invalid("供应商未配置 modelsUrl");
+  // The stored value detects concurrent config changes; the resolved one authenticates the request.
   const apiKey = getMediaProviderApiKey(provider.id);
+  const authKey = await resolveEnvReference(apiKey);
   const modelsUrl = new URL(provider.modelsUrl);
   const response = await fetch(modelsUrl, {
-    headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+    headers: { Accept: "application/json", ...(authKey ? { Authorization: `Bearer ${authKey}` } : {}) },
     signal: AbortSignal.timeout(30000), redirect: "error",
   });
   if (!response.ok) throw new Error(t`获取媒体模型列表失败（HTTP ${response.status}）`);
@@ -394,7 +397,10 @@ export async function loadMediaProviderSource(source: string, config: Record<str
   signal?.throwIfAborted();
   const definition = (module.namespace as { default: Provider }).default;
   const rules = Array.isArray(definition.rules) ? definition.rules : [];
-  const providerConfig = { ...Object.fromEntries(rules.map(rule => [rule.field, rule.value])), ...structuredClone(config) };
+  // Only values the user saved are resolved; provider defaults must not be able to pull environment variables.
+  const userConfig = Object.fromEntries(await Promise.all(Object.entries(structuredClone(config))
+    .map(async ([key, value]) => [key, await resolveEnvReference(value)])));
+  const providerConfig = { ...Object.fromEntries(rules.map(rule => [rule.field, rule.value])), ...userConfig };
   const provider = {
     ...definition,
     config: providerConfig,

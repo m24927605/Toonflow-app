@@ -2455,5 +2455,6 @@
   "Higgsfield 参考素材需为本地数据，不支持远程地址": "Higgsfield 參考素材需為本機資料，不支援遠端網址",
   "Higgsfield 模型 ID 无效": "Higgsfield 模型 ID 無效",
   "扩展": "擴充",
-  "Claude Code 模型 ID 无效": "Claude Code 模型 ID 無效"
+  "Claude Code 模型 ID 无效": "Claude Code 模型 ID 無效",
+  "环境变量 {0} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置": "環境變數 {0} 未設定，請在 Toonflow 程序環境或 ~/.env 中設定"
 }

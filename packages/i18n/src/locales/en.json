@@ -2455,5 +2455,6 @@
   "Higgsfield 参考素材需为本地数据，不支持远程地址": "Higgsfield reference media must be local data; remote URLs are not supported",
   "Higgsfield 模型 ID 无效": "Invalid Higgsfield model ID",
   "扩展": "Extensions",
-  "Claude Code 模型 ID 无效": "Invalid Claude Code model ID"
+  "Claude Code 模型 ID 无效": "Invalid Claude Code model ID",
+  "环境变量 {0} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置": "Environment variable {0} is not set. Set it in the Toonflow process environment or in ~/.env."
 }

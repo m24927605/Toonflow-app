@@ -6225,6 +6225,9 @@
   "素材查询及游标关闭失败": [
     "apps/server/src/utils/assets/index.ts"
   ],
+  "环境变量 {0} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置": [
+    "apps/server/src/utils/conf/env.ts"
+  ],
   "音频输入必须是 Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],

@@ -47,7 +47,7 @@ export default {
   id: "openai" as const,
   label: "OpenAI",
   version,
-  readme: "Image generation with the OpenAI Images API. The API key is stored locally and only sent to api.openai.com. GPT Image models require a verified API organization.",
+  readme: "Image generation with the OpenAI Images API. The API key is only sent to api.openai.com. To keep it out of Toonflow's settings, enter `env:VARIABLE_NAME` instead; Toonflow then reads that variable from its process environment or `~/.env`. GPT Image models require a verified API organization.",
   rules,
   models: [
     {

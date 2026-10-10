@@ -375,6 +375,8 @@ Credentials stay in your local data directory and are only sent to the provider 
 
 You can also add a custom media provider under Settings → Media models.
 
+To keep a media provider's API key out of Toonflow's settings, enter `env:VARIABLE_NAME` in its key field. Toonflow then reads that variable each time it is needed, first from its own process environment and then from `~/.env`, so the desktop app works without shell variables.
+
 ---
 
 ## 7. 👨‍👩‍👧‍👦 WeChat Community
