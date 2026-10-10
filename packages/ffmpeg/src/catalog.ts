@@ -14,17 +14,6 @@ export const builds = {
       sha256: "f309e6223ad89d2fe54bccd420a7709b66fd27540674e92309578ed491a43c8d",
     },
   },
-  "darwin-x64": {
-    version: "6.1.1",
-    ffmpeg: {
-      fileName: "ffmpeg-darwin-x64.gz",
-      sha256: "929b375c1182d956c51f7ac25e0b2b0411fb01f6f407aa15c9758efeb4242106",
-    },
-    ffprobe: {
-      fileName: "ffprobe-darwin-x64.gz",
-      sha256: "d4da574d6e2e197bd259b47d69cf262df9e312af24ad960444f6d806d3d4c186",
-    },
-  },
   "darwin-arm64": {
     version: "6.1.1",
     ffmpeg: {
