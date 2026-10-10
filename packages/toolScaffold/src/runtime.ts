@@ -108,6 +108,8 @@ export interface MediaGenerationRequest {
   duration?: number;
   generateAudio?: boolean;
   voice?: string;
+  /** Free-text delivery for speech, e.g. "low and slow"; mapped to the provider's emotion or style input. */
+  emotion?: string;
   speed?: number;
   volume?: number;
   pitch?: number;
@@ -116,7 +118,7 @@ export interface MediaGenerationRequest {
   sampleRate?: number;
   /** Trained character identity for image models that declare `character`. */
   characterId?: string;
-  mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text"
+  mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }
 

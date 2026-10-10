@@ -8,10 +8,10 @@ const rules = [
   },
 ] as const;
 
-const version = "1.0.0";
+const version = "1.1.0";
 const apiUrl = "https://generativelanguage.googleapis.com/v1beta";
 // Toonflow language values mapped to Gemini BCP-47 codes; anything else leaves detection to the model.
-const languageCodes: Record<string, string> = { "zh-CN": "cmn-CN", en: "en-US" };
+const languageCodes: Record<string, string> = { "zh-CN": "cmn-CN", en: "en-US", ja: "ja-JP" };
 
 /** Returns the PCM samples of a WAV file by locating its `data` chunk. */
 function wavData(bytes: Uint8Array) {

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "routes": "bun src/core.ts",
-    "dev": "NODE_ENV=dev bun --watch src/index.ts",
+    "dev": "NODE_ENV=dev bun --watch --watch-kill-signal=SIGUSR1 src/index.ts",
     "build": "bun scripts/build.ts",
     "start": "bun ../../build/server/index.js",
     "typecheck": "tsc"
@@ -17,8 +17,8 @@
   "dependencies": {
     "@babel/parser": "^7.29.8",
     "@breezystack/lamejs": "^1.2.7",
-    "@earendil-works/pi-ai": "0.85.1",
-    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
     "@toonflow/ffmpeg": "workspace:*",
     "@toonflow/file": "workspace:*",
     "@toonflow/mcp": "workspace:*",

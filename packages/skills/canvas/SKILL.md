@@ -2,7 +2,7 @@
 name: canvas
 description: Toonflow canvas operation manual. Use the canvas tools to create, switch, and rename canvases; add, move, rename, connect, and delete nodes; automatically arrange the whole canvas and adjust the viewport; and call functions registered by nodes. Use when the user asks to operate the current canvas or build a node flow.
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   displayName: 画布操作手册
   author: Toonflow
 ---
@@ -58,7 +58,7 @@ For global tasks, process page by page and record progress, keeping only the cur
 
 | Tool | Parameters | Behavior and return |
 | --- | --- | --- |
-| `addCanvas` | `{ name? }` | Creates a blank canvas and switches to it; when the name is omitted, it automatically uses an unused `画布N` (Canvas N). Returns an overview of the newly active canvas. |
+| `addCanvas` | `{ name? }` | Creates a blank canvas and switches to it; when the name is omitted, it automatically uses an unused default name in the interface language, such as `Canvas N`. Returns an overview of the newly active canvas. |
 | `switchCanvas` | `{ canvasId }` | Waits for current changes to be saved, then switches to the specified canvas, returning an overview of the newly active canvas. |
 | `renameCanvas` | `{ canvasId?, name }` | When the ID is omitted, renames the active canvas and also changes the JSON file name. Returns an overview of the active canvas after the operation. |
 

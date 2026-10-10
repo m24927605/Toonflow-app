@@ -202,14 +202,14 @@ watch(() => props.directory, async (directory, _previous, onCleanup) => {
     if (cancelled) return;
     if (!loaded.length) {
       try {
-        loaded = [await createCanvasFile(directory, "画布1")];
+        loaded = [await createCanvasFile(directory, defaultCanvasName(1))];
       } catch (err) {
         if (!axios.isAxiosError<{ data?: { code?: string } }>(err) || err.response?.status !== 409 || err.response.data.data?.code !== "EEXIST") throw err;
         // When the workspace is opened concurrently, read the default canvas another request just created
         // instead of overwriting the same-named file.
         entries = await listCanvases(directory);
         const refreshed = entries.canvases;
-        // If 画布1.json is taken by another JSON, use the next free name and keep the original file.
+        // If the first default name is taken by another JSON, use the next free name and keep the original file.
         loaded = refreshed.length ? refreshed : [await createCanvasFile(directory)];
       }
     }
@@ -358,13 +358,18 @@ async function removeCanvas(canvas: Canvas) {
   }
 }
 
+/** Default canvas names follow the interface language, e.g. "Canvas 1" or "畫布1". */
+function defaultCanvasName(number: number) {
+  return translate("画布{0}", { 0: number });
+}
+
 async function createCanvasFile(directory: string, name?: string, signal?: AbortSignal) {
   if (name !== undefined) name = normalizeCanvasName(name);
   const files = useWorkspaceFiles(directory);
   const flow = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
   for (let number = 1; ; number++) {
     checkCanvasDirectory(directory, signal);
-    const canvasName = name ?? `画布${number}`;
+    const canvasName = name ?? defaultCanvasName(number);
     const id = `${canvasName}.json`;
     try {
       await files.writeJson(id, { toonflowCanvas: true, ...flow }, true);

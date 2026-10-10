@@ -1,6 +1,6 @@
 import { onScopeDispose } from "vue";
 import { runAgentLoop, type AgentTool, type AgentToolResult } from "@earendil-works/pi-agent-core";
-import { createAssistantMessageEventStream, type AssistantMessage, type Context, type Message, type Model } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream, createInitialSystemMessage, getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type Context, type Message, type Model, type TranscriptContext } from "@earendil-works/pi-ai";
 import { EventSourceParserStream } from "eventsource-parser/stream";
 import type { MediaGenerationRequest, MediaModel } from "@toonflow/tools-scaffold/runtime";
 import type { NodeOutput } from "./values";
@@ -31,7 +31,7 @@ export type NodeImageRequest = {
 export type NodeImageResult = { path: string; mimeType: string; mediaType: "image" };
 export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
-export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate"> & { directory: string; outputDirectory: string };
+export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate"> & { directory: string; outputDirectory: string };
 export type NodeAudioResult = { path: string; mimeType: string; mediaType: "audio" };
 export type NodeAiRequest = {
   providerId: string;
@@ -102,14 +102,21 @@ async function readModels<T>(url: string, signal: AbortSignal): Promise<T[]> {
   }
 }
 
-async function requestModel(input: NodeAiRequest, context: Context, model: Model<NodeAiModel["protocol"]>, signal: AbortSignal) {
+async function requestModel(input: NodeAiRequest, transcript: TranscriptContext, model: Model<NodeAiModel["protocol"]>, signal: AbortSignal, session?: string) {
   const { providerId, modelId, references, directory, onEvent } = input;
+  // The server API keeps the flat context shape; system messages carry the prompt and tool declarations in the transcript.
+  const tools = getCurrentTools(transcript.messages);
+  const context: Context = {
+    systemPrompt: getCurrentSystemPrompt(transcript.messages) || undefined,
+    messages: transcript.messages.filter(message => message.role !== "system"),
+    ...(tools.length ? { tools } : {}),
+  };
   const stream = createAssistantMessageEventStream();
   try {
     signal.throwIfAborted();
     const response = await fetch("/api/ai/generate", {
       method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ providerId, modelId, context, directory, references }), signal,
+      body: JSON.stringify({ providerId, modelId, context, directory, references, session }), signal,
     });
     if (!response.ok) await readResult(response);
     if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) throw new Error("AI 未返回 SSE 数据流");
@@ -139,9 +146,10 @@ async function requestModel(input: NodeAiRequest, context: Context, model: Model
     }
   } catch (error) {
     const reason = signal.aborted ? "aborted" : "error";
+    const failure = error instanceof DOMException && error.name === "TimeoutError" ? new Error("模型单轮响应超过 10 分钟，已停止") : error;
     stream.push({ type: "error", reason, error: {
       role: "assistant", content: [], api: model.api, provider: model.provider, model: model.id, timestamp: Date.now(),
-      stopReason: reason, errorMessage: error instanceof Error ? error.message : "AI 请求失败",
+      stopReason: reason, errorMessage: failure instanceof Error ? failure.message : "AI 请求失败",
       usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
     } });
   }
@@ -184,12 +192,16 @@ export function useNodeAi() {
 
   async function generate(input: NodeAiRequest): Promise<NodeAiResult> {
     const signal = requestSignal(input.signal);
-    const callSignal = input.tools?.length ? AbortSignal.any([signal, AbortSignal.timeout(600000)]) : signal;
+    // Tool loops limit each model turn to 10 minutes rather than the whole loop: reasoning models can think for minutes
+    // per turn, so a whole-loop limit cut off healthy runs, while the 40-turn cap below already bounds the loop.
+    const turnSignal = () => input.tools?.length ? AbortSignal.any([signal, AbortSignal.timeout(600000)]) : signal;
+    // Every turn of one tool loop shares a session ID, so the server can keep the same model session across turns.
+    const session = input.tools?.length ? crypto.randomUUID() : undefined;
     const { providerId, modelId, prompt, systemPrompt, onEvent } = input;
     if (!prompt.trim()) throw new Error("请输入提示词");
     const definitions = input.tools ?? [];
     if (new Set(definitions.map(tool => tool.name)).size !== definitions.length) throw new Error("工具名称不能重复");
-    const selected = (await getModels(callSignal)).find(model => model.providerId === providerId && model.modelId === modelId);
+    const selected = (await getModels(signal)).find(model => model.providerId === providerId && model.modelId === modelId);
     if (!selected) throw new Error("所选模型不存在，请重新选择");
     const model: Model<NodeAiModel["protocol"]> = {
       id: modelId, name: selected.label, provider: providerId, api: selected.protocol, baseUrl: "",
@@ -200,28 +212,29 @@ export function useNodeAi() {
     const tools: AgentTool[] = definitions.map(tool => ({
       name: tool.name, label: tool.name, description: tool.description, parameters: tool.parameters,
       async execute(_id, args, toolSignal) {
-        callSignal.throwIfAborted();
+        signal.throwIfAborted();
         if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("工具参数必须是对象");
         const result = await tool.execute(args as Record<string, unknown>, toolSignal) ?? null;
-        callSignal.throwIfAborted();
+        signal.throwIfAborted();
         return { content: [{ type: "text", text: JSON.stringify(result) ?? "null" }], details: undefined };
       },
     }));
     let turns = 0;
+    const system = createInitialSystemMessage(systemPrompt, undefined);
     const messages = await runAgentLoop([{ role: "user", content: prompt, timestamp: Date.now() }], {
-      systemPrompt: systemPrompt ?? "", messages: [], tools,
+      messages: system ? [system] : [], tools,
     }, {
       model, convertToLlm: messages => messages as Message[], toolExecution: "sequential",
-      shouldStopAfterTurn: ({ message }) => ++turns >= 40 || message.stopReason === "length",
+      finishTurn: ({ message }) => ++turns >= 40 || message.stopReason === "length" ? { action: "end" } : undefined,
     }, event => {
-      callSignal.throwIfAborted();
+      signal.throwIfAborted();
       if (event.type === "tool_execution_start") onEvent?.({ type: "toolStart", id: event.toolCallId, name: event.toolName, args: event.args });
       if (event.type === "tool_execution_end" && onEvent) {
         const text = (event.result as AgentToolResult<unknown>).content.filter(part => part.type === "text").map(part => part.text).join("\n");
         onEvent({ type: "toolEnd", id: event.toolCallId, name: event.toolName, result: event.isError ? text : JSON.parse(text), isError: event.isError });
       }
-    }, callSignal, (_model, context) => requestModel(input, context, model, callSignal));
-    callSignal.throwIfAborted();
+    }, signal, (_model, context) => requestModel(input, context, model, turnSignal(), session));
+    signal.throwIfAborted();
     const message = messages.findLast((message): message is AssistantMessage => message.role === "assistant");
     if (!message) throw new Error("AI 未返回结果");
     if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "AI 请求失败");

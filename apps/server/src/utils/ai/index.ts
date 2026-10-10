@@ -2,13 +2,15 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
-import type { Context, Model } from "@earendil-works/pi-ai";
+import { normalizeContext, type Context, type Model } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import conf from "@/utils/conf";
 import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
 import { codexProviderId, createCodexRuntime, getCodexStatus } from "@/utils/ai/codex";
 import { streamClaudeCode } from "@/utils/ai/claudeCode";
+
+export { claudeCodeToolsRouter } from "@/utils/ai/claudeCode";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 export { startCodexLogin, submitCodexCode, getCodexStatus, logoutCodex } from "@/utils/ai/codex";
@@ -136,10 +138,11 @@ export async function streamAi(
   context: Context,
   signal: AbortSignal,
   references: Awaited<ReturnType<typeof readAiReferences>> = [],
+  session?: string,
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
   if (provider.protocol === "claude-code") {
-    return await streamClaudeCode(configured.providerId, configuredModel.id, context, signal, referenceContent("anthropic-messages", "", references).slice(1));
+    return await streamClaudeCode(configured.providerId, configuredModel.id, context, signal, referenceContent("anthropic-messages", "", references).slice(1), session);
   }
   // ACT: Do not infer attachment support from the model name; pass
   // attachments per the provider protocol and let the upstream API decide.
@@ -171,5 +174,5 @@ export async function streamAi(
     contextWindow: configuredModel.contextWindow,
     maxTokens: configuredModel.maxOutputTokens,
   };
-  return aiApis[provider.protocol].streamSimple(model, context, { apiKey: provider.apiKey, signal, onPayload });
+  return aiApis[provider.protocol].streamSimple(model, normalizeContext(context), { apiKey: provider.apiKey, signal, onPayload });
 }

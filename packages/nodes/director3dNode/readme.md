@@ -25,7 +25,7 @@ Keep the current window visible while a video is exporting; when it finishes, vi
 
 Generating a variant calls `ai.generate()` in the same way as the regular text node, passing the private `readDocument` / `editDocument` tools through `tools`; the selected text model must support tool calls. Each round first copies the selected variant as a draft, and the AI reads and partially modifies the scene, tracks, and camera as needed, keeping whatever it does not change; the first generation also fills in the draft through the same tools. The tool loop and the draft both live on the node side; the server only proxies individual model requests and keeps no Director's Studio session.
 
-The tools are not registered in `nodeTools`, are not exposed to the external main Agent, and do not operate on files directly. A new variant is appended only after full validation, preview rendering, and saving all succeed; the scene itself is still shared by all variants. On failure, cancellation, or a concurrent scene conflict, the draft is not committed. Each generation calls the model at most 40 times, and model and tool calls are cancelled after 10 minutes.
+The tools are not registered in `nodeTools`, are not exposed to the external main Agent, and do not operate on files directly. A new variant is appended only after full validation, preview rendering, and saving all succeed; the scene itself is still shared by all variants. On failure, cancellation, or a concurrent scene conflict, the draft is not committed. Each generation calls the model at most 40 times, and a single model call is cancelled after 10 minutes.
 
 ## Low-poly jointed mannequin
 

@@ -167,6 +167,8 @@ function getMatchingModes(choice?: NodeMediaModel) {
       count <= Number(mode.find((item) => item.startsWith(`${type}Reference:`))?.split(":")[1] ?? 0)
     );
     if (mode === "text") return image + video + audio === 0;
+    // Extension continues the one connected video; connected images stay as references.
+    if (mode === "videoExtension") return video === 1 && audio === 0;
     if (video || audio) return false;
     if (mode === "singleImage") return image === 1;
     if (mode === "startEndRequired") return image === 2;

@@ -1,12 +1,12 @@
 const rules = [] as const;
 
-const version = "1.2.0";
+const version = "1.3.0";
 
 export default {
   id: "higgsfield" as const,
   label: "Higgsfield",
   version,
-  readme: "Generates videos with Seedance 2.0 and 2.5, and character-consistent images with Soul 2.0 and Soul Cinematic, through the Higgsfield CLI installed on the computer running Toonflow.\n\n1. Install the CLI: `npm install -g @higgsfield/cli`\n2. Sign in once: `higgsfield auth login`\n\nSoul models keep a character trained with the Character node (Higgsfield Soul ID) consistent across images; a Soul 2.0 identity only works with Soul 2.0, and a Soul Cinematic identity with Soul Cinematic.\n\nJobs use the credits of your Higgsfield plan. Toonflow never reads or forwards the CLI credentials.",
+  readme: "Generates videos with Seedance 2.0 and 2.5, and character-consistent images with Soul 2.0 and Soul Cinematic, through the Higgsfield CLI installed on the computer running Toonflow.\n\n1. Install the CLI: `npm install -g @higgsfield/cli`\n2. Sign in once: `higgsfield auth login`\n\nSeedance 2.5 can also extend a connected video forward with the Extend video mode, up to 30 seconds per run.\n\nSoul models keep a character trained with the Character node (Higgsfield Soul ID) consistent across images; a Soul 2.0 identity only works with Soul 2.0, and a Soul Cinematic identity with Soul Cinematic.\n\nJobs use the credits of your Higgsfield plan. Toonflow never reads or forwards the CLI credentials.",
   rules,
   models: [
     {
@@ -22,7 +22,7 @@ export default {
       label: "Seedance 2.5",
       type: "video",
       // Higgsfield allows 50 reference items in total, at most 30 of them images (first and last frames included).
-      mode: ["text", "endFrameOptional", ["imageReference:30", "videoReference:10", "audioReference:10"]],
+      mode: ["text", "endFrameOptional", ["imageReference:30", "videoReference:10", "audioReference:10"], "videoExtension"],
       audio: "optional",
       durationResolutionMap: [{
         duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
@@ -70,8 +70,13 @@ export default {
       "video-references": request.videos ?? [],
       "audio-references": request.audios ?? [],
     };
+    if (request.mode === "videoExtension") {
+      if (request.model !== "seedance_2_5") throw new Error("只有 Seedance 2.5 支持延长视频");
+      if (request.videos?.length !== 1) throw new Error("延长视频需要连接且只连接一个视频");
+      params.mode = "video_extension";
+      params.extension_mode = "forward";
     // Seedance 2.5 needs an explicit mode: text-only jobs are t2v, anything with frames or references is omni_reference.
-    if (request.model === "seedance_2_5") params.mode = Object.values(media).some(items => items.length) ? "omni_reference" : "t2v";
+    } else if (request.model === "seedance_2_5") params.mode = Object.values(media).some(items => items.length) ? "omni_reference" : "t2v";
     const { url } = await this.tool.higgsfield({ jobType: request.model, prompt: request.prompt, params, media });
     return [{ mediaType: "video", type: "url", url }];
   },

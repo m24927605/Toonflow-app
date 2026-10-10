@@ -105,6 +105,8 @@ export async function createApp({
     translate: translateMessage,
     translateError,
   }));
+  const { claudeCodeToolsRouter } = await import("@/utils/ai/claudeCode");
+  app.use("/claudeCode/mcp", claudeCodeToolsRouter);
   const { createA2aRouter } = await import("@/agent/a2a");
   app.use("/a2a", createA2aRouter());
   app.use(express.static(webRoot));

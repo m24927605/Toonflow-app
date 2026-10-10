@@ -77,7 +77,7 @@ export async function runSubAgent(options: SubAgentModel & {
       tools: activeTools.map(tool => tool.name),
     }));
     signal.throwIfAborted();
-    session.agent.shouldStopAfterTurn = () => Boolean(inputRequired?.());
+    session.agent.finishTurn = () => inputRequired?.() ? { action: "end" } : undefined;
     session.subscribe(event => {
       if (signal.aborted) return;
       if (event.type === "message_start" && event.message.role === "assistant") onProgress?.("正在处理");

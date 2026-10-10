@@ -84,7 +84,7 @@ const formError = ref("");
 const modelTypes = { get image() { return translate("图片"); }, get video() { return translate("视频"); }, get audio() { return translate("音频"); } };
 const modeLabels: Record<string, string> = {
   singleImage: "单图参考", multiReference: "多图参考", startEndRequired: "首尾帧必填",
-  endFrameOptional: "尾帧可选", startFrameOptional: "首帧可选",
+  endFrameOptional: "尾帧可选", startFrameOptional: "首帧可选", videoExtension: "延长视频",
   imageReference: "图片参考", videoReference: "视频参考", audioReference: "音频参考",
 };
 

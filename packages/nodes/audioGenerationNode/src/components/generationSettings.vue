@@ -17,6 +17,16 @@
           <span class="fieldLabel">语种</span>
           <el-segmented v-model="language" :options="languageOptions" :disabled="disabled" block aria-label="音频语种" />
         </div>
+        <div v-if="voices.length" class="settingField">
+          <span class="fieldLabel">声线</span>
+          <el-select v-model="voice" :disabled="disabled" :teleported="false" clearable valueOnClear="" placeholder="默认" aria-label="音频声线">
+            <el-option v-for="item in voices" :key="item.voice" :value="item.voice" :label="item.title" />
+          </el-select>
+        </div>
+        <div class="settingField">
+          <span class="fieldLabel">语气</span>
+          <el-input v-model="emotion" :disabled="disabled" :maxlength="500" clearable aria-label="音频语气" />
+        </div>
         <div class="settingField">
           <span class="fieldLabel">采样率</span>
           <el-segmented v-model="sampleRate" :options="sampleRates" :disabled="disabled" block aria-label="音频采样率" />
@@ -33,12 +43,14 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ElButton, ElPopover, ElSegmented } from "element-plus";
+import { ElButton, ElInput, ElOption, ElPopover, ElSegmented, ElSelect } from "element-plus";
 import { IconAdjustmentsHorizontal, IconChevronUp } from "@tabler/icons-vue";
 import { languageOptions, sampleRateOptions, formatOptions } from "../audioSettings";
 
-defineProps<{ disabled?: boolean }>();
+const { voices } = defineProps<{ disabled?: boolean; voices: { title: string; voice: string }[] }>();
 const language = defineModel<string>("language", { required: true });
+const voice = defineModel<string>("voice", { required: true });
+const emotion = defineModel<string>("emotion", { required: true });
 const sampleRate = defineModel<number>("sampleRate", { required: true });
 const format = defineModel<string>("format", { required: true });
 const formatLabels: Record<string, string> = { wav: "WAV", mp3: "MP3", pcm: "PCM", ogg_opus: "Ogg Opus" };

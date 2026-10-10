@@ -58,6 +58,7 @@ const mode = defineModel<string>("mode", { required: true });
 const generateAudio = defineModel<boolean>("generateAudio", { required: true });
 const modeLabels: Record<string, string> = {
   text: "文生视频", singleImage: "单图参考", startEndRequired: "首尾帧必填", endFrameOptional: "尾帧可选", startFrameOptional: "首帧可选",
+  videoExtension: "延长视频",
 };
 const modes = computed(() => (props.model?.mode ?? []).map(item => ({
   value: JSON.stringify(item),

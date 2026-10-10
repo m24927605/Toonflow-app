@@ -77,7 +77,7 @@ export const customProviders = computed<CustomProvider[]>(() => Array.isArray(se
     && item.models.every((model: CustomProviderModel) => !!model && typeof model.id === "string" && typeof model.label === "string"))
   : []);
 
-// Claude Code only serves single-turn node generation, so agent model pickers leave it out.
+// Claude Code only serves node generation, so agent model pickers leave it out.
 export const agentProviders = computed(() => customProviders.value.filter(provider => provider.protocol !== "claude-code"));
 
 export const modelChoices = computed(() => agentProviders.value.flatMap(provider => provider.models.map(model => ({

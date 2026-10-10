@@ -9,6 +9,8 @@ type VideoMode =
   | "endFrameOptional"
   | "startFrameOptional"
   | "text"
+  /** Continues the single video in `videos` forward by `duration` seconds; reference images still guide the result. */
+  | "videoExtension"
   | (`${"video" | "image" | "audio"}Reference:${number}`)[];
 
 interface ProviderModel {

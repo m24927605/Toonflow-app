@@ -29,7 +29,7 @@ The frontend and business server are maintained in a single Bun Workspaces repos
 
 | Layer | Technology |
 | --- | --- |
-| Runtime and package management | Bun 1.3.14, Bun Workspaces |
+| Runtime and package management | Bun 1.4.2, Bun Workspaces |
 | Frontend | Vue 3, Vite, TypeScript, Pinia, Element Plus, Vue Flow |
 | Server | Bun, Express 5, Zod |
 | Agent | Pi Agent SDK, tool plugins, Markdown skills and memory |
@@ -60,7 +60,7 @@ Run the following commands in the repository root:
 | Command | Purpose |
 | --- | --- |
 | `bun run dev:web` | Starts the Web development server on its own. |
-| `bun run dev:server` | Starts the business Server on its own. |
+| `bun run dev:server` | Starts the business Server on its own and restarts it when its source changes. The restart uses `--watch-kill-signal=SIGUSR1`: since Bun 1.4 a watch restart first runs the handlers of that signal, and the default `SIGTERM` handler that `conf` installs through `atomically` re-raises the signal and ends the process instead of restarting it. |
 | `bun run dev:plugins` | Builds nodes and tools and syncs them to the development data directory. |
 | `bun run build` | Builds tools, Web, Server, and MCP, and outputs skill and provider files. |
 | `bun run build:server` | Builds the nodes, tools, Web, Server, MCP, skills, and providers needed for standalone deployment; supports Linux. |

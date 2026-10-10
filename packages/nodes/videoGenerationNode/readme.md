@@ -1,6 +1,6 @@
 # Video Generation Node
 
-Generates video from a prompt and reference assets, supporting the text-to-video, single-image, first/last-frame, or mixed reference modes offered by the selected model.
+Generates video from a prompt and reference assets, supporting the text-to-video, single-image, first/last-frame, mixed reference, or video extension modes offered by the selected model.
 
 ## Inputs and outputs
 
@@ -13,6 +13,7 @@ Generates video from a prompt and reference assets, supporting the text-to-video
 2. Describe the action, camera movement, and sound, connect reference assets as needed, and adjust their reference order.
 3. Open the generation settings and choose the mode, duration, resolution, and aspect ratio; when the model allows it, toggle "Generate audio".
 4. In first/last-frame modes, images are assigned in reference order; in "First frame optional" mode with only one image, that image is used as the last frame.
+   In "Extend video" mode, connect exactly one video; the duration is the length added after its end, and connected images keep characters and scenes consistent. Chain nodes to extend further.
 5. Click "Generate video", or click "Stop generation" to abort.
 6. When it finishes, you can play, seek, and adjust the volume, or download and preview full screen from the toolbar above.
 

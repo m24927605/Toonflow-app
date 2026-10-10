@@ -56,6 +56,8 @@ const inputSchema = z.object({
   context: contextSchema,
   directory: z.string().min(1).max(4096).optional(),
   references: z.array(u.ai.aiReferenceSchema).max(32).optional(),
+  // A tool loop keeps one session ID so providers such as Claude Code can continue the same model process.
+  session: z.uuid().optional(),
 });
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
@@ -66,16 +68,13 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const controller = new AbortController();
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   const close = () => { clearInterval(heartbeat); controller.abort(); };
+  // The response closes when the client disconnects, which cancels the upstream model call.
   res.once("close", close);
-  req.once("aborted", close);
-  // ACT: Handle close events across runtimes; Bun 1.3.14's idle SSE may
-  // still not notify, so stopping upstream immediately is not guaranteed.
-  req.socket.once("close", close);
   try {
     const directory = input.references?.some(item => item.dataType !== "STRING")
       ? await u.workspace.resolveWorkspace(req, input.directory ?? "") : undefined;
     const references = await u.ai.readAiReferences(directory, input.references ?? [], controller.signal);
-    const stream = await u.ai.streamAi(configured, input.context, controller.signal, references);
+    const stream = await u.ai.streamAi(configured, input.context, controller.signal, references, input.session);
     res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
     res.flushHeaders();
     heartbeat = setInterval(() => {
@@ -99,7 +98,5 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   } finally {
     clearInterval(heartbeat);
     res.off("close", close);
-    req.off("aborted", close);
-    req.socket.off("close", close);
   }
 });

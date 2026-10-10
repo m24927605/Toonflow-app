@@ -6,7 +6,7 @@ import { createCodexRuntime } from "@/utils/ai/codex";
 export async function createAgentModel(providerId: string, modelId: string, thinkingLevel = "off") {
   const configured = getConfiguredModel(providerId, modelId);
   const { provider, model, baseUrl } = configured;
-  if (provider.protocol === "claude-code") throw Object.assign(new Error("Claude Code 仅用于节点的单轮文本生成，请为 Agent 选择其他模型"), { status: 400 });
+  if (provider.protocol === "claude-code") throw Object.assign(new Error("Claude Code 仅用于节点生成，请为 Agent 选择其他模型"), { status: 400 });
   // ACT: Codex uses Pi's built-in provider so the OAuth credential in auth.json is refreshed per request and long
   // conversations do not outlive the access token.
   if (provider.protocol === "openai-codex-responses") return { ...configured, runtime: await createCodexRuntime() };

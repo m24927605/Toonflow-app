@@ -1609,6 +1609,10 @@
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
   ],
+  "延长视频": [
+    "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
+    "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
+  ],
   "图片参考": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue"
@@ -1984,7 +1988,8 @@
   ],
   "默认": [
     "apps/web/src/components/settings/panels/ui.vue",
-    "apps/web/src/components/modelPopover.vue"
+    "apps/web/src/components/modelPopover.vue",
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
   "较大": [
     "apps/web/src/components/settings/panels/ui.vue"
@@ -3126,6 +3131,10 @@
   ],
   "该文件夹不为空，请重新选择空文件夹；已有项目请使用“导入项目”或点击项目列表打开。": [
     "apps/web/src/pages/home/index.vue"
+  ],
+  "画布{0}": [
+    "apps/web/src/pages/home/index.vue",
+    "apps/web/src/pages/workspace/panels/canvas/components/canvasMenu.vue"
   ],
   "创建项目失败，请重试": [
     "apps/web/src/pages/home/index.vue"
@@ -5200,19 +5209,37 @@
   "临时对话已关闭": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "Claude Code 模型 ID 无效": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 不支持工具调用，请改用其他模型": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 仅支持单轮文本生成": [
+  "Claude Code 会话已结束": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
   "未找到 Claude Code，请先在运行 Toonflow 的电脑上安装并登录 Claude Code": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
+  "服务尚未就绪，请稍后重试": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 会话不存在": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 请求失败": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
   "Claude Code 输出无法解析": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 模型 ID 无效": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 工具调用需要会话 ID": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 请求必须以用户消息开始": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 会话已结束，请重新生成": [
+    "apps/server/src/utils/ai/claudeCode.ts"
+  ],
+  "Claude Code 会话只能继续提交本轮工具结果，请重新生成": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
   "登录已取消": [
@@ -5889,7 +5916,7 @@
   "读取工作区 AGENTS.md 失败：{0}": [
     "apps/server/src/agent/runtime/resources.ts"
   ],
-  "Claude Code 仅用于节点的单轮文本生成，请为 Agent 选择其他模型": [
+  "Claude Code 仅用于节点生成，请为 Agent 选择其他模型": [
     "apps/server/src/agent/runtime/model.ts"
   ],
   "请输入消息、提及或添加附件": [
@@ -7000,6 +7027,9 @@
   "请选择 getConfig 返回的有效输出格式": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
+  "请选择所选模型 voices 中的有效声线": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
   "节点正在删除或已关闭，请稍后修改": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
@@ -7018,6 +7048,18 @@
   "音频语种": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
+  "声线": [
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+  ],
+  "音频声线": [
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+  ],
+  "语气": [
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+  ],
+  "音频语气": [
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+  ],
   "采样率": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
@@ -7034,6 +7076,9 @@
     "packages/nodes/audioGenerationNode/src/audioSettings.ts"
   ],
   "英文": [
+    "packages/nodes/audioGenerationNode/src/audioSettings.ts"
+  ],
+  "日文": [
     "packages/nodes/audioGenerationNode/src/audioSettings.ts"
   ],
   "选择音频": [
@@ -9474,6 +9519,9 @@
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "AI 请求失败": [
+    "packages/nodeScaffold/src/nodeAi.ts"
+  ],
+  "模型单轮响应超过 10 分钟，已停止": [
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "工具参数必须是对象": [

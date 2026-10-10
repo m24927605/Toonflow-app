@@ -41,7 +41,7 @@
               <el-option v-for="item in provider.models" :key="item.modelId" :label="item.label" :value="JSON.stringify([item.providerId, item.modelId])" />
             </el-option-group>
           </el-select>
-          <generationSettings v-model:language="data.language" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :disabled="busy || !selectedModel" />
+          <generationSettings v-model:language="data.language" v-model:voice="data.voice" v-model:emotion="data.emotion" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :voices="selectedModel?.voices ?? []" :disabled="busy || !selectedModel" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { translate } from "@toonflow/i18n/vue";
-import { computed, onMounted, onScopeDispose, ref } from "vue";
+import { computed, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElLoading, ElOption, ElOptionGroup, ElSelect } from "element-plus";
 import { IconArrowUp, IconGauge, IconMusicBolt, IconPlayerStop, IconScissors, IconTransfer } from "@tabler/icons-vue";
 import { getTargetValues, isTypeCompatible, nodeSkeleton, nodeTools, useNode, z, type NodeAudioRequest, type NodeHandle, type NodeInputValue, type NodeMediaModel } from "@toonflow/nodes-scaffold/runtime";
@@ -84,11 +84,14 @@ defineOptions({
 const vLoading = ElLoading.directive;
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({ label: "音频生成" });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; sampleRate: number; format: string });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; voice: string; emotion: string; sampleRate: number; format: string });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
 data.value.language ??= "zh-CN";
+// An empty voice leaves the choice to the provider's default.
+data.value.voice ??= "";
+data.value.emotion ??= "";
 data.value.sampleRate ??= 24000;
 data.value.format ??= "wav";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
@@ -108,6 +111,10 @@ const generationState = useNodeGeneration(outputs, () => generationController?.a
 const { generating } = generationState;
 const busy = computed(() => generating.value || uploading.value || deleting.value || !!actions.value?.processing);
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
+// A voice belongs to one model, so switching models drops a voice the new model does not offer.
+watch(selectedModel, choice => {
+  if (choice && data.value.voice && !choice.voices?.some(item => item.voice === data.value.voice)) data.value.voice = "";
+});
 const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() => [data.value.prompt.trim(), ...refList.value.flatMap((item, index) =>
   item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])].filter(Boolean).join("\n\n"));
@@ -165,6 +172,8 @@ async function startGeneration() {
     modelId: choice.modelId,
     prompt: generationPrompt.value,
     language: data.value.language,
+    voice: data.value.voice || undefined,
+    emotion: data.value.emotion.trim() || undefined,
     sampleRate: data.value.sampleRate,
     format: data.value.format,
     outputDirectory: `assets/${id}`,
@@ -226,7 +235,7 @@ nodeEvent.on("delete", async () => {
 
 function getConfig() {
   return {
-    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, sampleRate: data.value.sampleRate, format: data.value.format },
+    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, voice: data.value.voice, emotion: data.value.emotion, sampleRate: data.value.sampleRate, format: data.value.format },
     models: models.value,
     languages: languageOptions,
     sampleRates: sampleRateOptions,
@@ -237,7 +246,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此音频生成节点的配置、可选音频模型、语种、采样率、输出格式与输入数量限制，不含密钥；文本不限，图片与音频互斥且合计最多一个，具体模型能力由供应商校验",
+  description: "读取此音频生成节点的配置、可选音频模型（含各模型的 voices 声线）、语种、采样率、输出格式与输入数量限制，不含密钥；文本不限，图片与音频互斥且合计最多一个，具体模型能力由供应商校验",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -248,11 +257,13 @@ nodeTools.register({
 });
 nodeTools.register({
   name: "setConfig",
-  description: "修改音频生成模型、语种、采样率或格式；先用 getConfig 查询选项，providerId 与 modelId 必须同时提供；不修改提示词、不启动生成",
+  description: "修改音频生成模型、语种、声线、语气、采样率或格式；emotion 用文字描述情绪与语速（如“低沉缓慢”“愤怒大吼”），空字符串表示不指定；先用 getConfig 查询选项，providerId 与 modelId 必须同时提供；voice 取所选模型 voices 中的 voice，空字符串表示使用供应商默认声线；不修改提示词、不启动生成",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     language: z.string().optional(),
+    voice: z.string().optional(),
+    emotion: z.string().max(500).optional(),
     sampleRate: z.number().int().positive().optional(),
     format: z.string().optional(),
   }).refine(args => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
@@ -267,8 +278,11 @@ nodeTools.register({
     if (args.language !== undefined && !languageOptions.some(item => item.value === args.language)) throw new Error("请选择 getConfig 返回的有效语种");
     if (args.sampleRate !== undefined && !sampleRateOptions.includes(args.sampleRate)) throw new Error("请选择 getConfig 返回的有效采样率");
     if (args.format !== undefined && !formatOptions.includes(args.format)) throw new Error("请选择 getConfig 返回的有效输出格式");
+    if (args.voice && !choice.voices?.some(item => item.voice === args.voice)) throw new Error("请选择所选模型 voices 中的有效声线");
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     if (args.language !== undefined) data.value.language = args.language;
+    if (args.voice !== undefined) data.value.voice = args.voice;
+    if (args.emotion !== undefined) data.value.emotion = args.emotion;
     if (args.sampleRate !== undefined) data.value.sampleRate = args.sampleRate;
     if (args.format !== undefined) data.value.format = args.format;
     return getConfig();

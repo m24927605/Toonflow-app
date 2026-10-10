@@ -56,7 +56,7 @@ Toonflow is an open-source AI creation platform for short dramas, animated comic
 
 ### 3.1 Docker Installation
 
-Install Git, [Docker Engine](https://docs.docker.com/engine/install/), and Docker Compose first. On Windows and macOS, you can use Docker Desktop in Linux container mode. The repository includes a [Dockerfile](./Dockerfile), [Compose configuration](./compose.yaml), and [build exclusions](./.dockerignore). The image is built with Bun 1.3.14 and includes FFmpeg.
+Install Git, [Docker Engine](https://docs.docker.com/engine/install/), and Docker Compose first. On Windows and macOS, you can use Docker Desktop in Linux container mode. The repository includes a [Dockerfile](./Dockerfile), [Compose configuration](./compose.yaml), and [build exclusions](./.dockerignore). The image is built with Bun 1.4.2 and includes FFmpeg.
 
 <details>
 <summary><strong>Expand Docker installation steps</strong></summary>
@@ -100,7 +100,7 @@ docker compose start
 
 ### 3.2 Server Installation
 
-Use this option to run Web and Server directly on a Linux server. The example below uses Ubuntu / Debian and the project's pinned version, [Bun 1.3.14](https://bun.sh/docs/installation).
+Use this option to run Web and Server directly on a Linux server. The example below uses Ubuntu / Debian and the project's pinned version, [Bun 1.4.2](https://bun.sh/docs/installation).
 
 <details>
 <summary><strong>Expand server installation steps</strong></summary>
@@ -110,7 +110,7 @@ Install the runtime environment:
 ```sh
 sudo apt-get update
 sudo apt-get install -y git curl unzip ffmpeg
-curl -fsSL https://bun.com/install | bash -s "bun-v1.3.14"
+curl -fsSL https://bun.com/install | bash -s "bun-v1.4.2"
 export PATH="$HOME/.bun/bin:$PATH"
 bun --version
 ```
@@ -163,7 +163,7 @@ Credentials stay in your local data directory and are only sent to the provider 
 | Provider | How it connects |
 | --- | --- |
 | OpenAI | Images API with GPT Image 2.5 Sunburst (`gpt-image-2.5-sunburst`). The API key is sent only to `api.openai.com`. |
-| Higgsfield | Video generation with Seedance 2.0 and Seedance 2.5, plus Soul 2.0 and Soul Cinematic images with trained character identities (Soul ID), through the Higgsfield CLI on the computer running Toonflow. Install it with `npm install -g @higgsfield/cli`, then sign in once with `higgsfield auth login`. Jobs use the credits of your Higgsfield plan; Toonflow never reads the CLI credentials. |
+| Higgsfield | Video generation with Seedance 2.0 and Seedance 2.5 (2.5 can also extend a video), plus Soul 2.0 and Soul Cinematic images with trained character identities (Soul ID), through the Higgsfield CLI on the computer running Toonflow. Install it with `npm install -g @higgsfield/cli`, then sign in once with `higgsfield auth login`. Jobs use the credits of your Higgsfield plan; Toonflow never reads the CLI credentials. |
 | Google Gemini | Text-to-speech with Gemini 3.8 Flash TTS (30 preset voices). The API key is sent only to `generativelanguage.googleapis.com`. A style prompt or emotion controls tone and pace; the text is read verbatim. |
 | Metaso | API key. |
 

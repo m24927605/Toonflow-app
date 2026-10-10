@@ -36,7 +36,7 @@ export const videoGenerationSchema = z.strictObject({
   duration: z.number().finite().positive().max(3600).optional(),
   generateAudio: z.boolean().optional(),
   mode: z.union([
-    z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text"]),
+    z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text", "videoExtension"]),
     z.array(referenceMode).min(1).max(3),
   ]).optional(),
 });
@@ -48,6 +48,8 @@ export const audioGenerationSchema = z.strictObject({
   images: sharedFields.images,
   audios: z.array(audioReference).max(64).optional(),
   voice: z.string().trim().min(1).max(256).optional(),
+  // Free-text delivery such as "low and slow" or "furious shout"; providers that cannot act on it ignore it.
+  emotion: z.string().trim().min(1).max(500).optional(),
   speed: z.number().finite().positive().optional(),
   volume: z.number().finite().optional(),
   pitch: z.number().finite().optional(),

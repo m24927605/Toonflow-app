@@ -2,7 +2,7 @@ import { t } from "@/lib/i18n";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { realpath, stat, mkdir, readdir, lstat, rm, rmdir, readFile } from "@toonflow/file";
 import { z } from "zod";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionToolContext } from "@earendil-works/pi-coding-agent";
 import type { CanvasContext } from "@toonflow/tools-scaffold/runtime";
 import type { McpTool } from "@toonflow/mcp";
 import { createAgentTools } from "@/agent/tools";
@@ -137,7 +137,7 @@ export async function getMcpTools(): Promise<McpTool[]> {
       // has no Pi conversation, so session capabilities throw an explicit error.
       const context = new Proxy({ cwd: directory, mode: "rpc", hasUI: false, model: undefined, signal }, {
         get(value, key) { if (Reflect.has(value, key)) return Reflect.get(value, key); throw new Error(t`MCP 不提供内置 Agent 会话能力：${String(key)}`); },
-      }) as unknown as ExtensionContext;
+      }) as unknown as ExtensionToolContext;
       return current.execute(crypto.randomUUID(), args, signal, undefined, context);
     }));
   }
