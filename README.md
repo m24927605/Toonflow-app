@@ -370,8 +370,9 @@ Credentials stay in your local data directory and are only sent to the provider 
 | Provider | How it connects |
 | --- | --- |
 | OpenAI | Images API with GPT Image 2.5 Sunburst (`gpt-image-2.5-sunburst`). The API key is sent only to `api.openai.com`. |
-| Higgsfield | Video generation with Seedance 2.0 through the Higgsfield CLI on the computer running Toonflow. Install it with `npm install -g @higgsfield/cli`, then sign in once with `higgsfield auth login`. Jobs use the credits of your Higgsfield plan; Toonflow never reads the CLI credentials. |
-| APIMart, Metaso, CompShare | API key. |
+| Higgsfield | Video generation with Seedance 2.0 and Seedance 2.5 through the Higgsfield CLI on the computer running Toonflow. Install it with `npm install -g @higgsfield/cli`, then sign in once with `higgsfield auth login`. Jobs use the credits of your Higgsfield plan; Toonflow never reads the CLI credentials. |
+| Google Gemini | Text-to-speech with Gemini 3.8 Flash TTS (30 preset voices). The API key is sent only to `generativelanguage.googleapis.com`. A style prompt or emotion controls tone and pace; the text is read verbatim. |
+| Metaso | API key. |
 
 You can also add a custom media provider under Settings → Media models.
 

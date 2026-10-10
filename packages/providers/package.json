@@ -12,8 +12,7 @@
     "./language/deepSeek": "./src/language/deepSeek.ts",
     "./media/openai": "./src/media/openai.ts",
     "./media/higgsfield": "./src/media/higgsfield.ts",
-    "./media/apiMart": "./src/media/apiMart.ts",
-    "./media/metaso": "./src/media/metaso.ts",
-    "./media/compshare": "./src/media/compshare.ts"
+    "./media/gemini": "./src/media/gemini.ts",
+    "./media/metaso": "./src/media/metaso.ts"
   }
 }
