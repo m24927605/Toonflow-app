@@ -10,7 +10,7 @@
       playsinline
       preload="auto"
       draggable="false"
-      :aria-label="label"
+      :aria-label="translate(label)"
       @fullscreenchange="fullscreen = !!video?.matches(':fullscreen')"
       @loadedmetadata="readMetadata"
       @loadeddata="readPreview"
@@ -51,6 +51,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { inject, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import { ElButton, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage, ElPopover, ElSlider } from "element-plus";
@@ -230,8 +231,8 @@ async function captureFrame(command: "current" | "first" | "last") {
     context.drawImage(source, 0, 0);
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error("截图生成失败")), "image/png"));
     controller.signal.throwIfAborted();
-    const frameLabel = { current: "当前帧", first: "首帧", last: "尾帧" }[command];
-    const name = `${node.data.label || label} · ${frameLabel}`;
+    const frameLabel = { current: translate("当前帧"), first: translate("首帧"), last: translate("尾帧") }[command];
+    const name = `${translate(node.data.label || label)} · ${frameLabel}`;
     if (findNode(node.id) !== node) throw new Error("画布节点已变化，请重新截帧");
     workspace = files.getWorkspaceFiles();
     uploadStarted = true;

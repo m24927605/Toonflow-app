@@ -40,6 +40,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElSlider } from "element-plus";
 import {
@@ -71,7 +72,7 @@ const viewport = ref<HTMLDivElement>();
 const handles = ref<{ kind: AngleKind; style: { left: string; top: string } }[]>([]);
 const directionLabels = ref<{ text: string; style: { left: string; top: string } }[]>([]);
 const relativeAngle = computed(() => (((azimuth.value - referenceAzimuth) % 360) + 360) % 360);
-const directionLabel = computed(() => ["前方", "右侧", "后方", "左侧"][Math.round(relativeAngle.value / 90) % 4]);
+const directionLabel = computed(() => [translate("前方"), translate("右侧"), translate("后方"), translate("左侧")][Math.round(relativeAngle.value / 90) % 4]);
 const radius = 1.65;
 const arcX = -2;
 const scene = new Scene();
@@ -117,10 +118,10 @@ function render() {
     { kind: "elevation", style: project(new Vector3(arcX, radius * Math.sin(vertical), radius * Math.cos(vertical))) },
   ];
   directionLabels.value = [
-    { text: "前", style: project(new Vector3(0, 0, 2)) },
-    { text: "后", style: project(new Vector3(0, 0, -2)) },
-    { text: "上", style: project(new Vector3(arcX, 1.95, 0)) },
-    { text: "下", style: project(new Vector3(arcX, -1.95, 0)) },
+    { text: translate("前"), style: project(new Vector3(0, 0, 2)) },
+    { text: translate("后"), style: project(new Vector3(0, 0, -2)) },
+    { text: translate("上"), style: project(new Vector3(arcX, 1.95, 0)) },
+    { text: translate("下"), style: project(new Vector3(arcX, -1.95, 0)) },
   ];
   renderer.render(scene, camera);
 }

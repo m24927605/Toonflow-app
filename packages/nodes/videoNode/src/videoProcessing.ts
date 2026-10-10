@@ -1,4 +1,5 @@
-import type { BrowserFfmpegCommand, BrowserFfmpegFactory, FfprobeData } from "@toonflow/ffmpeg/browser";
+import type { BrowserFfmpegFactory } from "@toonflow/ffmpeg/browser";
+import { probeMedia, runCommand } from "@toonflow/node-shared/ffmpegCommand";
 
 export type VideoProcessingOptions = {
   action: "extractAudio" | "separate" | "trim";
@@ -13,32 +14,6 @@ function normalizePath(path: string) {
     throw new Error("视频处理必须使用工作区相对路径");
   }
   return path.split(/[\\/]+/).filter(part => part && part !== ".").join("/").toLowerCase();
-}
-
-function probeMedia(ffmpeg: BrowserFfmpegFactory, path: string, signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  const command = ffmpeg(path);
-  const cancel = () => command.kill();
-  signal?.addEventListener("abort", cancel, { once: true });
-  return new Promise<FfprobeData>((resolve, reject) => {
-    command.ffprobe((error, data) => {
-      if (signal?.aborted) reject(signal.reason);
-      else if (error) reject(error);
-      else resolve(data);
-    });
-  }).finally(() => signal?.removeEventListener("abort", cancel));
-}
-
-function runCommand(command: BrowserFfmpegCommand, signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  const cancel = () => command.kill();
-  signal?.addEventListener("abort", cancel, { once: true });
-  return new Promise<void>((resolve, reject) => {
-    command.on("start", () => { if (signal?.aborted) command.kill(); });
-    command.on("error", error => reject(signal?.aborted ? signal.reason : error));
-    command.on("end", () => signal?.aborted ? reject(signal.reason) : resolve());
-    command.run();
-  }).finally(() => signal?.removeEventListener("abort", cancel));
 }
 
 /** Directory creation, unique file names and failure cleanup are the caller's job; the original video is always kept. */

@@ -102,6 +102,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElButton, ElOption, ElSelect, ElSlider, ElSwitch } from "element-plus";
 import * as three from "three";
@@ -438,7 +439,7 @@ async function capture() {
           const output = document.createElement("canvas");
           output.width = width * (combined ? columns : 1);
           output.height = height * (combined ? count / columns : 1);
-          outputs.push({ canvas: output, label: combined ? `${count}宫格全景截图` : view.label });
+          outputs.push({ canvas: output, label: combined ? translate("{0}宫格全景截图", { 0: count }) : view.label });
         }
         const output = outputs[outputs.length - 1]!.canvas;
         const context = output.getContext("2d");

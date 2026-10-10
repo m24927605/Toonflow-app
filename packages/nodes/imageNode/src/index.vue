@@ -37,7 +37,7 @@
         :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy"
         alt="节点图片"
         @load="resizeImage"
-        @error="ElMessage.error('无法预览该图片')" />
+        @error="ElMessage.error(translate('无法预览该图片'))" />
       <input ref="fileInput" class="fileInput" type="file" accept="image/*" aria-label="选择图片" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy" @change="uploadImage" />
       <el-button
         v-if="!outputFile"
@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, ref } from "vue";
 import { IconPhoto, IconUpload, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";

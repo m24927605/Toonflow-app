@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow, type Node } from "@vue-flow/core";
 import { ElButton, ElDialog, ElMessage, ElProgress } from "element-plus";
@@ -339,7 +340,7 @@ async function process() {
       type: output.type,
       position: { x, y: y + index * 320 },
       data: {
-        label: `${node.data.label || "视频"} · ${output.audio ? "音轨" : operation === "separate" ? "静音视频" : `${clipStart.toFixed(2)}–${clipEnd.toFixed(2)} 秒`}`,
+        label: `${translate(node.data.label || "视频")} · ${output.audio ? translate("音轨") : operation === "separate" ? translate("静音视频") : translate("{0}–{1} 秒", { 0: clipStart.toFixed(2), 1: clipEnd.toFixed(2) })}`,
         outputs: { [output.audio ? "audio" : "video"]: { dataType: output.audio ? "AUDIO" : "VIDEO", value: { url: output.path, mimeType: output.audio ? "audio/mp4" : "video/mp4" } } },
       },
     }));

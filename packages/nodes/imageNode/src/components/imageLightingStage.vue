@@ -31,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as three from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -178,13 +179,13 @@ function render() {
       imageMaterial.emissiveIntensity += transmission * 0.14;
       frameMaterial.emissive.copy(lamp.color).multiplyScalar(transmission * 0.3);
     }
-    return [{ kind, label: isRim ? "轮廓" : "主光", azimuth: Math.round(azimuth), elevation: Math.round(elevation), style: { ...project(bulb.position), "--lightColor": color } }];
+    return [{ kind, label: isRim ? translate("轮廓") : translate("主光"), azimuth: Math.round(azimuth), elevation: Math.round(elevation), style: { ...project(bulb.position), "--lightColor": color } }];
   });
   directionLabels.value = [
-    { text: "相机侧 · 0°", style: project(new three.Vector3(0, -0.15, radius + 0.25)) },
-    { text: "背侧 · 180°", style: project(new three.Vector3(0, -0.15, -radius - 0.25)) },
-    { text: "原图左 · −90°", style: project(new three.Vector3(-radius - 0.25, -0.15, 0)) },
-    { text: "原图右 · 90°", style: project(new three.Vector3(radius + 0.25, -0.15, 0)) },
+    { text: translate("相机侧 · 0°"), style: project(new three.Vector3(0, -0.15, radius + 0.25)) },
+    { text: translate("背侧 · 180°"), style: project(new three.Vector3(0, -0.15, -radius - 0.25)) },
+    { text: translate("原图左 · −90°"), style: project(new three.Vector3(-radius - 0.25, -0.15, 0)) },
+    { text: translate("原图右 · 90°"), style: project(new three.Vector3(radius + 0.25, -0.15, 0)) },
   ];
   renderer.render(scene, camera);
 }

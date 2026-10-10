@@ -1,4 +1,5 @@
-import type { BrowserFfmpegCommand, BrowserFfmpegFactory, FfprobeData } from "@toonflow/ffmpeg/browser";
+import type { BrowserFfmpegFactory } from "@toonflow/ffmpeg/browser";
+import { probeMedia, runCommand } from "@toonflow/node-shared/ffmpegCommand";
 
 export type AudioSegment = { start: number; end: number };
 export type AudioProcessingOptions = { outputPath: string } & (
@@ -14,32 +15,6 @@ function normalizePath(path: string) {
   return normalized;
 }
 
-function probeAudio(ffmpeg: BrowserFfmpegFactory, path: string, signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  const command = ffmpeg(path);
-  const cancel = () => command.kill();
-  signal?.addEventListener("abort", cancel, { once: true });
-  return new Promise<FfprobeData>((resolve, reject) => {
-    command.ffprobe((error, data) => {
-      if (signal?.aborted) reject(signal.reason);
-      else if (error) reject(error);
-      else resolve(data);
-    });
-  }).finally(() => signal?.removeEventListener("abort", cancel));
-}
-
-function runCommand(command: BrowserFfmpegCommand, signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  const cancel = () => command.kill();
-  signal?.addEventListener("abort", cancel, { once: true });
-  return new Promise<void>((resolve, reject) => {
-    command.on("start", () => { if (signal?.aborted) command.kill(); });
-    command.on("error", error => reject(signal?.aborted ? signal.reason : error));
-    command.on("end", () => signal?.aborted ? reject(signal.reason) : resolve());
-    command.run();
-  }).finally(() => signal?.removeEventListener("abort", cancel));
-}
-
 /** Caller owns the output directory, unique file names and failure cleanup; output never overwrites the original audio. */
 export async function processAudio(ffmpeg: BrowserFfmpegFactory, source: string, options: AudioProcessingOptions, signal?: AbortSignal) {
   signal?.throwIfAborted();
@@ -48,7 +23,7 @@ export async function processAudio(ffmpeg: BrowserFfmpegFactory, source: string,
   if (options.action === "speed" && (!Number.isFinite(options.speed) || options.speed < 0.1 || options.speed > 4)) {
     throw new Error("音频速度须在 0.1 至 4 倍之间");
   }
-  const media = await probeAudio(ffmpeg, source, signal);
+  const media = await probeMedia(ffmpeg, source, signal);
   const audio = media.streams.find(stream => stream.codec_type === "audio");
   if (!audio) throw new Error("文件不包含音轨");
   const duration = Math.max(...[audio.duration, media.format.duration].map(Number).filter(value => Number.isFinite(value) && value > 0));
@@ -75,7 +50,7 @@ export async function processAudio(ffmpeg: BrowserFfmpegFactory, source: string,
     command.complexFilter(filters).outputOptions("-map", "[result]");
   }
   await runCommand(command, signal);
-  const result = await probeAudio(ffmpeg, options.outputPath, signal);
+  const result = await probeMedia(ffmpeg, options.outputPath, signal);
   const resultDuration = Number(result.format.duration);
   if (!Number.isFinite(resultDuration) || resultDuration <= 0 || !result.streams.some(stream => stream.codec_type === "audio")) {
     throw new Error("生成的音频文件无效");

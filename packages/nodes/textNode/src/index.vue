@@ -49,6 +49,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { ElAlert, ElButton, ElCard, ElSelect, ElDialog, ElOption, ElOptionGroup, ElMessage, ElMessageBox } from "element-plus";
 import { IconEdit, IconFileText, IconSparkles, IconArrowUp } from "@tabler/icons-vue";
@@ -174,7 +175,7 @@ async function loadText(fromDisk = false) {
     documentState.error = "";
   } catch (error) {
     documentState.error = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-      || (error instanceof Error ? error.message : "文本加载失败");
+      || (error instanceof Error ? error.message : translate("文本加载失败"));
     ElMessage.error(documentState.error);
   } finally { textReloading.value = false; }
 }

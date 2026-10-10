@@ -28,6 +28,7 @@
   "dependencies": {
     "@toonflow/file": "workspace:*",
     "@toonflow/ffmpeg": "workspace:*",
+    "@toonflow/i18n": "workspace:*",
     "@earendil-works/pi-agent-core": "0.85.1",
     "@earendil-works/pi-ai": "0.85.1",
     "@tabler/icons-vue": "^3.46.0",

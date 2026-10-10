@@ -31,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import { ElButton, ElCard, ElDialog, ElInputNumber, ElMessage, ElSlider } from "element-plus";
@@ -108,7 +109,7 @@ async function process() {
   const options: AudioProcessingOptions = mode.value === "speed"
     ? { action: "speed", outputPath, speed: speed.value }
     : { action: "clip", outputPath, segments: segments.value.map(segment => ({ ...segment })) };
-  const label = options.action === "speed" ? `${options.speed.toFixed(2)}×` : "拼接";
+  const label = options.action === "speed" ? `${options.speed.toFixed(2)}×` : translate("拼接");
   const current = controller = new AbortController();
   processing.value = true;
   cancelling.value = false;
@@ -137,7 +138,7 @@ async function process() {
     await batchHistory(async () => {
       current.signal.throwIfAborted();
       if (findNode(node.id) !== node || !nodeTypes?.value?.["remote-audioNode"]) throw new Error("画布节点已变化，请重新处理");
-      addNodes([{ id, type: "remote-audioNode", position: { x, y }, data: { label: `${node.data.label || "音频"} · ${label}`, outputs: { audio: { dataType: "AUDIO", value: { url: outputPath, mimeType: "audio/mp4" } } } } }]);
+      addNodes([{ id, type: "remote-audioNode", position: { x, y }, data: { label: `${translate(node.data.label || "音频")} · ${label}`, outputs: { audio: { dataType: "AUDIO", value: { url: outputPath, mimeType: "audio/mp4" } } } } }]);
       committed = true;
     });
     mode.value = undefined;

@@ -33,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as three from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -154,10 +155,10 @@ function render() {
   grid.scale.set(distance + 0.6, 1, distance + 0.6);
   handleStyle.value = project(targetCamera.position);
   directionLabels.value = [
-    { text: "原始机位 · 0°", style: project(new three.Vector3(0, -0.3, 4.8)) },
-    { text: "后方 · 180°", style: project(new three.Vector3(0, -0.3, -distance - 0.25)) },
-    { text: "原图左 · −90°", style: project(new three.Vector3(-distance - 0.25, -0.3, 0)) },
-    { text: "原图右 · 90°", style: project(new three.Vector3(distance + 0.25, -0.3, 0)) },
+    { text: translate("原始机位 · 0°"), style: project(new three.Vector3(0, -0.3, 4.8)) },
+    { text: translate("后方 · 180°"), style: project(new three.Vector3(0, -0.3, -distance - 0.25)) },
+    { text: translate("原图左 · −90°"), style: project(new three.Vector3(-distance - 0.25, -0.3, 0)) },
+    { text: translate("原图右 · 90°"), style: project(new three.Vector3(distance + 0.25, -0.3, 0)) },
   ];
   // ACT: A single image only represents a reference plane, so the back is a solid color to avoid misleading mirroring;
   // new views of the subject are still filled in by the generation model.

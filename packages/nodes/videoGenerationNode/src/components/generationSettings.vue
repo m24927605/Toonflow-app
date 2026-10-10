@@ -3,14 +3,14 @@
     <template #reference>
       <el-button class="settingsButton" text size="small" :disabled="disabled" aria-label="视频生成设置">
         <span class="ratioShape" :style="ratioStyle(ratio)" aria-hidden="true" />
-        <span>{{ [ratio, resolution, duration ? `${duration}秒` : ''].filter(Boolean).join(' · ') }}</span>
+        <span>{{ [ratio, resolution, duration ? translate('{0}秒', { 0: duration }) : ''].filter(Boolean).join(' · ') }}</span>
         <icon-chevron-up :size="14" aria-hidden="true" />
       </el-button>
     </template>
     <div class="generationSettings nodrag nopan nowheel" @pointerdown.stop @mousedown.stop @dblclick.stop @keydown.stop @wheel.stop>
       <div v-if="modes.length" class="sectionLabel">生成模式</div>
       <el-select v-if="modes.length" v-model="mode" :disabled="disabled" :teleported="false" aria-label="视频生成模式">
-        <el-option v-for="item in modes" :key="item.value" :value="item.value" :label="item.label" />
+        <el-option v-for="item in modes" :key="item.value" :value="item.value" :label="translate(item.label)" />
       </el-select>
       <div v-if="durations.length || resolutions.length" class="outputOptions">
         <div v-if="durations.length" class="outputField">
@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed } from "vue";
 import { ElButton, ElPopover, ElSelect, ElOption, ElSwitch } from "element-plus";
 import { IconChevronUp } from "@tabler/icons-vue";

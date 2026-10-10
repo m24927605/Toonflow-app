@@ -485,11 +485,21 @@ const apiKey = computed(() => String(config.value.apiKey ?? ""));
 
 `config` is a read-only computed that contains only the configuration of the current node type; global settings are not exposed. The host provides reactive reads through Vue `provide("nodeConfig", (nodeType: string) => config)`, and the scaffold passes the full type of the current node (for example `remote-exampleNode`). After the user saves, existing nodes receive the new configuration. Unsaved fields use the `value` defaults declared in `configRules`, and `{}` is returned when the host does not provide this capability.
 
+## Internationalization
+
+Write node text in Chinese, as in the Web app. Node builds run the `@toonflow/i18n/vite` transform, which turns template text, display attributes, `ElMessage`, `showNodeError` and `new Error` messages into translation calls; `@toonflow/i18n/vue` stays external and resolves to the host's `toonflowNodeHost.i18n`, so nodes reuse the app dictionaries and follow language changes without a reload.
+
+- Default titles from `useNode({ label })`, port `label`s and the plugin `displayName` stay as source text and are translated by the skeleton, the add-node menu and the Plugins panel when shown.
+- Text the transform does not reach — template event handlers, labels kept in static arrays, 3D overlay text, titles of nodes created by an action — calls `translate()` from `@toonflow/i18n/vue` explicitly at the display boundary. Declare `@toonflow/i18n` in the node's `devDependencies` when importing it.
+- Agent tool descriptions and prompts sent to models are not translated.
+- After changing text, run `bun run --cwd packages/i18n extract` and add the new keys to `en.json` and `zhTw.json`.
+
 ## Dependency and style boundaries
 
 - `vue` and `@vue-flow/core` are peer dependencies of nodes; the UMD directly uses `window.toonflowNodeHost.vue` and `.vueFlow` provided by the host. Nodes do not create a Vue app, and `useVueFlow()` inherits the canvas the node is on.
 - `element-plus` is likewise declared as a peer dependency and reuses `window.toonflowNodeHost.elementPlus`. Import components on demand from the root entry, for example `import { ElButton } from "element-plus"`, and use `<el-button>` in templates; do not import `element-plus/es/...` or its CSS. The host loads Element Plus components and styles centrally, and node output does not bundle them again.
 - The `three` core reuses `window.toonflowNodeHost.three` through external, and the host provides the full API. Nodes keep declaring the same `three` version as the host (currently `0.184.0`) and use `import { WebGLRenderer, Vector3 } from "three"` as usual, without accessing the global object directly. Extensions from `three/addons/*` and `three/examples/jsm/*` are still bundled into the node on demand, and their internal `three` references also reuse the host core; do not deep-import the core from `three/src/*`. Node UMDs and the host must use matching versions.
+- `@toonflow/i18n/vue` reuses `window.toonflowNodeHost.i18n` in the same way, so the dictionaries are not bundled into each node.
 - The Pi SDK used by text AI likewise reuses `window.toonflowNodeHost.ai`, including `runAgentLoop` and `createAssistantMessageEventStream`, through the existing external mechanism. It is not bundled into each node UMD again, and no runtime or service is added. Node UMDs, the host, and the backend must use matching versions.
 - When third-party libraries reference `@vue/runtime-core` or `@vue/runtime-dom` directly, they also use the host's Vue exports. Each node's Vue/VueFlow version must be compatible with the host; do not bring in libraries that embed their own copy of Vue, and do not import Vue's `dist` output directly.
 - Other dependencies are bundled independently with each node. Different nodes may use different UI frameworks and third-party library versions, and the same library may appear in several UMDs.

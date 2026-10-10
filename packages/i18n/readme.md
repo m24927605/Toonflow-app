@@ -12,7 +12,7 @@ Flag artwork comes from the ready-made 4:3 SVGs of [flag-icons 7.3.2](https://gi
 
 Element Plus uses the complete language JSON files in `src/elementPlus/` (one per supported locale), wired into the global ConfigProvider through `@toonflow/i18n/elementPlus`; pagination, dates, upload, filters and accessibility hints update immediately with the language. Date formats and weekday names use the Day.js locales registered by Web. TDesign uses its built-in language packs, and the chat component text is supplied by the app dictionary.
 
-Static Web text and explicit display attributes are transformed by `@toonflow/i18n/vite` before Vue compilation, so business source code keeps being written in Chinese. The transform only applies to `apps/web/src`; the compiler only handles known display positions, does not walk the DOM, does not call online translation, does not disable Vue static optimization, and does not remount pages to switch languages.
+Static Web text and explicit display attributes are transformed by `@toonflow/i18n/vite` before Vue compilation, so business source code keeps being written in Chinese. The transform applies to `apps/web/src` and to the canvas node sources (`packages/nodes/*/src`, `packages/nodeShared/src`, `packages/nodeScaffold/src`); the compiler only handles known display positions, does not walk the DOM, does not call online translation, does not disable Vue static optimization, and does not remount pages to switch languages.
 
 Dynamic text can use native JavaScript tagged templates, with no Babel macros needed:
 
@@ -36,7 +36,7 @@ The backend uses the request context in `apps/server/src/lib/i18n.ts`. `success/
 
 The language is resolved per request from `Accept-Language` (including q weights) and isolated per request; when no supported request language is present, the saved app language or the system language is used. Zod uses a language dispatcher that is registered once and reads the language per request. SSE, MCP and FFmpeg only handle recognized system errors; model output, successful tool results, unknown provider errors, user content and log details stay unchanged.
 
-Providers, the tools and nodes subpackages, and the node scaffold are not internationalized and do not take part in text extraction. Plugin names and plugins' own text keep their original values; the plugin management menus, install actions and configuration validation messages in Web are still part of the app UI. No language runtime interface is provided between node builds and the host.
+Canvas nodes share the host's language runtime: node builds keep `@toonflow/i18n/vue` external and read it from `toonflowNodeHost.i18n`, so they reuse the app dictionaries and switch languages together with the page instead of bundling their own copy. Default node titles, port labels and plugin display names stay as Chinese source text in node data and plugin metadata and are translated where they are shown; a third-party node whose text is not in the dictionaries shows its original text. Providers, tools, document extensions and skills are not internationalized and do not take part in text extraction; the plugin management menus, install actions and configuration validation messages in Web are still part of the app UI.
 
 ## Updating text
 
@@ -54,4 +54,4 @@ When proofreading, follow the source index to the button events, state branches 
 
 Display code that is not covered should call `translate/t` explicitly at the display boundary; do not widen the rules to every `message`, `label` or Chinese string. User data such as `data`, `inputs` and `outputs` is outside the scope of automatic translation. Existing logic that locates elements with `[aria-label="<Chinese text>"]` should switch to stable `data-*` identifiers.
 
-Dictionaries are bundled with the app, and the runtime does not depend on a translation service. The translated dictionaries have been through an AI-assisted, entry-by-entry semantic review of the full set, with terms, negative conditions, action targets, numbers and template parameters re-checked; this is not equivalent to publication-grade review by native speakers of each language. Providers, the tools and nodes subpackages, third-party websites and the installer are outside the translation scope.
+Dictionaries are bundled with the app, and the runtime does not depend on a translation service. The translated dictionaries have been through an AI-assisted, entry-by-entry semantic review of the full set, with terms, negative conditions, action targets, numbers and template parameters re-checked; this is not equivalent to publication-grade review by native speakers of each language. Providers, tools, document extensions, third-party websites and the installer are outside the translation scope.

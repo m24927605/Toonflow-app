@@ -1,3 +1,5 @@
+import { translate } from "@toonflow/i18n/vue";
+
 export type PanoramaMode = "sphere" | "cylinder";
 export type PanoramaCapture = {
   images: { blob: Blob; width: number; height: number; label: string }[];
@@ -12,7 +14,7 @@ export function getPanoramaViews(mode: PanoramaMode, count: 1 | 4 | 12, yaw: num
     const columns = count === 12 && mode === "cylinder" ? 12 : 4;
     const viewYaw = ((startYaw + (count === 1 ? 0 : index % columns * 360 / columns)) % 360 + 360) % 360;
     const viewPitch = count === 1 ? startPitch : count === 12 && mode === "sphere" ? 45 - Math.floor(index / 4) * 45 : 0;
-    return { yaw: viewYaw, pitch: viewPitch, label: `水平 ${Math.round(viewYaw)}°${mode === "sphere" ? ` · 俯仰 ${viewPitch}°` : ""}` };
+    return { yaw: viewYaw, pitch: viewPitch, label: mode === "sphere" ? translate("水平 {0}° · 俯仰 {1}°", { 0: Math.round(viewYaw), 1: viewPitch }) : translate("水平 {0}°", { 0: Math.round(viewYaw) }) };
   });
 }
 

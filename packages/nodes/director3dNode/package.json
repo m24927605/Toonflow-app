@@ -20,6 +20,7 @@
     "vue-draggable-plus": "^0.6.1"
   },
   "devDependencies": {
+    "@toonflow/i18n": "workspace:*",
     "@toonflow/node-shared": "workspace:*",
     "@toonflow/nodes-scaffold": "workspace:*",
     "@types/three": "0.184.0",

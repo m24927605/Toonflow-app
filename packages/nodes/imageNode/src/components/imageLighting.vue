@@ -24,7 +24,7 @@
             @selectLight="selectLight"
             @aspectRatio="sourceRatio = $event" />
           <div class="directionButtons" role="group" :aria-label="`${activeLightLabel}方向`">
-            <button v-for="direction in directions" :key="direction.label" type="button" :disabled="busy" :aria-pressed="activeAzimuth === direction.azimuth && activeElevation === direction.elevation" @click="setDirection(direction)">{{ direction.label }}</button>
+            <button v-for="direction in directions" :key="direction.label" type="button" :disabled="busy" :aria-pressed="activeAzimuth === direction.azimuth && activeElevation === direction.elevation" @click="setDirection(direction)">{{ translate(direction.label) }}</button>
           </div>
         </div>
         <div class="parameterColumn">
@@ -45,7 +45,7 @@
       <div class="presetSection">
         <span class="sectionLabel">光影预设</span>
         <div class="presetGrid" role="group" aria-label="光影预设">
-          <button v-for="preset in lightingPresets" :key="preset.id" type="button" :class="{ active: settings.preset === preset.id }" :disabled="busy" :aria-pressed="settings.preset === preset.id" @click="selectPreset(preset)">{{ preset.label }}</button>
+          <button v-for="preset in lightingPresets" :key="preset.id" type="button" :class="{ active: settings.preset === preset.id }" :disabled="busy" :aria-pressed="settings.preset === preset.id" @click="selectPreset(preset)">{{ translate(preset.label) }}</button>
         </div>
       </div>
       <div class="smartSection">
@@ -58,6 +58,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, ref, watch } from "vue";
 import { useNode } from "@vue-flow/core";
 import { ElButton, ElInput, ElSwitch } from "element-plus";

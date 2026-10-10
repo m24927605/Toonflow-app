@@ -4,6 +4,7 @@ import { ElMessage } from "element-plus";
 import { uploadNodeFile, useNodeFiles } from "@toonflow/nodes-scaffold/runtime";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import type { PanoramaCapture } from "./imagePanorama";
+import { translate } from "@toonflow/i18n/vue";
 
 export function usePanoramaCapture(source: () => string) {
   const { node } = useNode();
@@ -48,7 +49,7 @@ export function usePanoramaCapture(source: () => string) {
         controller.signal.throwIfAborted();
         createdNodes.push({
           id, type: "remote-imageNode", position: { x: 0, y: 0 },
-          data: { label: `${node.data.label || "图片"} · ${image.label}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } },
+          data: { label: `${translate(node.data.label || "图片")} · ${image.label}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } },
         });
       }
       if (findNode(node.id) !== node || !nodeTypes?.value?.["remote-imageNode"] || (grouped && !nodeTypes?.value?.canvasGroup)) {
@@ -81,7 +82,7 @@ export function usePanoramaCapture(source: () => string) {
       const nodes: Node[] = groupId ? [{
         id: groupId, type: "canvasGroup", position: { x, y },
         style: { width: `${width}px`, height: `${height}px` }, connectable: false, expandParent: false,
-        data: { label: `${node.data.label || "图片"} · 全景 ${payload.count} 宫格` },
+        data: { label: `${translate(node.data.label || "图片")} · ${translate("全景 {0} 宫格", { 0: payload.count })}` },
       }, ...createdNodes] : createdNodes;
       await batchHistory(async () => {
         controller.signal.throwIfAborted();

@@ -1,4 +1,5 @@
 import { z } from "@toonflow/nodes-scaffold/runtime";
+import { translate } from "@toonflow/i18n/vue";
 
 export const multiAnglePresets = [
   { id: "front", label: "正面", settings: { azimuth: 0, elevation: 0 } },
@@ -33,7 +34,7 @@ export function readMultiAngleSettings(value: unknown): MultiAngleSettings {
 }
 
 export function getMultiAngleShot(distance: number) {
-  return distance <= 3.5 ? "近景" : distance >= 7 ? "远景" : "中景";
+  return distance <= 3.5 ? translate("近景") : distance >= 7 ? translate("远景") : translate("中景");
 }
 
 export function getMultiAngleCameraPosition(value: Pick<MultiAngleSettings, "azimuth" | "elevation" | "distance">) {

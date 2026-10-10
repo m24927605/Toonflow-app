@@ -114,7 +114,7 @@
             </div>
           </el-popover>
           <el-button :icon="IconPlus" :disabled="!ready" aria-label="添加关键帧" @click="addAnchor">添加关键帧</el-button>
-          <el-button :icon="IconMovie" :disabled="!ready || !result || exportingVideo" :loading="exportingVideo" aria-label="导出视频节点" @click="emit('exportVideo', sceneAspect)">
+          <el-button :icon="IconMovie" :disabled="!ready || !result || exportingVideo" :loading="exportingVideo" aria-label="导出视频节点" data-tour="exportVideo" @click="emit('exportVideo', sceneAspect)">
             {{ exportingVideo ? `导出视频 ${exportProgress ?? 0}%` : '导出视频节点' }}
           </el-button>
         </div>

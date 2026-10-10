@@ -1,6 +1,6 @@
 <template>
   <div class="audioPlayer" @keydown.stop>
-    <audio ref="audio" :src="src" preload="auto" :aria-label="label" @loadedmetadata="readMetadata" @durationchange="readDuration" @timeupdate="readTime" @play="startProgress(); emit('play')" @pause="stopProgress" @ended="stopProgress" @volumechange="readVolume" @error="mediaError" />
+    <audio ref="audio" :src="src" preload="auto" :aria-label="translate(label)" @loadedmetadata="readMetadata" @durationchange="readDuration" @timeupdate="readTime" @play="startProgress(); emit('play')" @pause="stopProgress" @ended="stopProgress" @volumechange="readVolume" @error="mediaError" />
     <div class="waveformPanel" :class="{ unavailable: !duration || failed }">
       <div class="waveformTrack">
         <slot name="track" :duration="duration" :currentTime="currentTime" :peaks="peaks">
@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { ElButton, ElMessage } from "element-plus";
 import { IconPlayerPlay, IconPlayerPause, IconVolume, IconVolumeOff } from "@tabler/icons-vue";

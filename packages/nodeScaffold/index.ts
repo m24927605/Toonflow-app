@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { i18nPlugin } from "@toonflow/i18n/vite";
 import type { Rule } from "@form-create/element-ui";
 import { z } from "zod";
 import postcssConfig from "../../postcss.config.ts";
@@ -59,6 +60,7 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
     root,
     css: { postcss: postcssConfig },
     plugins: [
+      i18nPlugin(),
       vue(),
       {
         name: "syncNodeFile",
@@ -109,7 +111,7 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
         fileName: () => fileName,
       },
       rolldownOptions: {
-        external: ["vue", "@vue/runtime-core", "@vue/runtime-dom", "@vue-flow/core", "element-plus", "three", "@earendil-works/pi-agent-core", "@earendil-works/pi-ai", ...Object.keys(tiptapGlobals)],
+        external: ["vue", "@vue/runtime-core", "@vue/runtime-dom", "@vue-flow/core", "element-plus", "three", "@earendil-works/pi-agent-core", "@earendil-works/pi-ai", "@toonflow/i18n/vue", ...Object.keys(tiptapGlobals)],
         output: {
           exports: "default",
           globals: {
@@ -122,6 +124,8 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
             three: "toonflowNodeHost.three",
             "@earendil-works/pi-agent-core": "toonflowNodeHost.ai",
             "@earendil-works/pi-ai": "toonflowNodeHost.ai",
+            // The host shares its dictionaries and reactive language, so switching languages updates nodes too.
+            "@toonflow/i18n/vue": "toonflowNodeHost.i18n",
           },
         },
       },

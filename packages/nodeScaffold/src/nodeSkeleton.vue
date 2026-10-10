@@ -99,10 +99,10 @@
         v-else
         class="labelText"
         tabindex="0"
-        :title="`${label}（双击编辑名称）`"
+        :title="`${displayLabel}（双击编辑名称）`"
         @dblclick.stop="editLabel"
         @keydown.enter.stop.prevent="editLabel">
-        {{ label }}
+        {{ displayLabel }}
       </span>
       <div class="nodeActions nodrag nopan" @pointerdown.stop @mousedown.stop @dblclick.stop>
         <el-button
@@ -147,8 +147,8 @@
           :isValidConnection="validateConnection"
           :data-connection-status="getHandleStatus(item)"
           :style="{ top: `${((index + 1) / (group.items.length + 1)) * 100}%` }"
-          :title="`${item.label ?? item.id} · ${Array.isArray(item.dataType) ? item.dataType.join(' / ') : item.dataType}`"
-          :aria-label="`${item.label ?? item.id} · ${Array.isArray(item.dataType) ? item.dataType.join(' / ') : item.dataType}`"
+          :title="`${handleLabel(item)} · ${Array.isArray(item.dataType) ? item.dataType.join(' / ') : item.dataType}`"
+          :aria-label="`${handleLabel(item)} · ${Array.isArray(item.dataType) ? item.dataType.join(' / ') : item.dataType}`"
           @pointermove="moveHandle"
           @pointerleave="resetHandle"
           @pointercancel="resetHandle">
@@ -178,6 +178,7 @@ import {
   IconLoader2,
 } from "@tabler/icons-vue";
 import { ElCard, ElButton, ElDivider, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 import type { DropdownInstance } from "element-plus";
 import { validateConnection } from "./connection";
 import { useNodeEvent } from "./nodeEvent";
@@ -218,6 +219,10 @@ const handleGroups = computed(() => [
   { type: "target" as const, position: Position.Left, items: props.handles.filter((item) => item.type === "target") },
   { type: "source" as const, position: Position.Right, items: props.handles.filter((item) => item.type === "source") },
 ]);
+// ACT: Default titles and port labels keep their Chinese source text in node data and are translated when shown;
+// a title the user typed is only affected if it happens to equal a dictionary entry.
+const displayLabel = computed(() => translate(props.label));
+const handleLabel = (handle: NodeHandle) => handle.label ? translate(handle.label) : handle.id;
 const cardHeight = computed(() => Math.max(100, ...handleGroups.value.map((group) => (group.items.length + 1) * 44)));
 const { id: nodeId, node } = useNode();
 const documentContext = inject<NodeDocumentContext | undefined>("nodeDocument", undefined);
@@ -421,12 +426,12 @@ const assetOutputs = computed(() =>
   props.handles.flatMap((handle) => {
     const output = props.outputs[handle.id];
     if (handle.type !== "source" || !output || (output.dataType === "STRING" && !output.value.trim())) return [];
-    return [{ label: handle.label ?? handle.id, output }];
+    return [{ label: handleLabel(handle), output }];
   })
 );
 
 async function handleCommand(command: string) {
-  if (command === "saveAsset") saveNodeToAssets?.(props.label, assetOutputs.value);
+  if (command === "saveAsset") saveNodeToAssets?.(displayLabel.value, assetOutputs.value);
   if (command === "clipboard" && copyNodeToClipboard && !copyingToClipboard.value) {
     copyingToClipboard.value = true;
     try {
@@ -472,7 +477,7 @@ async function handleCommand(command: string) {
       zIndex: node.zIndex,
       type: node.type,
       position: copyPosition,
-      data: { ...data, label: `${props.label} - 副本` },
+      data: { ...data, label: `${displayLabel.value} - ${translate("副本")}` },
       parentNode: node.parentNode,
     });
     await nextTick();
@@ -482,7 +487,7 @@ async function handleCommand(command: string) {
 }
 
 async function editLabel() {
-  labelDraft.value = props.label;
+  labelDraft.value = displayLabel.value;
   editingLabel.value = true;
   await nextTick();
   labelInput.value?.select();
@@ -491,7 +496,7 @@ async function editLabel() {
 function saveLabel() {
   if (!editingLabel.value) return;
   const label = labelDraft.value.trim();
-  if (label) node.data.label = label;
+  if (label && label !== displayLabel.value) node.data.label = label;
   editingLabel.value = false;
 }
 

@@ -1,6 +1,7 @@
 import { inject, nextTick } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import type { ImageInpaint } from "./imageInpaint";
+import { translate } from "@toonflow/i18n/vue";
 
 export function useImageVariationNode() {
   const { id, node } = useNode();
@@ -28,7 +29,7 @@ export function useImageVariationNode() {
     await batchHistory(async () => {
       signal?.throwIfAborted();
       try {
-        addNodes({ id: nodeId, type, position: { x, y }, data: { label: `${node.data.label || "图片"} · ${label}`, model, size, ratio, prompt, promptModel: prompt.split("\n").map(text => [{ type: "Write", text }]), ...(input.inpaint ? { inpaint: input.inpaint } : {}) } });
+        addNodes({ id: nodeId, type, position: { x, y }, data: { label: `${translate(node.data.label || "图片")} · ${translate(label)}`, model, size, ratio, prompt, promptModel: prompt.split("\n").map(text => [{ type: "Write", text }]), ...(input.inpaint ? { inpaint: input.inpaint } : {}) } });
         addEdges({ id: edgeId, source: id, sourceHandle: "image", target: nodeId, targetHandle: "in" });
       } catch (error) {
         removeNodes(nodeId, true, false);

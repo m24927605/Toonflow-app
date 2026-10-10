@@ -4,6 +4,7 @@ import { parse } from "@babel/parser";
 import type { Node } from "@babel/types";
 import { parse as parseSfc } from "@vue/compiler-sfc";
 import { collectMessages } from "./transform";
+import { translatedSource } from "./vite";
 import { escapeMessageText } from "./index";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -21,7 +22,7 @@ async function scan(directory: string) {
     if (item.isDirectory()) { if (!["node_modules", "installer", "locales", "dist"].includes(item.name)) await scan(path); continue; }
     if (!/\.(ts|vue)$/.test(item.name) || /(?:\.d\.ts|providerPrompt|systemPrompt)\./i.test(item.name) || /packages[\\/]ffmpeg[\\/]src[\\/]browser\.ts$/.test(path)) continue;
     const source = await readFile(path, "utf8");
-    if (/apps[\\/]web/.test(path)) {
+    if (translatedSource.test(path.replaceAll("\\", "/"))) {
       for (const message of collectMessages(source, path)) add(message, path);
     }
     const scripts = item.name.endsWith(".vue")
@@ -30,6 +31,8 @@ async function scan(directory: string) {
     for (const script of scripts) {
       const ast = parse(script, { sourceType: "module", plugins: ["typescript"] });
       const backend = /(?:apps[\\/](?:server|desktop)|packages[\\/](?:mcp|ffmpeg))/.test(path);
+      // Node titles, port labels and plugin names are stored as source text and translated where they are shown.
+      const nodePackage = /packages[\\/](?:nodes|nodeShared|nodeScaffold)[\\/]/.test(path);
       const visit = (node: Node, parents: Node[] = []) => {
         const owner = [...parents].reverse().find(parent => parent.type === "VariableDeclarator" || parent.type === "ObjectProperty");
         const name = owner?.type === "VariableDeclarator" && owner.id.type === "Identifier" ? owner.id.name
@@ -39,6 +42,7 @@ async function scan(directory: string) {
           add(node.quasi.quasis.map((part, index) => (node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw) + (index < node.quasi.expressions.length ? `{${index}}` : "")).join(""), path);
         }
         if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "translateMessage"].includes(node.callee.name) && node.arguments[0]?.type === "StringLiteral") add(node.arguments[0].value, path);
+        if (nodePackage && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["label", "displayName"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
         // ACT: The server only extracts a candidate dictionary here without changing business strings;
         // actual translation happens only at explicit system-text outputs.
         if (!protectedMessage && backend && node.type === "StringLiteral" && node.value.length < 1200 && !node.value.includes("```")) {
@@ -55,7 +59,7 @@ async function scan(directory: string) {
     }
   }
 }
-for (const path of ["apps/web/src", "apps/server/src", "apps/desktop/src", "packages/mcp/src", "packages/ffmpeg/src"]) await scan(resolve(root, path));
+for (const path of ["apps/web/src", "apps/server/src", "apps/desktop/src", "packages/mcp/src", "packages/ffmpeg/src", "packages/nodes", "packages/nodeShared/src", "packages/nodeScaffold/src"]) await scan(resolve(root, path));
 const messages = Object.fromEntries([...catalog].sort(([left], [right]) => left.localeCompare(right, "zh-CN")).map(([message]) => [message, message]));
 await mkdir(resolve(import.meta.dirname, "locales"), { recursive: true });
 await writeAtomic(resolve(import.meta.dirname, "locales/zhCn.json"), JSON.stringify(messages, null, 2) + "\n");

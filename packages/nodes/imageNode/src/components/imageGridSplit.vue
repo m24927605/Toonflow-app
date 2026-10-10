@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow, type Node } from "@vue-flow/core";
 import { ElButton, ElInputNumber, ElMessage, ElPopover } from "element-plus";
@@ -151,7 +152,7 @@ async function splitImage() {
           id,
           type: "remote-imageNode",
           position: { x: 0, y: 0 },
-          data: { label: `${node.data.label || "图片"} · ${row + 1}-${column + 1}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } },
+          data: { label: `${translate(node.data.label || "图片")} · ${row + 1}-${column + 1}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } },
         });
         completed.value++;
       }

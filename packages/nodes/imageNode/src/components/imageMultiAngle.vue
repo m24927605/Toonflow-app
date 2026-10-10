@@ -11,11 +11,11 @@
       <div class="angleWorkspace">
         <div class="presetColumn" role="group" aria-label="常用视角">
           <span>常用视角</span>
-          <button v-for="preset in multiAnglePresets" :key="preset.id" type="button" :aria-pressed="activePreset?.id === preset.id" :disabled="busy" @click="selectPreset(preset)">{{ preset.label }}</button>
+          <button v-for="preset in multiAnglePresets" :key="preset.id" type="button" :aria-pressed="activePreset?.id === preset.id" :disabled="busy" @click="selectPreset(preset)">{{ translate(preset.label) }}</button>
         </div>
         <div class="stageColumn">
           <div class="stageHeader">
-            <span>{{ activePreset?.label ?? '自定义' }}</span>
+            <span>{{ activePreset ? translate(activePreset.label) : '自定义' }}</span>
             <div class="viewSwitch" role="group" aria-label="预览模式">
               <button type="button" :aria-pressed="settings.viewMode === 'orbit'" :disabled="busy" @click="settings.viewMode = 'orbit'">空间总览</button>
               <button type="button" :aria-pressed="settings.viewMode === 'camera'" :disabled="busy" @click="settings.viewMode = 'camera'">参考平面</button>
@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, ref } from "vue";
 import { useNode } from "@vue-flow/core";
 import { ElButton } from "element-plus";

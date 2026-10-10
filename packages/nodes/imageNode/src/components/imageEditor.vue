@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import { ElButton, ElMessage } from "element-plus";
@@ -328,7 +329,7 @@ async function saveMark() {
     }
     await batchHistory(async () => {
       controller.signal.throwIfAborted();
-      addNodes([{ id, type: "remote-imageNode", position: { x, y }, data: { label: `${node.data.label || "图片"} - 标记`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } } }]);
+      addNodes([{ id, type: "remote-imageNode", position: { x, y }, data: { label: `${translate(node.data.label || "图片")} - ${translate("标记")}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } } }]);
       addEdges([{ id: crypto.randomUUID(), source: node.id, sourceHandle: "image", target: id, targetHandle: "in" }]);
       committed = true;
     });

@@ -68,7 +68,7 @@
           <el-dropdown-item v-if="!directNodes" command="actions" :icon="IconChevronLeft">返回操作菜单</el-dropdown-item>
           <el-dropdown-item v-else disabled>添加节点</el-dropdown-item>
           <el-dropdown-item v-for="node in filteredNodes" :key="node.type" :command="node.type" :icon="node.icon">
-            {{ node.label }}
+            {{ translate(node.label) }}
           </el-dropdown-item>
           <el-dropdown-item v-if="(pendingHandle || pendingGroup.length) && !filteredNodes.length" disabled>没有可连接的节点</el-dropdown-item>
         </template>
@@ -82,6 +82,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef, type Component } 
 import { useVueFlow, type ConnectingHandle, type GraphNode, type HandleType } from "@vue-flow/core";
 import { isTypeCompatible, useNodeEvent, validateConnection, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { ElMessage } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 import type { DropdownInstance } from "element-plus";
 import selectionHandle from "./selectionHandle.vue";
 import { getSelectionConnections } from "../selectionConnections";

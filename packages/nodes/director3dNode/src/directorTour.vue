@@ -6,13 +6,14 @@
       :target="() => root?.querySelector<HTMLElement>(step.target) ?? null"
       :title="step.title"
       :description="step.description"
-      :prevButtonProps="{ children: '上一步' }"
-      :nextButtonProps="{ children: index === steps.length - 1 ? '开始使用' : '下一步' }" />
+      :prevButtonProps="{ children: translate('上一步') }"
+      :nextButtonProps="{ children: index === steps.length - 1 ? translate('开始使用') : translate('下一步') }" />
     <template #indicators="{ current, total }">{{ current + 1 }} / {{ total }}</template>
   </el-tour>
 </template>
 
 <script setup lang="ts">
+import { translate } from "@toonflow/i18n/vue";
 import { ref } from "vue";
 import { ElTour, ElTourStep } from "element-plus";
 
@@ -46,7 +47,7 @@ const steps = [
     description: "用播放按钮和进度条检查动画；在这里调整画面比例、网格、天空与光照，让预演画面更符合你的想法。",
   },
   {
-    target: '[aria-label="导出视频节点"]',
+    target: '[data-tour="exportVideo"]',
     title: "导出到画布",
     description: "选中方案后，点击这里导出视频节点。关键帧缩略图上的导出按钮可以生成图片节点。视频导出期间请保持窗口可见，完成后回到画布查看结果。",
   },

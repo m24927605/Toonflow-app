@@ -325,6 +325,7 @@
         "@tabler/icons-vue": "^3.46.0",
         "@toonflow/ffmpeg": "workspace:*",
         "@toonflow/file": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
         "@vitejs/plugin-vue": "^6.0.8",
         "eventsource-parser": "3.1.1",
         "vite": "^8.2.2",
@@ -351,6 +352,7 @@
         "x-sender": "1.4.6",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "typescript": "~6.0.3",
         "vite": "^8.2.2",
@@ -383,6 +385,7 @@
         "@tabler/icons-vue": "^3.46.0",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-audio": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
@@ -404,6 +407,7 @@
       },
       "devDependencies": {
         "@toonflow/ffmpeg": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "typescript": "~6.0.3",
@@ -426,9 +430,31 @@
         "vue-draggable-plus": "^0.6.1",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "@types/three": "0.184.0",
+        "typescript": "~6.0.3",
+        "vite": "^8.2.2",
+        "vue-tsc": "^3.3.11",
+      },
+      "peerDependencies": {
+        "@vue-flow/core": "^1.48.2",
+        "element-plus": "^2.14.5",
+        "vue": "^3.5.42",
+      },
+    },
+    "packages/nodes/dubbingNode": {
+      "name": "@toonflow/node-dubbing",
+      "version": "2.0.0",
+      "dependencies": {
+        "@tabler/icons-vue": "^3.46.0",
+      },
+      "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
+        "@toonflow/node-video": "workspace:*",
+        "@toonflow/nodes-scaffold": "workspace:*",
         "typescript": "~6.0.3",
         "vite": "^8.2.2",
         "vue-tsc": "^3.3.11",
@@ -446,6 +472,7 @@
         "@tabler/icons-vue": "^3.46.0",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-image": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
@@ -467,6 +494,7 @@
         "three": "0.184.0",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "@types/three": "0.184.0",
@@ -487,6 +515,7 @@
         "@tabler/icons-vue": "^3.46.0",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "typescript": "~6.0.3",
@@ -521,6 +550,7 @@
         "@tabler/icons-vue": "^3.46.0",
       },
       "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/node-video": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
@@ -542,6 +572,7 @@
       },
       "devDependencies": {
         "@toonflow/ffmpeg": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
         "@toonflow/node-shared": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "typescript": "~6.0.3",
@@ -1330,6 +1361,8 @@
     "@toonflow/node-audio-generation": ["@toonflow/node-audio-generation@workspace:packages/nodes/audioGenerationNode"],
 
     "@toonflow/node-director3d": ["@toonflow/node-director3d@workspace:packages/nodes/director3dNode"],
+
+    "@toonflow/node-dubbing": ["@toonflow/node-dubbing@workspace:packages/nodes/dubbingNode"],
 
     "@toonflow/node-image": ["@toonflow/node-image@workspace:packages/nodes/imageNode"],
 
@@ -2730,6 +2763,8 @@
     "@toonflow/node-audio-generation/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@toonflow/node-director3d/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+
+    "@toonflow/node-dubbing/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@toonflow/node-image/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
