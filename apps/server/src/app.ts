@@ -108,8 +108,5 @@ export async function createApp({
     const body = errorFromCause(err);
     response.status(body.code).json(body);
   });
-
-  const { initializeMobileLinkRuntime } = await import("@/utils/mobileLink");
-  initializeMobileLinkRuntime(app);
   return app;
 }

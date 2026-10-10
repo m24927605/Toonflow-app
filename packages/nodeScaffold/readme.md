@@ -447,7 +447,7 @@ export default createNodeConfig({
 }, import.meta.url);
 ```
 
-`name` is the node's unique identifier and determines the file name and the VueFlow registration name; `displayName` is the name shown in Settings → Plugins. `author` and `github` may be left empty; only the fields that are filled in are shown.
+`name` is the node's unique identifier and determines the file name and the VueFlow registration name; `displayName` is the name shown in Settings → Plugins. `author` may be left empty and `github` may be omitted; only the fields that are filled in are shown.
 
 The version is maintained in each node subpackage's `package.json.version`, for example `"version": "2.0.0"`. Change this field when releasing a new version; there is no need to repeat it in the Vite config. The build requires a non-empty version string and watches `package.json` for changes.
 

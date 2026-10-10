@@ -55,5 +55,3 @@ When proofreading, follow the source index to the button events, state branches 
 Display code that is not covered should call `translate/t` explicitly at the display boundary; do not widen the rules to every `message`, `label` or Chinese string. User data such as `data`, `inputs` and `outputs` is outside the scope of automatic translation. Existing logic that locates elements with `[aria-label="<Chinese text>"]` should switch to stable `data-*` identifiers.
 
 Dictionaries are bundled with the app, and the runtime does not depend on a translation service. The translated dictionaries have been through an AI-assisted, entry-by-entry semantic review of the full set, with terms, negative conditions, action targets, numbers and template parameters re-checked; this is not equivalent to publication-grade review by native speakers of each language. Providers, the tools and nodes subpackages, third-party websites and the installer are outside the translation scope.
-
-See the [regression record](./regression.md) for the verification history.

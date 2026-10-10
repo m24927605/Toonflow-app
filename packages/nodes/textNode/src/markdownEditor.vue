@@ -21,8 +21,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { Editor, EditorContent } from "@tiptap/vue-3";
-import type { MarkdownProps } from "./markdownContent";
-import markdownExtensions, { parseMarkdownContent, serializeMarkdown } from "./markdownExtensions";
+import type { MarkdownProps } from "@toonflow/node-shared/markdownContent";
+import markdownExtensions, { parseMarkdownContent, serializeMarkdown } from "@toonflow/node-shared/markdownExtensions";
 
 const props = withDefaults(defineProps<MarkdownProps>(), { active: true });
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();

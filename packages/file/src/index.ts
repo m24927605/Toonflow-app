@@ -22,8 +22,6 @@ export const existsSync = native.existsSync;
 export const statSync = native.statSync;
 export const lstatSync = native.lstatSync;
 export const realpathSync = native.realpathSync;
-export const accessSync = native.accessSync;
-export const chmodSync = native.chmodSync;
 export const mkdtempSync = native.mkdtempSync;
 
 export const readFile: typeof promises.readFile = ((path: native.PathLike | promises.FileHandle, options: any) =>
@@ -34,9 +32,6 @@ export const readdir: typeof promises.readdir = ((path: native.PathLike, options
 export const writeFile: typeof promises.writeFile = ((path: native.PathLike | promises.FileHandle, data: any, options: any) =>
   typeof path === "object" && "fd" in path ? promises.writeFile(path, data, options)
     : withFileAccess([path as native.PathLike], "write", () => promises.writeFile(path, data, options), options?.signal)) as typeof promises.writeFile;
-export const appendFile: typeof promises.appendFile = ((path: native.PathLike | promises.FileHandle, data: any, options: any) =>
-  typeof path === "object" && "fd" in path ? promises.appendFile(path, data, options)
-    : withFileAccess([path as native.PathLike], "write", () => promises.appendFile(path, data, options), options?.signal)) as typeof promises.appendFile;
 export const rename: typeof promises.rename = (source, target) =>
   withFileAccess([source, target], "write", () => stubborn.retry.rename(retryOptions)(source, target));
 export const unlink: typeof promises.unlink = path => withFileAccess([path], "write", () => promises.unlink(path));
@@ -159,10 +154,7 @@ export async function writeAtomic(path: string, content: string | Uint8Array, op
           console.warn(`临时文件关闭失败：${temporary}`, error);
         });
       }
-      if (options.exclusive) {
-        if (process.platform === "android") require("./android.ts").renameExclusive(temporary, path);
-        else await promises.link(temporary, path);
-      }
+      if (options.exclusive) await promises.link(temporary, path);
       else await stubborn.retry.rename(retryOptions)(temporary, path);
     } finally {
       if (created) await promises.unlink(temporary).catch((error: NodeJS.ErrnoException) => {
@@ -191,10 +183,7 @@ export function writeAtomicSync(path: string, content: string | Uint8Array, opti
           console.warn(`临时文件关闭失败：${temporary}`, error);
         }
       }
-      if (options.exclusive) {
-        if (process.platform === "android") require("./android.ts").renameExclusive(temporary, path);
-        else native.linkSync(temporary, path);
-      }
+      if (options.exclusive) native.linkSync(temporary, path);
       else stubborn.retry.renameSync(retryOptions)(temporary, path);
     } finally {
       try { if (created) native.unlinkSync(temporary); }

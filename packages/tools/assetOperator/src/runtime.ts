@@ -47,4 +47,3 @@ export const assetRequestSchema = requestSchema.superRefine((request, context) =
   }
 });
 
-export type AssetRequest = z.infer<typeof assetRequestSchema>;

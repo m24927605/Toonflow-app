@@ -110,70 +110,17 @@
             </el-popover>
           </span>
         </el-tooltip>
-        <el-tooltip :showArrow="false" content="帮助" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]" :disabled="helpVisible">
-          <span class="toolTrigger">
-            <el-popover v-model:visible="helpVisible" trigger="click" placement="top-end" :width="196">
-              <template #reference>
-                <el-button class="toolButton" text aria-label="帮助">
-                  <icon-help :size="17" />
-                </el-button>
-              </template>
-              <div class="helpMenu">
-                <el-button
-                  class="helpAction"
-                  tag="a"
-                  text
-                  :icon="IconBook"
-                  href="https://qcn7xdsqgc4z.feishu.cn/docx/RXFqdgR2Xo0dXZxGfd0cZCGgnwf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  @click="helpVisible = false">
-                  使用教程
-                </el-button>
-                <el-button
-                  class="helpAction"
-                  tag="a"
-                  text
-                  :icon="IconBug"
-                  href="https://docs.qq.com/smartsheet/form/EmvmQBrmlPmr%2Fss_vsqk2v%2FvhiGzE?tab=ss_vsqk2v"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Toonflow 需求/BUG反馈表"
-                  @click="helpVisible = false">
-                  汇报 BUG
-                </el-button>
-                <el-button class="helpAction" text :icon="IconBrandWechat" @click="showContact('community')">加入交流群</el-button>
-                <el-button class="helpAction" text :icon="IconBriefcase" @click="showContact('business')">商务合作</el-button>
-              </div>
-            </el-popover>
-          </span>
-        </el-tooltip>
       </div>
     </elCard>
   </panel>
-  <el-dialog v-model="contactVisible" :title="contactInfo.title" width="min(360px, calc(100vw - 32px))" alignCenter appendToBody>
-    <div class="contactContent">
-      <q-r-code
-        :value="contactInfo.url"
-        :size="192"
-        type="svg"
-        color="#000000"
-        bgColor="#ffffff"
-        borderless
-        role="img"
-        :aria-label="`${contactInfo.title}二维码`" />
-      <p class="contactTip">{{ contactInfo.tip }}</p>
-    </div>
-  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Panel, useVueFlow, type XYPosition } from "@vue-flow/core";
 import { MiniMap } from "@vue-flow/minimap";
-import { IconMap, IconMagnet, IconFocusCentered, IconHelp, IconBook, IconBug, IconBrandWechat, IconBriefcase } from "@tabler/icons-vue";
+import { IconMap, IconMagnet, IconFocusCentered } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
-import { QRCode } from "tdesign-vue-next";
 import { arrangeCanvas } from "../arrangeCanvas";
 
 const props = defineProps<{
@@ -186,22 +133,6 @@ const showEdges = defineModel<boolean>("showEdges", { required: true });
 const assetsVisible = defineModel<boolean>("assetsVisible", { default: false });
 const showMap = ref(false);
 const zoomMenuVisible = ref(false);
-const helpVisible = ref(false);
-const contactVisible = ref(false);
-const contactType = ref<"community" | "business">("community");
-const contacts = {
-  community: {
-    title: "加入交流群",
-    url: "https://work.weixin.qq.com/u/vc36adcc89845edcbe?v=5.0.3.63936&bb=85b8d228e8",
-    tip: "Toonflow 是为爱发电的开源项目。欢迎文明交流、友善反馈；回复可能需要一些时间，请避免责问或命令式沟通，感谢你的理解与尊重。",
-  },
-  business: {
-    title: "商务合作",
-    url: "https://work.weixin.qq.com/u/vc0f54596c5837d05a?v=5.0.8.70675",
-    tip: "此联系方式仅用于商务合作接洽，不提供问题答疑。使用问题欢迎在交流群交流，需求与 BUG 可通过反馈表提交。感谢理解。",
-  },
-};
-const contactInfo = computed(() => contacts[contactType.value]);
 const flow = useVueFlow();
 const { viewport, zoomTo, zoomIn, zoomOut, fitView, getNodes, updateNode } = flow;
 const zoomPercent = computed(() => Math.round(viewport.value.zoom * 100));
@@ -231,12 +162,6 @@ watch(
   { flush: "sync" }
 );
 onBeforeUnmount(() => arrangeController?.abort());
-
-function showContact(type: "community" | "business") {
-  contactType.value = type;
-  helpVisible.value = false;
-  contactVisible.value = true;
-}
 
 function applyZoom(value: number | undefined) {
   if (value !== undefined && Number.isFinite(value)) void zoomTo(value / 100);
@@ -311,31 +236,6 @@ async function undoArrange() {
   .zoomAction {
     justify-content: flex-start;
     margin-left: 0;
-  }
-}
-
-.helpMenu {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  .helpAction {
-    justify-content: flex-start;
-    margin-left: 0;
-  }
-}
-
-.contactContent {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-
-  .contactTip {
-    margin: 0;
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
-    line-height: 1.7;
   }
 }
 </style>

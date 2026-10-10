@@ -68,9 +68,6 @@ export const canvasSchemas = {
 };
 
 export type CanvasOperationName = keyof typeof canvasSchemas;
-export type CanvasRequest = {
-  [Name in CanvasOperationName]: { name: Name; args: z.output<(typeof canvasSchemas)[Name]> };
-}[CanvasOperationName];
 
 export const canvasOperations = [
   { name: "getCanvas", label: "画布概览", description: "读取激活画布的 ID、节点数、连线数、选中数量和视口，不返回全部节点、连线或函数。include 按需选择 canvases（画布列表）或 nodeTypes（availableNodeTypes），二者共用 cursor/limit 分页。已知节点 ID 时可直接读取节点。所有读取工具每次最多 64 KiB，返回 hasMore/nextCursor；继续分页须保留原参数，仅替换 cursor。cursor 失效时重新查询。canvasId 可选，用于校验目标仍是当前激活画布。不要直接修改画布 JSON。", parameters: canvasSchemas.getCanvas },

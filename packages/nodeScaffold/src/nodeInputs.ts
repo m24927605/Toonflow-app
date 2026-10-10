@@ -66,6 +66,3 @@ export function useNodeInputs(canvas = useVueFlow()) {
     getSourceValue: (sourceId: string, sourceHandleId: string) => getSourceValue(sourceId, sourceHandleId, nodeLookup.value),
   };
 }
-
-/** @deprecated Use useNodeInputs; kept as a compatibility entry for published node sources. */
-export const useNodeTools = useNodeInputs;

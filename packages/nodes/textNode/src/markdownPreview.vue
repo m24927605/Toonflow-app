@@ -7,7 +7,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
-import { loadMarkdownImage, markdownDom, resolveMarkdownPath, type MarkdownProps } from "./markdownContent";
+import { loadMarkdownImage, markdownDom, resolveMarkdownPath, type MarkdownProps } from "@toonflow/node-shared/markdownContent";
 
 const props = withDefaults(defineProps<MarkdownProps>(), { active: true });
 const content = ref<HTMLElement>();

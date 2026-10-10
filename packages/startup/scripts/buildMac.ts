@@ -2,14 +2,13 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFi
 import { write } from "@toonflow/file/bun";
 import { join, resolve } from "node:path";
 
-const arch = process.argv[2] ?? process.arch;
-if (process.platform !== "darwin" || !["x64", "arm64"].includes(arch) || process.argv.length > 3) {
-  throw new Error("请在 macOS 执行：bun packages/startup/scripts/buildMac.ts [x64|arm64]，需要 Xcode Command Line Tools。");
+if (process.platform !== "darwin" || process.arch !== "arm64" || process.argv.length > 2) {
+  throw new Error("请在 Apple Silicon macOS 执行：bun packages/startup/scripts/buildMac.ts，需要 Xcode Command Line Tools。");
 }
 const packageDir = resolve(import.meta.dir, "..");
 const workDir = resolve(packageDir, "../../build/startupNative");
-const targetDir = join(workDir, arch);
-const outputDir = join(packageDir, "assets", arch === "arm64" ? "macArm64" : "macX64");
+const targetDir = join(workDir, "arm64");
+const outputDir = join(packageDir, "assets", "macArm64");
 const sourceDir = join(workDir, "thorvg-1.1.1");
 const archivePath = join(workDir, "thorvg.tar.xz");
 const sourceHash = "5ca6143088f18b5dbe42552c939594100da6226d79de503d1a171184d6aa310d";
@@ -40,7 +39,7 @@ const exportsPath = join(targetDir, "exports.txt");
 const exports = readFileSync(join(packageDir, "assets/exports.def"), "utf8").split(/\r?\n/)
   .map((line) => line.trim()).filter((line) => line.startsWith("tvg_")).map((name) => `_${name}`);
 writeFileSync(exportsPath, exports.join("\n") + "\n");
-const targetFlags = ["-arch", arch === "arm64" ? "arm64" : "x86_64", `-mmacosx-version-min=${arch === "arm64" ? "11.0" : "10.15"}`];
+const targetFlags = ["-arch", "arm64", "-mmacosx-version-min=11.0"];
 await run(["xcrun", "clang++", ...targetFlags, "-dynamiclib", "-Os", "-flto", "-std=c++14", "-fno-exceptions", "-fno-rtti", "-fvisibility=hidden",
   ...includeDirs.flatMap((directory) => ["-I", directory]), ...sourceFiles,
   "-Wl,-dead_strip", "-Wl,-install_name,@rpath/libthorvg.dylib", "-Xlinker", "-exported_symbols_list", "-Xlinker", exportsPath,

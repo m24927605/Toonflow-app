@@ -41,7 +41,7 @@ function getRegistry(flow: ReturnType<typeof useVueFlow>) {
       if (!node.size) index.nodes.delete(entry.nodeId);
     };
     for (const entry of registry.values()) add(entry);
-    // ACT: Old UMDs still write to the original Map; keep the index in sync on the shared Map
+    // ACT: Every node bundle writes to the shared Map; keep the index in sync on set/delete/clear
     // to avoid scanning all node functions on each read.
     Object.defineProperties(registry, {
       set: { value(this: Map<string, RegisteredNodeTool>, key: string, entry: RegisteredNodeTool) {

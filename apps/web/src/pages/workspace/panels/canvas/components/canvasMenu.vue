@@ -263,8 +263,6 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
     checkCanvasDirectory(directory, signal);
     if (data?.toonflowCanvas !== true || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !data.viewport
       || ![data.viewport.x, data.viewport.y, data.viewport.zoom].every(Number.isFinite) || data.viewport.zoom <= 0) throw new Error("画布文件格式无效");
-    // Old canvases may have saved transient export progress whose task no longer exists on reopen.
-    for (const node of data.nodes) if (node.type === "remote-videoNode" && node.data) delete node.data.exportProgress;
     nextCanvas.flow = { nodes: data.nodes, edges: data.edges, viewport: data.viewport };
   }
   await props.flushSave();
@@ -273,8 +271,7 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
   // Temporarily clear the file name while applying canvas data so initialization doesn't trigger auto-save.
   activeCanvasId.value = "";
   setNodes(nextCanvas.flow.nodes);
-  // Hit width is configured canvas-wide; ignore overrides from old files.
-  setEdges(nextCanvas.flow.edges.map(({ interactionWidth, ...edge }) => edge));
+  setEdges(nextCanvas.flow.edges);
   await setViewport(nextCanvas.flow.viewport);
   await nextTick();
   checkCanvasDirectory(directory);

@@ -17,7 +17,6 @@
         </el-form-item>
         <el-form-item label="模型类型">
           <el-select v-model="draft.type" aria-label="模型类型">
-            <el-option v-if="model?.type === 'text'" value="text" label="文本（旧配置）" disabled />
             <el-option v-for="item in modelTypes" :key="item.value" :value="item.value" :label="item.label" />
           </el-select>
         </el-form-item>
@@ -142,7 +141,7 @@ watch(visible, (isVisible) => {
   draft.value = createDraft();
   formError.value = "";
   original = JSON.parse(JSON.stringify(model ?? {}));
-  // ACT: Keep legacy text models' extra fields as-is; dedicated config for them is no longer offered.
+  // Fields without a dedicated form control stay editable as JSON in the extra options.
   const { id, label, type, ...extra } = original;
   Object.assign(draft.value, { id: id ?? "", label: label ?? "", type: type ?? "image" });
   if (draft.value.type === "image" || draft.value.type === "video") {

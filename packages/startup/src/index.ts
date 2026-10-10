@@ -55,7 +55,7 @@ export async function showNativeSplash(assetDir: string, onClose: () => void) {
       close,
     };
   }
-  if (process.platform === "darwin" && (process.arch === "x64" || process.arch === "arm64")) {
+  if (process.platform === "darwin" && process.arch === "arm64") {
     const { showMacSplash } = await import("./macSplash");
     return showMacSplash(assetDir, onClose);
   }

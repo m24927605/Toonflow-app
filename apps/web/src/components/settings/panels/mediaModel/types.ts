@@ -1,7 +1,7 @@
 export type MediaProviderModel = {
   id: string;
   label: string;
-  type: "text" | "image" | "video" | "audio";
+  type: "image" | "video" | "audio";
   [key: string]: unknown;
 };
 

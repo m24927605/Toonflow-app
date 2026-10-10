@@ -7,14 +7,12 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { createGunzip } from "node:zlib";
-import { builds, downloadSources } from "./catalog";
+import { builds, downloadUrl } from "./catalog";
 
 export { createFfmpeg } from "./runtime";
 export { executeRemoteFfmpeg } from "./remote";
 export type { BrowserFfmpegRequest } from "./browserTypes";
 export type * from "./types";
-export { downloadSources };
-export type SourceId = typeof downloadSources[number]["id"];
 export type FfmpegMode = "auto" | "download" | "system";
 export type DownloadState = {
   phase: "idle" | "downloading" | "verifying" | "installing" | "completed" | "error" | "cancelled";
@@ -68,9 +66,7 @@ async function checkDirectory(path: string) {
   return stat !== null;
 }
 
-export async function installFfmpeg(directory: string, sourceId: SourceId, signal: AbortSignal, report: (state: DownloadState) => void) {
-  const source = downloadSources.find(item => item.id === sourceId);
-  if (!source?.available) throw new Error("此下载源暂不可用，请选择其他下载源");
+export async function installFfmpeg(directory: string, signal: AbortSignal, report: (state: DownloadState) => void) {
   if (!build) throw messageError(msg`暂不支持自动下载 ${target} 版本`);
   signal = AbortSignal.any([signal, AbortSignal.timeout(15 * 60 * 1000)]);
   signal.throwIfAborted();
@@ -90,7 +86,7 @@ export async function installFfmpeg(directory: string, sourceId: SourceId, signa
       signal.throwIfAborted();
       const asset = build[name];
       report({ phase: "downloading", file: name, received: 0 });
-      const response = await fetch(`${source.urlPrefix}${asset.fileName}`, { signal });
+      const response = await fetch(`${downloadUrl}${asset.fileName}`, { signal });
       if (!response.ok || !response.body) throw messageError(msg`${name} 下载失败（HTTP ${response.status}）`);
       const total = Number(response.headers.get("content-length")) || undefined;
       let received = 0;
@@ -106,7 +102,7 @@ export async function installFfmpeg(directory: string, sourceId: SourceId, signa
         },
       }), createWriteStream(compressed, { flags: "wx", signal }), { signal });
       report({ phase: "verifying", file: name, received, total });
-      if (hash.digest("hex") !== asset.sha256) throw messageError(msg`${name} 文件校验失败，请换源重试`);
+      if (hash.digest("hex") !== asset.sha256) throw messageError(msg`${name} 文件校验失败，请重试`);
       const binary = join(staged, executableName(name));
       let extracted = 0;
       await pipeline(createReadStream(compressed, { signal }), createGunzip(), new Transform({

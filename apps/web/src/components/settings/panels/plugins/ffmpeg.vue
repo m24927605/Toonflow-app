@@ -12,37 +12,14 @@
       </div>
       <p class="introduction">Agent和部分节点插件、工具插件、供应商在处理音视频时可能需要 FFmpeg，按需安装即可。</p>
       <el-alert v-if="statusError" :title="statusError" type="error" :closable="false" showIcon />
-      <div class="downloadHeader">
-        <span>下载线路</span>
-        <el-text v-if="status" type="info" >{{ availableSourceCount }} 条可用线路</el-text>
-      </div>
       <div class="downloadActions">
-        <el-select
-          :modelValue="config.source"
-          :disabled="!status || loading || saving || busy || submitting"
-          
-          filterable
-          placeholder="选择下载线路"
-          aria-label="FFmpeg 下载源"
-          @change="(source) => updateConfig({ source })">
-          <el-option-group v-for="group in sourceGroups" :key="group.label" :label="group.label">
-            <el-option v-for="source in group.sources" :key="source.id" class="sourceOption" :label="source.label" :value="source.id">
-              <span class="sourceLabel" :title="source.label">{{ source.label }}</span>
-              <span class="sourceDescription" :title="source.description">{{ source.description }}</span>
-            </el-option>
-          </el-option-group>
-        </el-select>
         <el-button  type="primary" :icon="IconDownload" :loading="submitting || busy" :disabled="!canDownload" @click="submitDownload('download')">
           {{ busy ? phaseLabels[download.phase] : download.phase === 'error' ? '重试安装' : downloaded || download.phase === 'completed' ? '重新安装' : '下载并安装' }}
         </el-button>
         <el-button v-if="busy && download.phase !== 'installing'"  :disabled="submitting" @click="submitDownload('cancel')">取消</el-button>
       </div>
-      <div v-if="selectedSource" class="sourceHint">
-        <span>下载较慢时，可取消后切换线路。</span>
-        <el-link :href="selectedSource.homepage" target="_blank" rel="noopener noreferrer" :underline="false" type="primary">来源网站<icon-external-link :size="12" aria-hidden="true" /></el-link>
-      </div>
       <p class="description">{{ ready ? '已检测到可用版本，无需重复安装。' : '下载后自动完成安装，无需手动解压或配置。' }}</p>
-      <el-alert v-if="status && !status.supported" :title="isMobile && !isRemoteMobile ? 'Android 暂不提供 FFmpeg 下载，未配置 FFmpeg 时无法执行依赖它的音视频处理。' : '当前平台暂不提供下载，请在高级设置中使用系统安装版。'" type="warning" :closable="false" showIcon />
+      <el-alert v-if="status && !status.supported" title="当前平台暂不提供下载，请在高级设置中使用系统安装版。" type="warning" :closable="false" showIcon />
       <el-alert v-if="config.mode === 'system'" title="当前仅使用系统安装版。如需使用下载的版本，请在高级设置中切换运行方式。" type="info" :closable="false" showIcon />
       <div v-if="download.phase !== 'idle'" class="downloadProgress" aria-live="polite">
         <div class="progressHeader">
@@ -94,16 +71,14 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
-import { isMobile, isRemoteMobile } from "@/lib/mobile";
 import { IconDownload, IconRefresh } from "@tabler/icons-vue";
 import { saveSettings, settings } from "@/stores/settings";
 
-type FfmpegConfig = { mode: "auto" | "download" | "system"; source: string };
+type FfmpegConfig = { mode: "auto" | "download" | "system" };
 type DownloadState = { phase: "idle" | "downloading" | "verifying" | "installing" | "completed" | "error" | "cancelled"; file?: string; received: number; total?: number; error?: string };
 type ToolStatus = { path: string | null; version: string | null; error: string | null; origin: "download" | "system" | null };
 type FfmpegStatus = {
   platform: string; arch: string; target: string; supported: boolean; directory: string; version: string;
-  sources: { id: FfmpegConfig["source"]; label: string; description: string; available: boolean; homepage: string }[];
   config: FfmpegConfig; tools: { ffmpeg: ToolStatus; ffprobe: ToolStatus }; download: DownloadState;
 };
 
@@ -121,22 +96,11 @@ const config = computed<FfmpegConfig>(() => {
   const value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Partial<FfmpegConfig> : {};
   return {
     mode: value.mode === "download" || value.mode === "system" ? value.mode : "auto",
-    source: [value.source, status.value?.config.source].find(id => status.value?.sources.some(source => source.id === id && source.available))
-      ?? status.value?.sources.find(source => source.available)?.id ?? "",
   };
 });
 const status = ref<FfmpegStatus>();
 const ready = computed(() => toolNames.every(name => !!status.value?.tools[name].version));
 const downloaded = computed(() => toolNames.some(name => status.value?.tools[name].origin === "download"));
-const selectedSource = computed(() => status.value?.sources.find(source => source.id === config.value.source));
-const availableSourceCount = computed(() => status.value?.sources.filter(source => source.available).length ?? 0);
-const sourceGroups = computed(() => {
-  const sources = status.value?.sources ?? [];
-  return [
-    { label: "常用线路", sources: sources.filter(source => source.available && ["npmmirror", "github"].includes(source.id)) },
-    { label: "更多加速线路", sources: sources.filter(source => source.available && !["npmmirror", "github"].includes(source.id)) },
-  ].filter(group => group.sources.length);
-});
 const download = ref<DownloadState>({ phase: "idle", received: 0 });
 const statusError = ref("");
 const operationError = ref("");
@@ -144,7 +108,7 @@ const loading = ref(false);
 const saving = ref(false);
 const submitting = ref(false);
 const busy = computed(() => ["downloading", "verifying", "installing"].includes(download.value.phase));
-const canDownload = computed(() => status.value?.supported && status.value.sources.some(source => source.id === config.value.source && source.available) && !loading.value && !saving.value && !busy.value && !submitting.value);
+const canDownload = computed(() => status.value?.supported && !loading.value && !saving.value && !busy.value && !submitting.value);
 const percentage = computed(() => download.value.phase === "completed" ? 100 : download.value.total ? Math.min(100, Math.round(download.value.received / download.value.total * 100)) : 0);
 let timer: ReturnType<typeof setTimeout> | undefined;
 let readController = new AbortController();
@@ -226,7 +190,7 @@ async function submitDownload(action: "download" | "cancel") {
   submitting.value = true;
   operationError.value = "";
   try {
-    const { data } = await axios.post<{ code: number; data: DownloadState; message?: string }>(`/api/ffmpeg/${action}`, action === "download" ? { source: config.value.source } : {}, { headers });
+    const { data } = await axios.post<{ code: number; data: DownloadState; message?: string }>(`/api/ffmpeg/${action}`, {}, { headers });
     if (data.code !== 200) throw new Error(data.message || "操作失败");
     download.value = data.data;
     if (props.visible && !readController.signal.aborted) {
@@ -252,27 +216,6 @@ onBeforeUnmount(stopReading);
 </script>
 
 <style lang="scss" scoped>
-.sourceOption {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-  align-items: center;
-  gap: 20px;
-  padding: 0 20px;
-
-  .sourceLabel, .sourceDescription {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sourceDescription {
-    text-align: right;
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
-    font-weight: 400;
-  }
-}
-
 .ffmpegPanel {
   .description {
     margin: 6px 0 0;
@@ -285,7 +228,7 @@ onBeforeUnmount(stopReading);
   .downloadCard {
     :deep(.el-card__body) { padding: 12px; }
 
-    .componentHeader, .downloadHeader, .progressHeader {
+    .componentHeader, .progressHeader {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -320,33 +263,13 @@ onBeforeUnmount(stopReading);
       line-height: 1.6;
     }
 
-    .downloadHeader {
-      margin-top: 16px;
-      color: var(--el-text-color-regular);
-      font-size: 13px;
-    }
-
     .downloadActions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 16px;
 
-      .el-select { flex: 1 1 200px; min-width: 0; }
       .el-button { margin-left: 0; }
-    }
-
-    .sourceHint {
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: 4px 12px;
-      margin-top: 10px;
-      color: var(--el-text-color-secondary);
-      font-size: 12px;
-      line-height: 1.6;
-
-      .el-link { font-size: inherit; }
     }
 
     .downloadProgress {

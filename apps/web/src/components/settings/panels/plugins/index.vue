@@ -1,14 +1,11 @@
 <template>
-  <div class="pluginMarket">
-    <div class="marketToolbar">
-      <nav class="marketNav" aria-label="插件列表">
+  <div class="plugins">
+    <div class="pluginsToolbar">
+      <nav class="pluginsNav" aria-label="插件列表">
         <button class="navButton" type="button" :aria-pressed="activeTab === 'installed'" @click="activeTab = 'installed'">已安装</button>
         <button class="navButton" type="button" :aria-pressed="activeTab === 'ffmpeg'" @click="activeTab = 'ffmpeg'">FFmpeg</button>
       </nav>
-      <div class="marketActions">
-        <el-button tag="a" href="https://qcn7xdsqgc4z.feishu.cn/docx/KNBNd9naqolsy6xjAOCcEAkqnRd" target="_blank" rel="noopener noreferrer" size="small" text :icon="IconBook">
-          开发者文档
-        </el-button>
+      <div class="pluginsActions">
         <template v-if="activeTab === 'installed'">
           <el-button v-if="selectedType === 'ext' || selectedType === 'all'" size="small" :icon="IconSettings" @click="associationsVisible = true">默认打开方式</el-button>
           <el-button size="small" type="primary" :icon="IconUpload" :loading="installing" aria-label="安装本地插件" @click="pluginFileInput?.click()">
@@ -39,7 +36,7 @@
           <span v-if="installedCounts[type] !== undefined" class="filterCount">{{ installedCounts[type] }}</span>
         </button>
       </div>
-      <form v-if="activeTab !== 'ffmpeg'" class="marketSearch" role="search" @submit.prevent="applySearch">
+      <form v-if="activeTab !== 'ffmpeg'" class="pluginsSearch" role="search" @submit.prevent="applySearch">
         <el-input v-model="searchQuery" size="small" placeholder="搜索插件" aria-label="搜索插件" clearable @clear="applySearch" />
         <el-button size="small" type="primary" nativeType="submit">搜索</el-button>
       </form>
@@ -479,8 +476,8 @@ async function updatePlugin(plugin: Plugin, action: "setEnabled" | "uninstall", 
 </script>
 
 <style lang="scss" scoped>
-.pluginMarket {
-  .marketToolbar {
+.plugins {
+  .pluginsToolbar {
     position: sticky;
     top: 0;
     z-index: 1;
@@ -492,7 +489,7 @@ async function updatePlugin(plugin: Plugin, action: "setEnabled" | "uninstall", 
     padding-bottom: 12px;
     background: var(--el-bg-color);
 
-    .marketNav {
+    .pluginsNav {
       display: flex;
       flex-wrap: wrap;
       gap: 8px 20px;
@@ -534,7 +531,7 @@ async function updatePlugin(plugin: Plugin, action: "setEnabled" | "uninstall", 
       }
     }
 
-    .marketActions {
+    .pluginsActions {
       display: flex;
       align-items: center;
       justify-content: flex-end;
@@ -590,7 +587,7 @@ async function updatePlugin(plugin: Plugin, action: "setEnabled" | "uninstall", 
       }
     }
 
-    .marketSearch {
+    .pluginsSearch {
       display: flex;
       flex-basis: 100%;
       min-width: 0;

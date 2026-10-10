@@ -233,7 +233,7 @@ import { ElButton, ElDropdown, ElDropdownItem, ElDropdownMenu, ElInput, ElMessag
 import { Editor, EditorContent } from "@tiptap/vue-3";
 import type { ChainedCommands, EditorOptions } from "@tiptap/core";
 import type { ExtContext } from "@toonflow/ext-scaffold/runtime";
-import markdownExtensions, { parseMarkdownContent, resolveDocumentPath, serializeMarkdown } from "./markdownExtensions";
+import markdownExtensions, { parseMarkdownContent, resolveDocumentPath, serializeMarkdown } from "@toonflow/node-shared/markdownExtensions";
 import {
   IconBold,
   IconItalic,

@@ -1,6 +1,6 @@
 import type { ElectrobunConfig } from "./.hutch/devkit/api/config/ElectrobunConfig";
 
-const startupTarget = process.platform === "darwin" ? (process.arch === "x64" ? "macX64" : "macArm64") : "windowsX64";
+const startupTarget = process.platform === "darwin" ? "macArm64" : "windowsX64";
 
 export default {
   app: {
@@ -19,7 +19,6 @@ export default {
       ...(process.platform === "win32" ? {
         "build/desktop/protocol/protocolLauncher.exe": "protocolLauncher.exe",
         "build/desktop/protocol/saveFileDialog.exe": "saveFileDialog.exe",
-        "build/desktop/protocol/updateHelper.exe": "updateHelper.exe",
         "build/desktop/startup/windowsSplashWorker.js": "startup/windowsSplashWorker.js",
       } : {}),
       "build/web": "views/mainview",
@@ -36,7 +35,7 @@ export default {
       [`packages/startup/assets/${startupTarget}`]: `startup/${startupTarget}`,
     },
     buildFolder: "build/desktop/app",
-    artifactFolder: process.platform === "darwin" ? `build/desktop/artifacts/${process.arch === "x64" ? "macX64" : "macArm64"}` : "build/desktop/artifacts",
+    artifactFolder: process.platform === "darwin" ? "build/desktop/artifacts/macArm64" : "build/desktop/artifacts",
     win: {
       icon: "packages/assets/logo.ico",
     },
@@ -46,13 +45,6 @@ export default {
       codesign: process.env.macCodesign === "1",
       notarize: process.env.macCodesign === "1",
     },
-  },
-  release: {
-    // ACT: Build baselines and patches always come from GitHub; the client
-    // update source is set separately in settings and defaults to official.
-    baseUrl: `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "HBAI-Ltd/Toonflow-app"}/releases/latest/download`,
-    // ACT: Regular builds do not contact the update server; release:desktop explicitly enables delta builds.
-    generatePatch: process.env.generateUpdatePatch === "1",
   },
   ...(process.platform === "darwin" ? {
     scripts: {

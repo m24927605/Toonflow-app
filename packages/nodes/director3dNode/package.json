@@ -15,8 +15,6 @@
   },
   "dependencies": {
     "@tabler/icons-vue": "^3.46.0",
-    "@tweenjs/tween.js": "25.0.0",
-    "html2canvas-pro": "2.0.2",
     "three": "0.184.0",
     "threejson": "0.1.0-alpha.9",
     "vue-draggable-plus": "^0.6.1"

@@ -9,7 +9,7 @@ import { toolMetadataSchema, type ToolMetadata } from "./src/runtime";
 
 export type { ToolMetadata } from "./src/runtime";
 
-export async function createToolConfig(config: Omit<ToolMetadata, "components" | "readme" | "version"> & { components?: Record<string, string> }, configUrl: string) {
+export async function createToolConfig(config: Omit<ToolMetadata, "components" | "readme" | "version" | "github"> & { github?: string; components?: Record<string, string> }, configUrl: string) {
   const { components, ...toolConfig } = config;
   if (components !== undefined && (!components || Array.isArray(components) || typeof components !== "object" ||
     Object.entries(components).some(([name, entry]) => !name.trim() || typeof entry !== "string" || !entry.trim()))) {
@@ -33,7 +33,7 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
     prompt: config.prompt?.trim() ?? "",
     readme,
     author: config.author.trim(),
-    github: config.github.trim(),
+    github: config.github?.trim() ?? "",
   });
   const metadataJson = JSON.stringify(metadata).replaceAll("/", "\\u002f");
   const fileName = `${metadata.name}.tool.js`;

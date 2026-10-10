@@ -26,7 +26,6 @@
           <icon-key class="buttonIcon" />
           配置语言模型
         </el-button>
-        <el-button class="mobileConnectButton" :type="deviceHubEnabled ? 'success' : undefined" :plain="deviceHubEnabled" :icon="deviceHubEnabled || mobileConnection.mode === 'remote' ? IconDeviceDesktop : IconQrcode" @click="mobileConnectVisible = true">{{ mobileConnectionLabel }}</el-button>
         <div class="secondaryActions">
           <el-button class="secondaryButton" round :loading="saving" @click="completeSetup">稍后配置</el-button>
         </div>
@@ -43,7 +42,6 @@
         <span class="artName">Toonflow</span>
       </div>
     </div>
-    <mobileConnect v-model="mobileConnectVisible" />
   </main>
 </template>
 
@@ -51,17 +49,14 @@
 import { defineAsyncComponent, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { IconArrowLeft, IconQrcode, IconDeviceDesktop } from "@tabler/icons-vue";
+import { IconArrowLeft } from "@tabler/icons-vue";
 import { customProviders } from "@/stores/settings";
 import { useHelloStore } from "@/stores/hello";
 import logoSvg from "@toonflow/assets/logo.svg?raw";
 import bg from "./bg.vue";
 import languageSelect from "@/components/languageSelect.vue";
-import { deviceHubEnabled, mobileConnection, mobileConnectionLabel } from "@/lib/mobile";
 
 const languageModel = defineAsyncComponent(() => import("@/components/settings/panels/languageModel/index.vue"));
-const mobileConnect = defineAsyncComponent(() => import("@/components/mobileConnect.vue"));
-const mobileConnectVisible = ref(false);
 const view = ref<"welcome" | "custom">("welcome");
 const saving = ref(false);
 const router = useRouter();
@@ -188,7 +183,6 @@ async function completeSetup() {
         }
       }
 
-      .mobileConnectButton { width: 100%; margin: 12px 0 0; min-height: 42px; }
     }
 
     .pageFooter {

@@ -10,7 +10,6 @@
     "./connection": "./src/connection.ts",
     "./values": "./src/values.ts",
     "./nodeInputs": "./src/nodeInputs.ts",
-    "./utils": "./src/nodeInputs.ts",
     "./nodeEvent": "./src/nodeEvent.ts",
     "./nodeDocument": "./src/nodeDocument.ts",
     "./nodeAi": "./src/nodeAi.ts",

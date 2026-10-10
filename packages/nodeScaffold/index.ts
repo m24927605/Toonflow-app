@@ -31,7 +31,7 @@ export interface NodeConfig {
   name: string;
   displayName: string;
   author: string;
-  github: string;
+  github?: string;
   configRules?: Rule[];
 }
 
@@ -40,7 +40,7 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
   const metadata = {
     displayName: config.displayName.trim(),
     author: config.author.trim(),
-    github: config.github.trim(),
+    github: config.github?.trim() ?? "",
     configRules: z.array(z.record(z.string(), z.json())).max(100).parse(config.configRules ?? []),
   };
   if (!metadata.displayName) throw new Error("插件显示名不能为空");

@@ -89,8 +89,8 @@ import { nextTick, ref, shallowRef, watch } from "vue";
 import { ElMessage, ElMessageBox, type InputInstance } from "element-plus";
 import type { AgentHistory } from "./types";
 import type { AgentSubAgent } from "@toonflow/server/agent/types";
-import pluginConfigDialog from "@/components/settings/panels/pluginMarket/pluginConfigDialog.vue";
-import type { Plugin } from "@/components/settings/panels/pluginMarket/types";
+import pluginConfigDialog from "@/components/settings/panels/plugins/pluginConfigDialog.vue";
+import type { Plugin } from "@/components/settings/panels/plugins/types";
 import {
   IconMessagePlus, IconHistory,
   IconX, IconPencil,

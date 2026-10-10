@@ -5,7 +5,6 @@ metadata:
   version: "2.1.0"
   displayName: 画布操作手册
   author: Toonflow
-  github: https://github.com/HBAI-Ltd/Toonflow-app
 ---
 
 # 画布操作手册

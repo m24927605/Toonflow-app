@@ -50,20 +50,8 @@ function requestImage(url: URL, signal: AbortSignal) {
     void (async () => {
       signal.throwIfAborted();
       const hostname = url.hostname.replace(/^\[|\]$/g, "");
-      let addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await lookup(hostname, { all: true, verbatim: true });
+      const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await lookup(hostname, { all: true, verbatim: true });
       signal.throwIfAborted();
-      if (addresses.length && addresses.every(item => /^198\.(18|19)\./.test(item.address))) {
-        // ACT: Only tolerate TUN fake-IP answers; resolve the real public address via
-        // a fixed DoH server and never download directly from special-purpose ranges.
-        const dnsUrl = new URL("https://dns.alidns.com/resolve");
-        dnsUrl.searchParams.set("name", hostname);
-        dnsUrl.searchParams.set("type", "A");
-        const response = await fetch(dnsUrl, { signal, redirect: "error" });
-        if (!response.ok) invalid("无法解析图片的真实公网地址，请稍后重试", 502);
-        const answer = await response.json() as { Status?: number; Answer?: { type?: number; data?: unknown }[] };
-        addresses = answer.Status === 0 && Array.isArray(answer.Answer) ? answer.Answer.filter(item => item.type === 1 && typeof item.data === "string").map(item => ({ address: item.data as string, family: 4 })) : [];
-        signal.throwIfAborted();
-      }
       if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) invalid("不能下载解析到本机、内网或特殊网络地址的图片", 403);
       const address = addresses[0];
       const connection = new URL(url);

@@ -8,10 +8,9 @@ import { promisify } from "node:util";
 import { dlopen, ptr } from "bun:ffi";
 import type { DesktopRuntime, PluginInstallRequest } from "@toonflow/server/desktop";
 import { showNativeSplash } from "@toonflow/startup";
-import Electrobun, { ApplicationMenu, BrowserWindow, PATHS, Screen, Utils, Updater } from "electrobun/main";
+import Electrobun, { ApplicationMenu, BrowserWindow, PATHS, Screen, Utils } from "electrobun/main";
 import { parseInstallUrl } from "./protocol";
 import saveFile, { selectSaveFile } from "./saveFile";
-import createWindowsUpdater, { confirmWindowsUpdateStartup } from "./update/windowsUpdater";
 
 const execFileAsync = promisify(execFile);
 const pendingInstalls: PluginInstallRequest[] = [];
@@ -36,33 +35,12 @@ async function restoreInstallRegistration(installDirectory: string) {
   const uninstaller = resolve(installDirectory, "UninstallNSIS.exe");
   if (process.platform === "win32" && existsSync(uninstaller)) {
     try {
-      // SDK launches and updates rewrite the uninstall entry; when
-      // installed via NSIS, let it handle the data retention option.
+      // SDK launches rewrite the uninstall entry; when installed
+      // via NSIS, let it handle the data retention option.
       const { identifier, channel } = await file(resolve(PATHS.RESOURCES_FOLDER, "version.json")).json();
       const registryKey = `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${identifier}.${channel}`;
       for (const [name, command] of [["UninstallString", `"${uninstaller}"`], ["QuietUninstallString", `"${uninstaller}" /S`]]) {
         await execFileAsync("reg.exe", ["add", registryKey, "/v", name, "/t", "REG_SZ", "/d", command, "/f"], { windowsHide: true });
-      }
-      const protocolLauncher = resolve(PATHS.RESOURCES_FOLDER, "app/protocolLauncher.exe");
-      if (existsSync(protocolLauncher)) {
-        const protocolKey = "HKCU\\Software\\Classes\\toonflow";
-        const commandKey = `${protocolKey}\\shell\\open\\command`;
-        const command = `"${protocolLauncher}" "%1"`;
-        let protocolExists = true;
-        try {
-          await execFileAsync("reg.exe", ["query", protocolKey], { windowsHide: true });
-        } catch (error) {
-          if ((error as { code?: number }).code !== 1) throw error;
-          protocolExists = false;
-        }
-        // ACT: Auto-updates bypass NSIS; only register a missing protocol and
-        // leave existing registrations (including other installs) untouched.
-        if (!protocolExists) {
-          for (const [key, value] of [[protocolKey, "URL:Toonflow Protocol"], [`${protocolKey}\\DefaultIcon`, `"${resolve(PATHS.RESOURCES_FOLDER, "app.ico")}",0`], [commandKey, command]]) {
-            await execFileAsync("reg.exe", ["add", key, "/ve", "/t", "REG_SZ", "/d", value, "/f"], { windowsHide: true });
-          }
-          await execFileAsync("reg.exe", ["add", protocolKey, "/v", "URL Protocol", "/t", "REG_SZ", "/d", "", "/f"], { windowsHide: true });
-        }
       }
     } catch (error) {
       console.error("恢复桌面安装注册信息失败：", error);
@@ -72,7 +50,7 @@ async function restoreInstallRegistration(installDirectory: string) {
 
 async function start() {
   let splash: Awaited<ReturnType<typeof showNativeSplash>> | undefined;
-  let desktopConnection: Awaited<ReturnType<typeof import("./connection").default>> | undefined;
+  let desktopGateway: Awaited<ReturnType<typeof import("./gateway").default>> | undefined;
   let isClosing = false;
 
   try {
@@ -142,17 +120,10 @@ async function start() {
       // agentsRoot: resolve(PATHS.VIEWS_FOLDER, "../agents"),
       pluginRevision: hash,
     });
-    const { default: createDesktopConnection } = await import("./connection");
-    const connection = desktopConnection = await createDesktopConnection(app, dataDirectory, resolve(PATHS.VIEWS_FOLDER, "../mcp/stdio.js"), (port, remote) => {
-      deliverInstall = undefined;
-      saveRuntime(port);
-      mainWindow.webview.loadURL(`http://127.0.0.1:${port}/?desktop=1${remote ? "&remote=1" : ""}`);
-    }, error => {
-      console.error("设备连接切换失败：", error);
-      void Utils.showMessageBox({ type: "error", title: t`设备连接失败`, message: error instanceof Error ? error.message : String(error) });
-    });
-    if (isClosing) { await connection.close(); return; }
-    console.log(`桌面服务：http://127.0.0.1:${connection.port}`);
+    const { default: startGateway } = await import("./gateway");
+    const gateway = desktopGateway = await startGateway(app, resolve(PATHS.VIEWS_FOLDER, "../mcp/stdio.js"));
+    if (isClosing) { await gateway.close(); return; }
+    console.log(`桌面服务：http://127.0.0.1:${gateway.port}`);
 
     const { workArea } = Screen.getPrimaryDisplay();
     // ACT: Clamp width and height separately to the screen's usable area,
@@ -161,7 +132,7 @@ async function start() {
     const height = Math.min(960, workArea.height - 64);
     const mainWindow = new BrowserWindow({
       title: "Toonflow",
-      url: `http://127.0.0.1:${connection.port}/?desktop=1${connection.remote ? "&remote=1" : ""}`,
+      url: `http://127.0.0.1:${gateway.port}/?desktop=1`,
       hidden: Boolean(splash),
       frame: {
         width,
@@ -212,22 +183,12 @@ async function start() {
             splash = undefined;
           }
           isShowing = true;
-          // ACT: The installer has completed registration; the post-update
-          // repair runs only on first show and does not block the main window.
+          // ACT: The installer has completed registration; the repair
+          // runs only on first show and does not block the main window.
           void restoreInstallRegistration(installDirectory);
         }
-        if (failed && !connection.remote) {
-          if (process.platform === "win32") confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER, true);
-          else await (Updater as DesktopRuntime["updater"]).confirmStartup?.(true);
+        if (failed) {
           deliverInstall = undefined;
-          return;
-        }
-        if (connection.remote) {
-          // An offline remote does not mean the local update launch failed;
-          // install protocol requests are delivered after returning to standalone.
-          deliverInstall = undefined;
-          if (process.platform === "win32") confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER);
-          else await (Updater as DesktopRuntime["updater"]).confirmStartup?.();
           return;
         }
         deliverInstall = request => {
@@ -240,12 +201,8 @@ async function start() {
           deliverInstall(pendingInstalls[0]!);
           pendingInstalls.shift();
         }
-        if (process.platform === "win32") confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER);
-        else await (Updater as DesktopRuntime["updater"]).confirmStartup?.();
       },
       openDevTools() { mainWindow.webview.openDevTools(); },
-      // ACT: Windows uses a two-phase exit; Intel Mac adapts the 1.18.1 updater through a compatibility entry.
-      updater: process.platform === "win32" ? createWindowsUpdater(PATHS.RESOURCES_FOLDER, Utils as unknown as Parameters<typeof createWindowsUpdater>[1]) : Updater,
     } satisfies DesktopRuntime;
     if (process.platform === "win32") {
       // ACT: Electrobun 2.0.1 does not set the Windows window icon, so reuse the app ICO from the build output.
@@ -276,7 +233,7 @@ async function start() {
       mainWindow.on("close", closeIcons);
     }
     mainWindow.on("close", () => {
-      void connection.close().catch(error => console.error("设备连接关闭失败：", error));
+      void gateway.close().catch(error => console.error("桌面服务关闭失败：", error));
       void closeBrowsers().catch(error => console.error("浏览器关闭失败：", error));
       isClosing = true;
       deliverInstall = undefined;
@@ -286,20 +243,15 @@ async function start() {
     });
     function saveRuntime(port: number) {
       if (process.platform === "win32") {
-        // ACT: Switching connections also updates the port; the launcher
-        // uses the PID to ignore records left by exited processes.
+        // ACT: The launcher uses the PID to ignore records left by exited processes.
         writeAtomicSync(resolve(PATHS.RESOURCES_FOLDER, "desktopRuntime.json"), JSON.stringify({ pid: process.pid, port }));
       }
     }
-    saveRuntime(connection.port);
+    saveRuntime(gateway.port);
   } catch (error) {
-    await desktopConnection?.close().catch(error => console.error("设备连接关闭失败：", error));
+    await desktopGateway?.close().catch(error => console.error("桌面服务关闭失败：", error));
     splash?.close();
     console.error("桌面启动失败：", error);
-    if (process.platform === "win32") {
-      try { confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER, true); }
-      catch (resultError) { console.error("更新启动结果写入失败：", resultError); }
-    }
     Utils.quit(1);
   }
 }

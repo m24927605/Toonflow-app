@@ -3,8 +3,7 @@ import { join } from "node:path";
 import { createSplashPlayer } from "./splashPlayer";
 
 function loadNativeLibrary(assetDir: string) {
-  const target = process.arch === "arm64" ? "macArm64" : "macX64";
-  return dlopen(join(assetDir, target, "nativeSplash.dylib"), {
+  return dlopen(join(assetDir, "macArm64", "nativeSplash.dylib"), {
     createNativeSplash: { args: ["ptr"], returns: "ptr" },
     presentNativeSplash: { args: ["ptr", "ptr"], returns: "i32" },
     closeNativeSplash: { args: ["ptr"], returns: "void" },

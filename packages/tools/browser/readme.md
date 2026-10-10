@@ -22,17 +22,11 @@ This is not full stealth. Tested on local Edge 153 and Chrome 154: the script en
 
 The earliest scripts on a page may also briefly read the window's outer size as `0×0` before it returns to normal. Waiting for a blank page's size to be ready cannot eliminate the transient state of the new document during navigation, so such an ineffective wait is not used, and size properties are not tampered with.
 
-Verified on 2026-10-07 with the two browsers above: all 20 Fingerprint Scanner checks on [Sannysoft](https://bot.sannysoft.com/) were `ok`, both WebDriver checks passed, and [BotD v2](https://github.com/fingerprintjs/BotD) returned `bot: false`; an Edge control group launched with default Puppeteer was identified by BotD as `headless_chrome`. These public detection results only cover the corresponding checks and do not prove that a website's risk controls will not detect automation.
-
 ## Development
 
 `bun run --filter @toonflow/tool-browser typecheck`
 
 `NODE_ENV=dev bun run --filter @toonflow/tool-browser build`
-
-`bun run --filter @toonflow/tool-browser demo` starts a temporary local web page, drives a real browser, and checks operations, the view, isolation, cancellation cleanup, and manual hover, drag, double-click, modifier keys, release, address navigation, back/forward, and refresh; it does not call model services.
-
-Run `bun demo.ts --detect` in the subpackage directory to check the UA, Client Hints, webdriver, native descriptors, and sizes of the main page, a cross-origin iframe, the three kinds of Workers, a page popup, and an Agent-opened tab; add `--executable=<absolute browser path>` to specify Edge or Chrome. The probe uses in-memory local pages and does not visit detection websites. Missing detection results or regressions in guaranteed items cause a failing exit; known leaks are listed separately in `knownLeaks` and `geometryWarnings`. A successful process exit only means the probe completed and must not be taken to mean that all stealth checks passed.
 
 The browser runtime and the input protocol are exported through `./host` and `./protocol` respectively. The host holds the runtime and injects the call entry through the tool context, ensuring the tool and the view interface share the same session.
 

@@ -9,7 +9,6 @@
   "exports": {
     ".": "./index.ts",
     "./types": "./types.d.ts",
-    "./language/deepSeek": "./src/language/deepSeek.ts",
     "./media/openai": "./src/media/openai.ts",
     "./media/higgsfield": "./src/media/higgsfield.ts",
     "./media/gemini": "./src/media/gemini.ts",

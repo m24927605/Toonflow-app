@@ -8,20 +8,18 @@ if (process.argv.length !== 3 || !["build", "dev", "typecheck", "package"].inclu
   throw new Error("用法：bun apps/desktop/scripts/build.ts <build|dev|typecheck|package>");
 }
 const isMac = process.platform === "darwin";
-const isIntelMac = isMac && process.arch === "x64";
 // ACT: typecheck only reads current sources and existing SDK files; it does not install dependencies or generate files.
 if (mode === "typecheck") {
-  await $`${process.execPath} run tsc --project ${isIntelMac ? "compat/macIntel/tsconfig.json" : "apps/desktop/tsconfig.json"}`.cwd(projectDir);
+  await $`${process.execPath} run tsc --project apps/desktop/tsconfig.json`.cwd(projectDir);
   process.exit(0);
 }
-if (!(isMac && ["x64", "arm64"].includes(process.arch)) && !(process.platform === "win32" && process.arch === "x64")) {
-  throw new Error("桌面构建需要 Windows x64 或 macOS x64/arm64 环境。");
+if (!(isMac && process.arch === "arm64") && !(process.platform === "win32" && process.arch === "x64")) {
+  throw new Error("桌面构建需要 Windows x64 或 macOS arm64 环境。");
 }
 if (mode === "dev") process.env.TOONFLOW_DATA_DIR = resolve(projectDir, "data");
 if (isMac) {
-  const startupTarget = isIntelMac ? "macX64" : "macArm64";
   for (const name of ["libthorvg.dylib", "nativeSplash.dylib"]) {
-    if (!existsSync(resolve(projectDir, "packages/startup/assets", startupTarget, name))) {
+    if (!existsSync(resolve(projectDir, "packages/startup/assets/macArm64", name))) {
       throw new Error("缺少当前架构的 macOS 启动库，请先运行 bun packages/startup/scripts/buildMac.ts，再重新构建桌面应用。");
     }
   }
@@ -39,7 +37,6 @@ if (!isMac) {
   mkdirSync(protocolDir, { recursive: true });
   await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /out:${resolve(protocolDir, "protocolLauncher.exe")} ${resolve(projectDir, "apps/desktop/native/protocolLauncher.cs")}`;
   await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /out:${resolve(protocolDir, "saveFileDialog.exe")} ${resolve(projectDir, "apps/desktop/native/saveFileDialog.cs")}`;
-  await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Web.Extensions.dll /reference:System.Windows.Forms.dll /reference:Microsoft.CSharp.dll /out:${resolve(protocolDir, "updateHelper.exe")} ${resolve(projectDir, "apps/desktop/native/updateHelper.cs")}`;
 }
 // ACT: Teams are not bundled for now; when restoring, also add
 // --filter './packages/teams/*' back to dev:plugins in package.json.
@@ -58,11 +55,6 @@ const photonDirectory = dirname(Bun.resolveSync("@silvia-odwyer/photon-node", ag
 const photonOutput = resolve(projectDir, "build/desktop/photon");
 rmSync(photonOutput, { recursive: true, force: true });
 cpSync(photonDirectory, photonOutput, { recursive: true });
-if (isIntelMac) {
-  // ACT: Plugin and web builds are shared; Intel Mac only hands SDK adaptation to the separate 1.18.1.
-  await $`${process.execPath} ${resolve(projectDir, "compat/macIntel/build.ts")} ${mode === "package" ? "build" : mode}`.cwd(projectDir);
-  process.exit(0);
-}
 const cli = resolve(projectDir, "apps/desktop/node_modules/electrobun/bin/electrobun.cjs");
 await $`${process.execPath} ${cli} ${mode === "dev" ? "dev" : "build"} ${mode === "dev" ? [] : ["--env=stable"]}`.cwd(projectDir);
 if (mode === "package" && !isMac) {

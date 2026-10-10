@@ -26,7 +26,7 @@ export async function readNode(name: string) {
     const parsed = header ? JSON.parse(header) : null;
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) metadata = parsed;
   } catch {
-    // Legacy nodes or corrupt metadata fall back to the file name without executing the node script.
+    // Missing or corrupt metadata falls back to the file name without executing the node script.
   }
   let github = "";
   if (typeof metadata.github === "string" && URL.canParse(metadata.github)) {

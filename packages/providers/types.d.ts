@@ -242,11 +242,8 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
   label: string;
   /** Provider brand icon; supports an image URL or a data:image/...;base64,... URI. */
   icon?: string;
-  /**
-   * Adapter file version, independent of model versions;
-   * new providers should set it, and omitting it is only for compatibility with old files.
-   */
-  version?: string;
+  /** Adapter file version, independent of model versions. */
+  version: string;
   apiUrl?: string;
   /**
    * GET URL of the media model list;

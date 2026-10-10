@@ -6,7 +6,6 @@ export function createSplashPlayer(assetDir: string, width: number, height: numb
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096) throw new Error("启动画面尺寸无效");
   if (pixels.byteLength !== width * height * 4) throw new Error("启动画布尺寸不匹配");
   const libraryPath = process.platform === "win32" && process.arch === "x64" ? "windowsX64/thorvg.dll"
-    : process.platform === "darwin" && process.arch === "x64" ? "macX64/libthorvg.dylib"
     : process.platform === "darwin" && process.arch === "arm64" ? "macArm64/libthorvg.dylib" : undefined;
   if (!libraryPath) throw new Error(`当前平台不支持原生启动动画：${process.platform}/${process.arch}`);
   const library = dlopen(resolve(assetDir, libraryPath), {

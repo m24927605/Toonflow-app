@@ -25,7 +25,7 @@ export const mediaProviderFileSchema = z.string().refine(value => value.endsWith
 export const mediaModelsSchema = z.array(z.object({
   id: z.string().min(1).max(200).refine(value => !!value.trim()),
   label: z.string().min(1).max(200).refine(value => !!value.trim()),
-  type: z.enum(["text", "image", "video", "audio"]),
+  type: z.enum(["image", "video", "audio"]),
 }).catchall(z.json())).max(2000).refine(models => new Set(models.map(model => model.id)).size === models.length, "模型 ID 不能重复");
 
 function invalid(message: string, status = 400): never {
@@ -162,18 +162,7 @@ function parseProvider(source: string) {
   try { module = parse(source, { sourceType: "module", plugins: ["typescript"] }); }
   catch (err) { return invalid(t`供应商 TypeScript 语法错误：${err instanceof Error ? err.message : String(err)}`); }
   const exported = module.program.body.find(item => item.type === "ExportDefaultDeclaration");
-  if (!exported || exported.type !== "ExportDefaultDeclaration") {
-    const legacy = module.program.body.some(item => {
-      if (item.type !== "ExpressionStatement" || item.expression.type !== "AssignmentExpression") return false;
-      const target = item.expression.left;
-      if (target.type !== "MemberExpression" || target.object.type !== "Identifier" || target.object.name !== "exports") return false;
-      const name = !target.computed && target.property.type === "Identifier" ? target.property.name
-        : target.computed && target.property.type === "StringLiteral" ? target.property.value : "";
-      return ["vendor", "textRequest", "imageRequest", "videoRequest", "ttsRequest"].includes(name);
-    });
-    if (legacy) invalid("检测到旧版 Toonflow 供应商 TS，无法在 Toonflow 2.0 中使用。请在「添加自定义媒体供应商」中点击「一键复制提示词」，结合旧代码和接口资料重新生成新版代码后再导入。");
-    invalid("供应商须通过 export default 导出对象");
-  }
+  if (!exported || exported.type !== "ExportDefaultDeclaration") invalid("供应商须通过 export default 导出对象");
   const object = unwrap(exported.declaration as Expression);
   if (object.type !== "ObjectExpression") invalid("供应商须直接导出对象字面量");
   const entries = properties(object);
@@ -201,7 +190,7 @@ function parseProvider(source: string) {
   if (!providerIdSchema.safeParse(id).success) invalid("供应商 ID 必须为小驼峰文件名");
   if (typeof label !== "string" || !label.trim() || label.length > 200) invalid("供应商名称无效");
   if (icon !== undefined && typeof icon !== "string") invalid("供应商图标必须为字符串");
-  if (version !== undefined && (typeof version !== "string" || !version.trim())) invalid("供应商版本必须为非空字符串");
+  if (typeof version !== "string" || !version.trim()) invalid("供应商版本必须为非空字符串");
   if (readme !== undefined && typeof readme !== "string") invalid("供应商说明必须为字符串");
   if (modelsUrl !== undefined && !z.url({ protocol: /^https?$/ }).refine(value => {
     const url = new URL(value);
@@ -211,7 +200,7 @@ function parseProvider(source: string) {
   if (!models.success) invalid(models.error.issues.map(issue => translateMessage(issue.message)).join("; "));
   const rules = z.array(z.record(z.string(), z.json())).safeParse(value("rules") ?? []);
   if (!rules.success) invalid("供应商 rules 必须为表单配置对象数组");
-  return { object, modelProperty: entries.get("models"), id: id as string, label, icon, version: version?.trim(), readme, modelsUrl: modelsUrl as string | undefined, rules: rules.data, models: models.data };
+  return { object, modelProperty: entries.get("models"), id: id as string, label, icon, version: version.trim(), readme, modelsUrl: modelsUrl as string | undefined, rules: rules.data, models: models.data };
 }
 
 function metadata(fileName: string, source: string) {
@@ -345,7 +334,7 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
     }).catchall(z.json()).optional(),
   })).max(2000) }).parse(await response.json());
   if (!result.data.length) throw new Error("未获取到媒体模型，保留原有列表");
-  const requestedType = z.enum(["text", "image", "video", "audio"]).safeParse(modelsUrl.searchParams.get("type"));
+  const requestedType = z.enum(["image", "video", "audio"]).safeParse(modelsUrl.searchParams.get("type"));
   const models = result.data.map(({ modelInfo, ...model }) => {
     const id = model.id.trim();
     const previous = provider.models.find(item => item.id === id);

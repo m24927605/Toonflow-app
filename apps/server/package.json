@@ -4,10 +4,8 @@
   "type": "module",
   "exports": {
     "./app": "./src/app.ts",
-    "./remoteConnection": "./src/remoteConnection.ts",
     "./desktop": "./src/types/desktop.ts",
     "./mcp": "./src/utils/mcp/runtime.ts",
-    "./mobileLink": "./src/utils/mobileLink/index.ts",
     "./browser": "./src/utils/browser/index.ts",
     "./agent/types": "./src/agent/runtime/types.ts",
     "./singleAgent/types": "./src/utils/singleAgent/types.ts",

@@ -7,15 +7,7 @@ export const useHelloStore = defineStore("hello", () => {
 
   async function load() {
     if (typeof settings.value.helloCompleted === "boolean") return completed.value;
-    let previouslyCompleted = false;
-    try {
-      previouslyCompleted = JSON.parse(localStorage.getItem("toonflow.hello") ?? "null")?.completed === true;
-    } catch {
-      // ACT: If the old cache is unreadable, fall back to configured models; localStorage can't migrate across
-      // random desktop ports.
-    }
-    if (previouslyCompleted || customProviders.value.some(provider => provider.models.length))
-      await complete();
+    if (customProviders.value.some(provider => provider.models.length)) await complete();
     return completed.value;
   }
 

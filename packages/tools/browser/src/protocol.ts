@@ -30,7 +30,6 @@ export const browserActionSchema = z.discriminatedUnion("action", [
 ]);
 
 export type BrowserAction = z.infer<typeof browserActionSchema>;
-export type BrowserConfig = z.infer<typeof browserConfigSchema>;
 const pointerFields = { x: z.number().min(0).max(100000), y: z.number().min(0).max(100000) };
 const button = z.enum(["left", "right", "middle"]).default("left");
 const clickCount = z.union([z.literal(1), z.literal(2)]).default(1);
