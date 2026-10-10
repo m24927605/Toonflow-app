@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadConfigFromFile } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { i18nPlugin } from "@toonflow/i18n/vite";
 import { z } from "zod";
 import { defineExt, type ExtDefinition } from "./src/runtime.ts";
 
@@ -39,6 +40,7 @@ export function createExtConfig(config: ExtMetadata, configUrl: string) {
   return defineConfig({
     root,
     plugins: [
+      i18nPlugin(),
       vue(),
       {
         name: "extBundle",

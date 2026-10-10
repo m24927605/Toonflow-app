@@ -12,7 +12,7 @@
             <el-select :modelValue="extensionAssociations[row.suffix] ?? ''" placeholder="自动选择 / 每次询问" clearable
               :disabled="saving" :aria-label="`${row.suffix} 默认扩展`" @change="id => save(row.suffix, id)">
               <el-option v-if="row.unavailable" :value="row.unavailable" :label="`${row.unavailable}（不可用）`" disabled />
-              <el-option v-for="extension in row.candidates" :key="extension.id" :value="extension.id" :label="`${extension.displayName} · ${extension.id}`" />
+              <el-option v-for="extension in row.candidates" :key="extension.id" :value="extension.id" :label="`${translate(extension.displayName)} · ${extension.id}`" />
             </el-select>
           </template>
         </el-table-column>
@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from "vue";
 import { ElAlert, ElButton, ElDialog, ElMessage, ElOption, ElSelect, ElTable, ElTableColumn } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 import { extensionAssociations, listExtensions, setExtensionAssociation, type InstalledExtension } from "@/pages/workspace/panels/document/extensions";
 
 const visible = defineModel<boolean>({ required: true });

@@ -33,6 +33,8 @@ async function scan(directory: string) {
       const backend = /(?:apps[\\/]server|packages[\\/](?:mcp|ffmpeg))/.test(path);
       // Node titles, port labels and plugin names are stored as source text and translated where they are shown.
       const nodePackage = /packages[\\/](?:nodes|nodeShared|nodeScaffold)[\\/]/.test(path);
+      // Extension and tool names, descriptions and setting labels are shown by the host, which translates them.
+      const pluginMetadata = /packages[\\/](?:ext[\\/][^\\/]+[\\/]src[\\/]metadata|tools[\\/][^\\/]+[\\/]build)\.ts$/.test(path);
       const visit = (node: Node, parents: Node[] = []) => {
         const owner = [...parents].reverse().find(parent => parent.type === "VariableDeclarator" || parent.type === "ObjectProperty");
         const name = owner?.type === "VariableDeclarator" && owner.id.type === "Identifier" ? owner.id.name
@@ -43,6 +45,7 @@ async function scan(directory: string) {
         }
         if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "translateMessage"].includes(node.callee.name) && node.arguments[0]?.type === "StringLiteral") add(node.arguments[0].value, path);
         if (nodePackage && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["label", "displayName"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
+        if (pluginMetadata && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["displayName", "description", "title", "label", "placeholder"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
         // ACT: The server only extracts a candidate dictionary here without changing business strings;
         // actual translation happens only at explicit system-text outputs.
         if (!protectedMessage && backend && node.type === "StringLiteral" && node.value.length < 1200 && !node.value.includes("```")) {
@@ -59,7 +62,17 @@ async function scan(directory: string) {
     }
   }
 }
-for (const path of ["apps/web/src", "apps/server/src", "packages/mcp/src", "packages/ffmpeg/src", "packages/nodes", "packages/nodeShared/src", "packages/nodeScaffold/src"]) await scan(resolve(root, path));
+for (const path of ["apps/web/src", "apps/server/src", "packages/mcp/src", "packages/ffmpeg/src", "packages/nodes", "packages/ext", "packages/tools", "packages/nodeShared/src", "packages/nodeScaffold/src"]) await scan(resolve(root, path));
+// Built-in skill and team names are shown in the plugin list, which translates them.
+for (const kind of ["skills", "teams"]) {
+  for (const item of await readdir(resolve(root, "packages", kind), { withFileTypes: true })) {
+    if (!item.isDirectory()) continue;
+    const path = resolve(root, "packages", kind, item.name, kind === "skills" ? "SKILL.md" : "team.json");
+    const source = await readFile(path, "utf8");
+    const metadata = kind === "skills" ? { displayName: source.match(/^\s*displayName:\s*(.+?)\s*$/m)?.[1] } : JSON.parse(source);
+    for (const value of [metadata.displayName, metadata.description]) if (typeof value === "string") add(value, path);
+  }
+}
 const messages = Object.fromEntries([...catalog].sort(([left], [right]) => left.localeCompare(right, "zh-CN")).map(([message]) => [message, message]));
 await mkdir(resolve(import.meta.dirname, "locales"), { recursive: true });
 await writeAtomic(resolve(import.meta.dirname, "locales/zhCn.json"), JSON.stringify(messages, null, 2) + "\n");

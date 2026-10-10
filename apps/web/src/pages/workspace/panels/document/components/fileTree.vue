@@ -88,7 +88,7 @@ import { IconBox, IconChevronRight, IconFile, IconFilePlus, IconFileSearch, Icon
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { settingsStorage } from "@/stores/settings";
 import { writeClipboardText } from "@/lib/clipboard";
-import { t } from "@toonflow/i18n/vue";
+import { t, translate } from "@toonflow/i18n/vue";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
 import { extensionCandidates, extensionIcon, listExtensions } from "../extensions";
 import { getNodeIcon } from "../../canvas/loadNodeComponent";
@@ -524,7 +524,8 @@ function canvasItems(canvas: Record<string, unknown>, path: string): FileTreeIte
     if (!isRecord(node) || typeof node.id !== "string" || !node.id || node.type === "canvasGroup" || !isRecord(node.data)) return [];
     return [{
       key: JSON.stringify(["node", path, node.id]),
-      name: typeof node.data.label === "string" && node.data.label.trim() ? node.data.label : node.id,
+      // Default node labels are dictionary entries; labels the user typed come back unchanged.
+      name: typeof node.data.label === "string" && node.data.label.trim() ? translate(node.data.label) : node.id,
       path,
       type: "node",
       nodeId: node.id,
@@ -704,9 +705,9 @@ async function readDirectory(currentDirectory: string, path: string, signal: Abo
       const nodes = entry.type === "directory" ? nodeIndex?.get(pathIdentity(entry.name)) : undefined;
       if (nodes?.length) {
         const types = new Set(nodes.map(node => node.nodeType));
-        items.push({ ...item, displayLabel: [...new Set(nodes.map(node => node.label))].join(" / "), nodeId: entry.name,
+        items.push({ ...item, displayLabel: [...new Set(nodes.map(node => translate(node.label)))].join(" / "), nodeId: entry.name,
           nodeType: types.size === 1 ? nodes[0]!.nodeType : undefined,
-          nodeLocations: nodes.map(node => `${node.label} · ${node.canvasPath}`) });
+          nodeLocations: nodes.map(node => `${translate(node.label)} · ${node.canvasPath}`) });
         continue;
       }
       if (entry.type !== "file" || !entry.name.toLowerCase().endsWith(".json")) { items.push(item); continue; }

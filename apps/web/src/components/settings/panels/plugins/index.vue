@@ -328,6 +328,7 @@ watch(
             key: `${type}:${item.name}`,
             // Built-in plugin names are dictionary entries; other names come back unchanged.
             get displayName() { return translate(item.displayName || item.name); },
+            get description() { return item.description && translate(item.description); },
             configRules: markRaw(item.configRules ?? []),
           } as Plugin));
         } catch (error) {

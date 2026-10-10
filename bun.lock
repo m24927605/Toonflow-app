@@ -121,6 +121,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@toonflow/ext-scaffold": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
       },
       "devDependencies": {
         "typescript": "~6.0.3",
@@ -136,6 +137,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@toonflow/ext-scaffold": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
       },
       "devDependencies": {
         "typescript": "~6.0.3",
@@ -187,6 +189,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@toonflow/ext-scaffold": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
       },
       "devDependencies": {
         "typescript": "~6.0.3",
@@ -203,6 +206,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@toonflow/ext-scaffold": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
       },
       "devDependencies": {
         "typescript": "~6.0.3",
@@ -219,6 +223,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@toonflow/file": "workspace:*",
+        "@toonflow/i18n": "workspace:*",
         "@vitejs/plugin-vue": "^6.0.8",
         "vite": "^8.2.2",
         "zod": "^4.6.2",

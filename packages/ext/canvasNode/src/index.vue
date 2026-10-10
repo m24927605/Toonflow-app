@@ -4,6 +4,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import type { ExtContext } from "@toonflow/ext-scaffold/runtime";
 
 const props = defineProps<{ context: ExtContext }>();
@@ -26,7 +27,7 @@ async function mountNode() {
       release = unmount;
     }
   } catch (error) {
-    if (active && !disposed && currentRevision === revision) props.context.error = error instanceof Error ? error.message : "节点加载失败";
+    if (active && !disposed && currentRevision === revision) props.context.error = error instanceof Error ? error.message : translate("节点加载失败");
   } finally {
     mounting = false;
     // ACT: While switching, wait for the old mount to be released before restoring the current view,

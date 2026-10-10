@@ -82,7 +82,7 @@ function loadExtension(extension: InstalledExtension) {
       }
       url.searchParams.set("revision", `${extension.revision ?? extension.version}-${requestedRevision}`);
       const response = await fetch(url.href);
-      if (!response.ok) throw new Error(`扩展加载失败：${extension.displayName}（HTTP ${response.status}）`);
+      if (!response.ok) throw new Error(`扩展加载失败：${i18n.translate(extension.displayName)}（HTTP ${response.status}）`);
       const code = await response.text();
       if (code.includes("toonflowTiptapHost")) await import("@/lib/tiptapHost");
       if (requestedRevision !== revision) throw new Error("文件扩展已更新，请重新打开");
@@ -98,7 +98,7 @@ function loadExtension(extension: InstalledExtension) {
             resolve(defineExt(definition));
           } catch (error) { reject(error); }
         };
-        script.onerror = () => { script.remove(); reject(new Error(`扩展加载失败：${extension.displayName}`)); };
+        script.onerror = () => { script.remove(); reject(new Error(`扩展加载失败：${i18n.translate(extension.displayName)}`)); };
         delete host.toonflowExts?.[extension.id];
         document.head.append(script);
       });

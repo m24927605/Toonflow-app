@@ -14,6 +14,7 @@ import axios from "axios";
 import { computed, ref, shallowRef, toRaw, watch } from "vue";
 import formCreate, { type Api, type Options } from "../../formCreate";
 import { ElMessage } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 import type { Plugin } from "./types";
 import { extensionConfig, saveExtensionConfig } from "@/pages/workspace/panels/document/extensions";
 
@@ -29,7 +30,15 @@ const formOptions = computed<Options>(() => ({ form: { labelPosition: "top", siz
 watch(() => [visible.value, plugin], () => {
   if (!visible.value) return;
   formApi.value = undefined;
-  formRules.value = formCreate.copyRules(plugin.configRules ?? []);
+  const rules = formCreate.copyRules(plugin.configRules ?? []);
+  // Built-in plugins declare labels in the source language; text outside the dictionary comes back unchanged.
+  for (const rule of rules) {
+    if (typeof rule.title === "string") rule.title = translate(rule.title);
+    // Rules arrive as JSON, so props is always a plain object here, never form-create's chained creator.
+    if (typeof rule.props === "object" && typeof rule.props.placeholder === "string") rule.props.placeholder = translate(rule.props.placeholder);
+    for (const option of Array.isArray(rule.options) ? rule.options : []) if (typeof option?.label === "string") option.label = translate(option.label);
+  }
+  formRules.value = rules;
   formValues.value = structuredClone(toRaw(plugin.config ?? {}));
   configError.value = "";
 }, { immediate: true });

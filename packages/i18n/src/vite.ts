@@ -1,8 +1,11 @@
 import type { Plugin } from "vite";
 import { transformSource } from "./transform.ts";
 
-/** Web pages plus the canvas node sources, which reach the host's language state through `toonflowNodeHost.i18n`. */
-export const translatedSource = /\/(?:apps\/web\/src|packages\/(?:nodes\/[^/]+|nodeShared|nodeScaffold)\/src)\//;
+/**
+ * Web pages plus the canvas node and document extension sources, which reach the host's language state through
+ * `toonflowNodeHost.i18n` and `toonflowExtHost.i18n`.
+ */
+export const translatedSource = /\/(?:apps\/web\/src|packages\/(?:nodes\/[^/]+|ext\/[^/]+|nodeShared|nodeScaffold)\/src)\//;
 
 export function i18nPlugin(): Plugin {
   return {

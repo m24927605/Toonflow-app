@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { InputInstance } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
 import { documentError } from "../documentSession";
@@ -72,7 +73,7 @@ async function open() {
           if (Array.isArray(canvas.nodes)) for (const node of canvas.nodes) {
             if (typeof node.id !== "string") continue;
             found.push({ key: JSON.stringify([child.path, node.id]), path: child.path,
-              selection: { canvasPath: child.path, nodeId: node.id, label: typeof node.data?.label === "string" ? node.data.label : node.id } });
+              selection: { canvasPath: child.path, nodeId: node.id, label: typeof node.data?.label === "string" ? translate(node.data.label) : node.id } });
           }
         } else found.push({ key: child.path, path: child.path, selection: { filePath: child.path, label: child.name } });
       }

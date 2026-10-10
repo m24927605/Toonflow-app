@@ -5,7 +5,7 @@
       <el-radio-group v-model="selectedId" class="extensionOptions" aria-label="文件扩展">
         <el-radio v-for="option in options" :key="option.id" :value="option.id" class="extensionOption" border>
           <span class="optionInfo">
-            <span class="optionName">{{ option.displayName }}</span>
+            <span class="optionName">{{ translate(option.displayName) }}</span>
             <span class="optionDetails">{{ option.id }}<span v-if="option.version"> · v{{ option.version }}</span></span>
           </span>
         </el-radio>
@@ -22,6 +22,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, shallowRef } from "vue";
 import { ElButton, ElCheckbox, ElDialog, ElRadio, ElRadioGroup } from "element-plus";
+import { translate } from "@toonflow/i18n/vue";
 
 type ExtensionOption = { id: string; displayName: string; version: string };
 type ExtensionChoice = { id: string; makeDefault: boolean };
