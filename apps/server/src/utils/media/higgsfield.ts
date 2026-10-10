@@ -59,3 +59,67 @@ export async function runHiggsfield({ jobType, prompt, params = {}, media = {} }
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+export type SoulKind = "soul_2" | "soul_cinematic";
+export type HiggsfieldSoul = { id: string; name: string; kind: SoulKind; status: string; failReason: string | null; createdAt: string };
+
+const soulFlags: Record<SoulKind, string> = { soul_2: "--soul-2", soul_cinematic: "--soul-cinematic" };
+const soulId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function runSoulCommand(args: string[], signal?: AbortSignal) {
+  const command = findCommand("higgsfield", "未找到 Higgsfield CLI，请先在运行 Toonflow 的电脑上安装并执行 higgsfield auth login");
+  const child = Bun.spawn([command, "soul-id", ...args, "--json"], { env: { ...process.env, HIGGSFIELD_DISABLE_TELEMETRY: "1" }, stdin: "ignore", stdout: "pipe", stderr: "pipe", signal });
+  const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  await child.exited;
+  signal?.throwIfAborted();
+  if (child.exitCode !== 0) throw new Error(stderr.trim() || stdout.trim() || `Higgsfield CLI 异常退出（${child.exitCode}）`);
+  return JSON.parse(stdout) as unknown;
+}
+
+function readSoul(value: unknown): HiggsfieldSoul {
+  const item = (value ?? {}) as Record<string, unknown>;
+  if (typeof item.id !== "string" || !soulId.test(item.id) || (item.type !== "soul_2" && item.type !== "soul_cinematic")) throw new Error("Higgsfield 返回的角色身份格式无效");
+  return {
+    id: item.id,
+    name: typeof item.name === "string" ? item.name : "",
+    kind: item.type,
+    status: typeof item.status === "string" ? item.status : "unknown",
+    failReason: typeof item.fail_reason === "string" ? item.fail_reason : null,
+    createdAt: typeof item.created_at === "string" ? item.created_at : "",
+  };
+}
+
+/** Lists the Soul IDs of the signed-in Higgsfield account, newest first. */
+export async function listSouls(signal?: AbortSignal) {
+  const lists = await Promise.all((Object.keys(soulFlags) as SoulKind[]).map(kind => runSoulCommand(["list", soulFlags[kind], "--size", "100"], signal)));
+  return lists.flatMap(list => Array.isArray(list) ? list.map(readSoul) : []).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export async function getSoul(id: string, signal?: AbortSignal) {
+  if (!soulId.test(id)) throw Object.assign(new Error("角色身份 ID 无效"), { status: 400 });
+  return readSoul(await runSoulCommand(["get", id], signal));
+}
+
+/**
+ * Starts training a Soul ID from 5–20 images and returns it while Higgsfield trains it. Each training is charged to
+ * the Higgsfield plan; the CLI does not validate the inputs itself, so they are checked here first.
+ */
+export async function createSoul(name: string, kind: SoulKind, images: { data: Uint8Array; mimeType: string }[], signal?: AbortSignal) {
+  // The name goes into argv, so it is limited to letters, digits, spaces, dots, dashes and underscores (see runHiggsfield).
+  if (!/^[\p{L}\p{N}_. -]{1,64}$/u.test(name) || !name.trim()) throw Object.assign(new Error("角色名称只能包含文字、数字、空格、点、横线和下划线，最多 64 个字符"), { status: 400 });
+  if (!soulFlags[kind]) throw Object.assign(new Error("不支持此角色身份类型"), { status: 400 });
+  if (images.length < 5 || images.length > 20) throw Object.assign(new Error("训练角色身份需要 5 到 20 张图片"), { status: 400 });
+  const directory = await mkdtemp(join(tmpdir(), "toonflow-soul-"));
+  try {
+    const args = ["create", "--name", name.trim(), soulFlags[kind]];
+    for (const [index, image] of images.entries()) {
+      const extension = image.mimeType.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "png";
+      const path = join(directory, `${index}.${extension}`);
+      await writeFile(path, image.data);
+      args.push("--image", path);
+    }
+    return readSoul(await runSoulCommand(args, signal));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}

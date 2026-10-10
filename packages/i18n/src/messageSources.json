@@ -79,7 +79,8 @@
   "已完成": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/agent/toolMessage.vue",
-    "apps/web/src/components/agent/menu.vue"
+    "apps/web/src/components/agent/menu.vue",
+    "packages/nodes/characterNode/src/index.vue"
   ],
   "未完成": [
     "apps/web/src/components/settings/panels/developer/index.vue"
@@ -1557,7 +1558,8 @@
     "packages/nodes/imageNode/vite.config.ts",
     "packages/nodes/imageNode/src/index.vue",
     "packages/nodes/director3dNode/src/index.vue",
-    "packages/nodeShared/src/components/mediaHistory.vue"
+    "packages/nodeShared/src/components/mediaHistory.vue",
+    "packages/nodeShared/src/components/referenceCard.vue"
   ],
   "视频": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
@@ -1567,7 +1569,8 @@
     "packages/nodes/videoNode/vite.config.ts",
     "packages/nodes/videoNode/src/index.vue",
     "packages/nodes/director3dNode/src/index.vue",
-    "packages/nodeShared/src/components/mediaHistory.vue"
+    "packages/nodeShared/src/components/mediaHistory.vue",
+    "packages/nodeShared/src/components/referenceCard.vue"
   ],
   "音频": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
@@ -1575,7 +1578,8 @@
     "apps/web/src/components/agent/mentionMenu.vue",
     "apps/server/src/utils/media/generation.ts",
     "packages/nodes/audioNode/vite.config.ts",
-    "packages/nodes/audioNode/src/index.vue"
+    "packages/nodes/audioNode/src/index.vue",
+    "packages/nodeShared/src/components/referenceCard.vue"
   ],
   "单图参考": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
@@ -1790,7 +1794,8 @@
     "apps/web/src/components/settings/panels/mediaModel/providerAgentDialog.vue",
     "apps/web/src/pages/home/workspacePicker.vue",
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue",
-    "apps/web/src/pages/workspace/panels/canvas/components/assetMenu.vue"
+    "apps/web/src/pages/workspace/panels/canvas/components/assetMenu.vue",
+    "packages/nodes/characterNode/src/index.vue"
   ],
   "生成的供应商代码": [
     "apps/web/src/components/settings/panels/mediaModel/providerAgentDialog.vue"
@@ -5479,6 +5484,22 @@
   "Higgsfield 参考素材需为本地数据，不支持远程地址": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
+  "Higgsfield 返回的角色身份格式无效": [
+    "apps/server/src/utils/media/higgsfield.ts"
+  ],
+  "角色身份 ID 无效": [
+    "apps/server/src/utils/media/higgsfield.ts"
+  ],
+  "角色名称只能包含文字、数字、空格、点、横线和下划线，最多 64 个字符": [
+    "apps/server/src/utils/media/higgsfield.ts",
+    "apps/server/src/routes/higgsfield/souls/create.ts"
+  ],
+  "不支持此角色身份类型": [
+    "apps/server/src/utils/media/higgsfield.ts"
+  ],
+  "训练角色身份需要 5 到 20 张图片": [
+    "apps/server/src/utils/media/higgsfield.ts"
+  ],
   "供应商 ID 不能是系统保留文件名": [
     "apps/server/src/utils/media/provider.ts"
   ],
@@ -5647,6 +5668,9 @@
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "所选媒体模型不存在或类型不匹配，请重新选择": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
+  "所选模型不支持角色身份，请改用支持角色身份的图片模型": [
     "apps/server/src/utils/media/generation.ts"
   ],
   "此供应商不支持{0}生成": [
@@ -6103,6 +6127,12 @@
   "你选中的是文件夹，但这里需要的是文件。请重新选择具体文件。": [
     "apps/server/src/lib/responseFormat.ts"
   ],
+  "训练图片只支持 PNG、JPEG 或 WebP": [
+    "apps/server/src/routes/higgsfield/souls/create.ts"
+  ],
+  "单张训练图片不能超过 20 MB": [
+    "apps/server/src/routes/higgsfield/souls/create.ts"
+  ],
   "系统提示词不能超过 {0} 个字符": [
     "apps/server/src/routes/settings/save.ts"
   ],
@@ -6509,6 +6539,85 @@
   ],
   "安装失败且无法恢复旧版本，旧文件保留在 {0}": [
     "packages/ffmpeg/src/index.ts"
+  ],
+  "角色身份": [
+    "packages/nodes/characterNode/vite.config.ts",
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "已有角色": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练新角色": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色名称": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "版本": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份版本": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "已连接 {0} 张图片，需要 5–20 张同一真人的照片，建议 8–12 张": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "照片建议": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角度：正面 4–6 张，左右 45 度各 1–2 张，左右正侧面各 1 张，可加 1 张轻微俯仰": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "画质：脸部清晰不模糊，光线均匀，避免严重逆光或强烈阴影": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "表情：微笑、中性、轻微说话各占一部分": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "避免：墨镜、帽子遮脸、大量修图或滤镜": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "每次训练都会消耗 Higgsfield 点数": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练失败": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "排队中": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练中": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份状态读取失败": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份列表读取失败": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份正在训练，请等待完成": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "请填写角色名称": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练需要连接 5 到 20 张图片，当前为 {0} 张": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份训练失败": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "训练图片输入": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色输出": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "Higgsfield 请求失败（HTTP {0}）": [
+    "packages/nodes/characterNode/src/souls.ts"
   ],
   "提取音轨": [
     "packages/nodes/videoNode/src/index.vue",
@@ -8706,6 +8815,15 @@
   "请先选择图片模型": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
+  "一次只能引用一个角色身份": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "角色“{0}”需要改用 {1} 模型生成": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "没有可用于角色“{0}”的图片模型": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
   "图片处理中，请完成后再刷新节点": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
@@ -8718,7 +8836,7 @@
   "当前模型不支持比例 {0}，可选：{1}": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
-  "图片、文本输入": [
+  "图片、文本、角色输入": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片生成设置": [
@@ -8821,6 +8939,15 @@
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
   "删除引用": [
+    "packages/nodeShared/src/components/referenceCard.vue"
+  ],
+  "暂无内容": [
+    "packages/nodeShared/src/components/referenceCard.vue"
+  ],
+  "角色 {0}": [
+    "packages/nodeShared/src/components/referenceCard.vue"
+  ],
+  "引用 {0}：{1}{2}": [
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
   "读取引用文件失败": [

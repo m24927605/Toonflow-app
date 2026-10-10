@@ -421,7 +421,8 @@ const saveNodeToAssets = inject<((label: string, outputs: { label: string; outpu
 const assetOutputs = computed(() =>
   props.handles.flatMap((handle) => {
     const output = props.outputs[handle.id];
-    if (handle.type !== "source" || !output || (output.dataType === "STRING" && !output.value.trim())) return [];
+    // A character identity lives in the provider account, so there is no file to save.
+    if (handle.type !== "source" || !output || output.dataType === "CHARACTER" || (output.dataType === "STRING" && !output.value.trim())) return [];
     return [{ label: handleLabel(handle), output }];
   })
 );

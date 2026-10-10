@@ -24,6 +24,7 @@ export const listMediaModelsSchema = z.strictObject({});
 export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
   size: z.string().trim().min(1).max(64).optional(),
+  characterId: z.string().regex(/^[\w-]{1,128}$/, "角色身份 ID 无效").optional(),
 });
 export const videoGenerationSchema = z.strictObject({
   ...sharedFields,

@@ -331,6 +331,7 @@ The initial output protocols are listed below. Media uses file references, not t
 | IMAGE / MASK | `{ url: string, mimeType: "image/…" }` |
 | VIDEO | `{ url: string, mimeType: "video/…" }` |
 | AUDIO | `{ url: string, mimeType: "audio/…" }` |
+| CHARACTER | `{ id: string, name: string, kind: string }`, a trained character identity; `kind` names the identity family, such as Higgsfield `soul_2`, and must match the image model's `character` |
 
 Output values must use a concrete type, never `*` or a type array; those are only for port compatibility declarations. Other port types such as `LATENT` and `MODEL` do not have a value protocol yet; when adding one, extend `NodeValueMap` and `isNodeOutput` together. The image node's output is empty before an upload and is restored from the `data.outputs` saved in the canvas on refresh.
 

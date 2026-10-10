@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { translate } from "@toonflow/i18n/vue";
+import { t, translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
 import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
@@ -132,7 +132,7 @@ defineOptions({
   inheritAttrs: false,
   icon: IconPhotoAi,
   handles: [
-    { id: "in", type: "target", dataType: ["IMAGE", "STRING"], label: "图片、文本输入" },
+    { id: "in", type: "target", dataType: ["IMAGE", "STRING", "CHARACTER"], label: "图片、文本、角色输入" },
     { id: "image", type: "source", dataType: "IMAGE", label: "图片输出" },
   ] satisfies NodeHandle[],
 });
@@ -285,6 +285,13 @@ async function startGeneration() {
   const references = refList.value.filter(item => !data.value.inpaint || item.dataType !== "IMAGE" || item.value?.url !== data.value.inpaint.source);
   if (references.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   if (!choice) throw new Error("请先选择图片模型");
+  const characters = references.flatMap(item => item.dataType === "CHARACTER" && item.value ? [item.value] : []);
+  if (characters.length > 1) throw new Error("一次只能引用一个角色身份");
+  const character = characters[0];
+  if (character && choice.character !== character.kind) {
+    const supported = models.value.find(model => model.character === character.kind);
+    throw new Error(supported ? t`角色“${character.name}”需要改用 ${supported.label} 模型生成` : t`没有可用于角色“${character.name}”的图片模型`);
+  }
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const inpaintData = data.value.inpaint;
@@ -296,6 +303,7 @@ async function startGeneration() {
     ratio: data.value.ratio,
     outputDirectory: `assets/${id}`,
     images: references.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
+    characterId: character?.id,
   };
   if (inpaintData) {
     let imageIndex = 3 + (inpaintData.images?.length ?? 0);

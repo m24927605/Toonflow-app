@@ -4,7 +4,7 @@ Generates images from a prompt and can also use existing images and text as refe
 
 ## Inputs and outputs
 
-- Inputs accept images and text; connected text becomes part of the generation request.
+- Inputs accept images, text and one character identity; connected text becomes part of the generation request. A character identity, from the character identity node, keeps the same face across images and needs an image model that supports it, such as Higgsfield Soul 2.0 or Soul Cinematic.
 - Outputs one generated image, which can be used as a reference for further image or video generation.
 
 ## Usage

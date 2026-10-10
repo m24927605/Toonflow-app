@@ -45,7 +45,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { ElButton, ElImage } from "element-plus";
-import { IconX, IconFileText, IconPhoto, IconVideo, IconMusic, IconPlayerPlay } from "@tabler/icons-vue";
+import { IconX, IconFileText, IconPhoto, IconVideo, IconMusic, IconPlayerPlay, IconUserScan } from "@tabler/icons-vue";
+import { translate } from "@toonflow/i18n/vue";
 import { useNodeFiles } from "@toonflow/nodes-scaffold/workspaceFiles";
 import type { NodeInputValue } from "@toonflow/nodes-scaffold/values";
 
@@ -56,10 +57,12 @@ const previewError = ref("");
 const duration = ref("");
 const videoThumbnail = ref("");
 const media = computed(() => props.item.value !== undefined && (props.item.dataType === "IMAGE" || props.item.dataType === "VIDEO") ? { ...props.item.value } : undefined);
-const itemIcon = computed(() => props.item.dataType === "IMAGE" ? IconPhoto : props.item.dataType === "VIDEO" ? IconVideo : props.item.dataType === "AUDIO" ? IconMusic : IconFileText);
+const itemIcon = computed(() => ({ IMAGE: IconPhoto, VIDEO: IconVideo, AUDIO: IconMusic, CHARACTER: IconUserScan })[String(props.item.dataType)] ?? IconFileText);
 const title = computed(() => {
-  const content = props.item.value === undefined ? "暂无内容" : props.item.dataType === "STRING" ? props.item.value : props.item.dataType === "VIDEO" ? "视频" : props.item.dataType === "AUDIO" ? "音频" : "图片";
-  return `引用 ${props.index}：${content}${previewError.value ? `（${previewError.value}）` : ""}`;
+  const { dataType, value } = props.item;
+  const content = value === undefined ? translate("暂无内容") : dataType === "STRING" ? value
+    : dataType === "CHARACTER" ? translate("角色 {0}", { 0: value.name }) : dataType === "VIDEO" ? translate("视频") : dataType === "AUDIO" ? translate("音频") : translate("图片");
+  return translate("引用 {0}：{1}{2}", { 0: props.index, 1: content, 2: previewError.value ? translate("（{0}）", { 0: previewError.value }) : "" });
 });
 
 watch(media, () => {

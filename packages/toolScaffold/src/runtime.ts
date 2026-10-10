@@ -83,6 +83,8 @@ export interface MediaModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
   voices?: { title: string; voice: string }[];
+  /** Kind of trained character identity the image model accepts, e.g. `soul_2`. */
+  character?: string;
 }
 
 export interface MediaReference {
@@ -112,6 +114,8 @@ export interface MediaGenerationRequest {
   language?: string;
   format?: string;
   sampleRate?: number;
+  /** Trained character identity for image models that declare `character`. */
+  characterId?: string;
   mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }

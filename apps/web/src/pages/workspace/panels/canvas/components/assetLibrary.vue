@@ -208,7 +208,7 @@ const folders = computed(() => directoryEntries(entries.value));
 const extension = computed(() => {
   const output = outputs.value[selectedOutput.value]?.output;
   if (!output) return "";
-  if (typeof output.value !== "object") return output.dataType === "STRING" ? ".txt" : ".json";
+  if (typeof output.value !== "object" || !("url" in output.value)) return output.dataType === "STRING" ? ".txt" : ".json";
   return output.value.url.match(/\.[^./\\]+$/)?.[0] ?? "";
 });
 
@@ -298,7 +298,7 @@ async function saveAsset() {
   const path = saveDirectory.value === "." ? name : `${saveDirectory.value}/${name}`;
   saving.value = true;
   try {
-    const content = typeof output.value === "object"
+    const content = typeof output.value === "object" && "url" in output.value
       ? await useWorkspaceFiles(() => sourceDirectory).read(output.value.url)
       : new Blob([String(output.value)]);
     await axios.put("/api/assets/save", content, { params: { path }, headers: { "Content-Type": "application/octet-stream" } });

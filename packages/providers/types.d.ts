@@ -23,6 +23,8 @@ interface ProviderModel {
   imageRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   voices?: { title: string; voice: string }[];
+  /** Kind of trained character identity an image model accepts, e.g. `soul_2`; matched against the identity's kind. */
+  character?: string;
 }
 
 interface ProviderFormRule {
@@ -149,6 +151,8 @@ interface ImageRequest extends MediaRequest {
   quality?: string;
   /** Output encoding format, e.g. png, jpeg, webp. */
   outputFormat?: string;
+  /** Trained character identity to keep consistent; only sent to models that declare `character`. */
+  characterId?: string;
 }
 
 interface VideoRequest extends MediaRequest {
