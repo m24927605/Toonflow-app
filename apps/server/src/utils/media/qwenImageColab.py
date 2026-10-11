@@ -1,8 +1,9 @@
 # Qwen-Image 2.1 Turbo pipeline executed on a Colab GPU session by qwenImage.ts.
-# Inputs: /content/qwin_prompt.txt, /content/qwin_ref_* and the QW_* environment variables.
-# Output: /content/qwout/image.png, followed by a COLAB_DONE line on success.
-# Without references the image is drawn at the requested ratio and size; with references the output follows the
-# first reference's aspect, as ComfyUI's Qwen-Image 2.1 edit flow requires.
+# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs}) and the reference files it names.
+# Output: /content/qwout/image_<n>.png for every item, followed by a COLAB_DONE line on success.
+# The model loads once and the items are drawn one by one. Without references an image is drawn at its ratio and
+# size; with references it follows the first reference's aspect, as ComfyUI's Qwen-Image 2.1 edit flow requires.
+import json
 import math
 import os
 import shutil
@@ -22,12 +23,17 @@ comfy = Path("/content/ComfyUI")
 # Pinned to the revision this pipeline was verified with.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
 
-seed = int(os.environ["QW_SEED"])
-side = {"1K": 1024, "2K": 2048}[os.environ["QW_SIZE"]]
-ratioWidth, ratioHeight = (int(part) for part in os.environ["QW_RATIO"].split(":"))
-assert ratioWidth > 0 and ratioHeight > 0
-width = round(math.sqrt(side * side * ratioWidth / ratioHeight) / 32) * 32
-height = round(math.sqrt(side * side * ratioHeight / ratioWidth) / 32) * 32
+items = json.loads((inputs / "qwin_job.json").read_text())
+assert 1 <= len(items) <= 32
+
+
+def dimensions(item):
+    side = {"1K": 1024, "2K": 2048}[item["size"]]
+    ratioWidth, ratioHeight = (int(part) for part in item["ratio"].split(":"))
+    assert ratioWidth > 0 and ratioHeight > 0
+    return side, round(math.sqrt(side * side * ratioWidth / ratioHeight) / 32) * 32, round(math.sqrt(side * side * ratioHeight / ratioWidth) / 32) * 32
+
+
 # The checkpoint's own Turbo schedule (8 steps at CFG 1, scheduler shift 1.0, so the values are used as they are).
 turboSigmas = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0"
 
@@ -53,11 +59,11 @@ for remote, folder in [(f"diffusion_models/{diffusion}", "diffusion_models"), (f
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
 
-refs = sorted(inputs.glob("qwin_ref_*"), key=lambda path: int(path.stem.rsplit("_", 1)[-1]))
 (comfy / "input").mkdir(exist_ok=True)
-for ref in refs:
-    shutil.copy(ref, comfy / "input" / ref.name)
-prompt = (inputs / "qwin_prompt.txt").read_text()
+for item in items:
+    for name in item["refs"]:
+        assert "/" not in name and name.startswith("qwin_")
+        shutil.copy(inputs / name, comfy / "input" / name)
 
 base = "http://127.0.0.1:8188"
 log = Path("/content/comfyui.log")
@@ -77,40 +83,50 @@ except requests.RequestException:
     else:
         raise TimeoutError("ComfyUI did not start")
 
-graph = {
-    "1": {"class_type": "UNETLoader", "inputs": {"unet_name": diffusion, "weight_dtype": "default"}},
-    "2": {"class_type": "QwenImage21Cache", "inputs": {"model": ["1", 0], "device": "auto", "dtype": "default"}},
-    "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "qwen_image", "device": "default"}},
-    "4": {"class_type": "VAELoader", "inputs": {"vae_name": vae}},
-    "5": {"class_type": "TextEncodeQwenImage21", "inputs": {
-        "clip": ["3", 0], "vae": ["4", 0], "prompt": prompt, "negative_prompt": "", "resolution": side,
-        **{f"images.image_{index + 1}": [f"ref{index}", 0] for index in range(len(refs))}}},
-    "6": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
-    "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
-    "8": {"class_type": "BasicGuider", "inputs": {"model": ["2", 0], "conditioning": ["5", 0]}},
-    "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
-    "10": {"class_type": "ManualSigmas", "inputs": {"sigmas": turboSigmas}},
-    "11": {"class_type": "SamplerCustomAdvanced", "inputs": {
-        "noise": ["7", 0], "guider": ["8", 0], "sampler": ["9", 0], "sigmas": ["10", 0], "latent_image": ["5", 2] if refs else ["6", 0]}},
-    "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["4", 0]}},
-    "13": {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": "toonflow/qwen"}},
-}
-for index, ref in enumerate(refs):
-    graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
 
-response = requests.post(base + "/prompt", json={"prompt": graph}, timeout=60)
-if not response.ok:
-    raise RuntimeError(response.text[-4000:])
-promptId = response.json()["prompt_id"]
-while True:
-    history = requests.get(f"{base}/history/{promptId}", timeout=30).json().get(promptId)
-    if history and history.get("status", {}).get("completed") is not None:
-        break
-    time.sleep(5)
-if history["status"].get("status_str") != "success":
-    raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
 
-produced = sorted((comfy / "output" / "toonflow").glob("qwen_*.png"))[-1]
+def build(item):
+    side, width, height = dimensions(item)
+    refs = item["refs"]
+    graph = {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": diffusion, "weight_dtype": "default"}},
+        "2": {"class_type": "QwenImage21Cache", "inputs": {"model": ["1", 0], "device": "auto", "dtype": "default"}},
+        "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "qwen_image", "device": "default"}},
+        "4": {"class_type": "VAELoader", "inputs": {"vae_name": vae}},
+        "5": {"class_type": "TextEncodeQwenImage21", "inputs": {
+            "clip": ["3", 0], "vae": ["4", 0], "prompt": item["prompt"], "negative_prompt": "", "resolution": side,
+            **{f"images.image_{index + 1}": [f"ref{index}", 0] for index in range(len(refs))}}},
+        "6": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
+        "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": int(item["seed"])}},
+        "8": {"class_type": "BasicGuider", "inputs": {"model": ["2", 0], "conditioning": ["5", 0]}},
+        "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "10": {"class_type": "ManualSigmas", "inputs": {"sigmas": turboSigmas}},
+        "11": {"class_type": "SamplerCustomAdvanced", "inputs": {
+            "noise": ["7", 0], "guider": ["8", 0], "sampler": ["9", 0], "sigmas": ["10", 0], "latent_image": ["5", 2] if refs else ["6", 0]}},
+        "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["4", 0]}},
+    }
+    for index, name in enumerate(refs):
+        graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
+    return graph
+
+
+# Items are queued one by one instead of as one batch, so 2K images never need several at once in VRAM;
+# ComfyUI keeps the loaded models cached between them.
 outputs.mkdir(exist_ok=True)
-shutil.copy(produced, outputs / "image.png")
-print("COLAB_DONE", f"{width}x{height}" if not refs else "reference")
+for index, item in enumerate(items):
+    graph = build(item)
+    graph["13"] = {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": f"toonflow/qwen{index}"}}
+    response = requests.post(base + "/prompt", json={"prompt": graph}, timeout=60)
+    if not response.ok:
+        raise RuntimeError(response.text[-4000:])
+    promptId = response.json()["prompt_id"]
+    while True:
+        history = requests.get(f"{base}/history/{promptId}", timeout=30).json().get(promptId)
+        if history and history.get("status", {}).get("completed") is not None:
+            break
+        time.sleep(2)
+    if history["status"].get("status_str") != "success":
+        raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
+    produced = next((comfy / "output" / "toonflow").glob(f"qwen{index}_*.png"))
+    shutil.copy(produced, outputs / f"image_{index}.png")
+print("COLAB_DONE", len(items))

@@ -177,10 +177,12 @@ export async function generateMedia(
       const { bytes, mimeType } = await assetBytes(asset, mediaType, signal);
       signal?.throwIfAborted();
       const output = await resolveWorkspacePath(directory, outputDirectory, true);
-      const release = lockWorkspaceFiles([output.path]);
+      const file = join(outputDirectory, `${mediaType}${crypto.randomUUID()}.${mediaExtensions[mimeType]}`);
+      // Only the new file is locked: generations finishing together in one folder have unique names and never
+      // collide, while a rename or delete of the folder itself still conflicts with the lock.
+      const release = lockWorkspaceFiles([(await resolveWorkspacePath(directory, file, true)).path]);
       try {
         await mkdir(output.path, { recursive: true });
-        const file = join(outputDirectory, `${mediaType}${crypto.randomUUID()}.${mediaExtensions[mimeType]}`);
         const { path } = await resolveWorkspacePath(directory, file);
         signal?.throwIfAborted();
         await writeWorkspaceFile(path, bytes, true);

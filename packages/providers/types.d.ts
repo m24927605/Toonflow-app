@@ -155,8 +155,9 @@ interface ProviderTools {
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4" }>;
   /**
    * Draws one Qwen-Image 2.1 Turbo image on a Google Colab A100 through the Colab CLI installed and signed in on the
-   * host, using the compute units of that Google account. Blocks until the session finishes (about 5–10 minutes,
-   * mostly setup) and always stops the session. The host never exposes the Colab credentials.
+   * host, using the compute units of that Google account. The host gathers the requests made around the same time
+   * and draws them in one session, so setup is paid once per batch; it resolves when the batch finishes and the
+   * session always stops. The host never exposes the Colab credentials.
    */
   qwenImage(request: {
     prompt: string;
