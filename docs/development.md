@@ -17,7 +17,7 @@ Manage installed nodes, tools, skills, agents, and editor extensions under “Se
 
 Configuration forms for nodes and tools all use `@form-create/element-ui` rules; when a required field is empty, the configuration button shows a red dot. A tool only receives its own configuration; the host does not pass the full application settings to tools directly.
 
-The media interface includes extension types for images, video, and audio, and the actual capabilities are implemented by each provider. The built-in media providers, OpenAI, Higgsfield, Google Gemini, Metaso and MiniMax H3 (Colab), cover image, video and speech generation. Skills can be installed globally or placed in the `skill/` directory of the current workspace; when names collide, the workspace version takes precedence.
+The media interface includes extension types for images, video, and audio, and the actual capabilities are implemented by each provider. The built-in media providers, OpenAI, Higgsfield, Google Gemini, Metaso, MiniMax H3 (Colab) and Qwen-Image (Colab), cover image, video and speech generation. Skills can be installed globally or placed in the `skill/` directory of the current workspace; when names collide, the workspace version takes precedence.
 
 To operate Toonflow from an external coding tool, enable the service under “Settings → MCP” and copy the client configuration; both HTTP and stdio connections are supported. UI operations such as canvas and node actions require the Toonflow web page to stay open. See the [MCP Integration Guide](../packages/mcp/README.md) for details.
 

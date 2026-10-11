@@ -5454,12 +5454,6 @@
   "MiniMax H3 最多支持 9 张参考图片": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "未找到 Colab CLI，请先安装 google-colab-cli 并在终端执行 colab sessions 完成 Google 登录": [
-    "apps/server/src/utils/media/minimaxH3.ts"
-  ],
-  "MiniMax H3 参考图片需为本地数据，不支持远程地址": [
-    "apps/server/src/utils/media/minimaxH3.ts"
-  ],
   "音频输入必须是 Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
@@ -5562,6 +5556,24 @@
   ],
   "训练角色身份需要 5 到 20 张图片": [
     "apps/server/src/utils/media/higgsfield.ts"
+  ],
+  "未找到 Colab CLI，请先安装 google-colab-cli 并在终端执行 colab sessions 完成 Google 登录": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Colab 参考素材需为本地数据，不支持远程地址": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Qwen-Image 提示词不能为空": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Qwen-Image 只支持 1K 和 2K": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Qwen-Image 画面比例无效": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Qwen-Image 最多支持 16 张参考图片": [
+    "apps/server/src/utils/media/qwenImage.ts"
   ],
   "供应商 ID 不能是系统保留文件名": [
     "apps/server/src/utils/media/provider.ts"

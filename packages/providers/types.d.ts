@@ -153,6 +153,20 @@ interface ProviderTools {
     /** Keeps the generated soundtrack; false returns a silent video. */
     audio: boolean;
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4" }>;
+  /**
+   * Draws one Qwen-Image 2.1 Turbo image on a Google Colab A100 through the Colab CLI installed and signed in on the
+   * host, using the compute units of that Google account. Blocks until the session finishes (about 5–10 minutes,
+   * mostly setup) and always stops the session. The host never exposes the Colab credentials.
+   */
+  qwenImage(request: {
+    prompt: string;
+    /** Up to 16 reference images; with references the output follows the first reference's aspect. */
+    images?: MediaInput[];
+    /** Aspect ratio such as 16:9, used when there are no references. */
+    ratio: string;
+    /** Pixel area: 1K is about 1024×1024, 2K about 2048×2048. */
+    size: "1K" | "2K";
+  }): Promise<{ data: Uint8Array; mimeType: "image/png" }>;
 }
 
 interface ImageRequest extends MediaRequest {

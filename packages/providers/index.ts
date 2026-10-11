@@ -8,6 +8,7 @@ import higgsfield from "./src/media/higgsfield";
 import gemini from "./src/media/gemini";
 import metaso from "./src/media/metaso";
 import minimaxH3 from "./src/media/minimaxH3";
+import qwenImage from "./src/media/qwenImage";
 
 export type Provider = ProviderDefinition;
 export type ProviderTools = ProviderContext["tool"];
@@ -15,4 +16,4 @@ export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [openaiCodex, claudeCode, deepSeek] as const;
-export const mediaProviders = [openai, higgsfield, gemini, metaso, minimaxH3] as const;
+export const mediaProviders = [openai, higgsfield, gemini, metaso, minimaxH3, qwenImage] as const;

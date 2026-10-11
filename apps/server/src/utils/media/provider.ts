@@ -13,6 +13,7 @@ import { convertAudio } from "@/utils/media/audioProcessor";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { runHiggsfield } from "@/utils/media/higgsfield";
 import { runMinimaxH3 } from "@/utils/media/minimaxH3";
+import { runQwenImage } from "@/utils/media/qwenImage";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
 
 type Expression = Extract<ReturnType<typeof parseExpression>, { type: "ParenthesizedExpression" }>["expression"];
@@ -412,6 +413,7 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       },
       higgsfield: request => runHiggsfield(request, signal),
       minimaxH3: request => runMinimaxH3(request, signal),
+      qwenImage: request => runQwenImage(request, signal),
     } satisfies ProviderTools,
   };
   for (const [name, generate] of [

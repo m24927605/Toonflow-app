@@ -167,6 +167,7 @@ Credentials stay in your local data directory and are only sent to the provider 
 | Google Gemini | Text-to-speech with Gemini 3.8 Flash TTS (30 preset voices). The API key is sent only to `generativelanguage.googleapis.com`. A style prompt or emotion controls tone and pace; the text is read verbatim. |
 | Metaso | API key. |
 | MiniMax H3 (Colab) | Video with sound from the open-weight MiniMax H3 model at 480p, 720p or 1080p, 4–15 seconds, with up to 9 reference images, run on a Google Colab A100 through the Colab CLI on the computer running Toonflow. Install it with `uv tool install google-colab-cli`, then sign in once by running `colab sessions`. Each video starts and stops its own session and uses the compute units of your Colab plan (about 10 minutes at 480p or 720p, about 35 minutes at 1080p). The Colab CLI logs sign-in tokens to `~/.config/colab-cli/colab.log` in plain text, so Toonflow points that log at the null device and refuses to run while a regular log file exists; it never reads the Colab credentials. |
+| Qwen-Image (Colab) | Images from the open-weight Qwen-Image 2.1 Turbo model at about 1 or 4 megapixels in seven aspect ratios, or edits and combinations of up to 16 reference images, run on a Google Colab A100 through the same Colab CLI and sign-in as MiniMax H3. Each image starts and stops its own session (about 5–10 minutes, mostly setup) and uses the compute units of your Colab plan, with the same `colab.log` protection. |
 
 You can also add a custom media provider under Settings → Media models.
 
