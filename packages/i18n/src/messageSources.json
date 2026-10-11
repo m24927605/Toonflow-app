@@ -5439,6 +5439,27 @@
   "环境变量 {0} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置": [
     "apps/server/src/utils/conf/env.ts"
   ],
+  "MiniMax H3 提示词不能为空": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 时长须为 4 到 15 秒的整数": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 只支持 480p、720p 和 1080p": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 画面比例无效": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 最多支持 9 张参考图片": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "未找到 Colab CLI，请先安装 google-colab-cli 并在终端执行 colab sessions 完成 Google 登录": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 参考图片需为本地数据，不支持远程地址": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
   "音频输入必须是 Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],

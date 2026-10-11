@@ -12,6 +12,7 @@
     "./media/openai": "./src/media/openai.ts",
     "./media/higgsfield": "./src/media/higgsfield.ts",
     "./media/gemini": "./src/media/gemini.ts",
-    "./media/metaso": "./src/media/metaso.ts"
+    "./media/metaso": "./src/media/metaso.ts",
+    "./media/minimaxH3": "./src/media/minimaxH3.ts"
   }
 }

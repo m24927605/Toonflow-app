@@ -166,6 +166,7 @@ Credentials stay in your local data directory and are only sent to the provider 
 | Higgsfield | Video generation with Seedance 2.0 and Seedance 2.5 (2.5 can also extend a video), plus Soul 2.0 and Soul Cinematic images with trained character identities (Soul ID), through the Higgsfield CLI on the computer running Toonflow. Install it with `npm install -g @higgsfield/cli`, then sign in once with `higgsfield auth login`. Jobs use the credits of your Higgsfield plan; Toonflow never reads the CLI credentials. |
 | Google Gemini | Text-to-speech with Gemini 3.8 Flash TTS (30 preset voices). The API key is sent only to `generativelanguage.googleapis.com`. A style prompt or emotion controls tone and pace; the text is read verbatim. |
 | Metaso | API key. |
+| MiniMax H3 (Colab) | Video with sound from the open-weight MiniMax H3 model at 480p, 720p or 1080p, 4–15 seconds, with up to 9 reference images, run on a Google Colab A100 through the Colab CLI on the computer running Toonflow. Install it with `uv tool install google-colab-cli`, then sign in once by running `colab sessions`. Each video starts and stops its own session and uses the compute units of your Colab plan (about 10 minutes at 480p or 720p, about 35 minutes at 1080p). The Colab CLI logs sign-in tokens to `~/.config/colab-cli/colab.log` in plain text, so Toonflow points that log at the null device and refuses to run while a regular log file exists; it never reads the Colab credentials. |
 
 You can also add a custom media provider under Settings → Media models.
 

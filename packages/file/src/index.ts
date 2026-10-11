@@ -16,6 +16,7 @@ export const access = promises.access;
 export const stat = promises.stat;
 export const lstat = promises.lstat;
 export const realpath = promises.realpath;
+export const readlink = promises.readlink;
 export const chmod = promises.chmod;
 export const mkdtemp = promises.mkdtemp;
 export const existsSync = native.existsSync;
@@ -36,6 +37,7 @@ export const rename: typeof promises.rename = (source, target) =>
   withFileAccess([source, target], "write", () => stubborn.retry.rename(retryOptions)(source, target));
 export const unlink: typeof promises.unlink = path => withFileAccess([path], "write", () => promises.unlink(path));
 export const link: typeof promises.link = (source, target) => withFileAccess([source, target], "write", () => promises.link(source, target));
+export const symlink: typeof promises.symlink = (target, path, type) => withFileAccess([path], "write", () => promises.symlink(target, path, type));
 export const copyFile: typeof promises.copyFile = (source, target, mode) =>
   withFileAccess([source, target], "write", () => promises.copyFile(source, target, mode));
 export const cp: typeof promises.cp = (source, target, options) =>

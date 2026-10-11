@@ -136,6 +136,23 @@ interface ProviderTools {
     params?: Record<string, string | number | boolean>;
     media?: Partial<Record<"image-references" | "video-references" | "audio-references" | "start-image" | "end-image", MediaInput[]>>;
   }): Promise<{ url: string }>;
+  /**
+   * Renders one MiniMax H3 Ref2VA video on a Google Colab A100 through the Colab CLI installed and signed in on the
+   * host, using the compute units of that Google account. Blocks until the session finishes (about 10–35 minutes)
+   * and always stops the session. The host never exposes the Colab credentials.
+   */
+  minimaxH3(request: {
+    prompt: string;
+    /** Up to 9 reference images, referred to in the prompt as <Picture 1>…<Picture 9>. */
+    images?: MediaInput[];
+    /** Whole seconds, 4–15. */
+    duration: number;
+    resolution: "480p" | "720p" | "1080p";
+    /** Aspect ratio such as 16:9 or 9:16. */
+    ratio: string;
+    /** Keeps the generated soundtrack; false returns a silent video. */
+    audio: boolean;
+  }): Promise<{ data: Uint8Array; mimeType: "video/mp4" }>;
 }
 
 interface ImageRequest extends MediaRequest {

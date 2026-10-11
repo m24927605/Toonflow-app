@@ -3002,5 +3002,12 @@
   "请在服务器本机卸载团队": "請在伺服器本機卸載團隊",
   "请在服务器本机卸载文件扩展": "請在伺服器本機解除安裝檔案擴充功能",
   "请在服务器本机新增技能文件": "請在伺服器本機新增技能文件",
-  "请在服务器本机移动技能文件": "請在伺服器本機移動技能文件"
+  "请在服务器本机移动技能文件": "請在伺服器本機移動技能文件",
+  "未找到 Colab CLI，请先安装 google-colab-cli 并在终端执行 colab sessions 完成 Google 登录": "找不到 Colab CLI，請先安裝 google-colab-cli，並在終端機執行 colab sessions 完成 Google 登入",
+  "MiniMax H3 参考图片需为本地数据，不支持远程地址": "MiniMax H3 參考圖片須為本機資料，不支援遠端網址",
+  "MiniMax H3 画面比例无效": "MiniMax H3 畫面比例無效",
+  "MiniMax H3 时长须为 4 到 15 秒的整数": "MiniMax H3 時長須為 4 到 15 秒的整數",
+  "MiniMax H3 提示词不能为空": "MiniMax H3 提示詞不能為空",
+  "MiniMax H3 只支持 480p、720p 和 1080p": "MiniMax H3 只支援 480p、720p 和 1080p",
+  "MiniMax H3 最多支持 9 张参考图片": "MiniMax H3 最多支援 9 張參考圖片"
 }
