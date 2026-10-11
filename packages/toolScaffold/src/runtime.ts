@@ -16,7 +16,7 @@ export const toolMetadataSchema = z.object({
   prompt: z.string().max(20000).default(""),
   readme: z.string().max(200000).default(""),
   components: z.array(z.string().max(96).regex(/^[a-z][a-zA-Z0-9_]*$/)).max(100)
-    .refine(names => new Set(names).size === names.length, "工具组件名称不能重复").default([]),
+    .refine(names => new Set(names).size === names.length, "Tool component names must be unique").default([]),
   author: z.string().max(100),
   github: z.string().refine(value => !value || (URL.canParse(value) && new URL(value).origin === "https://github.com" && !new URL(value).username && !new URL(value).password)),
   configRules: z.array(z.record(z.string(), z.json())).max(100),
@@ -118,7 +118,11 @@ export interface MediaGenerationRequest {
   sampleRate?: number;
   /** Trained character identity for image models that declare `character`. */
   characterId?: string;
-  mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension"
+  /** Video only: generate without a previs control video; set only after the user explicitly agreed to skip the previs. */
+  skipPrevis?: boolean;
+  /** Image and video only: send although the prompt asks for on-screen text; set only after the user confirmed it. */
+  skipTextCheck?: boolean;
+  mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension" | "videoControl"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }
 

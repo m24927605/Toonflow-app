@@ -8,12 +8,14 @@ export type NodeEventCallbacks = {
   delete: () => void | Promise<void>;
   save: (reason?: "reload") => void | Promise<void>;
   copy: () => Record<string, unknown> | Promise<Record<string, unknown>>;
+  /** Starts the node's generation; nodes that cannot generate do not listen. */
+  generate: () => void;
   canConnect: ValidConnectionFunc;
   [name: `input:${string}`]: (values: NodeInputValue[]) => void;
   [name: `output:${string}`]: (output: NodeOutput | undefined) => void;
 };
 type NodeEventListeners = {
-  [name in "delete" | "save" | "copy" | "canConnect"]: Set<NodeEventCallbacks[name]>;
+  [name in "delete" | "save" | "copy" | "canConnect" | "generate"]: Set<NodeEventCallbacks[name]>;
 };
 
 // Attached to the shared canvas instance so standalone UMDs share the registry; never included in the canvas JSON.
@@ -43,16 +45,16 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
         { deep: true, immediate: true },
       );
     }
-    if (name !== "delete" && name !== "save" && name !== "copy" && name !== "canConnect") throw new Error(`未知节点事件：${name}`);
+    if (name !== "delete" && name !== "save" && name !== "copy" && name !== "canConnect" && name !== "generate") throw new Error(`未知节点事件：${name}`);
     let events = registry.get(nodeId);
     if (!events) {
-      events = { delete: new Set(), save: new Set(), copy: new Set(), canConnect: new Set() };
+      events = { delete: new Set(), save: new Set(), copy: new Set(), canConnect: new Set(), generate: new Set() };
       registry.set(nodeId, events);
     }
-    const listeners = events[name as "delete" | "save" | "copy" | "canConnect"] as Set<NodeEventCallbacks[name]>;
+    const listeners = events[name as "delete" | "save" | "copy" | "canConnect" | "generate"] as Set<NodeEventCallbacks[name]>;
     listeners.add(callback);
     const off = () => {
-      if (listeners.delete(callback) && !events.delete.size && !events.save.size && !events.copy.size && !events.canConnect.size) registry.delete(nodeId);
+      if (listeners.delete(callback) && !events.delete.size && !events.save.size && !events.copy.size && !events.canConnect.size && !events.generate.size) registry.delete(nodeId);
     };
     onScopeDispose(off);
     return off;
@@ -62,8 +64,14 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
   function emit(name: "save", reason?: "reload"): Promise<void>;
   function emit(name: "copy"): Promise<Record<string, unknown>>;
   function emit(name: "canConnect", ...args: Parameters<ValidConnectionFunc>): boolean;
-  function emit(...args: ["delete"] | ["save", "reload"?] | ["copy"] | ["canConnect", ...Parameters<ValidConnectionFunc>]) {
+  function emit(name: "generate"): number;
+  function emit(...args: ["delete"] | ["save", "reload"?] | ["copy"] | ["canConnect", ...Parameters<ValidConnectionFunc>] | ["generate"]) {
     const events = registry.get(nodeId);
+    if (args[0] === "generate") {
+      const listeners = [...events?.generate ?? []];
+      listeners.forEach(callback => callback());
+      return listeners.length;
+    }
     if (args[0] === "canConnect") {
       return [...events?.canConnect ?? []].every(callback => callback(args[1], args[2]) === true);
     }

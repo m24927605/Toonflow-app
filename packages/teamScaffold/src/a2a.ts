@@ -28,7 +28,7 @@ export type TeamA2aResult = { status: "completed" | "inputRequired"; text: strin
 export function createTeamAgentCard(manifest: TeamManifest, endpointUrl: string): AgentCard {
   const team = teamSchema.parse(manifest);
   const endpoint = new URL(endpointUrl);
-  if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash) throw new Error("A2A 地址必须是无内嵌凭据的 HTTP(S) 地址");
+  if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.hash) throw new Error("A2A address must be an HTTP(S) address without embedded credentials");
   return AgentCard.fromJSON({
     name: team.displayName,
     description: team.description,
@@ -66,8 +66,8 @@ export function createTeamA2aRouter(options: {
     async execute(context, bus) {
       const { taskId, contextId } = context;
       const userId = context.context.user?.userName;
-      if (!userId) throw new Error("A2A 请求缺少认证身份");
-      if (active.has(taskId)) throw new RequestMalformedError("同一任务正在执行，请等待当前执行结束");
+      if (!userId) throw new Error("A2A request is missing an authenticated identity");
+      if (active.has(taskId)) throw new RequestMalformedError("The same task is running; wait for the current run to finish");
       const controller = new AbortController();
       let finish!: () => void;
       const done = new Promise<void>(resolve => { finish = resolve; });
@@ -88,7 +88,7 @@ export function createTeamA2aRouter(options: {
         if (result.status === "inputRequired") paused.set(taskId, contextId);
         status(bus, taskId, contextId, result.status === "inputRequired" ? TaskState.TASK_STATE_INPUT_REQUIRED : TaskState.TASK_STATE_COMPLETED, result.text);
       } catch (error) {
-        status(bus, taskId, contextId, controller.signal.aborted ? TaskState.TASK_STATE_CANCELED : TaskState.TASK_STATE_FAILED, error instanceof Error ? error.message : "团队执行失败");
+        status(bus, taskId, contextId, controller.signal.aborted ? TaskState.TASK_STATE_CANCELED : TaskState.TASK_STATE_FAILED, error instanceof Error ? error.message : "Team execution failed");
       } finally {
         active.delete(taskId);
         finish();
@@ -98,12 +98,12 @@ export function createTeamA2aRouter(options: {
       const running = active.get(taskId);
       if (!running) {
         const contextId = paused.get(taskId);
-        if (!contextId) throw new TaskNotCancelableError("任务当前没有正在执行的工作");
-        status(bus, taskId, contextId, TaskState.TASK_STATE_CANCELED, "任务已取消");
+        if (!contextId) throw new TaskNotCancelableError("The task has no work currently running");
+        status(bus, taskId, contextId, TaskState.TASK_STATE_CANCELED, "Task cancelled");
         paused.delete(taskId);
         return;
       }
-      running.controller.abort(new Error("任务已取消"));
+      running.controller.abort(new Error("Task cancelled"));
       // execute publishes CANCELED only after the host cleans up concurrent members;
       // a cancel request must not pass for execution having stopped.
       await running.done;
@@ -126,7 +126,7 @@ export function createTeamA2aRouter(options: {
   function begin(taskId: string | undefined, userId: string | undefined) {
     if (!taskId) return;
     const key = JSON.stringify([userId, taskId]);
-    if (pending.has(key) || active.get(taskId)?.userId === userId) throw new RequestMalformedError("同一任务正在执行，请等待当前执行结束");
+    if (pending.has(key) || active.get(taskId)?.userId === userId) throw new RequestMalformedError("The same task is running; wait for the current run to finish");
     pending.add(key);
     return key;
   }
@@ -168,11 +168,11 @@ export function createTeamA2aRouter(options: {
 
 export async function createTeamA2aClient(options: { url: string; token?: string; fetch?: typeof fetch }) {
   const cardUrl = new URL(options.url);
-  if (!["http:", "https:"].includes(cardUrl.protocol) || cardUrl.username || cardUrl.password || cardUrl.hash) throw new Error("Agent Card 地址必须是无内嵌凭据的 HTTP(S) 地址");
+  if (!["http:", "https:"].includes(cardUrl.protocol) || cardUrl.username || cardUrl.password || cardUrl.hash) throw new Error("Agent Card address must be an HTTP(S) address without embedded credentials");
   const originalFetch = options.fetch ?? globalThis.fetch;
   const fetchImpl = ((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = new URL(input instanceof globalThis.Request ? input.url : String(input));
-    if (options.token && url.origin !== cardUrl.origin) throw new Error("不能将 A2A 密钥转发给 Agent Card 中的其他来源");
+    if (options.token && url.origin !== cardUrl.origin) throw new Error("Cannot forward the A2A key to another origin in the Agent Card");
     const headers = new Headers(input instanceof globalThis.Request ? input.headers : undefined);
     new Headers(init?.headers).forEach((value, name) => headers.set(name, value));
     if (options.token) headers.set("Authorization", `Bearer ${options.token}`);

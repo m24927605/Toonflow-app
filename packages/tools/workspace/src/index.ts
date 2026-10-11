@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 
 const configSchema = z.object({ readOnly: z.boolean().default(false) }).strict();
-const downloadImageSchema = z.object({ url: z.string().trim().min(1).max(8192).describe("公开 HTTP(S) 图片直链") }).strict();
+const downloadImageSchema = z.object({ url: z.string().trim().min(1).max(8192).describe("Direct link to a public HTTP(S) image") }).strict();
 
 const plugin: ToolPlugin = {
   validateConfig: config => configSchema.parse(config),
@@ -33,10 +33,10 @@ const plugin: ToolPlugin = {
       );
       tools.push({
         name: "downloadImage",
-        label: "下载图片",
-        description: "下载公开 HTTP(S) 图片并保存到当前工作区，返回工作区相对路径和 MIME 类型。支持 PNG、JPEG、WebP、GIF、AVIF、BMP，单张不超过 20 MB；不支持需要登录的图片、SVG、本机和内网地址。输出路径由宿主决定，无需指定目录。",
-        promptSnippet: "将远程图片下载到工作区，返回可用于本地预览和参考素材的相对路径。",
-        promptGuidelines: ["保存远程图片时使用 downloadImage，不用 web_fetch、write 或 FFmpeg 下载；成功后使用返回的工作区相对路径展示 Markdown 图片，例如 ![图片](<assets/chatImages/文件名.jpg>)。"],
+        label: "Download image",
+        description: "Download a public HTTP(S) image and save it to the current workspace, returning the workspace-relative path and MIME type. Supports PNG, JPEG, WebP, GIF, AVIF and BMP, up to 20 MB per image; images that require login, SVG, and local or private network addresses are not supported. The host decides the output path; no directory needs to be specified.",
+        promptSnippet: "Download a remote image to the workspace and return a relative path usable for local preview and as a reference asset.",
+        promptGuidelines: ["Use downloadImage to save remote images; do not download them with web_fetch, write or FFmpeg. On success, display a Markdown image using the returned workspace-relative path, for example ![Image](<assets/chatImages/filename.jpg>)."],
         parameters: z.toJSONSchema(downloadImageSchema, { io: "input", target: "draft-07" }),
         executionMode: "sequential",
         async execute(toolCallId, params, signal) {
@@ -45,7 +45,9 @@ const plugin: ToolPlugin = {
           const result = await files.importImage(url);
           signal?.throwIfAborted();
           return {
-            content: [{ type: "text", text: `图片已保存到工作区：${result.path}\nMIME 类型：${result.mimeType}\n![下载图片](<${result.path}>)` }],
+            content: [{ type: "text", text: `Image saved to the workspace: ${result.path}
+MIME type: ${result.mimeType}
+![Downloaded image](<${result.path}>)` }],
             details: result,
           };
         },
@@ -55,7 +57,7 @@ const plugin: ToolPlugin = {
       ...tool,
       promptGuidelines: [
         ...(tool.promptGuidelines ?? []),
-        ...(readOnly ? ["当前文件工具只支持读取，不能用它们写入或编辑文件；其他工具的能力以各自说明为准。"] : []),
+        ...(readOnly ? ["The current file tools only support reading and cannot be used to write or edit files; the capabilities of other tools are as described in their own descriptions."] : []),
       ],
     }));
   },

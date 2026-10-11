@@ -4,18 +4,18 @@ import { reportToParent } from "@/agent/runtime/sessions";
 import type { AgentEvent } from "@/agent/runtime/types";
 
 export function createReportTool(cwd: string, parentFile: string, file: string, name: string, send: (event: AgentEvent) => void): ToolDefinition {
-  const parameters = z.strictObject({ content: z.string().trim().min(1).max(16000).describe("向父 Agent 上报的结论、进展或需要协调的问题") });
+  const parameters = z.strictObject({ content: z.string().trim().min(1).max(16000).describe("Conclusion, progress or issues requiring coordination reported to the parent Agent") });
   return {
-    name: "report", label: "上报父 Agent",
-    description: "把当前子任务的重要进展或最终结论提交给父 Agent。报告进入父 Agent 的上下文；不替代当前与用户的直接对话，也不会自动启动空闲父 Agent。",
-    promptGuidelines: ["完成委派任务或发现需要父 Agent 协调的问题时，使用 report 上报实际结论、修改、验证情况及未完成项。"],
+    name: "report", label: "Report to parent Agent",
+    description: "Submits the important progress or final conclusion of the current subtask to the parent Agent. Reports into the context of the parent Agent; does not replace the current direct conversation with the user, nor automatically launch an idle parent agent.",
+    promptGuidelines: ["When you finish the delegated task or find an issue that needs coordination by the parent agent, use report to submit the actual conclusions, changes, verification status and unfinished items."],
     parameters: z.toJSONSchema(parameters), executionMode: "sequential",
     async execute(_id, params, signal) {
       signal?.throwIfAborted();
       const { content } = parameters.parse(params);
       const id = await reportToParent(cwd, parentFile, file, name, content);
       send({ type: "report", id, parentFile, file, name, content });
-      return { content: [{ type: "text", text: "已上报父 Agent" }], details: { id } };
+      return { content: [{ type: "text", text: "has been reported to the parent Agent" }], details: { id } };
     },
   };
 }

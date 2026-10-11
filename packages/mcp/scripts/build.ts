@@ -11,7 +11,7 @@ const result = await Bun.build({
   external: ["express"],
   minify: true,
 });
-if (!result.success) throw new AggregateError(result.logs, "MCP 构建失败");
+if (!result.success) throw new AggregateError(result.logs, "MCP build failed");
 await mkdir(output, { recursive: true });
 await cp(resolve(packageRoot, "skills"), resolve(output, "skills"), { recursive: true });
 await cp(resolve(packageRoot, "README.md"), resolve(output, "README.md"));
@@ -24,4 +24,4 @@ await writeFile(resolve(output, "package.json"), JSON.stringify({
   bin: { "toonflow-mcp": "./stdio.js" },
   peerDependencies: { express: "^5.2.1" },
 }, null, 2));
-console.log(`MCP 已构建到 ${output}`);
+console.log(`MCP built to ${output}`);

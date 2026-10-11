@@ -12,7 +12,7 @@ export default router.get("/", validateFields({ path: z.string().min(1).max(4096
   const root = await u.assets.getAssetsDirectory();
   const { directory, path } = await u.workspaceFile.resolveWorkspacePath(root, req.query.path as string);
   u.workspaceFile.protectWorkspaceRoot(directory, path);
-  if (!(await lstat(path)).isFile()) throw Object.assign(new Error("只能读取文件"), { status: 400 });
+  if (!(await lstat(path)).isFile()) throw Object.assign(new Error("can only read files"), { status: 400 });
   if (req.query.download === "true") res.attachment(basename(path));
   res.set({ "Cache-Control": "no-store", "Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff" });
   await sendFile(res, path, { dotfiles: "allow" }, err => { if (err) next(err); });

@@ -2,7 +2,7 @@ import type { BrowserFfmpegFactory } from "@toonflow/ffmpeg/browser";
 import { probeMedia, runCommand } from "@toonflow/node-shared/ffmpegCommand";
 
 export type VideoProcessingOptions = {
-  action: "extractAudio" | "separate" | "trim";
+  action: "extractAudio" | "separate" | "trim" | "fps30";
   audioPath?: string;
   videoPath?: string;
   start?: number;
@@ -20,8 +20,8 @@ function normalizePath(path: string) {
 export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string, options: VideoProcessingOptions, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const sourcePath = normalizePath(source);
-  if (!["extractAudio", "separate", "trim"].includes(options.action)) throw new Error("未知的视频处理操作");
-  const needsAudio = options.action !== "trim";
+  if (!["extractAudio", "separate", "trim", "fps30"].includes(options.action)) throw new Error("未知的视频处理操作");
+  const needsAudio = options.action === "extractAudio" || options.action === "separate";
   const needsVideo = options.action !== "extractAudio";
   if (needsAudio && !options.audioPath) throw new Error("缺少音轨输出路径");
   if (needsVideo && !options.videoPath) throw new Error("缺少视频输出路径");
@@ -48,16 +48,22 @@ export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string,
   if (needsVideo) {
     // ACT: Re-encode to H.264 for frame-accurate cuts and player compatibility;
     // odd dimensions are only padded to even, never stretched.
+    // Every edit lands on one 30 fps timeline; 24 fps sources then repeat one frame in five, which is expected, not stutter.
     command.output(options.videoPath!).videoCodec("libx264").format("mp4")
-      .videoFilters("pad=ceil(iw/2)*2:ceil(ih/2)*2")
+      .videoFilters("pad=ceil(iw/2)*2:ceil(ih/2)*2,fps=30")
       .outputOptions("-map", `0:${video.index}`, "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart");
     if (options.action === "separate") command.noAudio();
-    else command.duration(options.end! - options.start!).audioCodec("aac").audioBitrate(192).outputOptions("-map", "0:a:0?");
+    else {
+      if (options.action === "trim") command.duration(options.end! - options.start!);
+      command.audioCodec("aac").audioBitrate(192).outputOptions("-map", "0:a:0?");
+    }
   }
   await runCommand(command, signal);
   const result = await probeMedia(ffmpeg, needsVideo ? options.videoPath! : options.audioPath!, signal);
   const resultVideo = result.streams.find(stream => stream.codec_type === "video");
   const resultDuration = Number(result.format.duration);
   if (!Number.isFinite(resultDuration) || resultDuration <= 0 || (needsVideo && !resultVideo)) throw new Error("生成的媒体文件无效");
-  return { duration: resultDuration, width: resultVideo?.width ?? video.width, height: resultVideo?.height ?? video.height };
+  const [numerator, denominator] = String(video.r_frame_rate ?? "0/1").split("/").map(Number);
+  const sourceFps = denominator ? numerator! / denominator : 0;
+  return { duration: resultDuration, width: resultVideo?.width ?? video.width, height: resultVideo?.height ?? video.height, sourceFps };
 }

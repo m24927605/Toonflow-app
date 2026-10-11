@@ -61,26 +61,26 @@ export async function run(
 ) {
   mentions = agentMentionsSchema.parse(mentions);
   validateMentionTokens(prompt, mentions);
-  if (!prompt.trim() && !attachments.length && !mentions.length) throw Object.assign(new Error("请输入消息、提及或添加附件"), { status: 400 });
+  if (!prompt.trim() && !attachments.length && !mentions.length) throw Object.assign(new Error("Please enter a message, add a mention, or attach a file"), { status: 400 });
   const attachmentContents: (z.infer<typeof agentAttachmentsSchema>[number] & { content?: string })[] = [];
   for (const attachment of attachments) {
     const { path } = await resolveWorkspacePath(cwd, attachment.path);
     const info = await stat(path);
     if (!info.isFile() || !info.size || info.size > 100 * 1024 * 1024) {
-      throw Object.assign(new Error("附件必须是工作区内非空且不超过 100 MB 的文件"), { status: 400 });
+      throw Object.assign(new Error("The attachment must be a non-empty file in the workspace and no larger than 100 MB"), { status: 400 });
     }
     if (attachment.mimeType !== "text/plain") { attachmentContents.push(attachment); continue; }
     // ACT: Same limit as text references: read fully into the model
     // context, and reject instead of truncating when over the limit.
-    if (info.size > 400000) throw Object.assign(new Error("文本附件最多支持 100000 个字符，请缩小内容后重试"), { status: 400 });
+    if (info.size > 400000) throw Object.assign(new Error("Text attachments support up to 100000 characters. Please shorten the content and try again"), { status: 400 });
     const bytes = await readFile(path, { signal });
     let content: string;
     try { content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); }
-    catch { throw Object.assign(new Error("文本附件必须是 UTF-8 纯文本"), { status: 400 }); }
-    if (bytes.length > 400000 || content.length > 100000) throw Object.assign(new Error("文本附件最多支持 100000 个字符，请缩小内容后重试"), { status: 400 });
+    catch { throw Object.assign(new Error("Text attachments must be UTF-8 plain text"), { status: 400 }); }
+    if (bytes.length > 400000 || content.length > 100000) throw Object.assign(new Error("Text attachments support up to 100000 characters. Please shorten the content and try again"), { status: 400 });
     attachmentContents.push({ ...attachment, content });
   }
-  if (resendFrom && !sessionFile) throw Object.assign(new Error("重发需要指定原对话"), { status: 400 });
+  if (resendFrom && !sessionFile) throw Object.assign(new Error("Retransmission requires specifying the original conversation"), { status: 400 });
   signal?.throwIfAborted();
   const { path: sessionsDir } = await resolveWorkspacePath(cwd, ".agent/sessions", true);
   const sessionPath = sessionFile ? (await resolveWorkspacePath(sessionsDir, sessionFile)).path : undefined;
@@ -91,10 +91,10 @@ export async function run(
     await active.abort();
     signal?.throwIfAborted();
   } else if (active) {
-    if (!getParentSessionFile(active.history)) throw Object.assign(new Error("对话正在运行，请等待回复完成"), { status: 409 });
-    if (resendFrom) throw Object.assign(new Error("子 Agent 运行时不能重发历史消息"), { status: 409 });
-    if (!active.session?.isStreaming) throw Object.assign(new Error("子 Agent 正在准备或结束回复，请稍后发送"), { status: 409 });
-    if (attachments.length || mentions.length) throw Object.assign(new Error("请等子 Agent 当前回复结束后发送附件或提及"), { status: 400 });
+    if (!getParentSessionFile(active.history)) throw Object.assign(new Error("The conversation is running, please wait for the reply to complete"), { status: 409 });
+    if (resendFrom) throw Object.assign(new Error("Historical messages cannot be resent when the sub-Agent is running."), { status: 409 });
+    if (!active.session?.isStreaming) throw Object.assign(new Error("The sub-Agent is preparing or finishing the reply, please send it later."), { status: 409 });
+    if (attachments.length || mentions.length) throw Object.assign(new Error("Wait for the sub-Agent's current reply to finish before sending attachments or mentions."), { status: 400 });
     await active.session.prompt(prompt.trim(), { streamingBehavior: "steer", expandPromptTemplates: false });
     send({ type: "accepted" });
     return;
@@ -102,10 +102,10 @@ export async function run(
   const { provider, runtime } = await createAgentModel(providerId, modelId, thinkingLevel);
   if (sessionPath) {
     const file = await stat(sessionPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") throw Object.assign(new Error("会话不存在，请重新打开对话"), { status: 404 });
+      if (error.code === "ENOENT") throw Object.assign(new Error("The conversation does not exist, please reopen the conversation."), { status: 404 });
       throw error;
     });
-    if (!file.isFile()) throw Object.assign(new Error("会话必须是普通文件"), { status: 400 });
+    if (!file.isFile()) throw Object.assign(new Error("Session must be a normal file"), { status: 400 });
   }
   // ACT: New SDK sessions get a file name first and are only written on the first
   // reply; lock only the owning file so different conversations can run concurrently.
@@ -141,11 +141,11 @@ export async function run(
     const tools = await createAgentTools(cwd, canvas, question);
     if (isMemoryEnabled()) {
       const memoryTool = createMemoryTool();
-      if (tools.some(tool => tool.name === memoryTool.name)) throw new Error("工具名称 memory 已被内置全局记忆工具占用");
+      if (tools.some(tool => tool.name === memoryTool.name)) throw new Error("Tool name memory has been occupied by the built-in global memory tool");
       tools.push(memoryTool);
     }
     if (parentFile && child) {
-      if (tools.some(tool => tool.name === "report")) throw new Error("工具名称 report 已被内置上报工具占用");
+      if (tools.some(tool => tool.name === "report")) throw new Error("Tool name report has been occupied by the built-in reporting tool");
       tools.push(createReportTool(cwd, parentFile, file, child.name, send));
     }
     tools.push(await createSubAgentTool({
@@ -155,11 +155,12 @@ export async function run(
       }),
     }));
     const resources = await createAgentResources(cwd, tools, undefined, child
-      ? `## 子 Agent 职责\n你正在执行委派任务：${JSON.stringify({ name: child.name, task: child.task })}。遵守当前工作区规则与授权，用户可以进入此子会话补充要求。重要进展与最终结论使用 report 上报父 Agent。`
+      ? `## Sub-agent responsibilities
+You are performing a delegated task: ${JSON.stringify({ name: child.name, task: child.task })}. Follow the current workspace rules and authorization; the user can enter this sub-session to add requirements. Use report to submit important progress and the final conclusion to the parent agent.`
       : "");
     const resendEntry = resendFrom ? history.getBranch().find((item) => item.id === resendFrom) : undefined;
     if (resendFrom && (resendEntry?.type !== "message" || resendEntry.message.role !== "user")) {
-      throw Object.assign(new Error("重发消息不在当前对话中，请重新打开对话"), { status: 400 });
+      throw Object.assign(new Error("The resent message is not in the current conversation, please reopen the conversation."), { status: 400 });
     }
     const savedMentions = resendFrom ? history.getBranch().findLast(entry => entry.type === "custom" && entry.customType === "toonflowUserMessage" && (entry.data as { messageId?: string })?.messageId === resendFrom) : undefined;
     const previousMentions = savedMentions?.type === "custom" ? agentMentionsSchema.safeParse((savedMentions.data as { mentions?: unknown })?.mentions) : undefined;
@@ -191,7 +192,7 @@ export async function run(
       if (compacting) {
         const response = await stream.result();
         if (response.stopReason === "stop" && !response.content.some(part => part.type === "text" && part.text.trim())) {
-          throw new Error("模型返回了空摘要，已保留原上下文");
+          throw new Error("The model returned an empty summary, the original context has been preserved");
         }
       }
       return stream;
@@ -254,7 +255,7 @@ export async function run(
           history.appendSessionInfo((prompt.trim().replace(/\{\{mention:([^{}]+)\}\}/g, (text, id: string) => {
             const mention = mentions.find(item => item.id === id);
             return mention ? `@${mention.label}` : text;
-          }) || attachments[0]?.name || mentions[0]?.label || "新对话").slice(0, 60));
+          }) || attachments[0]?.name || mentions[0]?.label || "New conversation").slice(0, 60));
         }
       }
       const saved = history.getBranch().findLast(item => item.type === "custom" && item.customType === "toonflowUserMessage" && (item.data as { messageId?: string })?.messageId === entry.id);
@@ -273,7 +274,7 @@ export async function run(
       if (event.type === "compaction_start" || event.type === "compaction_end") {
         send({ type: "compaction", active: event.type === "compaction_start" });
         if (event.type === "compaction_end" && event.errorMessage) {
-          compactionError = t`上下文压缩失败：${event.errorMessage}`;
+          compactionError = t`Context compression failed: ${event.errorMessage}`;
         }
       }
       if (event.type === "message_start" && event.message.role === "assistant") {
@@ -347,8 +348,8 @@ export async function run(
           }
         }
         firstTokenAt = undefined;
-        modelError = event.message.stopReason === "error" ? event.message.errorMessage || "模型请求失败"
-          : event.message.stopReason === "length" ? "模型回复因长度限制被截断，未能完整生成回答。" : undefined;
+        modelError = event.message.stopReason === "error" ? event.message.errorMessage || "Model request failed"
+          : event.message.stopReason === "length" ? "The model response was truncated due to length restrictions and failed to generate a complete response." : undefined;
         limited = event.message.stopReason === "length";
       }
     });
@@ -378,7 +379,10 @@ export async function run(
       // ACT: Full text attachment content enters the model context while the UI keeps workspace
       // references; videos load at request time and images are read on demand via read.
       const content = attachments.length
-        ? `${mentionPrompt(prompt, mentions)}\n\n附件已保存到工作区，path 为相对路径，可用于节点选择素材。以下 JSON 包含文件信息，文本附件的 content 为完整正文：\n${JSON.stringify(
+        ? `${mentionPrompt(prompt, mentions)}
+
+Attachments have been saved to the workspace; path is a relative path that can be used to select assets in nodes. The following JSON contains file information; for text attachments, content is the full text:
+${JSON.stringify(
             attachmentContents
           )}`.trim()
         : mentionPrompt(prompt, mentions);

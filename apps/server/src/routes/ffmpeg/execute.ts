@@ -43,7 +43,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const controller = new AbortController();
   const finished = Promise.withResolvers<void>();
   if (input.operation.method !== "prepare") {
-    if (requests.has(requestKey)) throw Object.assign(new Error("FFmpeg 请求已在执行"), { status: 409 });
+    if (requests.has(requestKey)) throw Object.assign(new Error("FFmpeg request is already being executed"), { status: 409 });
     requests.set(requestKey, { controller, finished: finished.promise });
   }
   const close = () => controller.abort();

@@ -10,8 +10,10 @@ import { escapeMessageText } from "./index";
 const root = resolve(import.meta.dirname, "../../..");
 const catalog = new Map<string, Set<string>>();
 const chinese = /[\u3400-\u9fff]/;
-function add(message: string, path: string) {
-  if (!chinese.test(message) || !message.trim()) return;
+// Chinese text is collected wherever it appears, since the UI keeps Chinese source strings; other text only where code
+// marks it as a message (`force`), because English source strings live alongside identifiers and data.
+function add(message: string, path: string, force = false) {
+  if ((!force && !chinese.test(message)) || !message.trim()) return;
   const locations = catalog.get(message) ?? new Set<string>();
   locations.add(relative(root, path).replaceAll("\\", "/"));
   catalog.set(message, locations);
@@ -41,11 +43,18 @@ async function scan(directory: string) {
           : owner?.type === "ObjectProperty" && owner.key.type === "Identifier" ? owner.key.name : "";
         const protectedMessage = /(?:prompt|instructions|rawCode|sourceCode)/i.test(name);
         if (node.type === "TaggedTemplateExpression" && node.tag.type === "Identifier" && ["t", "msg"].includes(node.tag.name)) {
-          add(node.quasi.quasis.map((part, index) => (node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw) + (index < node.quasi.expressions.length ? `{${index}}` : "")).join(""), path);
+          add(node.quasi.quasis.map((part, index) => (node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw) + (index < node.quasi.expressions.length ? `{${index}}` : "")).join(""), path, true);
         }
-        if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "translateMessage"].includes(node.callee.name) && node.arguments[0]?.type === "StringLiteral") add(node.arguments[0].value, path);
+        if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "translateMessage"].includes(node.callee.name) && node.arguments[0]?.type === "StringLiteral") add(node.arguments[0].value, path, true);
         if (nodePackage && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["label", "displayName"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
-        if (pluginMetadata && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["displayName", "description", "title", "label", "placeholder"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
+        if (pluginMetadata && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["displayName", "description", "title", "label", "placeholder"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path, true);
+        // Server messages reach users through translateError and the response helpers, so their literal text is a key.
+        if (backend && (node.type === "NewExpression" || node.type === "CallExpression") && node.callee.type === "Identifier") {
+          const index = ({ Error: 0, invalid: 0, error: 0, rejected: 0, success: 1 } as Record<string, number>)[node.callee.name];
+          const argument = index === undefined ? undefined : node.arguments[index];
+          if (argument?.type === "StringLiteral") add(argument.value, path, true);
+          if (argument?.type === "TemplateLiteral" && !argument.expressions.length) add(argument.quasis[0]!.value.cooked ?? argument.quasis[0]!.value.raw, path, true);
+        }
         // ACT: The server only extracts a candidate dictionary here without changing business strings;
         // actual translation happens only at explicit system-text outputs.
         if (!protectedMessage && backend && node.type === "StringLiteral" && node.value.length < 1200 && !node.value.includes("```")) {
@@ -73,7 +82,10 @@ for (const kind of ["skills", "teams"]) {
     for (const value of [metadata.displayName, metadata.description]) if (typeof value === "string") add(value, path);
   }
 }
-const messages = Object.fromEntries([...catalog].sort(([left], [right]) => left.localeCompare(right, "zh-CN")).map(([message]) => [message, message]));
+// A Chinese key is its own Simplified Chinese text; an English key keeps the translation already in zhCn.json.
+const previous: Record<string, string> = await readFile(resolve(import.meta.dirname, "locales/zhCn.json"), "utf8").then(JSON.parse, () => ({}));
+const messages = Object.fromEntries([...catalog].sort(([left], [right]) => left.localeCompare(right, "zh-CN"))
+  .map(([message]) => [message, chinese.test(message) ? message : previous[message] ?? message]));
 await mkdir(resolve(import.meta.dirname, "locales"), { recursive: true });
 await writeAtomic(resolve(import.meta.dirname, "locales/zhCn.json"), JSON.stringify(messages, null, 2) + "\n");
 await writeAtomic(resolve(import.meta.dirname, "messageSources.json"), JSON.stringify(Object.fromEntries([...catalog].map(([key, value]) => [key, [...value]])), null, 2) + "\n");

@@ -20,7 +20,7 @@ function serializeError(error: unknown) {
 
 function invoke(command: FfmpegCommand, call: FfmpegCall, extra: unknown[] = []) {
   if ((inputNames.has(call.method) || outputNames.has(call.method)) && typeof call.args[0] !== "string") {
-    throw new Error("浏览器 FFmpeg 输入、输出必须使用工作区文件路径");
+    throw new Error("Browser FFmpeg input and output must use the workspace file path");
   }
   const args = call.args.map((value, index) => call.undefinedArgs?.includes(index) ? undefined : value);
   return Reflect.apply((command as unknown as Record<string, (...args: unknown[]) => unknown>)[call.method]!, command, [...args, ...extra]);
@@ -38,11 +38,11 @@ export async function executeRemoteFfmpeg(
   try {
     signal.throwIfAborted();
     for (const call of request.calls) {
-      if (!chainNames.has(call.method)) throw messageError(msg`FFmpeg 配置方法不可用：${call.method}`);
+      if (!chainNames.has(call.method)) throw messageError(msg`FFmpeg configuration method is not available: ${call.method}`);
     }
     const operation = request.operation;
     if (!queryNames.has(operation.method) && !runNames.has(operation.method)) {
-      throw messageError(msg`FFmpeg 执行方法不可用：${operation.method}`);
+      throw messageError(msg`FFmpeg execution method is not available: ${operation.method}`);
     }
     let command = factory(request.options);
     for (const call of request.calls) command = invoke(command, call) as FfmpegCommand;
@@ -53,7 +53,7 @@ export async function executeRemoteFfmpeg(
         if (finished) return;
         if (signal.aborted) {
           event = "error";
-          args = [serializeError(signal.reason ?? new DOMException("FFmpeg 已取消", "AbortError"))];
+          args = [serializeError(signal.reason ?? new DOMException("FFmpeg Canceled", "AbortError"))];
         }
         send(event, args);
         finished = true;

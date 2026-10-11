@@ -1,6 +1,7 @@
 import { z, type NodeAiTool } from "@toonflow/nodes-scaffold/runtime";
 import { sceneSchema, type SceneDocument } from "./scene";
 import { directorPlanSchema, type DirectorPlan, type DirectorPlanItem } from "./sceneAnimation";
+import { longShotIssues } from "./planReview";
 
 const pathSchema = z.array(z.union([
   z.string().max(100).refine(value => !["__proto__", "constructor", "prototype"].includes(value), "路径不允许访问原型"),
@@ -101,7 +102,9 @@ function validateDraft(draft: Draft, complete = false) {
   }
   draft.scene = scene;
   if (plan.success) draft.plan = plan.data;
-  return { valid: plan.success, issues: issues.map(issue => `plan.${issue.path.join(".")}：${issue.message}`) };
+  // Long shots are a warning: the draft stays valid, but the agent sees the issue and can add cuts.
+  const warnings = plan.success ? longShotIssues(plan.data).map(issue => `plan.cameraFrames: ${issue.message}`) : [];
+  return { valid: plan.success, issues: [...issues.map(issue => `plan.${issue.path.join(".")}：${issue.message}`), ...warnings] };
 }
 
 export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, plans: DirectorPlanItem[] = []) {
@@ -113,7 +116,7 @@ export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, p
 
   const tools: NodeAiTool[] = [{
     name: "readDocument",
-    description: "读取本轮独立草稿的 scene / plan；objectId 选择场景物体或方案轨道，joint 选择人偶关节轨道，path 为相对字段路径。history 只读且必须提供 planId。schema 可用 path ['scene'] / ['plan'] 读取 JSON Schema。按需读取，避免反复读取完整文档。",
+    description: "Read the scene / plan of this turn's independent draft. objectId selects a scene object or a plan track, joint selects a mannequin joint track, and path is a relative field path. history is read-only and requires planId. With schema, path ['scene'] / ['plan'] reads the JSON Schema. Read only what you need and avoid re-reading the whole document.",
     parameters: z.toJSONSchema(readSchema),
     execute(args, signal) {
       signal?.throwIfAborted();
@@ -132,7 +135,7 @@ export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, p
     },
   }, {
     name: "editDocument",
-    description: "原子批量修改本轮 scene / plan 草稿，不修改历史和磁盘。objectId / joint 按稳定 ID 选择现有物体/轨道，path 为相对路径。add 添加新字段或插入数组，数组下标 '-' 表示追加；replace / remove 必须命中已有路径。添加物体用 scene 的 ['objectList','-']，添加轨道用 plan 的 ['tracks','-']。任何非法操作整批撤销。返回 valid=false 时只保存了未完成草稿，必须依据 issues 补齐，直到 valid=true。",
+    description: "Atomically batch-edit this turn's scene / plan draft without touching history or disk. objectId / joint select an existing object / track by stable ID, and path is a relative path. add adds a new field or inserts into an array, where the array index '-' appends; replace / remove must hit an existing path. Add objects with ['objectList','-'] in scene and tracks with ['tracks','-'] in plan. Any invalid operation reverts the whole batch. When it returns valid=false only the incomplete draft was saved; complete it according to issues until valid=true.",
     parameters: z.toJSONSchema(editSchema),
     execute(args, signal) {
       signal?.throwIfAborted();

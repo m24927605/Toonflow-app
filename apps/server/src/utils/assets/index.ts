@@ -29,10 +29,10 @@ async function resolveAssetPath(path: string) {
 
 async function readAssetContents(path: string, signal?: AbortSignal) {
   const info = await lstat(path);
-  if (!info.isFile()) throw new Error("只能读取普通素材文件");
-  if (info.size > maxAssetBytes) throw new Error("素材文件不能超过 100 MB");
+  if (!info.isFile()) throw new Error("Only regular asset files can be read");
+  if (info.size > maxAssetBytes) throw new Error("Asset files must not exceed 100 MB");
   const content = await readFile(path, { signal });
-  if (content.byteLength > maxAssetBytes) throw new Error("素材文件不能超过 100 MB");
+  if (content.byteLength > maxAssetBytes) throw new Error("Asset files must not exceed 100 MB");
   return content;
 }
 
@@ -48,13 +48,13 @@ export async function readAssetFile(path: string, signal?: AbortSignal) {
 }
 
 export async function writeAssetFile(path: string, content: string | Uint8Array, revision?: string) {
-  if (Buffer.byteLength(content) > maxAssetBytes) throw new Error("素材文件不能超过 100 MB");
+  if (Buffer.byteLength(content) > maxAssetBytes) throw new Error("Asset files must not exceed 100 MB");
   const target = await resolveAssetPath(path);
   const release = lockWorkspaceFiles([target.path]);
   try {
     if (revision !== undefined) {
       const current = createHash("sha256").update(await readAssetContents(target.path)).digest("hex");
-      if (current !== revision) throw Object.assign(new Error("素材已被修改，请重新读取后再更新"), { status: 409, code: "ESTALE" });
+      if (current !== revision) throw Object.assign(new Error("The asset has been modified. Read it again before updating."), { status: 409, code: "ESTALE" });
     }
     await writeWorkspaceFile(target.path, content, revision === undefined);
     return { path: relative(target.directory, target.path).split(sep).join("/"), revision: createHash("sha256").update(content).digest("hex") };
@@ -76,7 +76,7 @@ export async function moveAsset(path: string, target: string) {
   try {
     if ((await lstat(source.path)).isDirectory()) {
       if (relative(source.path, destination.path) !== "" && isWithin(source.path, destination.path)) {
-        throw new Error("不能把素材文件夹移动到自身的子目录");
+        throw new Error("An asset folder cannot be moved into its own subfolder");
       }
       await closeAssetSearches(source.path);
       await closeAssetSearches(destination.path);
@@ -95,7 +95,7 @@ export async function removeAsset(path: string) {
       await rmdir(target.path);
     }
     else if (info.isFile()) await unlink(target.path);
-    else throw new Error("只能删除普通素材文件或空文件夹");
+    else throw new Error("Only regular asset files or empty folders can be deleted");
   } finally { release(); }
 }
 
@@ -157,13 +157,13 @@ export async function queryAssets(options: MentionQuery & { path?: string }) {
       const cursor = options.cursor.split(":");
       id = cursor[0]!;
       const search = assetSearches.get(id);
-      if (!search || search.key !== key || String(search.offset) !== cursor[1]) throw Object.assign(new Error("分页已失效，请重新搜索"), { status: 409 });
+      if (!search || search.key !== key || String(search.offset) !== cursor[1]) throw Object.assign(new Error("Pagination has expired, please search again"), { status: 409 });
     } else {
       id = randomUUID();
       const iterator = walkAssets(directory, path, !!query);
       const timer = setTimeout(() => {
         const search = assetSearches.get(id);
-        if (search) void closeAssetSearch(id, search).catch(error => console.warn("素材分页游标关闭失败", error));
+        if (search) void closeAssetSearch(id, search).catch(error => console.warn("Failed to close the asset pagination cursor", error));
       }, 60000);
       timer.unref();
       assetSearches.set(id, { key, directory: resolved.path, offset: 0, touched: Date.now(), busy: false, iterator, timer });
@@ -173,8 +173,8 @@ export async function queryAssets(options: MentionQuery & { path?: string }) {
       }
     }
     const search = assetSearches.get(id);
-    if (!search) throw Object.assign(new Error("分页已失效，请重新搜索"), { status: 409 });
-    if (search.busy) throw Object.assign(new Error("上一页仍在读取，请稍后重试"), { status: 409 });
+    if (!search) throw Object.assign(new Error("Pagination has expired, please search again"), { status: 409 });
+    if (search.busy) throw Object.assign(new Error("The previous page is still being read, please try again later."), { status: 409 });
     search.busy = true;
     const items: MentionAsset[] = [];
     const limit = Math.max(1, Math.min(50, options.limit ?? 20));
@@ -183,7 +183,7 @@ export async function queryAssets(options: MentionQuery & { path?: string }) {
       for (let scanned = 0; scanned < 2000 && items.length < limit; scanned++) {
         options.signal?.throwIfAborted();
         const next = await search.iterator.next();
-        if (assetSearches.get(id) !== search) throw Object.assign(new Error("分页已失效，请重新搜索"), { status: 409 });
+        if (assetSearches.get(id) !== search) throw Object.assign(new Error("Pagination has expired, please search again"), { status: 409 });
         if (next.done) { done = true; break; }
         search.offset++;
         const item = next.value;
@@ -195,7 +195,7 @@ export async function queryAssets(options: MentionQuery & { path?: string }) {
       return { items, ...(!done ? { nextCursor: `${id}:${search.offset}` } : {}) };
     } catch (error) {
       try { await closeAssetSearch(id, search); }
-      catch (closeError) { throw new AggregateError([error, closeError], "素材查询及游标关闭失败"); }
+      catch (closeError) { throw new AggregateError([error, closeError], "Failed to query assets and close the cursor"); }
       throw error;
     } finally { search.busy = false; }
   } finally { release(); }

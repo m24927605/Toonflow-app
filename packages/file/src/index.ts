@@ -94,7 +94,7 @@ function createPathStream<T extends native.ReadStream | native.WriteStream>(
   create: (path: native.PathLike, options: native.ReadStreamOptions & native.WriteStreamOptions) => T,
 ) {
   const settings = typeof options === "string" ? { encoding: options } : options;
-  if (settings?.fd != null || settings?.fs != null) throw new TypeError("文件流不接受外部 fd/fs；请使用 open 返回的句柄创建流");
+  if (settings?.fd != null || settings?.fs != null) throw new TypeError("File streams do not accept an external fd/fs; create the stream from the handle returned by open");
   let release: (() => void) | undefined;
   const controller = new AbortController();
   const signal = settings?.signal ? AbortSignal.any([settings.signal, controller.signal]) : controller.signal;
@@ -153,7 +153,7 @@ export async function writeAtomic(path: string, content: string | Uint8Array, op
       finally {
         await handle.close().catch(error => {
           if (!failed) throw error;
-          console.warn(`临时文件关闭失败：${temporary}`, error);
+          console.warn(`Failed to close temporary file: ${temporary}`, error);
         });
       }
       if (options.exclusive) await promises.link(temporary, path);
@@ -162,7 +162,7 @@ export async function writeAtomic(path: string, content: string | Uint8Array, op
       if (created) await promises.unlink(temporary).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return;
         // A cleanup failure must not mask the original error or report a committed save as failed.
-        console.warn(`临时文件清理失败：${temporary}`, error);
+        console.warn(`Failed to clean up temporary file: ${temporary}`, error);
       });
     }
   });
@@ -182,7 +182,7 @@ export function writeAtomicSync(path: string, content: string | Uint8Array, opti
         try { native.closeSync(fd); }
         catch (error) {
           if (!failed) throw error;
-          console.warn(`临时文件关闭失败：${temporary}`, error);
+          console.warn(`Failed to close temporary file: ${temporary}`, error);
         }
       }
       if (options.exclusive) native.linkSync(temporary, path);
@@ -191,7 +191,7 @@ export function writeAtomicSync(path: string, content: string | Uint8Array, opti
       try { if (created) native.unlinkSync(temporary); }
       catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-          console.warn(`临时文件清理失败：${temporary}`, error);
+          console.warn(`Failed to clean up temporary file: ${temporary}`, error);
         }
       }
     }

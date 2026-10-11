@@ -5,10 +5,10 @@ import { showNodeError } from "@toonflow/node-shared/showNodeError";
 export type ImageInpaint = { source: string; original: string; guide: string; mask: string; images: NonNullable<NodeImageRequest["images"]> };
 export type InpaintDraftInput = { prompt: string; images?: NodeImageRequest["images"] };
 
-const inpaintInstruction = "对父节点提供的第一张原图片进行局部重绘。第二张图片是同一原图的标注图，红色涂抹标出了需要修改的区域；红色仅用于指示选区，不要把标注画进结果。只修改标注区域，保留原图的构图、尺寸比例和区域外内容，返回完整图片。";
+const inpaintInstruction = "Inpaint the first original image provided by the parent node. The second image is an annotated copy of the same original, where red strokes mark the area to modify; the red only indicates the selection, so do not draw the annotation into the result. Modify only the annotated area, keep the original image's composition, size, aspect ratio and content outside the area, and return the complete image.";
 
 export function buildInpaintPrompt(prompt: string) {
-  return prompt.startsWith(inpaintInstruction) ? prompt : `${inpaintInstruction}\n\n重绘要求：\n${prompt}`;
+  return prompt.startsWith(inpaintInstruction) ? prompt : `${inpaintInstruction}\n\nInpainting requirements:\n${prompt}`;
 }
 
 export function useImageInpaint() {

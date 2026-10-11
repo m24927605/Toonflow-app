@@ -2,13 +2,13 @@ import { createToolConfig } from "@toonflow/tools-scaffold";
 
 await createToolConfig({
   name: "workspace",
-  displayName: "工作区文件",
-  description: "读取、列出和编辑当前工作区内的文件，下载远程图片到工作区。",
-  prompt: `路径相对于当前工作区解析。文件修改不得越出工作区；全局技能目录只允许读取技能及其附带资料。
-修改已有文件前先读取相关内容，避免覆盖用户已有修改。
-存在与任务匹配的可用技能时，先阅读技能目录中的 SKILL.md，再按需读取其引用的本地资料；不要一次加载全部技能，也不要只凭名称猜测技能内容。`,
+  displayName: "Workspace files",
+  description: "Reads, lists and edits files in the current workspace, and downloads remote images into it.",
+  prompt: `Paths are resolved relative to the current workspace. File modifications must not go outside the workspace; the global skills directory only allows reading skills and their bundled materials.
+Read the relevant content before modifying an existing file to avoid overwriting the user's changes.
+When an available skill matches the task, read the SKILL.md in the skill directory first, then read the local materials it references as needed; do not load all skills at once, and do not guess a skill's content from its name alone.`,
   author: "Toonflow",
   configRules: [
-    { type: "switch", field: "readOnly", title: "只读模式", value: false, info: "开启后只允许读取文件和列出目录。" },
+    { type: "switch", field: "readOnly", title: "Read-only mode", value: false, info: "When enabled, only reading files and listing directories are allowed." },
   ],
 }, import.meta.url);

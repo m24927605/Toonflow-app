@@ -24,7 +24,7 @@ export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (!tools.ffmpeg.path || tools.ffmpeg.error || !tools.ffprobe.path || tools.ffprobe.error) {
     for (const listener of requiredListeners) listener();
-    throw Object.assign(new Error("当前操作需要 FFmpeg，请在插件设置中下载安装或配置可用版本后重试。"), {
+    throw Object.assign(new Error("The current operation requires FFmpeg. Download and install it in Plugins settings, or configure an available version, then try again."), {
       name: "FfmpegRequiredError", code: "FFMPEG_REQUIRED", status: 424,
     });
   }
@@ -58,8 +58,8 @@ export async function getStatus() {
 }
 
 export function startDownload() {
-  if (controller) throw Object.assign(new Error("正在下载，请等待完成或取消后再试"), { status: 409 });
-  if (!build) throw Object.assign(new Error(t`暂不支持自动下载 ${target} 版本`), { status: 400 });
+  if (controller) throw Object.assign(new Error("Downloading, please wait for completion or cancel before trying again"), { status: 409 });
+  if (!build) throw Object.assign(new Error(t`does not currently support automatic download of ${target} version`), { status: 400 });
   const active = new AbortController();
   controller = active;
   download = { phase: "downloading", received: 0 };

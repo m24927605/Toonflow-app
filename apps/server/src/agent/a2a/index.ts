@@ -32,19 +32,19 @@ export function createA2aRouter() {
           try {
             const signal = AbortSignal.any([request.signal, configurationSignal]);
             signal.throwIfAborted();
-            if (!(await readTeam(name)).enabled) throw new Error("团队已禁用，不能接收新消息");
-            if (request.message.parts.some(part => part.content?.$case !== "text")) throw new Error("此团队入口只接受文本，不下载远端附件；请在文本中提供已授权工作区的相对路径");
+            if (!(await readTeam(name)).enabled) throw new Error("The team is disabled and cannot receive new messages");
+            if (request.message.parts.some(part => part.content?.$case !== "text")) throw new Error("This team endpoint accepts text only and does not download remote attachments. Provide relative paths within an authorized workspace in the text");
             const task = request.message.parts.map(part => part.content?.$case === "text" ? part.content.value : "").join("\n").trim();
-            if (!task || task.length > 24000) throw new Error("团队任务文本应为 1 到 24000 字符");
+            if (!task || task.length > 24000) throw new Error("Team task text should be 1 to 24000 characters");
             let current = pending.get(request.taskId);
-            if (current && current.userId !== request.userId) throw new Error("任务不属于当前调用方");
-            if (request.task && !current) throw new Error("任务上下文已释放，请创建新任务");
+            if (current && current.userId !== request.userId) throw new Error("The task does not belong to the current caller");
+            if (request.task && !current) throw new Error("The task context has been released, please create a new task");
             if (!current) {
               const settings = getA2aSettings();
               const cwd = await resolveA2aWorkspace();
               // The directory was normalized on save; do not allow it to be
               // replaced with a link to another location before running.
-              if (cwd !== settings.directory) throw new Error("A2A 工作目录已变化，请在设置中重新授权");
+              if (cwd !== settings.directory) throw new Error("The A2A working directory has changed, please re-authorize it in the settings");
               const { runtime } = await createAgentModel(settings.providerId, settings.modelId, settings.thinkingLevel);
               const connection = getConnection(undefined, cwd);
               const canvas: CanvasContext | undefined = connection ? {
@@ -62,9 +62,9 @@ export function createA2aRouter() {
             signal.throwIfAborted();
             if (result.status === "inputRequired") return { status: "inputRequired" as const, text: result.result };
             pending.delete(request.taskId);
-            if (result.status !== "completed") throw new Error(result.result || "团队未完成任务");
+            if (result.status !== "completed") throw new Error(result.result || "The team has not completed the task");
             return { status: "completed" as const, text: result.result, artifacts: [Artifact.fromJSON({
-              artifactId: request.taskId, name: "团队结果", parts: [{ text: result.result, mediaType: "text/plain" }],
+              artifactId: request.taskId, name: "Team Results", parts: [{ text: result.result, mediaType: "text/plain" }],
             })] };
           } catch (error) { pending.delete(request.taskId); throw error; }
         };

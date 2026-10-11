@@ -48,12 +48,15 @@ async function drawBatch() {
       size: request.size,
       seed: randomSeed(),
       refs: (request.images ?? []).map((image, refIndex) => `qwin_${index}_${refIndex}.${inputExtension(image)}`),
+      control: request.controlImage ? `qwin_${index}_control.${inputExtension(request.controlImage)}` : null,
     }));
     const results = await runColabJob({
+      provider: "qwenImage",
       script: pipeline,
       uploads: [
         { name: "qwin_job.json", data: JSON.stringify(items) },
         ...batch.flatMap(({ request }, index) => (request.images ?? []).map((image, refIndex) => ({ name: items[index]!.refs[refIndex]!, data: inputBytes(image) }))),
+        ...batch.flatMap(({ request }, index) => request.controlImage ? [{ name: items[index]!.control!, data: inputBytes(request.controlImage) }] : []),
       ],
       env: {},
       outputs: batch.map((_, index) => `/content/qwout/image_${index}.png`),
@@ -69,11 +72,11 @@ async function drawBatch() {
 
 /** Queues one Qwen-Image 2.1 Turbo image; it is drawn on Colab together with the other requests of its batch. */
 export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
-  if (!request.prompt.trim()) throw new Error("Qwen-Image 提示词不能为空");
-  if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image 只支持 1K 和 2K");
-  if (!/^[1-9]\d?:[1-9]\d?$/.test(request.ratio)) throw new Error("Qwen-Image 画面比例无效");
-  if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image 最多支持 16 张参考图片");
-  for (const image of request.images ?? []) inputBytes(image);
+  if (!request.prompt.trim()) throw new Error("Qwen-Image prompt cannot be empty");
+  if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");
+  if (!/^[1-9]\d?:[1-9]\d?$/.test(request.ratio)) throw new Error("Invalid Qwen-Image aspect ratio");
+  if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
+  for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []]) inputBytes(image);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {
     const item: Pending = { request, signal, resolve, reject };

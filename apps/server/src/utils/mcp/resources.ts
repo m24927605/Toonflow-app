@@ -18,7 +18,7 @@ export const skillResources: NonNullable<McpOptions["resources"]> = {
         resources.push({
           uri: `toonflow://skills/${encodeURIComponent(skill.name)}/${path.split("/").map(encodeURIComponent).join("/")}`,
           name: `${skill.name}/${path}`,
-          description: main ? skill.description : `${skill.name} 的附属资料：${path}`,
+          description: main ? skill.description : `Supporting files of ${skill.name}: ${path}`,
           mimeType: file(main ? skill.filePath : resolve(skill.baseDir, path)).type || "application/octet-stream",
         });
       }
@@ -28,15 +28,15 @@ export const skillResources: NonNullable<McpOptions["resources"]> = {
   async read(uri, signal) {
     signal.throwIfAborted();
     const match = /^toonflow:\/\/skills\/([^/]+)\/(.+)$/.exec(uri);
-    if (!match) throw Object.assign(new Error("技能资源地址无效"), { status: 400 });
+    if (!match) throw Object.assign(new Error("The skill resource address is invalid"), { status: 400 });
     const name = decodeURIComponent(match[1]!);
-    if (!skillFile.isEnabled(name)) throw Object.assign(new Error("技能已禁用"), { status: 404 });
+    if (!skillFile.isEnabled(name)) throw Object.assign(new Error("Skill disabled"), { status: 404 });
     const path = match[2]!.split("/").map(decodeURIComponent).join("/");
     const { mainPath, files } = await skillFile.list(name);
-    if (!files.includes(path)) throw Object.assign(new Error("技能资源不存在"), { status: 404 });
+    if (!files.includes(path)) throw Object.assign(new Error("Skill resource does not exist"), { status: 404 });
     const { target } = await skillFile.locate(name, path === mainPath ? undefined : path);
     const bytes = await readFile(target, { signal });
-    if (bytes.byteLength > skillFile.maxBytes) throw Object.assign(new Error("技能文件不能超过 20 MB"), { status: 413 });
+    if (bytes.byteLength > skillFile.maxBytes) throw Object.assign(new Error("Skill file cannot exceed 20 MB"), { status: 413 });
     const mimeType = file(target).type || "application/octet-stream";
     let text: string | undefined;
     if (!bytes.includes(0)) {

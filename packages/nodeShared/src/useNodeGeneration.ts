@@ -1,8 +1,9 @@
 import { computed, ref, type Ref } from "vue";
 import { nodeTools, z } from "@toonflow/nodes-scaffold/nodeTools";
+import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
 import type { NodeOutputs } from "@toonflow/nodes-scaffold/values";
 
-export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: () => void) {
+export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: () => void, start: () => void) {
   const status = ref<"idle" | "running" | "succeeded" | "failed">("idle");
   const error = ref("");
   const generating = computed(() => status.value === "running");
@@ -10,13 +11,13 @@ export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: (
 
   nodeTools.register({
     name: "getGenerationStatus",
-    description: "查询本次打开节点后的生成状态（idle/running/succeeded/failed）、当前输出和最近一次生成错误。当前输出可能来自之前的生成；idle 不表示没有历史输出，只有 succeeded 表示本次生成成功",
+    description: "Query the generation status since this node was opened (idle/running/succeeded/failed), the current output and the most recent generation error. The current output may come from an earlier generation; idle does not mean there is no previous output, and only succeeded means this generation succeeded",
     parameters: z.strictObject({}),
     execute: getStatus,
   });
   nodeTools.register({
     name: "cancelGeneration",
-    description: "请求停止当前后台生成；cancellationRequested 表示已发出停止请求，随后用 getGenerationStatus 查询终止状态。不会删除已有输出，不能保证供应商撤销任务或费用",
+    description: "Request to stop the current background generation; cancellationRequested means the stop request has been sent, then use getGenerationStatus to query the final status. Does not delete existing output, and cannot guarantee that the provider cancels the task or its charges",
     parameters: z.strictObject({}),
     execute() {
       const cancellationRequested = generating.value;
@@ -24,6 +25,9 @@ export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: (
       return { ...getStatus(), cancellationRequested };
     },
   });
+
+  // Batch generation from the canvas selection; a node that is already generating keeps its current run.
+  useNodeEvent().on("generate", () => { if (!generating.value) start(); });
 
   async function run<T>(task: () => Promise<T>): Promise<T> {
     if (generating.value) throw new Error("节点正在生成，请等待完成");
@@ -42,5 +46,5 @@ export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: (
     }
   }
 
-  return { generating, run };
+  return { generating, status, run };
 }

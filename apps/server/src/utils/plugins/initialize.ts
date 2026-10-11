@@ -34,7 +34,7 @@ export default async function initializePlugins(targetDirectory: string, sourceD
       await rename(temporary, target);
     } catch (error) {
       await unlink(temporary).catch((cleanupError: NodeJS.ErrnoException) => {
-        if (cleanupError.code !== "ENOENT") console.warn(`插件同步临时文件清理失败：${temporary}`, cleanupError);
+        if (cleanupError.code !== "ENOENT") console.warn(`Failed to clean up plugin sync temporary files: ${temporary}`, cleanupError);
       });
       throw error;
     }

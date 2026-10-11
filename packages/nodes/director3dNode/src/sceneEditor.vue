@@ -114,9 +114,10 @@
             </div>
           </el-popover>
           <el-button :icon="IconPlus" :disabled="!ready" aria-label="添加关键帧" @click="addAnchor">添加关键帧</el-button>
-          <el-button :icon="IconMovie" :disabled="!ready || !result || exportingVideo" :loading="exportingVideo" aria-label="导出视频节点" data-tour="exportVideo" @click="emit('exportVideo', sceneAspect)">
+          <el-button :icon="IconMovie" :disabled="!ready || !result || exportingVideo" :loading="exportingVideo" aria-label="导出视频节点" data-tour="exportVideo" @click="emit('exportVideo', sceneAspect, 'color')">
             {{ exportingVideo ? `导出视频 ${exportProgress ?? 0}%` : '导出视频节点' }}
           </el-button>
+          <el-button :disabled="!ready || !result || exportingVideo" title="近白远黑的深度视频，作为视频生成的控制视频，只传递走位与运镜" @click="emit('exportVideo', sceneAspect, 'depth')">导出深度视频</el-button>
         </div>
         <div class="controlHint">WASD 移动 · 空格上升 · Shift 下降 · 滚轮调焦 · 右键记录 · 左键 / Esc 退出取景</div>
         <div class="referenceHeader">
@@ -134,7 +135,8 @@
               <span>{{ String(index + 1).padStart(2, "0") }}</span>
             </button>
             <el-button class="removeReference" :icon="IconX" text circle :aria-label="'删除关键帧 ' + (index + 1)" @click="removeAnchor(anchor.id)" />
-            <el-button class="exportReference" :icon="IconPhotoPlus" text circle size="small" title="导出画布" :disabled="!ready || !!exportingImage" :loading="exportingImage === anchor.id" :aria-label="'导出关键帧 ' + (index + 1) + ' 到画布'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime)" />
+            <el-button class="exportReference" :icon="IconPhotoPlus" text circle size="small" title="导出画布" :disabled="!ready || !!exportingImage" :loading="exportingImage === anchor.id" :aria-label="'导出关键帧 ' + (index + 1) + ' 到画布'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime, 'color')" />
+            <el-button class="exportReference depthReference" :icon="IconStack2" text circle size="small" title="Export depth map (near white, far black) as an image control for image generation" :disabled="!ready || !!exportingImage" :aria-label="'Export depth map of keyframe ' + (index + 1) + ' to canvas'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime, 'depth')" />
           </div>
         </vue-draggable>
       </section>
@@ -161,9 +163,10 @@
 </template>
 
 <script setup lang="ts">
+import type { RenderPass } from "./renderMedia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElButton, ElDialog, ElMessage, ElSlider, ElSelect, ElOption, ElPopover, ElSwitch, ElColorPicker, ElInputNumber } from "element-plus";
-import { IconCube3dSphere, IconCamera, IconLoader2, IconPlayerPause, IconPlayerPlay, IconPlus, IconX, IconMovie, IconPhotoPlus, IconSun, IconSettings, IconUserPlus } from "@tabler/icons-vue";
+import { IconCube3dSphere, IconCamera, IconLoader2, IconPlayerPause, IconPlayerPlay, IconPlus, IconX, IconMovie, IconPhotoPlus, IconStack2, IconSun, IconSettings, IconUserPlus } from "@tabler/icons-vue";
 import directorPanel from "./directorPanel.vue";
 import directorTour from "./directorTour.vue";
 import lightDirection from "./lightDirection.vue";
@@ -189,7 +192,7 @@ const props = defineProps<{
   exportingImage: string;
   exportProgress?: number;
 }>();
-const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
+const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportVideo: [aspect: number, pass: RenderPass]; exportImage: [anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass] }>();
 const anchors = defineModel<CameraAnchor[]>("anchors", { default: () => [] });
 const lighting = defineModel<LightingSettings>("lighting", { required: true });
 const sceneSettings = defineModel<SceneSettings>("sceneSettings", { required: true });
@@ -794,6 +797,7 @@ onBeforeUnmount(() => {
         .exportReference {
           position: absolute; right: 3px; bottom: 3px; width: 22px; height: 22px; padding: 0; margin: 0; opacity: 0;
           background: var(--el-bg-color-overlay); color: var(--el-text-color-regular);
+          &.depthReference { left: 3px; right: auto; }
         }
         &:hover .exportReference, &:focus-within .exportReference { opacity: 1; }
         &:hover .removeReference,

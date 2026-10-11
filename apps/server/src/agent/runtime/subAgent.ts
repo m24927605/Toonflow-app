@@ -35,7 +35,7 @@ export async function runSubAgent(options: SubAgentModel & {
   onProgress?: (message: string) => void;
 }) {
   const { cwd, name, task, tools, instructions, signal = new AbortController().signal, history, inputRequired, onTool, onProgress, ...modelOptions } = options;
-  const result: SubAgentResult = { name, status: "running", result: "准备执行" };
+  const result: SubAgentResult = { name, status: "running", result: "Ready to execute" };
   const usage = emptyUsage();
   let session: AgentSession | undefined;
   const abort = () => { void session?.abort(); };
@@ -50,7 +50,7 @@ export async function runSubAgent(options: SubAgentModel & {
         signal.throwIfAborted();
         // ACT: The SDK only stops the turn after the whole tool batch
         // finishes; once a question is asked, skip the rest of the batch.
-        if (inputRequired?.()) throw new Error("任务正在等待调用方补充输入，不能继续执行工具");
+        if (inputRequired?.()) throw new Error("The task is waiting for additional input from the caller and cannot continue to execute the tool.");
         if (tool.name !== "askUser" || !onTool) return tool.execute(...args);
         // Sub-session model call IDs may repeat, so question cards and answer channels use separate IDs.
         const id = crypto.randomUUID();
@@ -80,23 +80,25 @@ export async function runSubAgent(options: SubAgentModel & {
     session.agent.finishTurn = () => inputRequired?.() ? { action: "end" } : undefined;
     session.subscribe(event => {
       if (signal.aborted) return;
-      if (event.type === "message_start" && event.message.role === "assistant") onProgress?.("正在处理");
-      if (event.type === "tool_execution_start") onProgress?.(`正在调用 ${event.toolName}`);
+      if (event.type === "message_start" && event.message.role === "assistant") onProgress?.("is being processed");
+      if (event.type === "tool_execution_start") onProgress?.(`Calling ${event.toolName}`);
     });
-    await session.prompt(`你正在执行委派的独立子任务。仅处理下述任务，遵守系统中的授权与工作区规则。缺少信息或授权时，说明阻碍并交回调用方；若提供 requestInput 则使用它等待补充。最终返回简明结论、实际修改的文件相对路径、验证情况与未完成项；长篇产物写入已授权的工作区文件。\n\n${JSON.stringify({ name, task })}`, { expandPromptTemplates: false });
+    await session.prompt(`You are performing a delegated independent subtask. Handle only the task below and follow the authorization and workspace rules in the system. If information or authorization is missing, explain the blocker and hand it back to the caller; if requestInput is provided, use it to wait for more input. Finally return a concise conclusion, the relative paths of files actually modified, verification status and unfinished items; write long deliverables to authorized workspace files.
+
+${JSON.stringify({ name, task })}`, { expandPromptTemplates: false });
     signal.throwIfAborted();
     const question = inputRequired?.();
     const reply = session.messages.findLast(message => message.role === "assistant");
-    if (!reply || reply.role !== "assistant") throw new Error("子任务没有返回回复");
-    if (reply.stopReason === "error" || reply.stopReason === "aborted") throw new Error(reply.errorMessage || "子任务执行失败");
+    if (!reply || reply.role !== "assistant") throw new Error("The subtask did not return a reply");
+    if (reply.stopReason === "error" || reply.stopReason === "aborted") throw new Error(reply.errorMessage || "Subtask execution failed");
     const text = question ?? reply.content.filter(part => part.type === "text").map(part => part.text).join("\n").trim();
-    if (!text) throw new Error("子任务没有返回文本结果");
+    if (!text) throw new Error("Subtask did not return text result");
     result.status = question ? "inputRequired" : reply.stopReason === "length" || text.length > 16000 ? "limited" : "completed";
-    result.result = `${text.slice(0, 16000)}${text.length > 16000 ? "\n[结果过长，已截断；请读取工作区产物]" : ""}${reply.stopReason === "length" ? "\n[模型输出达到长度限制，任务可能未完成]" : ""}`.trim();
+    result.result = `${text.slice(0, 16000)}${text.length > 16000 ? "\n[Result too long and truncated; read the output files in the workspace]" : ""}${reply.stopReason === "length" ? "\n[Model output reached the length limit; the task may be incomplete]" : ""}`.trim();
   } catch (error) {
     result.status = signal.aborted ? "cancelled" : "error";
     const reason = signal.aborted ? signal.reason : error;
-    result.result = reason instanceof Error ? reason.message : "子任务执行失败";
+    result.result = reason instanceof Error ? reason.message : "Subtask execution failed";
   } finally {
     signal.removeEventListener("abort", abort);
     if (session) {

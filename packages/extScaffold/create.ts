@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const [name, ...extra] = process.argv.slice(2);
 if (!name || name.length > 92 || extra.length || !/^[a-z][a-zA-Z0-9]*$/.test(name) || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(name)) {
-  throw new Error("用法：bun packages/extScaffold/create.ts <小驼峰扩展名>（不能使用系统保留名称）");
+  throw new Error("Usage: bun packages/extScaffold/create.ts <lowerCamelCase extension name> (system reserved names cannot be used)");
 }
 
 const extRoot = fileURLToPath(new URL("../ext/", import.meta.url));
@@ -46,7 +46,7 @@ export default {
   id: "ext-${name}",
   displayName: "${name}",
   icon: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4e9fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg>'),
-  configRules: [{ type: "inputNumber", field: "fontSize", title: "字号", value: 14, props: { min: 10, max: 32, step: 1 } }],
+  configRules: [{ type: "inputNumber", field: "fontSize", title: "Font size", value: 14, props: { min: 10, max: 32, step: 1 } }],
   extensions: ["${name.toLowerCase()}"],
   resourceKind: "file",
   text: true,
@@ -97,9 +97,9 @@ function updateText(event: Event) {
   "readme.md": [
     `# ${name}`,
     "",
-    "在 `src/metadata.ts` 中修改显示名、图标、支持后缀和 `configRules`，在 `src/index.vue` 中实现内容组件。组件只接收 `context: ExtContext`，文本变化调用 `context.updateText(text)`，宿主负责保存；字号从 `context.config` 读取。",
+    "Change the display name, icon, supported extensions and `configRules` in `src/metadata.ts`, and implement the content component in `src/index.vue`. The component only receives `context: ExtContext`; call `context.updateText(text)` when the text changes, and the host handles saving; read the font size from `context.config`.",
     "",
-    "从仓库根目录执行：",
+    "Run from the repository root:",
     "",
     "```sh",
     "bun install",
@@ -107,7 +107,7 @@ function updateText(event: Event) {
     `bun run --cwd packages/ext/${name} build`,
     "```",
     "",
-    "构建产物：`build/ext/ext-" + name + ".umd.js`。文件内包含元数据与组件样式。开发构建同步到 `data/ext/`。接口和宿主接入说明见 `packages/extScaffold/readme.md`。",
+    "Build output: `build/ext/ext-" + name + ".umd.js`. The file contains the metadata and component styles. Development builds are synced to `data/ext/`. See `packages/extScaffold/readme.md` for the API and host integration notes.",
     "",
   ].join("\n"),
 };
@@ -120,4 +120,4 @@ await mkdir(target);
 // so a directory-level rollback cannot wrongly delete files or links added meanwhile.
 await mkdir(resolve(target, "src"));
 for (const [path, content] of Object.entries(files)) await writeFile(resolve(target, path), content, { flag: "wx" });
-console.log(`已创建 packages/ext/${name}。修改 src/metadata.ts 与 src/index.vue 后，执行 bun install 和 bun run --cwd packages/ext/${name} build。`);
+console.log(`Created packages/ext/${name}. After editing src/metadata.ts and src/index.vue, run bun install and bun run --cwd packages/ext/${name} build.`);

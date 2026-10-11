@@ -27,11 +27,12 @@ export type NodeImageRequest = {
   ratio?: string;
   size?: string;
   characterId?: string;
+  skipTextCheck?: boolean;
 };
 export type NodeImageResult = { path: string; mimeType: string; mediaType: "image" };
 export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
-export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate"> & { directory: string; outputDirectory: string };
+export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate" | "duration"> & { directory: string; outputDirectory: string };
 export type NodeAudioResult = { path: string; mimeType: string; mediaType: "audio" };
 export type NodeAiRequest = {
   providerId: string;
@@ -170,12 +171,37 @@ export function useNodeAi() {
   }
 
   async function generateMedia<T extends "image" | "video" | "audio">(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal) {
-    return readResult<{ path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ ...input, mediaType }),
-      signal: requestSignal(signal),
+    const jobSignal = requestSignal(signal);
+    const headers = { "Content-Type": "application/json", "x-toonflow-workspace": "1" };
+    const { id } = await readResult<{ id: string }>(await fetch("/api/ai/media/generate", {
+      method: "POST", headers, body: JSON.stringify({ ...input, mediaType }), signal: jobSignal,
     }));
+    // The server runs the job in the background, so polling keeps browser connections free for other requests;
+    // Chrome allows only six per host and a long generation used to hold one for its whole run.
+    const query = new URLSearchParams({ id, directory: input.directory });
+    try {
+      while (true) {
+        jobSignal.throwIfAborted();
+        await new Promise<void>((resolve, reject) => {
+          const abort = () => {
+            clearTimeout(timer);
+            reject(jobSignal.reason);
+          };
+          const timer = setTimeout(() => {
+            jobSignal.removeEventListener("abort", abort);
+            resolve();
+          }, 2000);
+          jobSignal.addEventListener("abort", abort, { once: true });
+        });
+        const state = await readResult<{ done: boolean; files?: { path: string; mimeType: string; mediaType: T }[] }>(
+          await fetch(`/api/ai/media/jobs/get?${query}`, { headers, cache: "no-store", signal: jobSignal }),
+        );
+        if (state.done) return state.files ?? [];
+      }
+    } catch (error) {
+      if (jobSignal.aborted) void fetch("/api/ai/media/jobs/cancel", { method: "POST", headers, body: JSON.stringify({ id, directory: input.directory }) }).catch(() => {});
+      throw error;
+    }
   }
 
   function generateImage(input: NodeImageRequest, signal?: AbortSignal) {

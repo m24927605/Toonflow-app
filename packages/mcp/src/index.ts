@@ -53,8 +53,8 @@ export function createMcpRouter(options: McpOptions) {
     const resources = options.resources;
     const server = new McpServer({ name: "toonflow", version: "0.0.0" }, {
       capabilities: { tools: { listChanged: false }, ...(resources ? { resources: { subscribe: false, listChanged: false } } : {}) },
-      instructions: "先调用 getAppState 获取连接和工作区；从 tools/list 读取当前工具参数。业务工具使用 {target: {connectionId, directory}, args: {...}}。画布与节点必须使用实时工具，禁止直接修改画布 JSON。"
-        + (resources ? "通过 resources/list 发现全局技能和附属资料，再以返回的 URI 调用 resources/read 读取最新内容。" : ""),
+      instructions: "First call getAppState to get connections and workspaces; read the current tool parameters from tools/list. Business tools use {target: {connectionId, directory}, args: {...}}. Canvases and nodes must use the live tools; modifying canvas JSON directly is forbidden."
+        + (resources ? "Discover global skills and supporting materials through resources/list, then call resources/read with the returned URI to read the latest content." : ""),
     });
     if (resources) {
       server.server.setRequestHandler("resources/list", async (_request, context) => ({ resources: await resources.list(context.mcpReq.signal) }));
@@ -75,10 +75,10 @@ export function createMcpRouter(options: McpOptions) {
     }));
     server.server.setRequestHandler("tools/call", async (request, context) => {
       const tool = (await options.getTools()).find(item => item.name === request.params.name);
-      if (!tool) throw new ProtocolError(ProtocolErrorCode.InvalidParams, translateMessage(msg`工具不存在或已停用：${request.params.name}`));
+      if (!tool) throw new ProtocolError(ProtocolErrorCode.InvalidParams, translateMessage(msg`Tool does not exist or is disabled: ${request.params.name}`));
       try {
         const parsed = await fromJsonSchema<Record<string, unknown>>(tool.inputSchema)["~standard"].validate(request.params.arguments ?? {});
-        if (parsed.issues) throw new Error(parsed.issues.map(issue => issue.message).join("；"));
+        if (parsed.issues) throw new Error(parsed.issues.map(issue => issue.message).join("; "));
         return toToolResult(await tool.execute(parsed.value, context.mcpReq.signal));
       } catch (error) {
         return { isError: true, content: [{ type: "text", text: translateError(error) }] };
@@ -94,7 +94,7 @@ export function createMcpRouter(options: McpOptions) {
     try {
       if (!await options.authorize(request)) {
         response.setHeader("WWW-Authenticate", 'Bearer realm="Toonflow"');
-        response.status(401).json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: translateMessage("MCP 未开启或访问凭证无效") } });
+        response.status(401).json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: translateMessage("MCP is not enabled or the access credentials are invalid") } });
         return;
       }
       const sessionId = request.get("mcp-session-id");
@@ -110,7 +110,7 @@ export function createMcpRouter(options: McpOptions) {
         await createServer().connect(transport);
       }
       if (!transport) {
-        response.status(sessionId ? 404 : 400).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: translateMessage("MCP 会话不存在，请重新连接") } });
+        response.status(sessionId ? 404 : 400).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: translateMessage("MCP session does not exist, please reconnect") } });
         return;
       }
       await transport.handleRequest(request, response, request.body);

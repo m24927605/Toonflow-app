@@ -2,16 +2,16 @@ import { createToolConfig } from "@toonflow/tools-scaffold";
 
 await createToolConfig({
   name: "canvas",
-  displayName: "画布操作",
-  description: "新增、切换、重命名和自动整理画布，操作节点、连线和视口，并调用节点注册的函数。",
+  displayName: "Canvas Operations",
+  description: "Adds, switches, renames and auto-arranges canvases, works with nodes, edges and the viewport, and calls functions that nodes register.",
   author: "Toonflow",
-  prompt: `getCanvas 默认只读画布概览，按需用 include 查询画布列表或可用节点类型。findCanvasNodes 按名称、ID、类型或选择状态定位节点；已知 ID 时直接用 getCanvasNodes 读取必要字段，用 getCanvasEdges 查询局部连线，用 getNodeTools 查询目标节点函数。用户可能同时编辑画布，状态变化后重新查询，不把旧快照当作当前状态。
-所有读取都有条数和体积上限，检查 hasMore/nextCursor 与截断信息；空列表但 hasMore 为 true 仍需继续扫描。继续分页时保留原查询参数，只替换 cursor，游标失效时重新查询。全图任务逐批完成，只保留进度摘要和游标，不将全部节点详情累积到上下文。
-使用实际提供的画布操作工具修改画布，不直接写入画布 JSON 代替界面操作。新建或切换画布后，后续操作针对返回的新画布。
-节点业务参数和执行行为通过已注册的 nodeTools 操作；nodeId、node:functionName 和参数结构以 getNodeTools 返回值为准，args 根据用户任务填写，不能猜测未注册的函数或字段。
-连线前核对输出端口、输入端口及类型兼容性；节点位置使用画布坐标，合理留出内容和连线空间。已有节点能够复用时不要重复创建。
-deleteNodes、moveNodes、renameNodes、connectNodes、deleteEdges 均一次接受多个目标，涉及多个节点或连线时合并为一次调用，不要逐个单独调用；任一目标校验失败则整体不生效，需按返回的错误修正后重新提交整批。
-每次操作等待返回结果，用 getCanvasNodes/getCanvasEdges 只核对受影响节点、连接和业务输出；节点函数不存在或画布离线时说明具体问题。`,
+  prompt: `getCanvas reads only the canvas overview by default; use include to query the canvas list or available node types as needed. findCanvasNodes locates nodes by name, ID, type or selection state; when IDs are known, use getCanvasNodes directly to read the necessary fields, getCanvasEdges to query local edges, and getNodeTools to query the target node's functions. The user may be editing the canvas at the same time; query again after state changes and do not treat an old snapshot as the current state.
+All reads have item-count and size limits; check hasMore/nextCursor and truncation information. If the list is empty but hasMore is true, keep scanning. When continuing pagination, keep the original query parameters and replace only cursor; if the cursor is invalid, query again. For whole-canvas tasks, work batch by batch, keeping only progress summaries and cursors, and do not accumulate all node details in context.
+Modify the canvas with the canvas operation tools actually provided; do not write canvas JSON directly instead of using the UI operations. After creating or switching canvases, subsequent operations target the returned new canvas.
+Node business parameters and execution behavior are operated through the registered nodeTools; nodeId, node:functionName and parameter structure follow what getNodeTools returns, and args are filled in according to the user's task. Do not guess unregistered functions or fields.
+Before connecting, check the output port, input port and type compatibility; node positions use canvas coordinates, leaving reasonable room for content and edges. Do not create duplicates when existing nodes can be reused.
+deleteNodes, moveNodes, renameNodes, connectNodes and deleteEdges each accept multiple targets at once; when multiple nodes or edges are involved, combine them into one call instead of calling for each separately. If any target fails validation, the whole call has no effect; fix it according to the returned error and resubmit the whole batch.
+Wait for the result of each operation, and use getCanvasNodes/getCanvasEdges to check only the affected nodes, connections and business outputs; when a node function does not exist or the canvas is offline, state the specific problem.`,
   configRules: [],
   components: Object.fromEntries([
     "addNode", "moveNodes", "renameNodes", "nodeTools", "connectNodes",

@@ -14,6 +14,7 @@
     "./media/gemini": "./src/media/gemini.ts",
     "./media/metaso": "./src/media/metaso.ts",
     "./media/minimaxH3": "./src/media/minimaxH3.ts",
-    "./media/qwenImage": "./src/media/qwenImage.ts"
+    "./media/qwenImage": "./src/media/qwenImage.ts",
+    "./media/suno": "./src/media/suno.ts"
   }
 }

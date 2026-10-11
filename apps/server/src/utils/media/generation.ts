@@ -3,9 +3,11 @@ import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
+import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
 import conf from "@/utils/conf";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
+import { checkMediaBudget, recordGeneration } from "@/utils/media/usage";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const mediaExtensions: Record<string, string> = {
@@ -72,24 +74,24 @@ export async function readReference(cwd: string, reference: MediaReference, medi
   signal?.throwIfAborted();
   const { path } = await resolveWorkspacePath(cwd, reference.path);
   const info = await stat(path);
-  if (!info.isFile() || info.size > maxMediaSize) invalid("参考媒体须为不超过 100 MB 的文件");
+  if (!info.isFile() || info.size > maxMediaSize) invalid("Reference media must be a file no larger than 100 MB");
   const bytes = await readFile(path, { signal });
-  if (!bytes.length || bytes.length > maxMediaSize) invalid("参考媒体为空或超过 100 MB");
+  if (!bytes.length || bytes.length > maxMediaSize) invalid("Reference media is empty or exceeds 100 MB");
   const mimeType = detectMimeType(bytes, reference.mimeType);
-  if (!mimeType.startsWith(`${mediaType}/`)) invalid(t`参考媒体类型须为 ${mediaType}`);
+  if (!mimeType.startsWith(`${mediaType}/`)) invalid(t`The reference media type must be ${mediaType}`);
   return { type: "base64", data: bytes.toString("base64"), mimeType, name: reference.path };
 }
 
 async function downloadAsset(url: string, signal?: AbortSignal) {
-  if (!/^https?:\/\//i.test(url)) invalid("生成结果必须使用 HTTP 或 HTTPS 地址");
+  if (!/^https?:\/\//i.test(url)) invalid("Generated results must use HTTP or HTTPS URLs");
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(t`下载生成结果失败（HTTP ${response.status}）`);
+  if (!response.ok) throw new Error(t`Failed to download generated results (HTTP ${response.status})`);
   if (Number(response.headers.get("content-length")) > maxMediaSize) {
     await response.body?.cancel();
-    invalid("生成文件不能超过 100 MB");
+    invalid("The generated file cannot exceed 100 MB");
   }
   const reader = response.body?.getReader();
-  if (!reader) invalid("生成结果为空");
+  if (!reader) invalid("The generation result is empty");
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -98,7 +100,7 @@ async function downloadAsset(url: string, signal?: AbortSignal) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > maxMediaSize) invalid("生成文件不能超过 100 MB");
+      if (size > maxMediaSize) invalid("The generated file cannot exceed 100 MB");
       chunks.push(value);
     }
   } finally { await reader.cancel(); }
@@ -106,7 +108,7 @@ async function downloadAsset(url: string, signal?: AbortSignal) {
 }
 
 async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "audio", signal?: AbortSignal) {
-  if (!asset || asset.mediaType !== mediaType) invalid("供应商返回的媒体类型不正确");
+  if (!asset || asset.mediaType !== mediaType) invalid("Incorrect media type returned by provider");
   let bytes: Uint8Array;
   let mimeType = asset.mimeType ?? "";
   if (asset.type === "url") {
@@ -117,15 +119,15 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
   } else if (asset.type === "base64") {
     const data = /^data:([^;,]+);base64,([\s\S]+)$/.exec(asset.data);
     const content = (data?.[2] ?? asset.data).replace(/\s/g, "");
-    if (content.length > Math.ceil(maxMediaSize / 3) * 4 || !/^[a-zA-Z0-9+/]*={0,2}$/.test(content) || content.length % 4 === 1) invalid("生成结果的 base64 内容无效或超过 100 MB");
+    if (content.length > Math.ceil(maxMediaSize / 3) * 4 || !/^[a-zA-Z0-9+/]*={0,2}$/.test(content) || content.length % 4 === 1) invalid("The base64 content of the generated result is invalid or exceeds 100 MB");
     bytes = Buffer.from(content, "base64");
     mimeType = data?.[1] ?? mimeType;
   } else if (asset.type === "binary" && ArrayBuffer.isView(asset.data) && asset.data.BYTES_PER_ELEMENT === 1) {
     bytes = asset.data;
-  } else { return invalid("供应商返回了无效的媒体结果"); }
-  if (!bytes.byteLength || bytes.byteLength > maxMediaSize) invalid("生成文件为空或超过 100 MB");
+  } else { return invalid("The provider returned an invalid media result"); }
+  if (!bytes.byteLength || bytes.byteLength > maxMediaSize) invalid("The generated file is empty or exceeds 100 MB");
   mimeType = detectMimeType(bytes, mimeType);
-  if (!mimeType.startsWith(`${mediaType}/`) || !mediaExtensions[mimeType]) invalid("生成结果不是支持的图片、视频或音频格式");
+  if (!mimeType.startsWith(`${mediaType}/`) || !mediaExtensions[mimeType]) invalid("The generated result is not in a supported image, video or audio format");
   return { bytes, mimeType };
 }
 
@@ -136,27 +138,34 @@ export async function generateMedia(
   signal?: AbortSignal,
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
-  if (!request.prompt.trim()) invalid("请输入生成提示词");
+  if (!request.prompt.trim()) invalid("Enter a generation prompt");
   const directory = await realpath(cwd);
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
   const providerInfo = await getMediaProvider(request.providerId);
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
-  if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
-  if (request.characterId && (mediaType !== "image" || typeof model.character !== "string")) invalid("所选模型不支持角色身份，请改用支持角色身份的图片模型");
+  if (!model) invalid("The selected media model does not exist or the type does not match, please select again.");
+  // Every video is blocked out in the Director's Studio first; its depth export drives the model as a control video.
+  // ACT: The server cannot tell who set skipPrevis; nodes set it only after a confirmation dialog and the agent tool
+  // description requires the user's consent. A signed per-request consent would close that gap.
+  if (mediaType === "video" && request.mode !== "videoControl" && request.skipPrevis !== true) invalid("Video generation needs the previs depth video connected in control video mode. Skip it only with the user's explicit consent.");
+  const onScreenText = mediaType === "audio" || request.skipTextCheck ? [] : findOnScreenText(request.prompt);
+  if (onScreenText.length) invalid(`The prompt asks the model to render on-screen text (${onScreenText.join(", ")}); add captions, title cards and signs in post-production, or confirm sending it anyway`);
+  if (request.characterId && (mediaType !== "image" || typeof model.character !== "string")) invalid("The selected model does not support character identities. Use an image model that does.");
+  await checkMediaBudget(providerInfo.id, model, mediaType, request);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
-  if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
+  if (typeof generate !== "function") invalid(t`This provider does not support ${translateMessage({ image: "Image", video: "Video", audio: "Audio" }[mediaType])} generation`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
-  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
+  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("Please configure the provider API Key in the media model settings first");
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
   signal?.throwIfAborted();
   const assets = mediaType === "audio"
     ? await provider.generateAudio!({
       model: request.modelId, text: request.prompt, images, audios: await references(request.audios, "audio"),
-      voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate,
+      voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate, duration: request.duration,
     })
     : mediaType === "image"
     ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId })
@@ -168,7 +177,9 @@ export async function generateMedia(
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode,
     });
-  if (!Array.isArray(assets) || !assets.length) invalid("供应商未返回生成结果");
+  if (!Array.isArray(assets) || !assets.length) invalid("The provider did not return any generation results");
+  // The provider has been paid once it returns results, so the run counts even if writing them fails.
+  await recordGeneration(providerInfo.id, model.id);
   const written: string[] = [];
   const result: GeneratedMedia[] = [];
   try {

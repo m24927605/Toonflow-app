@@ -28,10 +28,10 @@ export function parseTool(source: string, name: string) {
     metadata = toolMetadataSchema.parse(JSON.parse(header ?? ""));
     if (metadata.name !== name) throw new Error("name");
   } catch {
-    throw Object.assign(new Error("工具元数据无效，或文件名与工具名称不一致"), { status: 400 });
+    throw Object.assign(new Error("The tool metadata is invalid, or the file name is inconsistent with the tool name."), { status: 400 });
   }
   const client = parseToolClient(source);
-  if (metadata.components.length && !client) throw Object.assign(new Error("工具声明了组件但缺少客户端界面"), { status: 400 });
+  if (metadata.components.length && !client) throw Object.assign(new Error("Tool declares component but lacks client interface"), { status: 400 });
   return { metadata, client };
 }
 
@@ -44,7 +44,7 @@ function parseToolClient(source: string) {
     new Bun.Transpiler({ loader: "js" }).scan(client.code);
     return client;
   } catch {
-    throw Object.assign(new Error("工具客户端界面格式或脚本语法无效"), { status: 400 });
+    throw Object.assign(new Error("The tool client interface format or script syntax is invalid."), { status: 400 });
   }
 }
 
@@ -52,8 +52,8 @@ export async function readTool(name: string, directory = toolsDirectory) {
   toolNameSchema.parse(name, validationOptions());
   const path = resolve(directory, `${name}.tool.js`);
   const file = await lstat(path);
-  if (!file.isFile()) throw Object.assign(new Error("工具文件无效"), { status: 400 });
-  if (file.size > 20 * 1024 * 1024) throw Object.assign(new Error("工具文件不能超过 20 MB"), { status: 400 });
+  if (!file.isFile()) throw Object.assign(new Error("The tool file is invalid"), { status: 400 });
+  if (file.size > 20 * 1024 * 1024) throw Object.assign(new Error("Tool file cannot exceed 20 MB"), { status: 400 });
   const source = await readFile(path, "utf8");
   return { path, source, revision: createHash("sha256").update(source).digest("hex"), ...parseTool(source, name) };
 }
@@ -80,7 +80,7 @@ export async function listTools() {
         const { metadata, revision } = await readTool(name);
         return { ...metadata, enabled, config: getToolConfig(metadata), revision, loadError: "" };
       } catch (err) {
-        const loadError = translateMessage(err instanceof Error ? err.message : "工具文件无法读取");
+        const loadError = translateMessage(err instanceof Error ? err.message : "Tool file cannot be read");
         return { name, version: "", displayName: name, description: loadError, author: "", github: "", components: [], configRules: [], enabled, config: {}, revision: "", loadError };
       }
     }));
@@ -92,7 +92,7 @@ export async function loadTool(name: string, directory = toolsDirectory) {
   // installer clears the module cache after a successful install.
   const { default: plugin } = await import(pathToFileURL(path).href) as { default: ToolPlugin };
   if (typeof plugin?.createTools !== "function" || typeof plugin.validateConfig !== "function") {
-    throw Object.assign(new Error(t`${metadata.displayName} 未导出有效的工具插件`), { status: 400 });
+    throw Object.assign(new Error(t`${metadata.displayName} did not export a valid tool plugin`), { status: 400 });
   }
   return { plugin, metadata };
 }
@@ -101,6 +101,6 @@ export function validateToolConfig(plugin: ToolPlugin, config: Record<string, un
   try {
     return plugin.validateConfig(config);
   } catch (err) {
-    throw Object.assign(err instanceof Error ? err : new Error("工具配置无效"), { status: 400 });
+    throw Object.assign(err instanceof Error ? err : new Error("Tool configuration is invalid"), { status: 400 });
   }
 }

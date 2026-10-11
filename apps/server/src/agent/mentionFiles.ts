@@ -12,16 +12,16 @@ const canvasCache = new Map<string, { revision: string; bytes: number; value: Pr
 async function readMentionText(directory: string, relativePath: string) {
   const { path } = await u.workspaceFile.resolveWorkspacePath(directory, relativePath);
   const info = await stat(path);
-  if (!info.isFile() || info.size > 400000) throw Object.assign(new Error("文本引用最多支持 100000 个字符，请缩小内容后重试"), { status: 400 });
+  if (!info.isFile() || info.size > 400000) throw Object.assign(new Error("Text quotation supports up to 100000 characters, please reduce the content and try again"), { status: 400 });
   const text = await readFile(path, "utf8");
-  if (text.length > 100000) throw Object.assign(new Error("文本引用最多支持 100000 个字符，请缩小内容后重试"), { status: 400 });
+  if (text.length > 100000) throw Object.assign(new Error("Text quotation supports up to 100000 characters, please reduce the content and try again"), { status: 400 });
   return text;
 }
 
 async function readCanvas(directory: string, canvasId: string) {
   const { path } = await u.workspaceFile.resolveWorkspacePath(directory, canvasId);
   const info = await stat(path);
-  if (!info.isFile() || info.size > 256 * 1024 * 1024) throw Object.assign(new Error("画布文件无效或超过 256 MB 的读取上限"), { status: 400 });
+  if (!info.isFile() || info.size > 256 * 1024 * 1024) throw Object.assign(new Error("The canvas file is invalid or exceeds the 256 MB read limit"), { status: 400 });
   const revision = `${info.mtimeMs}:${info.size}`;
   const cached = canvasCache.get(path);
   if (cached?.revision === revision) {
@@ -32,8 +32,8 @@ async function readCanvas(directory: string, canvasId: string) {
   const value = (async () => {
     const canvas: unknown = JSON.parse(await readFile(path, "utf8"));
     const latest = await stat(path);
-    if (latest.mtimeMs !== info.mtimeMs || latest.size !== info.size) throw Object.assign(new Error("画布正在保存，请重试"), { status: 409 });
-    if (!mentionRecord(canvas) || canvas.toonflowCanvas !== true || !Array.isArray(canvas.nodes)) throw Object.assign(new Error("文件不是有效画布"), { status: 400 });
+    if (latest.mtimeMs !== info.mtimeMs || latest.size !== info.size) throw Object.assign(new Error("The canvas is being saved, please try again"), { status: 409 });
+    if (!mentionRecord(canvas) || canvas.toonflowCanvas !== true || !Array.isArray(canvas.nodes)) throw Object.assign(new Error("The file is not a valid canvas"), { status: 400 });
     const nodes = canvas.nodes.filter((node): node is MentionCanvasNode => mentionRecord(node) && typeof node.id === "string");
     return { revision, nodes, byId: new Map(nodes.map(node => [node.id, node])) };
   })();
@@ -87,7 +87,7 @@ export async function queryStoredMentionNodes(directory: string, canvasId: strin
 export async function storedMentionOutput(directory: string, canvasId: string, nodeId: string, outputId?: string) {
   const canvas = await readCanvas(directory, canvasId);
   const node = canvas.byId.get(nodeId);
-  if (!node) throw Object.assign(new Error("节点已删除，请重新选择"), { status: 404 });
+  if (!node) throw Object.assign(new Error("The node has been deleted, please select again."), { status: 404 });
   return outputId === undefined ? mentionNodeOutputs(node) : createCanvasMention(node, canvasId, outputId, path => readMentionText(directory, path));
 }
 
@@ -96,7 +96,7 @@ export async function selectMentionAsset(relativePath: string): Promise<AgentMen
   const { path } = await u.workspaceFile.resolveWorkspacePath(directory, relativePath);
   const info = await stat(path);
   const type = mentionAssetType(relativePath);
-  if (!info.isFile() || !info.size || info.size > 100 * 1024 * 1024) throw Object.assign(new Error("请选择非空且不超过 100 MB 的素材文件"), { status: 400 });
+  if (!info.isFile() || !info.size || info.size > 100 * 1024 * 1024) throw Object.assign(new Error("Please select a asset file that is not empty and does not exceed 100 MB"), { status: 400 });
   const value = type.dataType === "STRING" ? await readMentionText(directory, relativePath) : { url: relativePath, mimeType: type.mimeType };
   return { id: crypto.randomUUID(), label: basename(path), source: { kind: "asset", path: relativePath }, dataType: type.dataType, value };
 }

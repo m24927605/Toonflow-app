@@ -154,7 +154,7 @@ onScopeDispose(() => {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取角色身份节点的当前角色、训练名称、版本（soul_2 或 soul_cinematic）以及已连接的训练图片数量，不发起任何请求",
+  description: "Read the character identity node's current character, training name, version (soul_2 or soul_cinematic) and the number of connected training images, without making any request",
   parameters: z.strictObject({}),
   execute() {
     return { name: data.value.name, kind: data.value.kind, character: data.value.character, imageCount: imageCount.value };
@@ -163,7 +163,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "listCharacters",
-  description: "列出当前 Higgsfield 账号已有的角色身份（Soul ID）及其训练状态，只有 completed 的角色可以用于生成",
+  description: "List the character identities (Soul ID) that already exist in the current Higgsfield account and their training status; only completed characters can be used for generation",
   parameters: z.strictObject({}),
   async execute() {
     souls.value = await listSouls();
@@ -173,7 +173,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "selectCharacter",
-  description: "按 ID 选择一个已有的角色身份作为节点输出；训练中的角色会在完成后自动输出",
+  description: "Select an existing character identity by ID as the node output; a character still in training is output automatically when it completes",
   parameters: z.strictObject({ id: z.string().uuid() }),
   async execute({ id: soulId }) {
     const soul = await getSoul(soulId);
@@ -184,7 +184,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "train",
-  description: "用连接到训练图片输入的 5–20 张同一真人的照片训练新的角色身份；每次调用都会消耗 Higgsfield 点数，训练需要数分钟，节点会自动轮询并在完成后输出角色。name 和 kind 不传时使用节点当前设置",
+  description: "Train a new character identity from the 5–20 photos of the same real person connected to the training image input; every call consumes Higgsfield credits, training takes several minutes, and the node polls automatically and outputs the character when it completes. When name and kind are omitted, the node's current settings are used",
   parameters: z.strictObject({
     name: z.string().min(1).max(64).optional(),
     kind: z.enum(["soul_2", "soul_cinematic"]).optional(),

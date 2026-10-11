@@ -2,6 +2,6 @@ import { createNodeConfig } from "@toonflow/nodes-scaffold";
 
 export default createNodeConfig({
   name: "characterNode",
-  displayName: "角色身份",
+  displayName: "Character identity",
   author: "Toonflow",
 }, import.meta.url);

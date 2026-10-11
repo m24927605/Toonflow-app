@@ -28,8 +28,8 @@ export const sceneSchema = z.strictObject({
     position: vector,
     rotation: z.strictObject({ rotationX: coordinate, rotationY: coordinate, rotationZ: coordinate }).optional(),
     scale: z.strictObject({ scaleX: coordinate, scaleY: coordinate, scaleZ: coordinate }).optional(),
-    pose: z.partialRecord(z.enum(mannequinJoints), vector).describe("仅 mannequin：关节相对父关节的局部 XYZ 旋转，弧度，省略为自然站姿").optional(),
-    hiddenParts: z.array(z.enum(mannequinJoints)).max(mannequinJoints.length).describe("仅 mannequin：不显示指定关节及其下游部位，省略为完整人偶").optional(),
+    pose: z.partialRecord(z.enum(mannequinJoints), vector).describe("mannequin only: local XYZ rotation of each joint relative to its parent joint, in radians; omit for a natural standing pose").optional(),
+    hiddenParts: z.array(z.enum(mannequinJoints)).max(mannequinJoints.length).describe("mannequin only: hide the specified joints and their downstream parts; omit for a complete mannequin").optional(),
     material: z.strictObject({
       type: z.enum(["standard", "basic", "phong", "lambert"]), color,
       roughness: z.number().min(0).max(1).optional(), metalness: z.number().min(0).max(1).optional(),

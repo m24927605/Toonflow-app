@@ -42,14 +42,14 @@ const contextSchema: z.ZodType<Context> = z.object({
   tools: z.array(z.object({
     name: z.string().regex(/^[a-z][a-zA-Z0-9]{0,63}$/),
     description: z.string().min(1).max(10000),
-    parameters: z.record(z.string(), z.json()).refine(value => value.type === "object" && JSON.stringify(value).length <= 100000, "工具参数必须是 JSON 对象结构，且不超过 100 KB"),
+    parameters: z.record(z.string(), z.json()).refine(value => value.type === "object" && JSON.stringify(value).length <= 100000, "Tool parameters must be a JSON object structure and no larger than 100 KB"),
     constrainedSampling: z.union([
       z.literal(false),
       z.object({ type: z.literal("json_schema"), strict: z.enum(["prefer", "require"]) }),
       z.object({ type: z.literal("grammar"), variants: z.object({ openai_lark: z.string().optional(), openai_regex: z.string().optional() }) }),
     ]).optional(),
-  })).max(32).refine(tools => new Set(tools.map(tool => tool.name)).size === tools.length, "工具名称不能重复").optional(),
-}).refine(context => Buffer.byteLength(JSON.stringify(context)) <= 8000000, "模型上下文不能超过 8 MB");
+  })).max(32).refine(tools => new Set(tools.map(tool => tool.name)).size === tools.length, "Tool names cannot be repeated").optional(),
+}).refine(context => Buffer.byteLength(JSON.stringify(context)) <= 8000000, "Model context cannot exceed 8 MB");
 
 const inputSchema = z.object({
   providerId: z.string().min(1), modelId: z.string().min(1),
@@ -88,10 +88,10 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
         }
       }
       const message = await stream.result();
-      if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "模型请求失败");
+      if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
       send({ type: "done", message });
     } catch (error) {
-      send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("模型请求失败") });
+      send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("Model request failed") });
     } finally {
       res.end();
     }

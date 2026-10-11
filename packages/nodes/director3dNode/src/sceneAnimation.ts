@@ -11,11 +11,11 @@ export const directorPlanSchema = z.strictObject({
   duration: z.number().min(0.2).max(300),
   tracks: z.array(z.strictObject({
     objectId: z.string().trim().min(1).max(100),
-    joint: z.enum(mannequinJoints).describe("仅人偶关节动画填写；不填时控制整个物体").optional(),
+    joint: z.enum(mannequinJoints).describe("Fill only for mannequin joint animation; when omitted, the track controls the whole object").optional(),
     frames: z.array(z.strictObject({
       time: z.number().min(0).max(300),
       position: vector.optional(),
-      rotation: vector.describe("XYZ 欧拉角，单位为弧度"),
+      rotation: vector.describe("XYZ Euler angles in radians"),
       scale: vector.optional(),
     })).min(2).max(120),
   })).max(200),

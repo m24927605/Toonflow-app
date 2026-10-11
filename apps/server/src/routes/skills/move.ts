@@ -11,16 +11,16 @@ export default router.put("/", validateFields({
   path: z.string().min(1).max(1024),
   target: z.string().min(1).max(1024),
 }), async (req, res) => {
-  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在服务器本机移动技能文件", null, 403));
+  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("Please move skill files locally on the server", null, 403));
   const { name, path, target } = req.body as { name: string; path: string; target: string };
   const release = u.workspaceFile.lockWorkspaceFiles([u.skillFile.directory()]);
   try {
     const { source: sourcePath, target: targetPath } = await u.skillFile.move(name, path, target);
     try { await u.workspaceFile.renameWorkspaceFile(sourcePath, targetPath); }
     catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "EEXIST") return res.status(409).json(error("已存在同名文件或目录", null, 409));
+      if ((err as NodeJS.ErrnoException).code === "EEXIST") return res.status(409).json(error("A file or directory with the same name already exists", null, 409));
       throw err;
     }
-    res.json(success(null, "文件已移动"));
+    res.json(success(null, "File moved"));
   } finally { release(); }
 });

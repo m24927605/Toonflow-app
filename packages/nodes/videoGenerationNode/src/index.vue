@@ -1,6 +1,7 @@
 <template>
   <nodeSkeleton
     v-bind="nodeProps"
+    :generationStatus="generationStatus"
     v-model:bottomVisible="node.selected"
     :topVisible="node.selected"
     topWidth="max-content"
@@ -18,6 +19,7 @@
       <input ref="fileInput" type="file" accept="video/*" hidden aria-label="选择替换视频" :disabled="generating || deleting || uploading" @change="replaceOutput" />
     </template>
     <template #topRightActions>
+      <gradeControl :outputUrl="outputFile?.url" kind="video" />
       <el-dropdown trigger="click" placement="bottom-end" :disabled="!player?.ready || player?.capturing || generating || deleting || uploading" @command="player?.captureFrame($event)">
         <el-button :icon="IconPhotoScan" :loading="player?.capturing" :disabled="!player?.ready || player?.capturing || generating || deleting || uploading" text title="截取视频帧" aria-label="截取视频帧" />
         <template #dropdown>
@@ -98,12 +100,16 @@
 <script setup lang="ts">
 import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
-import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem } from "element-plus";
+import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessageBox } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import { useNodeGeneration } from "@toonflow/node-shared/useNodeGeneration";
+import gradeControl from "@toonflow/node-shared/gradeControl";
+import { gradeOf } from "@toonflow/node-shared/grading";
+import { useVueFlow } from "@vue-flow/core";
+import { confirmOnScreenText } from "@toonflow/node-shared/confirmOnScreenText";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
 import videoPlayer from "@toonflow/node-video/videoPlayer";
@@ -144,8 +150,9 @@ const player = ref<InstanceType<typeof videoPlayer>>();
 const actions = ref<InstanceType<typeof videoActions>>();
 const videoWidth = ref(0);
 let generationController: AbortController | undefined;
-const generationState = useNodeGeneration(outputs, () => generationController?.abort());
-const { generating } = generationState;
+const generationState = useNodeGeneration(outputs, () => generationController?.abort(), () => void startGeneration().catch(error => showNodeError(error, translate("视频生成失败"))));
+const { generating, status: generationStatus } = generationState;
+const { findNode } = useVueFlow();
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 // ACT: Providers don't declare video ratio ranges, so use the UI's common ratios; the provider validates actual support.
@@ -169,6 +176,8 @@ function getMatchingModes(choice?: NodeMediaModel) {
     if (mode === "text") return image + video + audio === 0;
     // Extension continues the one connected video; connected images stay as references.
     if (mode === "videoExtension") return video === 1 && audio === 0;
+    // A control video (e.g. a previs depth pass) drives structure only; connected images stay look references.
+    if (mode === "videoControl") return video === 1 && audio === 0;
     if (video || audio) return false;
     if (mode === "singleImage") return image === 1;
     if (mode === "startEndRequired") return image === 2;
@@ -210,7 +219,7 @@ const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() =>
   [
     data.value.prompt.trim(),
-    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])),
+    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`Reference ${index + 1}:\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -279,9 +288,27 @@ async function startGeneration() {
   if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   if (choice.mode?.length && !matchingModes.value.length) throw new Error("当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用");
+  // Previs is the default gate for every video: skipping it needs the user's explicit consent each time.
+  const skipPrevis = selectedMode.value !== "videoControl";
+  if (skipPrevis && !await ElMessageBox.confirm("没有以控制视频模式连接粗模试演的深度视频。粗模试演是成本最低的把关，确定跳过并直接生成吗？", "跳过粗模试演", {
+    confirmButtonText: "跳过并生成", cancelButtonText: "取消", type: "warning", closeOnClickModal: false,
+  }).then(() => true, () => false)) throw new Error("已取消生成：请先在导演台导出深度视频，并以控制视频模式连接到此节点");
+  // Only keyframes graded L3 or above should drive a video; anything else needs the user's explicit consent.
+  const belowL3 = refList.value.flatMap(item => {
+    if (item.dataType !== "IMAGE" || !item.value) return [];
+    const source = findNode(item.source);
+    const grade = gradeOf(source?.data, item.value.url);
+    return grade && grade.level >= 3 ? [] : [`${source?.data?.label || item.source}: ${grade ? `L${grade.level}` : "ungraded"}`];
+  });
+  if (belowL3.length && !await ElMessageBox.confirm(`These input images are not graded L3 or above:\n${belowL3.join("\n")}\n\nGrade the keyframes first; generating from weak keyframes wastes the video run. Generate anyway?`, "Keyframe grade", {
+    confirmButtonText: "Generate anyway", cancelButtonText: "Cancel", type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
+  }).then(() => true, () => false)) throw new Error("Generation cancelled: grade the input keyframes L3 or above first");
+  const skipTextCheck = await confirmOnScreenText(generationPrompt.value);
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const input: Omit<NodeVideoRequest, "directory"> = {
+    skipPrevis: skipPrevis || undefined,
+    skipTextCheck: skipTextCheck || undefined,
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: generationPrompt.value,
@@ -359,7 +386,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此视频生成节点的当前配置、可选视频模型能力、通用比例及适合当前引用的模式，不含密钥；时长与分辨率须符合 durationResolutionMap",
+  description: "Read this video generation node's current configuration, the capabilities of the available video models, common aspect ratios and the modes suitable for the current references, without keys; duration and resolution must match durationResolutionMap",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -371,7 +398,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setConfig",
-  description: "修改此视频生成节点的模型、时长、分辨率、比例、模式或声音；先用 getConfig 查询能力，providerId 与 modelId 必须同时提供；mode 使用返回的原始字符串或数组，须匹配当前引用；不修改提示词、不启动生成",
+  description: "Modify this video generation node's model, duration, resolution, aspect ratio, mode or audio; first use getConfig to query the capabilities, and providerId and modelId must be provided together; mode uses the original string or array returned and must match the current references; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -410,7 +437,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setPrompt",
-  description: "修改此节点的视频生成提示词，支持 {{ref 1}} 等参考标记；只修改提示词，不启动生成",
+  description: "Modify this node's video generation prompt, supporting reference markers such as {{ref 1}}; only modifies the prompt and does not start generation",
   parameters: z.strictObject({ prompt: z.string() }),
   execute({ prompt: value }) {
     if (deleting.value) throw new Error("节点正在删除，请稍后修改");
@@ -422,7 +449,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateVideo",
-  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  description: "Start this node's video generation in the background, using the current prompt, model, mode, duration, resolution, aspect ratio and reference assets; returns started immediately; use getGenerationStatus to query the result and cancelGeneration to stop generation",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

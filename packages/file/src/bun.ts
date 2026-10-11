@@ -35,7 +35,7 @@ function wrapFile(value: Bun.BunFile, path?: PathLike): ManagedFile {
   }
   Object.defineProperty(value, "write", { value: (...args: any[]) => Reflect.apply(write, undefined, [value, ...args]) });
   // A synchronous FileSink cannot wait on the async queue; stream writes always use createWriteStream.
-  Object.defineProperty(value, "writer", { value: () => { throw new TypeError("请使用 @toonflow/file 的 createWriteStream 进行流式写入"); } });
+  Object.defineProperty(value, "writer", { value: () => { throw new TypeError("Use createWriteStream from @toonflow/file for streaming writes"); } });
   const stream = value.stream.bind(value);
   Object.defineProperty(value, "stream", { value: () => {
     let reader: { read(): Promise<{ done: boolean; value?: Uint8Array }>; cancel(reason?: unknown): Promise<void> } | undefined;
@@ -69,7 +69,7 @@ function wrapFile(value: Bun.BunFile, path?: PathLike): ManagedFile {
 }
 
 export function file(path: string | URL | ArrayBufferLike | Uint8Array<ArrayBuffer>, options?: BlobPropertyBag): ManagedFile {
-  if (typeof path === "number") throw new TypeError("文件对象不接受外部 fd；请使用 open 返回的句柄");
+  if (typeof path === "number") throw new TypeError("File objects do not accept an external fd; use the handle returned by open");
   return wrapFile(Bun.file(path as string, options), pathKey(path));
 }
 
@@ -77,7 +77,7 @@ export async function write(destination: string | URL | ArrayBufferLike | NodeJS
   // ACT: Bun 1.3.14 never settles the Promise on some failing input streams;
   // stream writes use the standard pipeline/createWriteStream.
   if (content instanceof Response || content instanceof Request || content instanceof ReadableStream) {
-    throw new TypeError("流式写入请使用 @toonflow/file 的 createWriteStream 和 pipeline");
+    throw new TypeError("For streaming writes, use createWriteStream and pipeline from @toonflow/file");
   }
   const paths = [destination, content].flatMap((value, index) => {
     const path = index === 0 ? pathKey(value) : typeof value === "object" && value ? filePaths.get(value) : undefined;

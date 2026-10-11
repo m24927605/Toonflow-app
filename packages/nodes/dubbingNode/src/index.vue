@@ -33,6 +33,7 @@
             <el-slider v-model="data.originalVolume" class="volumeSlider" :min="0" :max="200" :disabled="processing" aria-label="配音时原声音量" />
             <span class="settingUnit">{{ data.originalVolume }}%</span>
           </div>
+          <p class="mixRule">With music connected, the voice is levelled 6 dB above it and the music ducks while the voice plays.</p>
           <div class="settingsFooter">
             <el-button type="primary" :icon="processing ? IconPlayerStop : IconWand" @click="processing ? controller?.abort() : startCompose()">{{ processing ? "停止" : "合成" }}</el-button>
           </div>
@@ -57,6 +58,7 @@ defineOptions({
   handles: [
     { id: "video", type: "target", dataType: "VIDEO", label: "视频输入" },
     { id: "audio", type: "target", dataType: "AUDIO", label: "配音输入" },
+    { id: "music", type: "target", dataType: "AUDIO", label: "Music input" },
     { id: "output", type: "source", dataType: "VIDEO", label: "视频输出" },
   ] satisfies NodeHandle[],
 });
@@ -96,13 +98,13 @@ nodeEvent.on("delete", async () => {
   await files.removeNodeFiles();
 });
 
-function readInput(handleId: "video" | "audio") {
+function readInput(handleId: "video" | "audio" | "music") {
   const input = getTargetValues(id, handleId)[0];
-  return input?.dataType === handleId.toUpperCase() ? input.value as NodeMediaValue | undefined : undefined;
+  return input?.dataType === (handleId === "music" ? "AUDIO" : handleId.toUpperCase()) ? input.value as NodeMediaValue | undefined : undefined;
 }
 
 function getConfig() {
-  return { ...data.value, videoConnected: !!readInput("video"), audioConnected: !!readInput("audio") };
+  return { ...data.value, videoConnected: !!readInput("video"), audioConnected: !!readInput("audio"), musicConnected: !!readInput("music") };
 }
 
 function compose(signal?: AbortSignal) {
@@ -129,6 +131,7 @@ function compose(signal?: AbortSignal) {
         start: data.value.start,
         voiceVolume: data.value.voiceVolume / 100,
         originalVolume: data.value.originalVolume / 100,
+        musicPath: readInput("music")?.url,
       }, current.signal);
       // ACT: Earlier results stay on disk so undo history and copied nodes keep their files.
       outputs.value.output = { dataType: "VIDEO", value: { url: outputPath, mimeType: "video/mp4" } };
@@ -167,7 +170,7 @@ async function resizeVideo(event: Event) {
 
 nodeTools.register({
   name: "setConfig",
-  description: "修改配音合成参数并返回当前参数与输入连接状态：start 为配音开始秒数，voiceVolume 为配音音量，originalVolume 为配音播放期间原声的音量，均为 0–200 的百分比；配音前后原声保持 100%，originalVolume 为 0 时配音期间只听到配音；不传参数即只读取，不启动合成",
+  description: "Modify the dubbing mix parameters and return the current parameters and input connection status: start is the dubbing start time in seconds, voiceVolume is the dubbing volume, and originalVolume is the volume of the original audio while the dubbing plays, both as percentages from 0–200; the original audio stays at 100% before and after the dubbing, and when originalVolume is 0 only the dubbing is heard during it; pass no parameters to only read them; does not start mixing",
   parameters: settingsSchema,
   execute(args) {
     if (processing.value) throw new Error("配音正在合成，请稍后修改");
@@ -178,7 +181,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "compose",
-  description: "按当前参数把配音输入混入视频输入，生成新的视频输出并返回其路径；画面不重新编码，时长与原视频相同，原文件保留",
+  description: "Mix the dubbing input into the video input with the current parameters, produce a new video output and return its path; the picture is not re-encoded, the duration matches the original video, and the original file is kept",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     return compose(signal);
@@ -234,6 +237,14 @@ nodeTools.register({
         color: var(--el-text-color-secondary);
         font-variant-numeric: tabular-nums;
       }
+    }
+
+    .mixRule {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+      line-height: 1.5;
     }
 
     .settingsFooter {

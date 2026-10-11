@@ -22,10 +22,10 @@
 
 <script setup lang="ts">
 import { translate } from "@toonflow/i18n/vue";
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, h, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
-import { ElLoading, ElMessage } from "element-plus";
+import { ElLoading, ElMessage, ElMessageBox } from "element-plus";
 import { nodeSkeleton, useNode, useNodeFiles, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
@@ -36,7 +36,8 @@ import { createDirectorDraft } from "./agentTools";
 import { directorPrompt } from "./agentPrompt";
 import { anchorSchema, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
 import { directorPlanSchema, prepareSceneAnimation, type DirectorPlan, type DirectorGeneration } from "./sceneAnimation";
-import { renderImage, renderVideo } from "./renderMedia";
+import { renderImage, renderVideo, type RenderPass } from "./renderMedia";
+import { reviewPlan, type PlanIssue } from "./planReview";
 
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
 const modelDocumentSchema = z.strictObject({
@@ -271,16 +272,35 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
   }
 }
 
-function exportVideo(aspect: number) {
+async function exportVideo(aspect: number, pass: RenderPass) {
   const plan = selectedPlan.value;
-  if (!plan) return;
-  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value));
+  if (!plan || exportingVideo.value) return;
+  exportingVideo.value = true;
+  exportProgress.value = 0;
+  let issues: PlanIssue[];
+  try {
+    issues = await reviewPlan(scene.value, plan, aspect, exportController.signal);
+  } catch (error) {
+    if (!disposed) ElMessage.error(error instanceof Error ? error.message : "粗模试演检查失败");
+    return;
+  } finally {
+    exportingVideo.value = false;
+  }
+  if (issues.length) {
+    const shown = issues.slice(0, 20).map(issue => h("li", `${issue.time.toFixed(2)} 秒：${issue.message}`));
+    if (issues.length > shown.length) shown.push(h("li", `另有 ${issues.length - shown.length} 项`));
+    const proceed = await ElMessageBox.confirm(h("ul", shown), "粗模试演检查发现问题", {
+      confirmButtonText: "仍然导出", cancelButtonText: "返回修改", type: "warning", closeOnClickModal: false,
+    }).then(() => true, () => false);
+    if (!proceed || disposed || selectedPlan.value !== plan) return;
+  }
+  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, pass));
 }
 
-function exportImage(anchor: CameraAnchor, aspect: number, time: number) {
-  const name = `关键帧${anchors.value.findIndex(item => item.id === anchor.id) + 1}`;
+function exportImage(anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass) {
+  const name = `关键帧${anchors.value.findIndex(item => item.id === anchor.id) + 1}${pass === "depth" ? " (depth)" : ""}`;
   return exportToCanvas("image", anchor.id, aspect, async signal => {
-    const file = await renderImage(scene.value, anchor, aspect, time, signal, selectedPlan.value, lighting.value, sceneSettings.value);
+    const file = await renderImage(scene.value, anchor, aspect, time, signal, selectedPlan.value, lighting.value, sceneSettings.value, pass);
     return new File([file], `${name}.png`, { type: file.type });
   });
 }

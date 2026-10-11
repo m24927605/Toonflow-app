@@ -1,5 +1,7 @@
 # MiniMax H3 Ref2VA pipeline executed on a Colab GPU session by minimaxH3.ts.
-# Inputs: /content/h3in_prompt.txt, /content/h3in_ref_* and the H3_* environment variables.
+# Inputs: /content/h3in_prompt.txt, optional /content/h3in_ref_* images, /content/h3in_vid_* videos,
+# /content/h3in_first.* and /content/h3in_last.* frames, an optional /content/h3in_control.* structure video
+# (depth, pose or edges) for the Fun ControlNet Union 2.0, and the H3_* environment variables.
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
 # 480p samples just above the target size; 720p samples at the model's native ~768p and downscales;
 # 1080p upscales the 768p video latent with the LBH 3D latent upscaler and resamples it.
@@ -82,6 +84,8 @@ diffusion = f"minimax_h3_ref2va_pruned_{variant}.safetensors"
 videoVae = "minimax_h3_video_vae_int8_convrot.safetensors" if variant == "int8_convrot" else "minimax_h3_video_vae_fp16.safetensors"
 lora = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
 upscaler = "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
+controlPatch = f"minimax_h3_fun_controlnet_union_2.0_pruned_{'int8_convrot' if variant == 'int8_convrot' else 'bf16'}.safetensors"
+controlSource = next(inputs.glob("h3in_control.*"), None)
 print("Ref2VA variant:", variant)
 
 weights = [
@@ -91,6 +95,8 @@ weights = [
     ("Comfy-Org/MiniMax-H3", f"vae/{videoVae}", "vae"),
     ("Comfy-Org/MiniMax-H3", "vae/minimax_h3_audio_vae_fp32.safetensors", "vae"),
 ]
+if controlSource:
+    weights.append(("Comfy-Org/MiniMax-H3", f"model_patches/{controlPatch}", "model_patches"))
 if refine:
     weights.append(("LBH-123-AI/Minimax_h3_latent_Upscaler", f"minimax_h3_latent_upscaler_3d_conv_v1/{upscaler}", "latent_upscale_models"))
 for repo, remote, folder in weights:
@@ -102,9 +108,24 @@ for repo, remote, folder in weights:
     shutil.move(downloaded, target)
 
 refs = sorted(inputs.glob("h3in_ref_*"))
+firstFrame = next(inputs.glob("h3in_first.*"), None)
+lastFrame = next(inputs.glob("h3in_last.*"), None)
 (comfy / "input").mkdir(exist_ok=True)
-for ref in refs:
-    shutil.copy(ref, comfy / "input" / ref.name)
+for image in [*refs, *filter(None, [firstFrame, lastFrame])]:
+    shutil.copy(image, comfy / "input" / image.name)
+# Reference videos are re-encoded to 24 fps, silent and at most 15 s, the shape H3 expects for <Video N>.
+videos = []
+for index, source in enumerate(sorted(inputs.glob("h3in_vid_*"))):
+    target = comfy / "input" / f"h3vid{index}.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True)
+    seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(target)], capture_output=True, text=True, check=True).stdout)
+    if seconds < 2:
+        raise ValueError(f"reference video {index + 1} is shorter than 2 seconds")
+    videos.append(target.name)
+if controlSource:
+    # The control video only drives structure and motion; its look never reaches the output.
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(controlSource), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    str(comfy / "input" / "h3control.mp4")], check=True)
 prompt = (inputs / "h3in_prompt.txt").read_text()
 
 base = "http://127.0.0.1:8188"
@@ -137,8 +158,8 @@ graph = {
     "7": {"class_type": "MiniMaxH3ReferenceToVideo", "inputs": {
         "clip": ["3", 0], "vae": ["4", 0], "audio_vae": ["5", 0], "prompt": prompt,
         "width": generateWidth, "height": generateHeight, "length": length, "ref_image_size": "match",
-        **{f"ref_images.ref_image_{index}": [f"ref{index}", 0] for index in range(len(refs))}}},
-    "8": {"class_type": "BasicGuider", "inputs": {"model": ["2", 0], "conditioning": ["7", 0]}},
+        **{f"ref_images.ref_image_{index}": [f"ref{index}", 0] for index in range(len(refs))},
+        **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))}}},
     "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
     "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
     "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": 4, "denoise": 1.0}},
@@ -147,6 +168,39 @@ graph = {
 }
 for index, ref in enumerate(refs):
     graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
+for index, name in enumerate(videos):
+    graph[f"vidFile{index}"] = {"class_type": "LoadVideo", "inputs": {"file": name}}
+    graph[f"vid{index}"] = {"class_type": "GetVideoComponents", "inputs": {"video": [f"vidFile{index}", 0]}}
+# Official Union 2.0 setting: strength 1.0 over the whole schedule; the patched model feeds both passes.
+model = ["2", 0]
+if controlSource:
+    graph.update({
+        "cvFile": {"class_type": "LoadVideo", "inputs": {"file": "h3control.mp4"}},
+        "cv": {"class_type": "GetVideoComponents", "inputs": {"video": ["cvFile", 0]}},
+        "30": {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}},
+        "31": {"class_type": "MiniMaxH3FunControlNetApply", "inputs": {
+            "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
+    })
+    model = ["31", 0]
+    graph["11"]["inputs"]["model"] = model
+for name, image in (("first", firstFrame), ("last", lastFrame)):
+    if image:
+        graph[f"{name}Frame"] = {"class_type": "LoadImage", "inputs": {"image": image.name}}
+
+
+def guided(prefix, latent):
+    # Pins the first frame at frame 0 and the last frame at the last frame that survives the final trim.
+    # Guides are encoded at the latent's own size, so the 1080p refine pass gets its own chain.
+    conditioning = ["7", 0]
+    for name, image, frameIndex in (("first", firstFrame, 0), ("last", lastFrame, frames - 1)):
+        if image:
+            graph[f"{prefix}{name}"] = {"class_type": "MiniMaxH3AddGuide", "inputs": {
+                "positive": conditioning, "vae": ["4", 0], "latent": latent, "image": [f"{name}Frame", 0], "frame_idx": frameIndex}}
+            conditioning = [f"{prefix}{name}", 0]
+    return conditioning
+
+
+graph["8"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": guided("guide", ["7", 1])}}
 videoLatent = ["12", 0]
 if refine:
     # Second-pass schedule from the LBH r2v example; the soundtrack stays from the first pass.
@@ -156,8 +210,8 @@ if refine:
             "latent": ["20", 0], "model_name": upscaler, "mode": "target dimensions", "mode.width": upscaleWidth, "mode.height": upscaleHeight,
             "align": 32, "enable_temporal_chunking": True, "force_unload": True, "device": "cuda", "precision": "fp16"}},
         "22": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["21", 0], "audio_latent": ["20", 1]}},
-        "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": ["2", 0], "shift_video": 12.0, "shift_audio": 3.0}},
-        "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": ["7", 0]}},
+        "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
+        "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0])}},
         "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
         "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": ["22", 0]}},
     })

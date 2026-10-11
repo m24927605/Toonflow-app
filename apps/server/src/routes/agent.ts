@@ -21,7 +21,7 @@ const inputSchema = z.object({
       name: z.string().max(101).regex(/^node:[a-z][a-zA-Z0-9]*$/),
       nodeLabel: z.string().max(200).optional(),
       description: z.string().max(4000),
-      parameters: z.record(z.string(), z.json()).refine(value => value.type === "object", "函数参数必须是 object JSON Schema"),
+      parameters: z.record(z.string(), z.json()).refine(value => value.type === "object", "Function parameters must be object JSON Schema"),
     })).max(1000),
   }).optional(),
 });
@@ -51,7 +51,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
     await u.agent.run({ ...options, cwd, canvas: bridge?.context, question: questions.context, signal: controller.signal, onCancel: close }, send);
     send({ type: "done" });
   } catch (error) {
-    send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("Agent 运行失败") });
+    send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("Agent failed to run") });
   } finally {
     clearInterval(heartbeat);
     res.off("close", close);

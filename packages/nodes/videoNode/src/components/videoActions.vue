@@ -64,6 +64,7 @@
         </div>
         <p class="actionHint">{{ validRange ? '截取后生成新视频节点，原视频会保留。' : '请选择有效的起止时间。' }}</p>
       </template>
+      <p v-else-if="action === 'fps30'" class="actionHint">Re-encodes to 30 fps for the edit timeline and keeps the original. A 24 fps source repeats one frame in five; that is expected, not stutter.</p>
       <p v-else class="actionHint">{{ action === 'extractAudio' ? '提取音轨并生成音频节点，保留原视频。' : '生成静音视频和音频两个节点，保留原视频。' }}</p>
       <div v-if="processing" class="processingStatus" role="status" aria-live="polite">
         <el-progress :percentage="100" :indeterminate="true" :showText="false" />
@@ -94,7 +95,7 @@ const loadFfmpeg = useNodeFfmpeg();
 const nodeEvent = useNodeEvent();
 const getCanvas = inject<(() => { id: string } | undefined) | undefined>("canvas", undefined);
 const batchHistory = inject<(action: () => Promise<void>) => Promise<void>>("batchCanvasHistory", action => action());
-const actionLabels = { extractAudio: "提取音轨", separate: "分离音视频", trim: "截取片段" };
+const actionLabels = { extractAudio: "提取音轨", separate: "分离音视频", trim: "截取片段", fps30: "Convert to 30 fps" };
 const action = ref<keyof typeof actionLabels>("trim");
 const visible = ref(false);
 const processing = ref(false);
@@ -290,7 +291,7 @@ function run() {
 
 async function process() {
   const operation = action.value;
-  const requiredTypes = operation === "extractAudio" ? ["remote-audioNode"] : operation === "trim" ? ["remote-videoNode"] : ["remote-videoNode", "remote-audioNode"];
+  const requiredTypes = operation === "extractAudio" ? ["remote-audioNode"] : operation === "trim" || operation === "fps30" ? ["remote-videoNode"] : ["remote-videoNode", "remote-audioNode"];
   if (requiredTypes.some(type => !nodeTypes?.value?.[type])) return void ElMessage.error("请先启用所需的视频或音频节点插件");
   const source = props.file!.url;
   const clipStart = start.value;
@@ -340,7 +341,7 @@ async function process() {
       type: output.type,
       position: { x, y: y + index * 320 },
       data: {
-        label: `${translate(node.data.label || "视频")} · ${output.audio ? translate("音轨") : operation === "separate" ? translate("静音视频") : translate("{0}–{1} 秒", { 0: clipStart.toFixed(2), 1: clipEnd.toFixed(2) })}`,
+        label: `${translate(node.data.label || "视频")} · ${output.audio ? translate("音轨") : operation === "separate" ? translate("静音视频") : operation === "fps30" ? "30 fps" : translate("{0}–{1} 秒", { 0: clipStart.toFixed(2), 1: clipEnd.toFixed(2) })}${!output.audio && Math.abs(media.sourceFps - 24) < 0.5 ? " (from 24 fps: 1 repeated frame in 5, expected)" : ""}`,
         outputs: { [output.audio ? "audio" : "video"]: { dataType: output.audio ? "AUDIO" : "VIDEO", value: { url: output.path, mimeType: output.audio ? "audio/mp4" : "video/mp4" } } },
       },
     }));

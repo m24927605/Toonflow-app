@@ -55,7 +55,7 @@ export async function acquireFileAccess(paths: PathLike[], kind: AccessKind, sig
   const controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
   signal?.addEventListener("abort", abort, { once: true });
-  const timer = setTimeout(() => controller.abort(Object.assign(new Error("文件正在使用，等待操作超时"), { code: "EBUSY" })), 30000);
+  const timer = setTimeout(() => controller.abort(Object.assign(new Error("The file is in use; timed out waiting for the operation"), { code: "EBUSY" })), 30000);
   timer.unref?.();
   try {
     for (const { entry } of requests) handles.push(await waitForAccess(entry, kind, controller.signal));
@@ -76,7 +76,7 @@ export function withSyncFileAccess<T>(paths: PathLike[], kind: AccessKind, actio
   for (const key of accessKeys(paths)) {
     const entry = entries.get(key);
     if (entry && (entry.writers || kind === "write" && entry.readers)) {
-      throw Object.assign(new Error(`文件正在使用：${String(paths[0])}`), { code: "EBUSY", path: paths[0] });
+      throw Object.assign(new Error(`The file is in use: ${String(paths[0])}`), { code: "EBUSY", path: paths[0] });
     }
   }
   return action();

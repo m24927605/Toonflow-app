@@ -2,6 +2,6 @@ import { createNodeConfig } from "@toonflow/nodes-scaffold";
 
 export default createNodeConfig({
   name: "imageGenerationNode",
-  displayName: "图片生成",
+  displayName: "Image generation",
   author: "Toonflow",
 }, import.meta.url);

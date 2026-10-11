@@ -13,10 +13,10 @@ export async function readNode(name: string) {
   nodeNameSchema.parse(name);
   const path = resolve(nodesDirectory, `${name}.umd.js`);
   const file = await lstat(path).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") throw Object.assign(error, { status: 404, message: "节点不存在" });
+    if (error.code === "ENOENT") throw Object.assign(error, { status: 404, message: "Node does not exist" });
     throw error;
   });
-  if (!file.isFile()) throw Object.assign(new Error("节点文件无效"), { status: 400 });
+  if (!file.isFile()) throw Object.assign(new Error("The node file is invalid"), { status: 400 });
   // ACT: Reads whole bundles for now, so memory grows with total
   // node size; read only the first line once nodes or bundles grow.
   const source = await readFile(path, "utf8");
@@ -34,7 +34,7 @@ export async function readNode(name: string) {
     if (url.origin === "https://github.com" && !url.username && !url.password) github = url.href;
   }
   const rules = configRulesSchema.safeParse(metadata.configRules ?? []);
-  if (!rules.success) throw Object.assign(new Error("节点配置表单规则无效，请重新构建节点"), { status: 400 });
+  if (!rules.success) throw Object.assign(new Error("The node configuration form rule is invalid, please rebuild the node"), { status: 400 });
   return {
     name,
     displayName: typeof metadata.displayName === "string" && metadata.displayName.trim() ? metadata.displayName : name,
@@ -81,7 +81,7 @@ export function validateNodeConfig(rules: ConfigRule[], config: Record<string, u
     const value = Object.hasOwn(parsed, rule.field) ? parsed[rule.field] : undefined;
     if (value == null || (typeof value === "string" && !value.trim()) || (Array.isArray(value) && !value.length)) {
       const label = typeof rule.title === "string" && rule.title.trim() ? rule.title : rule.field;
-      throw Object.assign(new Error(t`请填写${translateMessage(label)}`), { status: 400 });
+      throw Object.assign(new Error(t`Please fill in ${translateMessage(label)}`), { status: 400 });
     }
   }
   return parsed;

@@ -68,7 +68,7 @@ export async function saveRemoteTeam(record: RemoteTeam) {
       throw error;
     });
     if ([...locals, ...Object.keys(remotes)].some(name => name.toLowerCase() === record.name.toLowerCase())) {
-      throw Object.assign(new Error("已存在同名团队或远端连接"), { status: 409 });
+      throw Object.assign(new Error("A team or remote connection with the same name already exists"), { status: 409 });
     }
     conf.set("remoteConnections", { ...remotes, [record.name]: record });
   });
@@ -86,7 +86,7 @@ export async function setEnabled(name: string, enabled: boolean) {
     if (enabled) validateFiles(name, files);
     const path = resolve(agentsDirectory, `${name}.disabled`);
     const marker = await lstat(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
-    if (marker && !marker.isFile()) throw Object.assign(new Error("团队状态文件无效"), { status: 409 });
+    if (marker && !marker.isFile()) throw Object.assign(new Error("The team status file is invalid"), { status: 409 });
     if (enabled && marker) await unlink(path);
     if (!enabled && !marker) await writeFile(path, "", { flag: "wx", mode: 0o600 });
   });
@@ -121,9 +121,9 @@ export async function readEditableTeam(name: string) {
 
 export async function saveTeamFile(name: string, path: string, content: string) {
   path = skillPath(path);
-  if (!editablePath(path)) throw Object.assign(new Error("只能编辑团队配置、成员说明、技能或知识文件"), { status: 403 });
-  if (content.includes("\0")) throw Object.assign(new Error("文件内容不能包含空字符"), { status: 400 });
-  if (Buffer.byteLength(content) > maxBytes) throw Object.assign(new Error("团队文件不能超过 20 MB"), { status: 413 });
+  if (!editablePath(path)) throw Object.assign(new Error("Only team configuration, member descriptions, skills or knowledge files can be edited"), { status: 403 });
+  if (content.includes("\0")) throw Object.assign(new Error("The file content cannot contain null characters"), { status: 400 });
+  if (Buffer.byteLength(content) > maxBytes) throw Object.assign(new Error("Team files cannot exceed 20 MB"), { status: 413 });
   return withTeamFiles(async () => {
     const { directory, files } = await readFiles(name);
     files.set(path, Buffer.from(content));

@@ -10,15 +10,15 @@ const require = createRequire(import.meta.url);
 
 export async function installTeam(fileName: string, bytes: Uint8Array, force = false) {
   if (!/^[a-z][a-zA-Z0-9]*\.agent\.zip$/.test(fileName) || fileName.length > 128) {
-    throw Object.assign(new Error("请选择小驼峰命名的 .agent.zip 团队包"), { status: 400 });
+    throw Object.assign(new Error("Select a team package with a lowerCamelCase filename ending in .agent.zip"), { status: 400 });
   }
-  if (!bytes.byteLength || bytes.byteLength > maxBytes) throw Object.assign(new Error("团队包不能为空且不能超过 20 MB"), { status: 413 });
+  if (!bytes.byteLength || bytes.byteLength > maxBytes) throw Object.assign(new Error("Team package cannot be empty and cannot exceed 20 MB"), { status: 413 });
   const name = checkName(fileName.slice(0, -10));
   // ACT: Shares ZIP validation with skill installs; never runs bundled tools or extracts to uncontrolled paths.
   const archive = skillZip(bytes);
   const prefix = archive.has("team.json") ? "" : `${name}/`;
   if (!archive.has(`${prefix}team.json`) || [...archive.keys()].some(path => !path.startsWith(prefix))) {
-    throw Object.assign(new Error("团队包须在根目录或同名目录下包含 team.json，所有文件须位于该目录内"), { status: 400 });
+    throw Object.assign(new Error("The team package must contain team.json in the root directory or a directory with the same name, and all files must be located in this directory"), { status: 400 });
   }
   const files = new Map([...archive].map(([path, content]) => [path.slice(prefix.length), content]));
   const manifest = validateFiles(name, files);
@@ -28,12 +28,12 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
     let preserveBackup = false;
     try {
       await mkdir(agentsDirectory, { recursive: true });
-      if (!(await lstat(agentsDirectory)).isDirectory()) throw Object.assign(new Error("团队目录必须是普通目录"), { status: 403 });
+      if (!(await lstat(agentsDirectory)).isDirectory()) throw Object.assign(new Error("The team directory must be a normal directory"), { status: 403 });
       const existing = (await readdir(agentsDirectory)).find(item => item.toLowerCase() === name.toLowerCase());
       if (Object.keys(conf.get("remoteConnections", {})).some(item => item.toLowerCase() === name.toLowerCase())) {
-        throw Object.assign(new Error("已存在同名远端团队连接"), { status: 409 });
+        throw Object.assign(new Error("A remote team connection with the same name already exists"), { status: 409 });
       }
-      if (existing && existing !== name) throw Object.assign(new Error("团队目录名称大小写冲突"), { status: 409 });
+      if (existing && existing !== name) throw Object.assign(new Error("Team directory name case conflict"), { status: 409 });
       const target = resolve(agentsDirectory, name);
       const previous = existing ? await readFiles(name) : undefined;
       if (previous && !force) {
@@ -44,17 +44,17 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
           try { saved = JSON.parse(await readFile(recordPath, "utf8")).fingerprint; } catch { /* Without a valid install fingerprint, local content cannot be confirmed unmodified. */ }
         }
         if (saved !== fingerprint(previous.files)) {
-          throw Object.assign(new Error("团队存在本地修改或缺少安装记录，请先导出备份；确定覆盖时使用开发者强制安装"), { status: 409 });
+          throw Object.assign(new Error("This team has local changes or no installation record. Export a backup first. If you are sure you want to overwrite it, use Force Install in developer settings."), { status: 409 });
         }
         let version: unknown;
         try { version = JSON.parse(decodeText(previous.files.get("team.json")!)).version; } catch { /* A missing version is reported by the shared upgrade check. */ }
-        requireNewerVersion(version, manifest.version, `团队“${name}”`);
+        requireNewerVersion(version, manifest.version, `Team "${name}"`);
       }
       temporary = await mkdtemp(resolve(root, ".agentInstall"));
       const staged = resolve(temporary, "new");
       for (const [path, content] of files) {
         const destination = resolve(staged, path);
-        if (!isWithin(staged, destination)) throw Object.assign(new Error("团队文件路径无效"), { status: 400 });
+        if (!isWithin(staged, destination)) throw Object.assign(new Error("Invalid team file path"), { status: 400 });
         await mkdir(dirname(destination), { recursive: true });
         await writeFile(destination, content, { flag: "wx", mode: 0o600 });
       }
@@ -67,7 +67,7 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
           try { await rename(backup, target); }
           catch (restoreError) {
             preserveBackup = true;
-            throw new AggregateError([error, restoreError], `团队更新失败，旧版保留在 ${backup}，请恢复后重试`);
+            throw new AggregateError([error, restoreError], `Team update failed; the old version is kept in ${backup}. Restore it and try again`);
           }
         }
         throw error;
@@ -79,7 +79,7 @@ export async function installTeam(fileName: string, bytes: Uint8Array, force = f
       return { name };
     } finally {
       if (temporary && !preserveBackup && temporary !== root && isWithin(root, temporary)) {
-        await rm(temporary, { recursive: true, force: true }).catch(error => console.warn(`团队安装暂存目录清理失败：${temporary}`, error));
+        await rm(temporary, { recursive: true, force: true }).catch(error => console.warn(`Failed to clean up the team installation staging directory: ${temporary}`, error));
       }
     }
   });

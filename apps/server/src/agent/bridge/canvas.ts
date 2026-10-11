@@ -19,10 +19,10 @@ export function createCanvasContext(cwd: string, canvas: CanvasInfo, send: (even
       // The frontend applies canvas changes sequentially; send and start timing
       // only on this call's turn so queueing does not eat the execution timeout.
       const pending = queue.then(() => {
-        if (disposed) throw new Error("画布调用所属对话已结束");
+        if (disposed) throw new Error("The conversation to which the canvas call belongs has ended");
         signal?.throwIfAborted();
         const operation = canvasOperations.find(item => item.name === request.name);
-        if (!operation) throw new Error("画布操作不存在");
+        if (!operation) throw new Error("Canvas operation does not exist");
         const args = operation.parameters.parse(request.args);
         const callId = crypto.randomUUID();
         return new Promise((resolve, reject) => {
@@ -31,16 +31,16 @@ export function createCanvasContext(cwd: string, canvas: CanvasInfo, send: (even
             activeCalls.delete(callId);
             clearTimeout(timer);
             signal?.removeEventListener("abort", abort);
-            if (error !== undefined) reject(new Error(error || "画布调用失败"));
+            if (error !== undefined) reject(new Error(error || "Canvas call failed"));
             else resolve(result);
           };
-          const abort = () => finish({ error: "画布调用已取消" });
-          const timer = setTimeout(() => finish({ error: "画布调用超时，请确认画布仍然打开" }), 120000);
+          const abort = () => finish({ error: "Canvas call canceled" });
+          const timer = setTimeout(() => finish({ error: "The canvas call timed out, please confirm that the canvas is still open" }), 120000);
           pendingCalls.set(callId, { cwd, finish });
           activeCalls.add(callId);
           signal?.addEventListener("abort", abort, { once: true });
           try { send({ type: "canvasCall", callId, name: operation.name, args }); }
-          catch (error) { finish({ error: (error instanceof Error ? error.message : "") || "发送画布调用失败" }); }
+          catch (error) { finish({ error: (error instanceof Error ? error.message : "") || "Send canvas call failed" }); }
         });
       });
       queue = pending.then(() => {}, () => {});
@@ -51,7 +51,7 @@ export function createCanvasContext(cwd: string, canvas: CanvasInfo, send: (even
     context,
     dispose() {
       disposed = true;
-      for (const callId of activeCalls) pendingCalls.get(callId)?.finish({ error: "画布调用所属对话已结束" });
+      for (const callId of activeCalls) pendingCalls.get(callId)?.finish({ error: "The conversation to which the canvas call belongs has ended" });
     },
   };
 }
@@ -61,6 +61,6 @@ export function finishCanvasCall(cwd: string, callId: string, response: CanvasRe
   // Callbacks may still arrive after timeout, cancellation or completion;
   // ignore them idempotently to avoid aborting the whole turn.
   if (!pending) return;
-  if (pending.cwd !== cwd) throw Object.assign(new Error("画布调用不存在或已结束"), { status: 404 });
+  if (pending.cwd !== cwd) throw Object.assign(new Error("Canvas call does not exist or has ended"), { status: 404 });
   pending.finish(response);
 }

@@ -14,7 +14,7 @@ export async function runRemoteTeam(options: {
   onProgress?: (text: string) => void;
 }): Promise<{ result: SubAgentResult; usage: Usage }> {
   const { name, task, signal, onProgress } = options;
-  const result: SubAgentResult = { name, status: "running", result: "准备连接远端团队", taskId: options.taskId, contextId: options.contextId };
+  const result: SubAgentResult = { name, status: "running", result: "Prepare to connect to the remote team", taskId: options.taskId, contextId: options.contextId };
   const artifacts = new Map<string, string>();
   let client: Awaited<ReturnType<typeof createTeamA2aClient>> | undefined;
   let sent = false;
@@ -32,13 +32,13 @@ export async function runRemoteTeam(options: {
       const content = part.content;
       if (content?.$case === "text") return content.value;
       if (content?.$case === "data") return JSON.stringify(content.value);
-      if (content?.$case === "url") return `远端文件${part.filename ? ` ${part.filename}` : ""}：${content.value}`;
-      if (content?.$case === "raw") return `远端附件${part.filename ? ` ${part.filename}` : ""}（${content.value.byteLength} 字节，未保存到工作区）`;
+      if (content?.$case === "url") return `Remote file ${part.filename ? ` ${part.filename}` : ""}: ${content.value}`;
+      if (content?.$case === "raw") return `Remote attachment ${part.filename ? ` ${part.filename}` : ""} (${content.value.byteLength} bytes, not saved to the workspace)`;
       return "";
     }).filter(Boolean).join("\n"));
   }
   function identify(taskId?: string, contextId?: string) {
-    if ((taskId && result.taskId && taskId !== result.taskId) || (contextId && result.contextId && contextId !== result.contextId)) throw new Error("远端返回的任务标识不匹配");
+    if ((taskId && result.taskId && taskId !== result.taskId) || (contextId && result.contextId && contextId !== result.contextId)) throw new Error("The task ID returned by the remote end does not match");
     if (taskId) result.taskId = taskId;
     if (contextId) result.contextId = contextId;
   }
@@ -53,7 +53,7 @@ export async function runRemoteTeam(options: {
     state = value.state;
     const update = value.message ? partsText(value.message.parts) : "";
     if (update) text = update;
-    if (state === TaskState.TASK_STATE_WORKING || state === TaskState.TASK_STATE_SUBMITTED) onProgress?.(update || "远端团队正在执行");
+    if (state === TaskState.TASK_STATE_WORKING || state === TaskState.TASK_STATE_SUBMITTED) onProgress?.(update || "The remote team is executing");
   }
   function snapshot(value: Task) {
     identify(value.id, value.contextId);
@@ -70,14 +70,14 @@ export async function runRemoteTeam(options: {
     else if (state === TaskState.TASK_STATE_FAILED || state === TaskState.TASK_STATE_REJECTED) result.status = "error";
     else return false;
     result.result = limit([...new Set([text, ...artifacts.values()].filter(Boolean))].join("\n\n")) || (
-      result.status === "completed" ? "远端任务已完成，未返回文本产物" :
-      result.status === "cancelled" ? "远端任务已确认取消" :
-      state === TaskState.TASK_STATE_AUTH_REQUIRED ? "远端任务需要额外认证，请由用户处理后继续" :
-      result.status === "inputRequired" ? "远端任务需要补充信息" : "远端任务失败或被拒绝"
+      result.status === "completed" ? "The remote task completed without returning text output" :
+      result.status === "cancelled" ? "The remote task has been confirmed to be canceled." :
+      state === TaskState.TASK_STATE_AUTH_REQUIRED ? "The remote task requires additional authentication, please let the user handle it before continuing." :
+      result.status === "inputRequired" ? "The remote task requires supplementary information" : "The remote task failed or was rejected"
     );
     if (truncated) {
       if (result.status === "completed") result.status = "limited";
-      result.result += "\n[远端结果过长，已截断；可使用 taskId 查询完整产物]";
+      result.result += "\n[Remote result too long and truncated; use taskId to retrieve the complete output]";
     }
     return true;
   }
@@ -85,15 +85,15 @@ export async function runRemoteTeam(options: {
   try {
     signal?.throwIfAborted();
     const remote = getRemoteTeam(name);
-    if (!remote) throw new Error(t`远端团队 ${name} 不存在`);
-    if (!remote.enabled) throw new Error(t`远端团队 ${name} 已禁用`);
+    if (!remote) throw new Error(t`Remote team ${name} does not exist`);
+    if (!remote.enabled) throw new Error(t`Remote Team ${name} Disabled`);
     client = await createTeamA2aClient({
       url: remote.cardUrl, token: remote.token,
       fetch: ((input, init) => fetch(input, { ...init, signal: init?.signal ?? signal })) as typeof fetch,
     });
     const card = await client.getAgentCard({ signal });
     signal?.throwIfAborted();
-    if (!getRemoteTeam(name)?.enabled) throw new Error(t`远端团队 ${name} 已禁用`);
+    if (!getRemoteTeam(name)?.enabled) throw new Error(t`Remote Team ${name} Disabled`);
     const request = SendMessageRequest.fromJSON({ message: {
       messageId: randomUUID(), role: "ROLE_USER", parts: [{ text: task }], taskId: result.taskId, contextId: result.contextId,
     } });
@@ -119,10 +119,10 @@ export async function runRemoteTeam(options: {
       else { identify(reply.taskId, reply.contextId); text = partsText(reply.parts); directReply = true; }
     }
     signal?.throwIfAborted();
-    if (!finish()) throw new Error("远端响应结束，但没有返回完成、失败或等待输入状态");
+    if (!finish()) throw new Error("The remote response ends but does not return completion, failure or waiting for input status");
   } catch (error) {
     const reason = signal?.aborted ? signal.reason : error;
-    const description = reason instanceof Error ? reason.message : String(reason ?? "远端调用失败");
+    const description = reason instanceof Error ? reason.message : String(reason ?? "Remote call failed");
     result.status = "error";
     result.result = description;
     if (client && (sent || options.taskId) && result.taskId) {
@@ -130,22 +130,22 @@ export async function runRemoteTeam(options: {
         if (signal?.aborted) {
           const cancelled = await client.cancelTask(CancelTaskRequest.fromJSON({ id: result.taskId }), { signal: AbortSignal.timeout(15000) });
           snapshot(cancelled);
-          if (state !== TaskState.TASK_STATE_CANCELED) throw new Error("远端没有确认取消");
+          if (state !== TaskState.TASK_STATE_CANCELED) throw new Error("The remote end did not confirm the cancellation.");
           result.status = "cancelled";
-          result.result = `${description}；远端已确认取消`;
+          result.result = `${description}; the remote side confirmed cancellation`;
         } else {
           // On stream loss only check the task without resending the message, to avoid repeating work with side effects.
           snapshot(await client.getTask(GetTaskRequest.fromJSON({ id: result.taskId }), { signal: AbortSignal.timeout(15000) }));
-          if (!finish()) result.result = `${description}；远端任务仍未结束，未自动重试或取消`;
+          if (!finish()) result.result = `${description}; the remote task has not finished yet and was not automatically retried or cancelled`;
         }
       } catch (checkError) {
         result.status = "error";
-        result.result = `${description}；${signal?.aborted ? "无法确认远端已取消" : "无法确认远端任务状态"}：${checkError instanceof Error ? checkError.message : String(checkError)}`;
+        result.result = `${description}; ${signal?.aborted ? "Unable to confirm cancellation of the remote task" : "Unable to confirm remote task status"}: ${checkError instanceof Error ? checkError.message : String(checkError)}`;
       }
     } else if (signal?.aborted && !sent) {
-      if (result.taskId) result.result += "；本次请求尚未提交，原远端任务未执行取消";
+      if (result.taskId) result.result += "; this request has not been submitted, and the original remote task has not been canceled";
       else result.status = "cancelled";
-    } else if (sent) result.result += "；尚未获得任务标识，远端状态未知，未自动重试";
+    } else if (sent) result.result += "; The task ID has not been obtained, the remote status is unknown, and it has not been automatically retried.";
   }
   return { result, usage: emptyUsage() };
 }

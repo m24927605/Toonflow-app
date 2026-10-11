@@ -14,15 +14,15 @@ const plugin: ToolPlugin = {
     if (!media) return [];
     const permissions = configSchema.parse(config);
     const generationTools = ([
-      { name: "generateImage", mediaType: "image", enabled: permissions.allowImage, label: "生成图片", parameters: imageGenerationSchema, description: "根据提示词和可选的工作区参考图生成图片。" },
-      { name: "generateVideo", mediaType: "video", enabled: permissions.allowVideo, label: "生成视频", parameters: videoGenerationSchema, description: "根据提示词和可选的工作区图片、视频、音频、首尾帧生成视频。按模型能力设置生成模式、时长、分辨率和音频。" },
-      { name: "generateAudio", mediaType: "audio", enabled: permissions.allowAudio, label: "生成音频", parameters: audioGenerationSchema, description: "根据文本或提示词和可选的工作区参考图片和音频生成音频。按模型能力设置音色、语气（emotion，用文字描述情绪与语速，如“低沉缓慢”“愤怒大吼”）、语速、音量、语种、采样率和格式。" },
+      { name: "generateImage", mediaType: "image", enabled: permissions.allowImage, label: "Generate image", parameters: imageGenerationSchema, description: "Generate an image from a prompt and optional workspace reference images. Never ask the model to render readable text (captions, title cards, signs, logos); add it in post-production, and set skipTextCheck only after the user confirmed otherwise." },
+      { name: "generateVideo", mediaType: "video", enabled: permissions.allowVideo, label: "Generate video", parameters: videoGenerationSchema, description: "Generate a video from a prompt and optional workspace images, video, audio, and first/last frames. Set the generation mode, duration, resolution and audio according to the model's capabilities. By default you must connect the previs depth video exported from Director's Studio in videoControl mode; if there is no previs, ask the user first, and set skipPrevis only after the user explicitly agrees to skip it. Never ask the model to render readable text (captions, title cards, signs, logos); add it in post-production, and set skipTextCheck only after the user confirmed otherwise." },
+      { name: "generateAudio", mediaType: "audio", enabled: permissions.allowAudio, label: "Generate audio", parameters: audioGenerationSchema, description: "Generate audio from text or a prompt and optional workspace reference images and audio. Set voice, tone (emotion: describe the emotion and pace in words, such as \"low and slow\" or \"angry shouting\"), speed, volume, language, sample rate and format according to the model's capabilities." },
     ] as const).filter(operation => operation.enabled);
     if (!generationTools.length) return [];
     const listTool: ToolDefinition = {
       name: "listMediaModels",
-      label: "查询媒体模型",
-      description: "查询已允许生成的媒体模型，返回 providerId、modelId、类型、模式及支持的画幅、时长、分辨率或音色。生成前先查询，不能猜测模型 ID。",
+      label: "Query media models",
+      description: "Query the media models allowed for generation, returning providerId, modelId, type, modes, and the supported aspect ratios, durations, resolutions or voices. Query before generating; do not guess model IDs.",
       parameters: z.toJSONSchema(listMediaModelsSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
         listMediaModelsSchema.parse(params);
@@ -34,8 +34,8 @@ const plugin: ToolPlugin = {
     return [listTool, ...generationTools.map<ToolDefinition>(operation => ({
       name: operation.name,
       label: operation.label,
-      description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,
-      promptSnippet: "生成媒体前先查询 listMediaModels，复用实际模型和工作区参考素材。",
+      description: `${operation.description}providerId and modelId must come from listMediaModels. The path of referenced assets and outputDirectory are workspace-relative paths; when the output directory is omitted, the default media directory is used. Waits for generation to finish and returns the saved file path, not Base64.`,
+      promptSnippet: "Query listMediaModels before generating media, and reuse actual models and workspace reference assets.",
       parameters: z.toJSONSchema(operation.parameters, { io: "input", target: "draft-07" }),
       executionMode: "sequential",
       async execute(_id, params, signal) {
@@ -43,8 +43,9 @@ const plugin: ToolPlugin = {
         const result = await media[operation.name](operation.parameters.parse(params), signal);
         const text = result.map(asset => {
           const url = asset.path.replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/");
-          const preview = asset.mediaType === "image" ? `![生成图片](<${url}>)` : `[${asset.mediaType === "audio" ? "播放生成音频" : "查看生成视频"}](<${url}>)`;
-          return `${preview}\n工作区文件：${asset.path}`;
+          const preview = asset.mediaType === "image" ? `![Generated image](<${url}>)` : `[${asset.mediaType === "audio" ? "Play generated audio" : "View generated video"}](<${url}>)`;
+          return `${preview}
+Workspace file: ${asset.path}`;
         }).join("\n\n");
         return { content: [{ type: "text", text }], details: result };
       },

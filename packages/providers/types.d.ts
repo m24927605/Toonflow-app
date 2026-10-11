@@ -11,6 +11,8 @@ type VideoMode =
   | "text"
   /** Continues the single video in `videos` forward by `duration` seconds; reference images still guide the result. */
   | "videoExtension"
+  /** Uses the single video in `videos` as a structure control (depth, pose or edges) instead of a look reference; images stay look references. */
+  | "videoControl"
   | (`${"video" | "image" | "audio"}Reference:${number}`)[];
 
 interface ProviderModel {
@@ -145,6 +147,14 @@ interface ProviderTools {
     prompt: string;
     /** Up to 9 reference images, referred to in the prompt as <Picture 1>…<Picture 9>. */
     images?: MediaInput[];
+    /** Up to 3 reference videos (2–15 s, re-encoded to 24 fps), referred to as <Video 1>…<Video 3>; the model copies their look. */
+    videos?: MediaInput[];
+    /** Structure video (depth, pose or edges, e.g. a previs depth pass) applied with the Fun ControlNet Union 2.0; its look is never copied. */
+    controlVideo?: MediaInput;
+    /** Image pinned as the first frame. */
+    firstFrame?: MediaInput;
+    /** Image pinned as the last frame. */
+    lastFrame?: MediaInput;
     /** Whole seconds, 4–15. */
     duration: number;
     resolution: "480p" | "720p" | "1080p";
@@ -167,6 +177,8 @@ interface ProviderTools {
     ratio: string;
     /** Pixel area: 1K is about 1024×1024, 2K about 2048×2048. */
     size: "1K" | "2K";
+    /** Structure map (a depth map: near white, far black) that fixes the composition and viewpoint through ControlNet. */
+    controlImage?: MediaInput;
   }): Promise<{ data: Uint8Array; mimeType: "image/png" }>;
 }
 
@@ -214,6 +226,8 @@ interface VideoRequest extends MediaRequest {
  * at least one of text or prompt is required, and providers handle non-empty validation and model capability checks.
  */
 type AudioRequest = MediaRequest & {
+  /** Output length in seconds for music and sound creation; empty uses the model default. */
+  duration?: number;
   /** Text to read aloud, for text-to-speech. */
   text?: string;
   /** Prompt for audio creation or voice style, which can be passed separately from the text to read. */

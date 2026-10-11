@@ -13,8 +13,8 @@ const inputSchema = z.strictObject({
     ])),
     details: z.json().default({}),
   }).optional(),
-}).refine(input => (input.result !== undefined) !== (input.error !== undefined), "必须提供工具结果或错误信息")
-  .refine(input => !input.partial || input.result !== undefined, "工具增量必须提供结果");
+}).refine(input => (input.result !== undefined) !== (input.error !== undefined), "A tool result or an error message is required")
+  .refine(input => !input.partial || input.result !== undefined, "Incremental tool updates must include a result");
 
 export default Router().post("/", validateFields(inputSchema.shape), (req, res) => {
   u.mcpControl.assertAppRequest(req);

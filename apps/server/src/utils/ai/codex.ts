@@ -30,10 +30,10 @@ export async function startCodexLogin() {
     notify: event => { if (event.type === "auth_url") authUrl.resolve(event.url); },
     prompt: prompt => {
       if (prompt.type === "select") return Promise.resolve("browser");
-      if (prompt.type !== "manual_code") return Promise.reject(new Error("不支持的登录步骤"));
+      if (prompt.type !== "manual_code") return Promise.reject(new Error("Unsupported login step"));
       return new Promise((resolve, reject) => {
         session.submit = resolve;
-        const abort = () => reject(new Error("登录已取消"));
+        const abort = () => reject(new Error("Sign-in canceled"));
         signal.addEventListener("abort", abort, { once: true });
         prompt.signal?.addEventListener("abort", abort, { once: true });
       });
@@ -41,7 +41,7 @@ export async function startCodexLogin() {
   }).then(() => {
     if (login === session) login = undefined;
   }, (error: unknown) => {
-    session.error = signal.aborted && !controller.signal.aborted ? "登录超时，请重新登录" : error instanceof Error ? error.message : "登录失败";
+    session.error = signal.aborted && !controller.signal.aborted ? "Sign-in timed out. Please sign in again." : error instanceof Error ? error.message : "Login failed";
     authUrl.reject(Object.assign(new Error(session.error), { status: 400 }));
     throw Object.assign(new Error(session.error), { status: 400 });
   });
@@ -52,7 +52,7 @@ export async function startCodexLogin() {
 /** Completes the login with the redirect URL or code when the browser cannot reach the local callback. */
 export async function submitCodexCode(code: string) {
   const session = login;
-  if (!session?.submit || session.error) throw Object.assign(new Error("没有等待中的登录，请重新登录"), { status: 409 });
+  if (!session?.submit || session.error) throw Object.assign(new Error("No sign-in is in progress. Please sign in again."), { status: 409 });
   session.submit(code);
   await session.done;
 }

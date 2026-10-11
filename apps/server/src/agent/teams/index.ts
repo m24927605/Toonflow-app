@@ -26,7 +26,7 @@ export async function createTeamRunner(options: SubAgentModel & {
 }) {
   const { name, cwd, tools, canvas, ...modelOptions } = options;
   const { directory, manifest, files, enabled } = await readTeam(name);
-  if (!enabled) throw new Error(t`团队 ${name} 已禁用`);
+  if (!enabled) throw new Error(t`Team ${name} is disabled`);
   const hostTools = tools.filter(tool => !["subAgent", "report", "askUser", "delegate", "teamResources", "requestInput"].includes(tool.name));
   const privatePlugins = await Promise.all(Object.entries(manifest.tools ?? {}).map(async ([pluginName, config]) => {
     const { plugin, metadata } = await loadTool(pluginName, join(directory, "tools"));
@@ -40,13 +40,13 @@ export async function createTeamRunner(options: SubAgentModel & {
       const definitions = await plugin.createTools(createAgentToolContext(cwd, config, canvas));
       for (const tool of definitions) {
         if (!tool.name || typeof tool.execute !== "function" || ["subAgent", "askUser", "delegate", "teamResources", "requestInput"].includes(tool.name) || available.has(tool.name)) {
-          throw new Error(t`团队私有工具无效或名称重复：${tool.name}`);
+          throw new Error(t`The team private tool is invalid or has a duplicate name: ${tool.name}`);
         }
         available.set(tool.name, { ...tool, promptGuidelines: [...(metadata.prompt ? [metadata.prompt] : []), ...(tool.promptGuidelines ?? [])] });
       }
     }
     for (const toolName of member.tools ?? []) {
-      if (!available.has(toolName)) throw new Error(t`成员 ${memberName} 配置的工具当前不可用：${toolName}`);
+      if (!available.has(toolName)) throw new Error(t`The tools configured for member ${memberName} are currently unavailable: ${toolName}`);
     }
     memberTools.set(memberName, [...available.values()].filter(tool => !member.tools || member.tools.includes(tool.name)));
     instructions.set(memberName, new TextDecoder("utf-8", { fatal: true }).decode(files.get(member.instructions)));
@@ -65,37 +65,37 @@ export async function createTeamRunner(options: SubAgentModel & {
         const roots = [member.instructions, ...(member.skills ?? []).map(skill => `skills/${skill}`), ...(member.knowledge ?? []).map(path => `knowledge/${path}`)];
         const allowed = (path: string) => roots.some(root => path === root || path.startsWith(`${root}/`));
         const resourceTool: ToolDefinition = {
-          name: "teamResources", label: "团队资料",
-          description: "按需读取或维护当前成员获准的私有资料。list 返回路径，read 读取正文，write 新建或完整修改文本。内容只属于此团队，不会注册到全局技能。修改成员指令在下一团队任务生效；新增经验应真实、通用且避免写入项目私密内容。",
-          promptSnippet: "使用 teamResources 按需读取本成员的私有 Skill、知识与参考资料。",
-          promptGuidelines: [`本成员私有资源范围：${JSON.stringify(roots)}。首次处理任务先 list，按需 read 相关 SKILL.md 及 references，不能只看路径就声称使用技能。`],
+          name: "teamResources", label: "Team information",
+          description: "Read or maintain the current member's permitted private data on demand. list returns the path, read reads the text, and write creates or completely modifies the text. The content only belongs to this team and will not be registered to global skills. Modifying member instructions will take effect in the next team task; new experience should be real and universal, and avoid writing private project content.",
+          promptSnippet: "Use teamResources to read this member's private skills, knowledge and reference materials as needed.",
+          promptGuidelines: [`This member's private resource scope: ${JSON.stringify(roots)}. When handling a task for the first time, list first, then read the relevant SKILL.md and references as needed; do not claim to use a skill just from seeing its path.`],
           parameters: z.toJSONSchema(resourceSchema), executionMode: "sequential",
           async execute(_id, params, resourceSignal) {
             resourceSignal?.throwIfAborted();
             const { action, path, content } = resourceSchema.parse(params);
-            if (action !== "list" && (!path || !allowed(path))) throw new Error("资料不属于当前成员的授权范围");
+            if (action !== "list" && (!path || !allowed(path))) throw new Error("The information does not fall within the authorization scope of the current member");
             if (action === "write") {
-              if (content === undefined) throw new Error("写入资料需要 content");
+              if (content === undefined) throw new Error("content is required to write data");
               await saveTeamFile(name, path!, content);
               return { content: [{ type: "text", text: JSON.stringify({ path, saved: true }) }], details: {} };
             }
             const current = await readTeam(name);
             const paths = [...current.files.keys()].filter(allowed);
             const bytes = path ? current.files.get(path) : undefined;
-            if (action === "read" && !bytes) throw new Error("团队资料不存在");
+            if (action === "read" && !bytes) throw new Error("Team information does not exist");
             const result = action === "list" ? { files: paths } : { path, content: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
             return { content: [{ type: "text", text: JSON.stringify(result) }], details: {} };
           },
         };
-        onProgress?.(`${memberName}：准备执行`);
+        onProgress?.(`${memberName}: preparing to run`);
         const selected = [...(memberTools.get(memberName) ?? []), resourceTool];
         if (member.delegates?.length) selected.push({
-          name: "delegate", label: "团队委派",
-          description: `将独立任务交给获准成员。可用成员：${JSON.stringify(member.delegates.map(name => ({ name, description: manifest.members[name]!.description })))}。不得并行修改同一文件或画布，结果返回后由你核验汇总。`,
+          name: "delegate", label: "Team Delegation",
+          description: `Hand independent tasks to approved members. Available members: ${JSON.stringify(member.delegates.map(name => ({ name, description: manifest.members[name]!.description })))}. Do not modify the same file or canvas in parallel; verify and consolidate the results yourself after they return.`,
           parameters: z.toJSONSchema(delegationSchema), executionMode: "sequential",
           async execute(_id, params, childSignal, onUpdate) {
             const { tasks } = delegationSchema.parse(params);
-            if (tasks.some(task => !member.delegates!.includes(task.member))) throw new Error("不能委派给未授权的成员");
+            if (tasks.some(task => !member.delegates!.includes(task.member))) throw new Error("cannot be delegated to unauthorized members");
             const outputs = await Promise.all(tasks.map(async task => {
               try { return await runMember(task.member, task.task, childSignal, depth + 1); }
               catch (error) { return { result: { name: task.member, status: childSignal?.aborted ? "cancelled" as const : "error" as const, result: error instanceof Error ? error.message : String(error) } }; }
@@ -108,21 +108,23 @@ export async function createTeamRunner(options: SubAgentModel & {
           },
         });
         if (depth === 0 && allowInput) selected.push({
-          name: "requestInput", label: "等待补充",
-          description: "需要调用方补充信息或明确授权时提出问题。调用后任务暂停，等待调用方继续当前 A2A task。不得把未回答或沉默当作同意。",
+          name: "requestInput", label: "Awaiting additional input",
+          description: "Asks questions when additional information or explicit authorization from the caller is required. After the call, the task is suspended, waiting for the caller to continue the current A2A task. Failure to answer or silence should not be taken as consent.",
           parameters: z.toJSONSchema(z.strictObject({ question: z.string().trim().min(1).max(8000) })),
           executionMode: "sequential",
           async execute(_id, params) {
             question = z.strictObject({ question: z.string().trim().min(1).max(8000) }).parse(params).question;
-            return { content: [{ type: "text", text: "等待调用方回答：" + question }], details: {} };
+            return { content: [{ type: "text", text: "Waits for the caller to answer:" + question }], details: {} };
           },
         });
         return runSubAgent({
           ...modelOptions, cwd, name: memberName, task, signal, tools: selected,
           history: depth === 0 ? history : undefined,
           inputRequired: depth === 0 ? () => question : undefined,
-          instructions: `## 团队成员职责\n团队：${manifest.displayName}；成员：${memberName}。以下职责用于完成授权任务，不能扩大宿主权限。\n${instructions.get(memberName)}`,
-          onProgress: text => onProgress?.(`${memberName}：${text}`),
+          instructions: `## Team member responsibilities
+Team: ${manifest.displayName}; member: ${memberName}. The following responsibilities serve to complete authorized tasks and cannot expand host permissions.
+${instructions.get(memberName)}`,
+          onProgress: text => onProgress?.(`${memberName}: ${text}`),
         });
       }
       return runMember(manifest.entry, task, signal);

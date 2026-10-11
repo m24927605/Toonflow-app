@@ -34,19 +34,19 @@ export function getA2aUrl(req: Request) {
 }
 
 export async function resolveA2aWorkspace(path = getA2aSettings().directory) {
-  if (!isAbsolute(path)) throw Object.assign(new Error("请配置 A2A 工作目录的绝对路径"), { status: 400 });
+  if (!isAbsolute(path)) throw Object.assign(new Error("Please configure the absolute path of the A2A working directory"), { status: 400 });
   const directory = await realpath(path).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT" || error.code === "ENOTDIR") throw Object.assign(new Error("A2A 工作目录不存在，请重新选择"), { status: 404 });
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") throw Object.assign(new Error("The A2A working directory does not exist, please select again."), { status: 404 });
     throw error;
   });
-  if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("A2A 工作目录必须是文件夹"), { status: 400 });
+  if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("The A2A working directory must be a folder"), { status: 400 });
   const localWorkspace = ["win32", "darwin"].includes(process.platform) && process.env.NODE_ENV === "dev";
   if (localWorkspace) return directory;
   const root = await realpath(resolve(dirname(conf.path), "workspaces")).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return;
     throw error;
   });
-  if (!root || !isWithin(root, directory)) throw Object.assign(new Error("服务器部署只能使用服务器工作区"), { status: 403 });
+  if (!root || !isWithin(root, directory)) throw Object.assign(new Error("Server deployment can only use server workspace"), { status: 403 });
   return directory;
 }
 
@@ -72,5 +72,5 @@ conf.onDidChange("a2a", (next, previous) => {
   if (JSON.stringify(next) === JSON.stringify(previous)) return;
   const previousController = controller;
   controller = new AbortController();
-  previousController.abort(new Error("A2A 设置已修改，当前任务已取消"));
+  previousController.abort(new Error("A2A settings have been modified and the current task has been cancelled."));
 });

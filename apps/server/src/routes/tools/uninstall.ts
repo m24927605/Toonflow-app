@@ -8,12 +8,12 @@ import { error, success } from "@/lib/responseFormat";
 const router = Router();
 
 export default router.delete("/", validateFields({ name: u.plugins.toolNameSchema }), async (req, res) => {
-  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在服务器本机管理工具", null, 403));
+  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("Please manage tools locally on the server", null, 403));
   const { name } = req.body as { name: string };
   const path = resolve(u.plugins.toolsDirectory, `${name}.tool.js`);
   const release = u.workspaceFile.lockWorkspaceFiles([path]);
   try {
-    if (!(await lstat(path)).isFile()) return res.status(400).json(error("工具文件无效", null, 400));
+    if (!(await lstat(path)).isFile()) return res.status(400).json(error("The tool file is invalid", null, 400));
     await unlink(path);
     await unlink(resolve(u.plugins.toolsDirectory, `${name}.disabled`)).catch((err: NodeJS.ErrnoException) => {
       if (err.code !== "ENOENT") throw err;
@@ -21,6 +21,6 @@ export default router.delete("/", validateFields({ name: u.plugins.toolNameSchem
     const configs = u.conf.get("toolConfigs", {});
     delete configs[name];
     u.conf.set("toolConfigs", configs);
-    res.json(success(null, "工具已卸载"));
+    res.json(success(null, "Tool has been uninstalled"));
   } finally { release(); }
 });

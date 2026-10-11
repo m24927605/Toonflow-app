@@ -28,7 +28,7 @@ async function verifyRoot() {
   const root = directory();
   const rootInfo = await lstat(root);
   if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
-    throw Object.assign(new Error("技能根目录必须是非符号链接目录"), { status: 403 });
+    throw Object.assign(new Error("The skill root directory must be a non-symbolic link directory"), { status: 403 });
   }
   return { root, actualRoot: await realpath(root) };
 }
@@ -38,14 +38,14 @@ async function verifyChain(actualRoot: string, start: string, target: string, fi
   for (const part of relative(start, target).split(sep)) {
     path = resolve(path, part);
     const info = await lstat(path).catch((err: NodeJS.ErrnoException) => {
-      throw Object.assign(new Error(err.code === "ENOENT" ? "文件不存在" : "技能路径无效"), { status: err.code === "ENOENT" ? 404 : 403 });
+      throw Object.assign(new Error(err.code === "ENOENT" ? "file does not exist" : "Invalid skill path"), { status: err.code === "ENOENT" ? 404 : 403 });
     });
     const isFinal = path === target;
     const expectDirectory = !isFinal || finalKind === "directory";
     if (info.isSymbolicLink() || (expectDirectory ? !info.isDirectory() : !info.isFile()) || !isWithin(actualRoot, await realpath(path))) {
-      throw Object.assign(new Error("技能路径不能包含符号链接、特殊文件或越界目录"), { status: 403 });
+      throw Object.assign(new Error("The skill path cannot contain symbolic links, special files, or out-of-bounds directories"), { status: 403 });
     }
-    if (isFinal && finalKind === "file" && info.size > maxBytes) throw Object.assign(new Error("技能文件不能超过 20 MB"), { status: 413 });
+    if (isFinal && finalKind === "file" && info.size > maxBytes) throw Object.assign(new Error("Skill file cannot exceed 20 MB"), { status: 413 });
   }
 }
 
@@ -59,7 +59,7 @@ export function isSafeSegment(part: string) {
 function validatePath(path: string) {
   const parts = path.split(/[\\/]/);
   if (!parts.length || parts.some(part => !isSafeSegment(part))) {
-    throw Object.assign(new Error("文件路径无效"), { status: 400 });
+    throw Object.assign(new Error("Invalid file path"), { status: 400 });
   }
   return parts;
 }
@@ -67,9 +67,9 @@ function validatePath(path: string) {
 async function resolveSkill(name: string) {
   const { root, actualRoot } = await verifyRoot();
   const skill = loadSkillsFromDir({ dir: root, source: "user" }).skills.find(skill => skill.name === name);
-  if (!skill) throw Object.assign(new Error("技能不存在"), { status: 404 });
+  if (!skill) throw Object.assign(new Error("Skill does not exist"), { status: 404 });
   const mainTarget = resolve(skill.filePath);
-  if (mainTarget === root || !isWithin(root, mainTarget)) throw Object.assign(new Error("技能文件超出目录范围"), { status: 403 });
+  if (mainTarget === root || !isWithin(root, mainTarget)) throw Object.assign(new Error("The skill file exceeds the directory range"), { status: 403 });
   await verifyChain(actualRoot, root, mainTarget);
   const baseDir = dirname(mainTarget);
   // Only browse/edit supporting files when the skill is a dedicated folder directly under the
@@ -83,7 +83,7 @@ export async function uninstall(name: string) {
   if (isDirectorySkill) {
     const entries = await readdir(baseDir, { recursive: true, withFileTypes: true });
     if (entries.some(entry => entry.name.toLowerCase() === "skill.md" && resolve(entry.parentPath, entry.name) !== mainTarget)) {
-      throw Object.assign(new Error("目录中包含其他技能，不能整体卸载"), { status: 409 });
+      throw Object.assign(new Error("The directory contains other skills and cannot be uninstalled as a whole."), { status: 409 });
     }
   }
   // ACT: For non-standard layouts only delete the main file, keeping a directory that may be shared with other skills.
@@ -94,13 +94,13 @@ export async function uninstall(name: string) {
 export async function locate(name: string, path?: string) {
   const { actualRoot, mainTarget, baseDir, isDirectorySkill } = await resolveSkill(name);
   if (!path) return { target: mainTarget, isMain: true };
-  if (!isDirectorySkill) throw Object.assign(new Error("该技能没有可编辑的附属文件"), { status: 400 });
+  if (!isDirectorySkill) throw Object.assign(new Error("This skill has no editable attachments."), { status: 400 });
   const parts = validatePath(path);
   if (parts.length === 1 && parts[0]!.toLowerCase() === orderFileName.toLowerCase()) {
-    throw Object.assign(new Error("该文件由系统管理，不能直接编辑"), { status: 403 });
+    throw Object.assign(new Error("This file is managed by the system and cannot be edited directly."), { status: 403 });
   }
   const target = resolve(baseDir, path);
-  if (!isWithin(baseDir, target)) throw Object.assign(new Error("文件路径超出技能目录"), { status: 403 });
+  if (!isWithin(baseDir, target)) throw Object.assign(new Error("File path exceeds skill directory"), { status: 403 });
   await verifyChain(actualRoot, baseDir, target);
   return { target, isMain: target === mainTarget };
 }
@@ -108,24 +108,24 @@ export async function locate(name: string, path?: string) {
 // Shared by new-file and move targets: the parent directory must exist and the target itself must not.
 export async function resolveNewFile(name: string, path: string) {
   const { actualRoot, baseDir, isDirectorySkill } = await resolveSkill(name);
-  if (!isDirectorySkill) throw Object.assign(new Error("该技能没有可编辑的附属文件"), { status: 400 });
+  if (!isDirectorySkill) throw Object.assign(new Error("This skill has no editable attachments."), { status: 400 });
   const parts = validatePath(path);
   const leaf = parts.at(-1)!.toLowerCase();
   if (leaf === "skill.md" || leaf === orderFileName.toLowerCase()) {
-    throw Object.assign(new Error("不能创建或移动为该保留文件名"), { status: 400 });
+    throw Object.assign(new Error("Cannot create or move a file to this reserved filename"), { status: 400 });
   }
   const target = resolve(baseDir, path);
-  if (!isWithin(baseDir, target)) throw Object.assign(new Error("文件路径超出技能目录"), { status: 403 });
+  if (!isWithin(baseDir, target)) throw Object.assign(new Error("File path exceeds skill directory"), { status: 403 });
   const parent = dirname(target);
   if (parent !== baseDir) await verifyChain(actualRoot, baseDir, parent, "directory");
   const exists = await lstat(target).catch((err: NodeJS.ErrnoException) => { if (err.code === "ENOENT") return null; throw err; });
-  if (exists) throw Object.assign(new Error("已存在同名文件或目录"), { status: 409 });
+  if (exists) throw Object.assign(new Error("A file or directory with the same name already exists"), { status: 409 });
   return target;
 }
 
 export async function move(name: string, sourcePath: string, targetPath: string) {
   const { target: source, isMain } = await locate(name, sourcePath);
-  if (isMain) throw Object.assign(new Error("不能移动主文件"), { status: 400 });
+  if (isMain) throw Object.assign(new Error("Cannot move main file"), { status: 400 });
   const target = await resolveNewFile(name, targetPath);
   return { source, target };
 }
@@ -145,7 +145,7 @@ export async function list(name: string) {
   async function walk(dir: string, prefix: string) {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       if (entry.isSymbolicLink() || (!prefix && entry.name === orderFileName)) continue;
-      if (files.length >= 2000) throw Object.assign(new Error("技能文件过多，无法列出"), { status: 413 });
+      if (files.length >= 2000) throw Object.assign(new Error("There are too many skill files to list."), { status: 413 });
       const entryPath = resolve(dir, entry.name);
       const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
@@ -165,12 +165,12 @@ export async function list(name: string) {
 
 export async function saveOrder(name: string, order: string[]) {
   const { baseDir, isDirectorySkill } = await resolveSkill(name);
-  if (!isDirectorySkill) throw Object.assign(new Error("该技能没有可编辑的附属文件"), { status: 400 });
-  if (new Set(order).size !== order.length) throw Object.assign(new Error("顺序列表包含重复路径"), { status: 400 });
+  if (!isDirectorySkill) throw Object.assign(new Error("This skill has no editable attachments."), { status: 400 });
+  if (new Set(order).size !== order.length) throw Object.assign(new Error("The file order list contains duplicate paths"), { status: 400 });
   const { files } = await list(name);
   const known = new Set(files);
   if (order.some(path => path === "SKILL.md" || !known.has(path))) {
-    throw Object.assign(new Error("顺序列表包含无效或不存在的文件"), { status: 400 });
+    throw Object.assign(new Error("The file order list contains invalid or nonexistent files"), { status: 400 });
   }
   await writeWorkspaceFile(resolve(baseDir, orderFileName), JSON.stringify(order));
 }

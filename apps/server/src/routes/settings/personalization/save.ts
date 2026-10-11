@@ -14,5 +14,5 @@ export default router.put("/", validateFields({
   u.mcpControl.assertAppRequest(req);
   const { document, content, revision } = req.body as { document: "memory" | "agents"; content: string; revision: string };
   res.set("Cache-Control", "no-store");
-  res.json(success(await u.personalization.saveDocument(document, content, revision), "已保存"));
+  res.json(success(await u.personalization.saveDocument(document, content, revision), "Saved"));
 });

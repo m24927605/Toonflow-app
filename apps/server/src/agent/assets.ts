@@ -16,10 +16,10 @@ async function readWorkspaceSource(cwd: string, path: string, signal?: AbortSign
   try {
     signal?.throwIfAborted();
     const info = await lstat(source.path);
-    if (!info.isFile()) throw new Error("来源必须是当前工作区内的普通文件");
-    if (info.size > 100 * 1024 * 1024) throw new Error("素材文件不能超过 100 MB");
+    if (!info.isFile()) throw new Error("The source must be a regular file in the current workspace");
+    if (info.size > 100 * 1024 * 1024) throw new Error("Asset files must not exceed 100 MB");
     const content = await readFile(source.path, { signal });
-    if (content.byteLength > 100 * 1024 * 1024) throw new Error("素材文件不能超过 100 MB");
+    if (content.byteLength > 100 * 1024 * 1024) throw new Error("Asset files must not exceed 100 MB");
     return content;
   } finally { release(); }
 }
@@ -39,13 +39,14 @@ export function createAssetContext(cwd: string): NonNullable<ToolContext["assets
         const details = { path: file.path, revision: file.revision, mimeType, size: file.content.byteLength };
         const isImage = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"].includes(mimeType);
         if (dataType !== "STRING" && !isImage) {
-          return { content: [{ type: "text", text: `${JSON.stringify(details)}\n此格式不直接展示内容；使用 import 复制到工作区后预览或交给相应节点。` }], details };
+          return { content: [{ type: "text", text: `${JSON.stringify(details)}
+This format is not displayed directly; use import to copy it into the workspace, then preview it or pass it to the appropriate node.` }], details };
         }
         const root = await getAssetsDirectory();
         const absolutePath = resolve(root, file.path);
         const allowSnapshot = (candidate: string) => {
           signal?.throwIfAborted();
-          if (resolve(candidate) !== absolutePath) throw new Error("只能读取本次已授权的素材快照");
+          if (resolve(candidate) !== absolutePath) throw new Error("Only asset snapshots authorized for this request can be read");
         };
         const reader = createReadToolDefinition(root, { operations: {
           access: async candidate => { allowSnapshot(candidate); },
@@ -63,7 +64,8 @@ export function createAssetContext(cwd: string): NonNullable<ToolContext["assets
         const { mimeType, dataType } = mentionAssetType(imported.path);
         const details = { ...imported, mimeType };
         const url = imported.workspacePath.split("/").map(encodeURIComponent).join("/");
-        const preview = dataType === "IMAGE" ? `\n![导入素材](<${url}>)` : "";
+        const preview = dataType === "IMAGE" ? `
+![Imported asset](<${url}>)` : "";
         return { content: [{ type: "text", text: `${JSON.stringify(details)}${preview}` }], details };
       } else {
         if (action === "mkdir") await createAssetDirectory(path!);

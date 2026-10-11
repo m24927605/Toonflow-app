@@ -13,10 +13,10 @@ export default router.get("/", validateFields({ path: z.string().max(4096).optio
   await mkdir(workspaceRoot, { recursive: true });
   const root = await realpath(workspaceRoot);
   const target = resolve(root, (req.query.path as string | undefined) ?? "");
-  if (!u.workspaceFile.isWithin(root, target)) return res.status(403).json(error("只能选择服务器工作区内的目录", null, 403));
+  if (!u.workspaceFile.isWithin(root, target)) return res.status(403).json(error("Only directories within the server workspace can be selected", null, 403));
   try {
     const directory = await realpath(target);
-    if (!u.workspaceFile.isWithin(root, directory)) return res.status(403).json(error("只能选择服务器工作区内的目录", null, 403));
+    if (!u.workspaceFile.isWithin(root, directory)) return res.status(403).json(error("Only directories within the server workspace can be selected", null, 403));
     const entries = await readdir(directory, { withFileTypes: true });
     const path = relative(root, directory).split(sep).join("/");
     res.set("Cache-Control", "no-store").json(success({
@@ -28,8 +28,8 @@ export default router.get("/", validateFields({ path: z.string().max(4096).optio
     }));
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return res.status(404).json(error("目录不存在", null, 404));
-    if (code === "EACCES" || code === "EPERM") return res.status(403).json(error("没有权限访问此目录", null, 403));
+    if (code === "ENOENT" || code === "ENOTDIR") return res.status(404).json(error("Directory does not exist", null, 404));
+    if (code === "EACCES" || code === "EPERM") return res.status(403).json(error("No permission to access this directory", null, 403));
     throw err;
   }
 });

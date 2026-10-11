@@ -18,7 +18,7 @@ import { createAssetContext } from "@/agent/assets";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, workspaceAvailable = true): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
-  const requireWorkspace = () => { if (!workspaceAvailable) throw new Error("此对话未提供工作目录，无法使用文件或媒体操作"); };
+  const requireWorkspace = () => { if (!workspaceAvailable) throw new Error("This chat has no working directory. File and media operations are unavailable."); };
   const resolvePath = async (path: string, readOnly = false) => {
     requireWorkspace();
     const absolute = resolve(cwd, path);
@@ -85,13 +85,13 @@ export async function createAgentTools(cwd: string, canvas?: CanvasContext, ques
   const context = createAgentToolContext(cwd, {}, canvas, question);
   for (const item of await listTools()) {
     if (!item.enabled) continue;
-    if (item.loadError) throw new Error(`${item.displayName}：${item.loadError}`);
+    if (item.loadError) throw new Error(`${item.displayName}: ${item.loadError}`);
     const { plugin, metadata } = await loadTool(item.name);
     const config = validateToolConfig(plugin, item.config);
     const definitions = await plugin.createTools({ ...context, config });
     for (const tool of definitions) {
-      if (!tool.name || typeof tool.execute !== "function") throw new Error(t`${item.displayName} 返回了无效的工具`);
-      if (names.has(tool.name)) throw new Error(t`工具名称重复：${tool.name}`);
+      if (!tool.name || typeof tool.execute !== "function") throw new Error(t`${item.displayName} returned an invalid tool`);
+      if (names.has(tool.name)) throw new Error(t`Duplicate tool name: ${tool.name}`);
       names.add(tool.name);
       tools.push({
         ...tool,

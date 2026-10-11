@@ -11,7 +11,7 @@ const router = Router();
 
 export default router.post("/", validateFields({ directory: z.string().min(1).max(4096), path: z.string().max(4096) }), async (req, res) => {
   const native = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform);
-  if (!native || !u.workspace.isLocalWorkspaceRequest(req)) throw Object.assign(new Error("仅支持本机开发页面打开文件所在位置"), { status: 403 });
+  if (!native || !u.workspace.isLocalWorkspaceRequest(req)) throw Object.assign(new Error("Showing a file in its folder only works on the local development page"), { status: 403 });
   const { path } = await u.workspaceFile.resolveWorkspaceFile(req, req.body.directory, req.body.path);
   await stat(path);
   const child = process.platform === "win32"

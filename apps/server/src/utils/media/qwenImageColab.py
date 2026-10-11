@@ -1,8 +1,9 @@
 # Qwen-Image 2.1 Turbo pipeline executed on a Colab GPU session by qwenImage.ts.
-# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs}) and the reference files it names.
+# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control}) and the files it names; control
+# is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch.
 # Output: /content/qwout/image_<n>.png for every item, followed by a COLAB_DONE line on success.
-# The model loads once and the items are drawn one by one. Without references an image is drawn at its ratio and
-# size; with references it follows the first reference's aspect, as ComfyUI's Qwen-Image 2.1 edit flow requires.
+# The model loads once and the items are drawn one by one, always at the requested ratio and size; references reach
+# the model through the text encoder's conditioning, so the output canvas does not have to share their aspect.
 import json
 import math
 import os
@@ -51,7 +52,16 @@ from huggingface_hub import hf_hub_download
 diffusion = "qwen_image_2.1_turbo_bf16.safetensors"
 encoder = "qwen3vl_8b_bf16.safetensors"
 vae = "qwen_image_2.1_vae_bf16.safetensors"
-for remote, folder in [(f"diffusion_models/{diffusion}", "diffusion_models"), (f"text_encoders/{encoder}", "text_encoders"), (f"vae/{vae}", "vae")]:
+controlPatch = "qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors"
+# ACT: The depth map fixes layout and viewpoint over the early steps and then lets go, so the references can carry the
+# design detail; at full strength through every step the result kept the proxy's plain shapes. Tune per shot if needed.
+controlStrength = 0.7
+controlEnd = 0.6
+weights = [(f"diffusion_models/{diffusion}", "diffusion_models"), (f"text_encoders/{encoder}", "text_encoders"), (f"vae/{vae}", "vae")]
+# The patch is only downloaded when a batch actually uses it.
+if any(item.get("control") for item in items):
+    weights.append((f"model_patches/{controlPatch}", "model_patches"))
+for remote, folder in weights:
     target = comfy / "models" / folder / Path(remote).name
     if target.exists():
         continue
@@ -61,7 +71,7 @@ for remote, folder in [(f"diffusion_models/{diffusion}", "diffusion_models"), (f
 
 (comfy / "input").mkdir(exist_ok=True)
 for item in items:
-    for name in item["refs"]:
+    for name in item["refs"] + ([item["control"]] if item.get("control") else []):
         assert "/" not in name and name.startswith("qwin_")
         shutil.copy(inputs / name, comfy / "input" / name)
 
@@ -98,15 +108,23 @@ def build(item):
             **{f"images.image_{index + 1}": [f"ref{index}", 0] for index in range(len(refs))}}},
         "6": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
         "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": int(item["seed"])}},
-        "8": {"class_type": "BasicGuider", "inputs": {"model": ["2", 0], "conditioning": ["5", 0]}},
+        "8": {"class_type": "BasicGuider", "inputs": {"model": ["31", 0] if item.get("control") else ["2", 0], "conditioning": ["5", 0]}},
         "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
         "10": {"class_type": "ManualSigmas", "inputs": {"sigmas": turboSigmas}},
         "11": {"class_type": "SamplerCustomAdvanced", "inputs": {
-            "noise": ["7", 0], "guider": ["8", 0], "sampler": ["9", 0], "sigmas": ["10", 0], "latent_image": ["5", 2] if refs else ["6", 0]}},
+            "noise": ["7", 0], "guider": ["8", 0], "sampler": ["9", 0], "sigmas": ["10", 0], "latent_image": ["6", 0]}},
         "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["4", 0]}},
     }
     for index, name in enumerate(refs):
         graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
+    if item.get("control"):
+        # The depth map is scaled to the output canvas so the structure lines up with the latent.
+        graph["ctrl"] = {"class_type": "LoadImage", "inputs": {"image": item["control"]}}
+        graph["ctrlScaled"] = {"class_type": "ImageScale", "inputs": {"image": ["ctrl", 0], "upscale_method": "lanczos", "width": width, "height": height, "crop": "center"}}
+        graph["30"] = {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}}
+        graph["31"] = {"class_type": "QwenImageDiffsynthControlnet", "inputs": {
+            "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "image": ["ctrlScaled", 0],
+            "strength": controlStrength, "start_percent": 0.0, "end_percent": controlEnd}}
     return graph
 
 

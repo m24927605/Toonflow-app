@@ -13,12 +13,12 @@ export function isLocalWorkspaceRequest(req: Request) {
 }
 
 export async function resolveWorkspace(req: Request, path: string) {
-  if (!isAbsolute(path)) throw Object.assign(new Error("工作目录必须是绝对路径"), { status: 400 });
+  if (!isAbsolute(path)) throw Object.assign(new Error("The working directory must be an absolute path"), { status: 400 });
   const directory = await realpath(path).catch((err: NodeJS.ErrnoException) => {
-    if (err.code === "ENOENT" || err.code === "ENOTDIR") throw Object.assign(new Error("工作目录不存在，请重新选择文件夹"), { status: 404 });
+    if (err.code === "ENOENT" || err.code === "ENOTDIR") throw Object.assign(new Error("The working directory does not exist, please select the folder again."), { status: 404 });
     throw err;
   });
-  if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("工作目录不是文件夹，请重新选择"), { status: 404 });
+  if (!(await stat(directory)).isDirectory()) throw Object.assign(new Error("The working directory is not a folder, please select again."), { status: 404 });
   const localWorkspace = ["win32", "darwin"].includes(process.platform) && process.env.NODE_ENV === "dev";
   if (localWorkspace && isLocalWorkspaceRequest(req)) return directory;
 
@@ -30,5 +30,5 @@ export async function resolveWorkspace(req: Request, path: string) {
     const offset = relative(root, directory);
     if (offset !== ".." && !offset.startsWith(`..${sep}`) && !isAbsolute(offset)) return directory;
   }
-  throw Object.assign(new Error("服务器部署只能使用服务器工作区"), { status: 403 });
+  throw Object.assign(new Error("Server deployment can only use server workspace"), { status: 403 });
 }

@@ -15,7 +15,7 @@ export default {
   version: "2.0.0",
   apiUrl: "https://api.deepseek.com",
   protocol: "openai-completions",
-  readme: "DeepSeek 提供的模型列表",
+  readme: "Models provided by DeepSeek",
   rules,
   models: [],
 } satisfies ProviderDefinition<typeof rules>;

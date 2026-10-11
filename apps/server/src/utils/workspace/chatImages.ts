@@ -32,10 +32,10 @@ function isPublicAddress(address: string) {
 
 function remoteAddress(value: string) {
   let url: URL;
-  try { url = new URL(value); } catch { return invalid("图片地址无效，请使用完整的 HTTP/HTTPS 地址"); }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) invalid("图片仅支持不含账号密码的 HTTP/HTTPS 地址");
+  try { url = new URL(value); } catch { return invalid("Invalid image URL. Use a complete HTTP/HTTPS URL."); }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) invalid("Images only support HTTP/HTTPS URLs without usernames or passwords");
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (isIP(host) && !isPublicAddress(host)) invalid("不能下载本机、内网或特殊网络地址的图片", 403);
+  if (isIP(host) && !isPublicAddress(host)) invalid("Images cannot be downloaded from local, private, or special-use network addresses", 403);
   url.hash = "";
   return url;
 }
@@ -52,7 +52,7 @@ function requestImage(url: URL, signal: AbortSignal) {
       const hostname = url.hostname.replace(/^\[|\]$/g, "");
       const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await lookup(hostname, { all: true, verbatim: true });
       signal.throwIfAborted();
-      if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) invalid("不能下载解析到本机、内网或特殊网络地址的图片", 403);
+      if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) invalid("Images cannot be downloaded from addresses that resolve to local, private, or special-use networks", 403);
       const address = addresses[0];
       const connection = new URL(url);
       connection.hostname = address.family === 6 ? `[${address.address}]` : address.address;
@@ -86,8 +86,8 @@ function imageMimeType(bytes: Buffer): keyof typeof imageFormats {
       for (let offset = 8; offset + 4 <= end; offset += 4) if (["avif", "avis"].includes(bytes.toString("ascii", offset, offset + 4))) return "image/avif";
     }
   }
-  if (/<svg(?:\s|>)/i.test(bytes.toString("utf8", 0, 512))) invalid("暂不支持网络 SVG 图片，请使用 PNG、JPEG、WebP、GIF、AVIF 或 BMP");
-  return invalid("下载内容不是支持的图片，可能返回了网页或登录页面");
+  if (/<svg(?:\s|>)/i.test(bytes.toString("utf8", 0, 512))) invalid("Remote SVG images are not yet supported. Use PNG, JPEG, WebP, GIF, AVIF, or BMP.");
+  return invalid("The downloaded content is not a supported image. A webpage or sign-in page may have been returned.");
 }
 
 async function downloadImage(url: URL, signal: AbortSignal) {
@@ -97,29 +97,29 @@ async function downloadImage(url: URL, signal: AbortSignal) {
     if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
       const location = response.headers.location;
       response.destroy();
-      if (!location || redirects === 5) invalid("图片重定向无效或超过 5 次，请使用图片直接地址", 502);
+      if (!location || redirects === 5) invalid("Image redirects are invalid or exceed 5. Use a direct image URL.", 502);
       url = remoteAddress(new URL(location, url).href);
       continue;
     }
     if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
       response.destroy();
-      invalid(t`下载图片失败（HTTP ${response.statusCode ?? 0}），链接可能失效或需要登录`, 502);
+      invalid(t`Image download failed (HTTP ${response.statusCode ?? 0}). The link may have expired or require sign-in.`, 502);
     }
-    if (Number(response.headers["content-length"]) > maxImageSize) { response.destroy(); invalid("聊天图片不能超过 20 MB", 413); }
+    if (Number(response.headers["content-length"]) > maxImageSize) { response.destroy(); invalid("Chat images must not exceed 20 MB", 413); }
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of response) {
       signal.throwIfAborted();
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += bytes.length;
-      if (size > maxImageSize) { response.destroy(); invalid("聊天图片不能超过 20 MB", 413); }
+      if (size > maxImageSize) { response.destroy(); invalid("Chat images must not exceed 20 MB", 413); }
       chunks.push(bytes);
     }
     signal.throwIfAborted();
     const bytes = Buffer.concat(chunks, size);
     return { bytes, mimeType: imageMimeType(bytes) };
   }
-  return invalid("图片重定向无效", 502);
+  return invalid("Invalid image redirect", 502);
 }
 
 export async function importImage(cwd: string, value: string) {
@@ -139,9 +139,9 @@ export async function importImage(cwd: string, value: string) {
     }
     const signal = AbortSignal.timeout(30000);
     const { bytes, mimeType } = await downloadImage(url, signal).catch(error => {
-      if (signal.aborted) invalid("图片下载超时（30 秒），请检查网络后重试", 504);
+      if (signal.aborted) invalid("Image download timed out (30 seconds). Check the network and try again.", 504);
       if (error instanceof Error && "status" in error) throw error;
-      throw Object.assign(new Error("图片下载连接失败，请检查图片地址、网络或 HTTPS 证书", { cause: error }), { status: 502 });
+      throw Object.assign(new Error("Failed to connect for image download. Check the image URL, network, or HTTPS certificate.", { cause: error }), { status: 502 });
     });
     const path = `${outputDirectory}/${hash}.${imageFormats[mimeType]}`;
     const output = await resolveWorkspacePath(directory, outputDirectory, true);

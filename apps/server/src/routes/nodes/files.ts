@@ -17,12 +17,12 @@ export default router.get("/", validateFields({ name: z.string().regex(/^[a-z][a
     if (err.code === "ENOENT") return null;
     throw err;
   });
-  if (!file?.isFile()) return res.status(404).json(error("节点不存在", null, 404));
+  if (!file?.isFile()) return res.status(404).json(error("Node does not exist", null, 404));
   const disabled = await lstat(resolve(nodesDirectory, `${name}.disabled`)).catch((err: NodeJS.ErrnoException) => {
     if (err.code === "ENOENT") return null;
     throw err;
   });
-  if (disabled) return res.status(404).json(error("节点已禁用", null, 404));
+  if (disabled) return res.status(404).json(error("Node disabled", null, 404));
   res.set("Cache-Control", "no-cache");
   await sendFile(res, filePath);
 });

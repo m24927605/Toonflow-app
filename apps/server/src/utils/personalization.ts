@@ -8,7 +8,7 @@ import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/
 export type PersonalizationDocument = "memory" | "agents";
 
 const documents = { memory: "memories/memory.md", agents: "AGENTS.md" };
-const labels = { memory: "全局记忆", agents: "全局 AGENTS.md" };
+const labels = { memory: "Global memory", agents: "Global AGENTS.md" };
 export const maxDocumentLength = 20000;
 
 export function isMemoryEnabled() {
@@ -21,14 +21,14 @@ function result(content: string) {
 }
 
 async function documentPath(document: PersonalizationDocument) {
-  if (!Object.hasOwn(documents, document)) throw Object.assign(new Error("个性化文档类型无效"), { status: 400 });
+  if (!Object.hasOwn(documents, document)) throw Object.assign(new Error("Invalid personalization document type"), { status: 400 });
   const directory = dirname(conf.path);
   await mkdir(directory, { recursive: true });
   const directories = [directory, ...(document === "memory" ? [join(directory, "memories")] : [])];
   for (const path of directories) {
     const info = await lstat(path).catch((err: NodeJS.ErrnoException) => { if (err.code === "ENOENT") return null; throw err; });
-    if (info?.isSymbolicLink()) throw Object.assign(new Error("不能通过符号链接访问个性化文档"), { status: 403 });
-    if (info && !info.isDirectory()) throw Object.assign(new Error("个性化文档所在路径不是目录"), { status: 400 });
+    if (info?.isSymbolicLink()) throw Object.assign(new Error("Personalization document cannot be accessed through a symbolic link"), { status: 403 });
+    if (info && !info.isDirectory()) throw Object.assign(new Error("The path to the personalized document is not a directory"), { status: 400 });
   }
   return (await resolveWorkspacePath(await realpath(directory), documents[document], true)).path;
 }
@@ -36,19 +36,19 @@ async function documentPath(document: PersonalizationDocument) {
 async function readContent(path: string) {
   const info = await lstat(path).catch((err: NodeJS.ErrnoException) => { if (err.code === "ENOENT") return null; throw err; });
   if (!info) return "";
-  if (info.isSymbolicLink()) throw Object.assign(new Error("不能通过符号链接访问个性化文档"), { status: 403 });
-  if (!info.isFile()) throw Object.assign(new Error("个性化文档必须是普通文件"), { status: 400 });
-  if (info.size > maxDocumentLength * 3 + 3) throw Object.assign(new Error(t`个性化文档不能超过 ${maxDocumentLength} 个字符`), { status: 413 });
+  if (info.isSymbolicLink()) throw Object.assign(new Error("Personalization document cannot be accessed through a symbolic link"), { status: 403 });
+  if (!info.isFile()) throw Object.assign(new Error("Personalized documents must be ordinary files"), { status: 400 });
+  if (info.size > maxDocumentLength * 3 + 3) throw Object.assign(new Error(t`Personalized document cannot exceed ${maxDocumentLength} characters`), { status: 413 });
   const content = (await readFile(path, "utf8")).replace(/^\uFEFF/, "");
-  if (content.length > maxDocumentLength) throw Object.assign(new Error(t`个性化文档不能超过 ${maxDocumentLength} 个字符`), { status: 413 });
+  if (content.length > maxDocumentLength) throw Object.assign(new Error(t`Personalized document cannot exceed ${maxDocumentLength} characters`), { status: 413 });
   return content;
 }
 
 function documentError(action: "read" | "save", document: PersonalizationDocument, cause: unknown) {
   const err = cause as NodeJS.ErrnoException & { status?: number };
-  const label = translateMessage(labels[document] ?? "个性化文档");
+  const label = translateMessage(labels[document] ?? "Personalized Document");
   const message = translateMessage(err?.message ?? String(cause));
-  return Object.assign(new Error(action === "read" ? t`读取${label}失败：${message}` : t`保存${label}失败：${message}`, { cause }), { status: err?.status, code: err?.code });
+  return Object.assign(new Error(action === "read" ? t`Failed to read ${label}: ${message}` : t`Failed to save ${label}: ${message}`, { cause }), { status: err?.status, code: err?.code });
 }
 
 export async function readDocument(document: PersonalizationDocument) {
@@ -60,12 +60,12 @@ export async function readDocument(document: PersonalizationDocument) {
 export async function saveDocument(document: PersonalizationDocument, content: string, revision: string) {
   try {
     content = content.replace(/^\uFEFF/, "");
-    if (content.length > maxDocumentLength) throw Object.assign(new Error(t`个性化文档不能超过 ${maxDocumentLength} 个字符`), { status: 413 });
+    if (content.length > maxDocumentLength) throw Object.assign(new Error(t`Personalized document cannot exceed ${maxDocumentLength} characters`), { status: 413 });
     const path = await documentPath(document);
     const release = lockWorkspaceFiles([path]);
     try {
       const current = result(await readContent(path));
-      if (revision !== current.revision) throw Object.assign(new Error("文档已被其他操作更新，请重新加载后再保存，避免覆盖最新内容"), { status: 409 });
+      if (revision !== current.revision) throw Object.assign(new Error("The document has been updated by other operations. Please reload and save to avoid overwriting the latest content."), { status: 409 });
       await mkdir(dirname(path), { recursive: true });
       await writeWorkspaceFile(await documentPath(document), content);
       return result(content);

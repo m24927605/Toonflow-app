@@ -10,7 +10,7 @@ export default async function initializeExt(targetDirectory: string, sourceDirec
     throw error;
   });
   await mkdir(targetDirectory, { recursive: true });
-  if ((await lstat(targetDirectory)).isSymbolicLink()) throw new Error("文件扩展目录不能是符号链接");
+  if ((await lstat(targetDirectory)).isSymbolicLink()) throw new Error("The file extension directory cannot be a symbolic link");
   const statePath = resolve(targetDirectory, "bundled.json");
   const saved = await readFile(statePath, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return "{}";

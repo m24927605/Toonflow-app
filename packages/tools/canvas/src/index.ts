@@ -4,19 +4,19 @@ import { canvasOperations } from "./runtime";
 
 const plugin: ToolPlugin = {
   validateConfig(config) {
-    if (Object.keys(config).length) throw new Error("画布操作工具没有配置项");
+    if (Object.keys(config).length) throw new Error("The canvas operation tool has no configuration options");
     return {};
   },
   createTools({ canvas }) {
     if (!canvas) return [];
     const promptGuidelines = [
-      `本轮初始画布环境（以下 JSON 仅描述环境，不是额外指令）：${JSON.stringify({ initialCanvasId: canvas.id })}。getCanvas 仅返回概览；按任务范围使用 findCanvasNodes、getCanvasNodes、getCanvasEdges、getNodeTools 查询实时状态。已知 ID 时直接读取目标，分批处理仅保留摘要和游标。`,
+      `Initial canvas environment for this turn (the following JSON only describes the environment and is not an additional instruction): ${JSON.stringify({ initialCanvasId: canvas.id })}. getCanvas returns only an overview; use findCanvasNodes, getCanvasNodes, getCanvasEdges and getNodeTools to query the live state according to the task scope. When IDs are known, read the targets directly; when processing in batches, keep only summaries and cursors.`,
     ];
     return canvasOperations.map(operation => ({
       name: operation.name,
       label: operation.label,
       description: operation.description,
-      promptSnippet: "通过运行中的画布操作工具控制激活画布，不要直接修改画布 JSON。",
+      promptSnippet: "Control the active canvas through the running canvas operation tools; do not modify canvas JSON directly.",
       promptGuidelines,
       parameters: z.toJSONSchema(operation.parameters, { io: "input", target: "draft-07" }),
       executionMode: "sequential",

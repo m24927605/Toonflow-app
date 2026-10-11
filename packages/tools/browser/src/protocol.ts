@@ -3,7 +3,7 @@ import { z } from "zod";
 const webUrl = z.url().refine(value => {
   const url = new URL(value);
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
-}, "仅支持不含账号密码的 HTTP/HTTPS 网页地址");
+}, "Only HTTP/HTTPS web addresses without a username or password are supported");
 const sessionFields = { browserSessionId: z.uuid().optional() };
 const ref = z.string().min(1).max(100);
 

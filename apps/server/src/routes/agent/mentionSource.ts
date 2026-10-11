@@ -17,7 +17,7 @@ export default router.get("/", validateFields(shape, "query"), async (req, res) 
   const args = z.object(shape).parse(req.query);
   const directory = await u.workspace.resolveWorkspace(req, args.directory);
   const controller = new AbortController();
-  const cancel = () => { if (!res.writableEnded) controller.abort(new Error("查询已取消")); };
+  const cancel = () => { if (!res.writableEnded) controller.abort(new Error("Query canceled")); };
   res.on("close", cancel);
   try {
     const options = { query: args.query, cursor: args.cursor, limit: args.limit, signal: controller.signal };
@@ -25,13 +25,13 @@ export default router.get("/", validateFields(shape, "query"), async (req, res) 
     if (args.operation === "canvases") result = await u.mentionFiles.listMentionCanvases(directory, controller.signal);
     else if (args.operation === "assets") result = await u.mentionFiles.queryMentionAssets({ ...options, path: args.path });
     else if (args.operation === "selectAsset") {
-      if (!args.path) throw Object.assign(new Error("请选择素材"), { status: 400 });
+      if (!args.path) throw Object.assign(new Error("Please select asset"), { status: 400 });
       result = await u.mentionFiles.selectMentionAsset(args.path);
     } else {
-      if (!args.canvasId) throw Object.assign(new Error("请选择画布"), { status: 400 });
+      if (!args.canvasId) throw Object.assign(new Error("Please select canvas"), { status: 400 });
       if (args.operation === "nodes") result = await u.mentionFiles.queryStoredMentionNodes(directory, args.canvasId, options);
       else {
-        if (!args.nodeId || (args.operation === "selectCanvas" && !args.outputId)) throw Object.assign(new Error("请选择节点输出"), { status: 400 });
+        if (!args.nodeId || (args.operation === "selectCanvas" && !args.outputId)) throw Object.assign(new Error("Please select node output"), { status: 400 });
         result = await u.mentionFiles.storedMentionOutput(directory, args.canvasId, args.nodeId, args.operation === "selectCanvas" ? args.outputId : undefined);
       }
     }

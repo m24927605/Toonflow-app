@@ -44,13 +44,13 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
     github: config.github?.trim() ?? "",
     configRules: z.array(z.record(z.string(), z.json())).max(100).parse(config.configRules ?? []),
   };
-  if (!metadata.displayName) throw new Error("插件显示名不能为空");
+  if (!metadata.displayName) throw new Error("Plugin display name cannot be empty");
   if (metadata.github) {
     const githubUrl = new URL(metadata.github);
-    if (githubUrl.origin !== "https://github.com" || githubUrl.username || githubUrl.password) throw new Error("GitHub 地址必须是 https://github.com 下的地址");
+    if (githubUrl.origin !== "https://github.com" || githubUrl.username || githubUrl.password) throw new Error("GitHub URL must be under https://github.com");
   }
   const root = fileURLToPath(new URL(".", configUrl));
-  if (!/^[a-z][a-zA-Z0-9]*$/.test(nodeName)) throw new Error(`节点名必须使用小驼峰：${nodeName}`);
+  if (!/^[a-z][a-zA-Z0-9]*$/.test(nodeName)) throw new Error(`Node name must use lowerCamelCase: ${nodeName}`);
   const fileName = `${nodeName}.umd.js`;
   const outDir = fileURLToPath(new URL("../../build/nodes", import.meta.url));
   const dataDir = fileURLToPath(new URL("../../data/nodes", import.meta.url));
@@ -69,12 +69,12 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
         },
         async generateBundle(_options, bundle) {
           const chunk = bundle[fileName];
-          if (!chunk || chunk.type !== "chunk") throw new Error(`未生成节点文件：${fileName}`);
+          if (!chunk || chunk.type !== "chunk") throw new Error(`Node file not generated: ${fileName}`);
           const packagePath = resolve(root, "package.json");
           this.addWatchFile(packagePath);
           const packageInfo = JSON.parse(await readFile(packagePath, "utf8"));
           const version = typeof packageInfo.version === "string" ? packageInfo.version.trim() : "";
-          if (!version) throw new Error(`节点 package.json 缺少有效的 version：${nodeName}`);
+          if (!version) throw new Error(`Node package.json is missing a valid version: ${nodeName}`);
           const readmePath = resolve(root, "readme.md");
           this.addWatchFile(readmePath);
           const readme = await readFile(readmePath, "utf8").catch((error: NodeJS.ErrnoException) => {

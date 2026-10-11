@@ -20,7 +20,7 @@ export default router.get("/", async (req, res) => {
       const name = file.name.slice(0, -7);
       const metadata = await u.nodePlugins.readNode(name).catch((err: NodeJS.ErrnoException) => {
         if (err.code === "ENOENT") return null;
-        return { name, displayName: name, version: "", author: "", readme: "", github: "", configRules: [], loadError: translateMessage(err instanceof Error ? err.message : "节点文件无法读取") };
+        return { name, displayName: name, version: "", author: "", readme: "", github: "", configRules: [], loadError: translateMessage(err instanceof Error ? err.message : "Node file cannot be read") };
       });
       if (metadata === null) return null;
       return {

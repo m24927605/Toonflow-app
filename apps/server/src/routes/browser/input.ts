@@ -8,11 +8,11 @@ import u from "@/utils";
 const inputSchema = z.strictObject({
   directory: z.string().min(1).max(4096).optional(), toolSessionId: z.uuid().optional(),
   sessionId: z.uuid(), tabId: z.uuid(), input: browserInputSchema,
-}).refine(input => !!input.directory !== !!input.toolSessionId, "请提供工作目录或临时对话身份，不能同时提供");
+}).refine(input => !!input.directory !== !!input.toolSessionId, "Provide either a working directory or a temporary chat identity, but not both");
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
-  if (process.env.NODE_ENV !== "dev") throw Object.assign(new Error("浏览器操作仅在本机开发模式中可用"), { status: 404 });
+  if (process.env.NODE_ENV !== "dev") throw Object.assign(new Error("Browser actions are only available in local development mode"), { status: 404 });
   const input = inputSchema.parse(req.body);
   if (!input.toolSessionId) u.singleAgent.assertWorkspaceBrowserAccess(input.sessionId);
   const cwd = input.toolSessionId

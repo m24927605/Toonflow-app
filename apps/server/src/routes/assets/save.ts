@@ -8,7 +8,7 @@ const router = Router();
 
 export default router.put("/", validateFields({ path: z.string().min(1).max(4096) }, "query"), async (req, res) => {
   if (!req.is("application/octet-stream") || (req.body !== undefined && !Buffer.isBuffer(req.body))) {
-    throw Object.assign(new Error("请发送文件原始内容"), { status: 400 });
+    throw Object.assign(new Error("Please send the original content of the file"), { status: 400 });
   }
   await u.assets.writeAssetFile(req.query.path as string, req.body ?? Buffer.alloc(0));
   res.json(success());

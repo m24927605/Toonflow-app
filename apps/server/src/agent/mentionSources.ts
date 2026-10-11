@@ -66,12 +66,12 @@ export function mentionNodeOutputs(node: MentionCanvasNode): MentionOutput[] {
     const output = data.outputs[id];
     if (mentionRecord(output)) names.set(id, { name: id, dataType: String(output.dataType ?? "") });
   }
-  if (!names.size && node.type === "remote-textNode" && (data.textPath || data.textSnapshot)) names.set("text", { name: "文本输出", dataType: "STRING" });
+  if (!names.size && node.type === "remote-textNode" && (data.textPath || data.textSnapshot)) names.set("text", { name: "Text output", dataType: "STRING" });
   return [...names].map(([id, item]) => {
     const output = mentionOutputValue(node, id);
     const available = !!output && (output.textPath !== undefined || (typeof output.value === "string" ? !!output.value.length : output.value !== undefined));
-    const preview = output?.textPath ? "文本内容" : mentionRecord(output?.value) ? String(output.value.url).slice(-160).split(/[\\/]/).pop() ?? ""
-      : output?.value === undefined ? "暂无输出" : String(output.value).slice(0, 160);
+    const preview = output?.textPath ? "Text content" : mentionRecord(output?.value) ? String(output.value.url).slice(-160).split(/[\\/]/).pop() ?? ""
+      : output?.value === undefined ? "No output yet" : String(output.value).slice(0, 160);
     const media = output?.value;
     const thumbnail = output && ["IMAGE", "MASK", "VIDEO"].includes(output.dataType) && mentionRecord(media)
       && typeof media.url === "string" && media.url.length <= 4096 && typeof media.mimeType === "string" && media.mimeType.length <= 128
@@ -86,8 +86,8 @@ export async function queryMentionNodes(nodes: readonly MentionCanvasNode[], rev
   let offset = 0;
   if (options.cursor) {
     let cursor: unknown;
-    try { cursor = JSON.parse(options.cursor); } catch { throw new Error("分页已失效，请重新搜索"); }
-    if (!Array.isArray(cursor) || cursor[0] !== revision || cursor[1] !== query || !Number.isSafeInteger(cursor[2]) || cursor[2] < 0) throw new Error("分页已失效，请重新搜索");
+    try { cursor = JSON.parse(options.cursor); } catch { throw new Error("Pagination has expired, please search again"); }
+    if (!Array.isArray(cursor) || cursor[0] !== revision || cursor[1] !== query || !Number.isSafeInteger(cursor[2]) || cursor[2] < 0) throw new Error("Pagination has expired, please search again");
     offset = cursor[2];
   }
   const items: MentionNode[] = [];
@@ -113,10 +113,10 @@ export async function queryMentionNodes(nodes: readonly MentionCanvasNode[], rev
 export async function createCanvasMention(node: MentionCanvasNode, canvasId: string, outputId: string, readText: (path: string) => Promise<string>): Promise<AgentMention> {
   const output = mentionNodeOutputs(node).find(output => output.id === outputId);
   const selected = mentionOutputValue(node, outputId);
-  if (!output?.available || !selected) throw new Error("这个输出暂无内容，请重新选择");
+  if (!output?.available || !selected) throw new Error("This output has no content, please select again.");
   const value = selected.textPath === undefined ? selected.value : await readText(selected.textPath);
-  if (typeof value === "string" && value.length > 100000) throw new Error("文本引用最多支持 100000 个字符，请缩小内容后重试");
-  if (typeof value === "string" && !value.trim()) throw new Error("这个输出暂无内容，请重新选择");
+  if (typeof value === "string" && value.length > 100000) throw new Error("Text quotation supports up to 100000 characters, please reduce the content and try again");
+  if (typeof value === "string" && !value.trim()) throw new Error("This output has no content, please select again.");
   const canvasName = canvasId.replace(/\.json$/i, "").slice(0, 255);
   const nodeName = mentionNodeName(node);
   return { id: crypto.randomUUID(), label: `${nodeName} · ${output.name}`.slice(0, 500), source: { kind: "canvas", canvasId, canvasName, nodeId: node.id,

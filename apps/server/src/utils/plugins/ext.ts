@@ -35,7 +35,7 @@ export function parseExt(source: string, name: string) {
     }
     return { name, ...metadata };
   } catch {
-    throw Object.assign(new Error("文件扩展元数据无效，请使用扩展脚手架重新构建，且文件名必须与扩展 ID 一致"), { status: 400 });
+    throw Object.assign(new Error("Invalid file extension metadata. Rebuild it using the extension scaffold; the file name must match the extension ID"), { status: 400 });
   }
 }
 
@@ -43,8 +43,8 @@ export async function readExt(name: string) {
   extNameSchema.parse(name);
   const path = resolve(extDirectory, `${name}.umd.js`);
   const file = await lstat(path);
-  if (!file.isFile()) throw Object.assign(new Error("文件扩展必须是普通文件"), { status: 400 });
-  if (file.size > 20 * 1024 * 1024) throw Object.assign(new Error("文件扩展不能超过 20 MB"), { status: 413 });
+  if (!file.isFile()) throw Object.assign(new Error("A file extension must be a regular file"), { status: 400 });
+  if (file.size > 20 * 1024 * 1024) throw Object.assign(new Error("File extensions cannot exceed 20 MB"), { status: 413 });
   const source = await readFile(path, "utf8");
   return { ...parseExt(source, name), revision: Bun.hash(source).toString(16) };
 }
@@ -63,11 +63,11 @@ export function validateExtConfig(rules: z.infer<typeof configRulesSchema>, conf
     const label = translateMessage(typeof rule.title === "string" && rule.title.trim() ? rule.title : rule.field);
     let message = "";
     if (rule.type === "inputNumber") {
-      if (typeof value !== "number" || !Number.isFinite(value)) message = t`${label}必须为数字`;
-      else if (typeof props.min === "number" && value < props.min) message = t`${label}不能小于${props.min}`;
-      else if (typeof props.max === "number" && value > props.max) message = t`${label}不能大于${props.max}`;
+      if (typeof value !== "number" || !Number.isFinite(value)) message = t`${label} must be a number`;
+      else if (typeof props.min === "number" && value < props.min) message = t`${label} must not be less than ${props.min}`;
+      else if (typeof props.max === "number" && value > props.max) message = t`${label} must not exceed ${props.max}`;
     } else if (rule.type === "switch" && value !== (props.activeValue ?? true) && value !== (props.inactiveValue ?? false)) {
-      message = t`${label}的开关值无效`;
+      message = t`Invalid switch value for ${label}`;
     }
     // ACT: Only validate supported standard controls; custom controls
     // keep their values. Add matching rules when adding new controls.

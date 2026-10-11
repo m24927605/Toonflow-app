@@ -1,6 +1,7 @@
 <template>
   <nodeSkeleton
     v-bind="nodeProps"
+    :generationStatus="generationStatus"
     v-model:bottomVisible="node.selected"
     :topVisible="node.selected"
     topWidth="max-content"
@@ -21,6 +22,7 @@
       <input ref="fileInput" type="file" accept="image/*" hidden aria-label="选择替换图片" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy" @change="replaceOutput" />
     </template>
     <template #topRightActions>
+      <gradeControl :outputUrl="outputFile?.url" kind="image" />
       <el-button :icon="IconPencil" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="标记" aria-label="标记" @click.stop="startEditor('mark')" />
     </template>
     <div v-loading="generating || uploading" class="imageContent nopan" :aria-busy="generating || uploading">
@@ -116,6 +118,8 @@ import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeHand
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import { useNodeGeneration } from "@toonflow/node-shared/useNodeGeneration";
+import gradeControl from "@toonflow/node-shared/gradeControl";
+import { confirmOnScreenText } from "@toonflow/node-shared/confirmOnScreenText";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
@@ -171,8 +175,8 @@ const previewVisible = ref(false);
 const inpaintPreviewVisible = ref(false);
 const imageWidth = ref(0);
 let generationController: AbortController | undefined;
-const generationState = useNodeGeneration(outputs, () => generationController?.abort());
-const { generating } = generationState;
+const generationState = useNodeGeneration(outputs, () => generationController?.abort(), () => void startGeneration().catch(error => showNodeError(error, translate("图片生成失败"))));
+const { generating, status: generationStatus } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
@@ -195,7 +199,7 @@ const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() =>
   [
     (editor.value?.mode === "inpaint" ? data.value.inpaintPrompt : data.value.prompt).trim(),
-    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])),
+    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`Reference ${index + 1}:\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -264,10 +268,10 @@ async function confirmInpaint() {
   if (inpaintEditor.busy || generating.value || deleting.value || uploading.value) return;
   if (!generationPrompt.value) throw new Error("请输入重绘提示词");
   if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
-  let prompt = generationPrompt.value.replace(/\{\{ref (\d+)\}\}/g, "重绘参考 $1").replace(/^参考 (\d+)：/gm, "重绘参考 $1：");
+  let prompt = generationPrompt.value.replace(/\{\{ref (\d+)\}\}/g, "Inpaint reference $1").replace(/^Reference (\d+):/gm, "Inpaint reference $1:");
   const images = refList.value.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   const imageReferences = refList.value.flatMap((item, index) => item.dataType === "IMAGE" && item.value ? [index + 1] : []);
-  if (imageReferences.length) prompt += `\n重绘参考编号对应关系（前两张为原图和区域引导图）：${imageReferences.map((reference, index) => `重绘参考 ${reference} 对应第 ${index + 3} 张图`).join("；")}。`;
+  if (imageReferences.length) prompt += `\nInpaint reference numbering (the first two images are the original image and the area guide image): ${imageReferences.map((reference, index) => `Inpaint reference ${reference} is image ${index + 3}`).join("; ")}.`;
   await inpaintEditor.createInpaint({ prompt, images }, new AbortController().signal);
 }
 
@@ -292,10 +296,12 @@ async function startGeneration() {
     const supported = models.value.find(model => model.character === character.kind);
     throw new Error(supported ? t`角色“${character.name}”需要改用 ${supported.label} 模型生成` : t`没有可用于角色“${character.name}”的图片模型`);
   }
+  const skipTextCheck = await confirmOnScreenText(generationPrompt.value);
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const inpaintData = data.value.inpaint;
   const input = {
+    skipTextCheck: skipTextCheck || undefined,
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: generationPrompt.value,
@@ -308,8 +314,8 @@ async function startGeneration() {
   if (inpaintData) {
     let imageIndex = 3 + (inpaintData.images?.length ?? 0);
     const mapping = refList.value.flatMap((item, index) => item.dataType === "IMAGE" && item.value
-      ? [`参考 ${index + 1} / {{ref ${index + 1}}} 对应第 ${item.value.url === inpaintData.source ? 1 : imageIndex++} 张图`] : []);
-    if (mapping.length) input.prompt += `\n当前节点参考编号对应关系：${mapping.join("；")}。`;
+      ? [`Reference ${index + 1} / {{ref ${index + 1}}} is image ${item.value.url === inpaintData.source ? 1 : imageIndex++}`] : []);
+    if (mapping.length) input.prompt += `\nReference numbering for the current node: ${mapping.join("; ")}.`;
   }
   generationController = controller;
   // ACT: The tool returns immediately; the node owns the task and cancels it on stop or unmount.
@@ -396,7 +402,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此图片生成节点的当前模型、分辨率、比例及可选图片模型能力，不含密钥；未声明分辨率或比例时分别使用 2K、16:9",
+  description: "Read this image generation node's current model, resolution, aspect ratio and the capabilities of the available image models, without keys; when the resolution or aspect ratio is not declared, 2K and 16:9 are used respectively",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -408,7 +414,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setConfig",
-  description: "修改此图片生成节点的模型、分辨率或比例；先用 getConfig 查询可选能力，providerId 与 modelId 必须同时提供；不修改提示词、不启动生成",
+  description: "Modify this image generation node's model, resolution or aspect ratio; first use getConfig to query the available capabilities, and providerId and modelId must be provided together; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -437,7 +443,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setPrompt",
-  description: "修改此节点的普通图片生成提示词，支持 {{ref 1}} 等参考标记；不修改局部重绘提示词，不启动生成",
+  description: "Modify this node's regular image generation prompt, supporting reference markers such as {{ref 1}}; does not modify the inpainting prompt or start generation",
   parameters: z.strictObject({ prompt: z.string() }),
   execute({ prompt: value }) {
     if (deleting.value) throw new Error("节点正在删除，请稍后修改");
@@ -449,7 +455,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateImage",
-  description: "启动此节点的后台普通图片生成，使用普通生成提示词、模型、分辨率、比例和参考图片；局部重绘模式下须先退出；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  description: "Start this node's regular image generation in the background, using the regular generation prompt, model, resolution, aspect ratio and reference images; in inpainting mode you must exit it first; returns started immediately; use getGenerationStatus to query the result and cancelGeneration to stop generation",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

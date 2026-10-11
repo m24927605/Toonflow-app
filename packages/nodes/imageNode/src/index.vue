@@ -26,6 +26,7 @@
         @click.stop="fileInput?.click()">替换图片</el-button>
     </template>
     <template #topRightActions>
+      <gradeControl :outputUrl="outputFile?.url" kind="image" />
       <el-button :icon="IconPencil" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="标记" aria-label="标记" @click.stop="startEditor('mark')" />
     </template>
     <div class="imageContent nopan">
@@ -74,6 +75,7 @@ import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, ref } from "vue";
 import { IconPhoto, IconUpload, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";
+import gradeControl from "@toonflow/node-shared/gradeControl";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import imageGridSplit from "./components/imageGridSplit.vue";
 import imageEditor from "./components/imageEditor.vue";
@@ -130,7 +132,7 @@ nodeEvent.on("delete", () => {
 
 nodeTools.register({
   name: "setImage",
-  description: "选择工作区内已有的图片文件作为此节点的输出，path 使用工作区相对路径",
+  description: "Select an existing image file in the workspace as this node's output; path is a workspace-relative path",
   parameters: z.strictObject({
     path: z.string().min(1).max(4096),
     mimeType: z.string().regex(/^image\/[a-zA-Z0-9.+-]+$/),

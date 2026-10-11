@@ -20,6 +20,6 @@ export async function resolveEnvReference(value: unknown) {
     throw error;
   });
   const resolved = parseEnv(file)[name];
-  if (!resolved) throw Object.assign(new Error(t`环境变量 ${name} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置`), { status: 400 });
+  if (!resolved) throw Object.assign(new Error(t`Environment variable ${name} is not set. Set it in the Toonflow process environment or in ~/.env.`), { status: 400 });
   return resolved;
 }

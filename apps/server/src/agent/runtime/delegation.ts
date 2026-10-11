@@ -22,19 +22,19 @@ export async function runDelegatedAgent(options: {
   const send = (event: AgentEvent) => {
     trackAgentEvent(cwd, child.file, event);
     options.send({ type: "subAgentEvent", file: child.file, event });
-    if (event.type === "tool" && event.tool.status === "running") onProgress?.(`正在调用 ${event.tool.name}`);
+    if (event.type === "tool" && event.tool.status === "running") onProgress?.(`Calling ${event.tool.name}`);
   };
   const controller = new AbortController();
   const childSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   const bridge = canvas ? createCanvasContext(cwd, canvas, send) : undefined;
   const questions = createQuestionContext(cwd, send, () => controller.abort());
-  const result: SubAgentResult = { name, status: "running", result: "准备执行" };
+  const result: SubAgentResult = { name, status: "running", result: "Ready to execute" };
   try {
     await run({ prompt: task, cwd, sessionFile: child.file, providerId, modelId, thinkingLevel, canvas: bridge?.context, question: questions.context, signal: childSignal, onCancel: () => controller.abort() }, send);
     result.status = childSignal.aborted ? "cancelled" : "completed";
   } catch (error) {
     result.status = childSignal.aborted ? "cancelled" : (error as { code?: string })?.code === "AGENT_LENGTH" ? "limited" : "error";
-    result.result = error instanceof Error ? translateError(error) : translateMessage("子任务执行失败");
+    result.result = error instanceof Error ? translateError(error) : translateMessage("Subtask execution failed");
     if (result.status !== "limited") await updateSubAgent(cwd, parentFile, { ...agent, status: result.status, result: result.result });
     send({ type: "error", message: result.result });
   } finally {

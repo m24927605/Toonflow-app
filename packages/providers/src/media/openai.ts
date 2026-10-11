@@ -18,7 +18,7 @@ function imageSize(size = "1K", ratio = "1:1") {
   if (/^\d+x\d+$/.test(size)) return size;
   const pixels = pixelBudgets[size.toUpperCase()];
   const [width, height] = ratio.split(":").map(Number);
-  if (!pixels || !width || !height) throw new Error(`不支持的图片尺寸：${size} ${ratio}`);
+  if (!pixels || !width || !height) throw new Error(`Unsupported image size: ${size} ${ratio}`);
   const scale = Math.min(Math.sqrt(pixels / (width * height)), 3840 / Math.max(width, height));
   const fit = (value: number) => Math.max(16, Math.floor(value * scale / 16) * 16);
   return `${fit(width)}x${fit(height)}`;
@@ -30,7 +30,7 @@ function multipart(fields: Record<string, string>, files: { name: string; input:
   const parts: (string | Uint8Array<ArrayBuffer>)[] = Object.entries(fields)
     .map(([name, value]) => `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`);
   files.forEach(({ name, input }, index) => {
-    if (input.type === "url") throw new Error("参考图需为本地数据，不支持远程地址");
+    if (input.type === "url") throw new Error("Reference images must be local data; remote URLs are not supported");
     const bytes = input.type === "binary" ? input.data : Buffer.from(input.data.replace(/^data:[^,]*,/, ""), "base64");
     const extension = input.mimeType.split("/")[1] || "png";
     parts.push(
@@ -61,9 +61,9 @@ export default {
   ] satisfies ProviderModel[],
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
-    if (!apiKey) throw new Error("请填写 API Key");
+    if (!apiKey) throw new Error("Please fill in the API Key");
     const images = request.images ?? [];
-    if (images.length > 16) throw new Error("最多支持 16 张参考图");
+    if (images.length > 16) throw new Error("At most 16 reference images are supported");
     const format = request.outputFormat ?? "png";
     const fields: Record<string, string> = {
       model: request.model,
@@ -85,12 +85,12 @@ export default {
       body,
       signal,
     });
-    if (!response.ok) throw new Error(`请求失败：HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Request failed: HTTP ${response.status}`);
     const result = await response.json() as { data?: { b64_json?: string }[] };
     const assets = (result.data ?? []).flatMap(item => item.b64_json
       ? [{ mediaType: "image" as const, type: "base64" as const, data: item.b64_json, mimeType: `image/${format}` }]
       : []);
-    if (!assets.length) throw new Error("未返回生成结果");
+    if (!assets.length) throw new Error("No generation result returned");
     return assets;
   },
 } satisfies ProviderDefinition<typeof rules>;

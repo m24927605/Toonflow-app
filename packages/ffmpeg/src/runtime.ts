@@ -19,37 +19,37 @@ const native = ffmpeg.prototype as FfmpegInternals;
  */
 export function createFfmpeg(directory: string): typeof ffmpeg {
   const root = realpathSync(directory);
-  if (!statSync(root).isDirectory()) throw new Error("FFmpeg 工作区必须是目录");
+  if (!statSync(root).isDirectory()) throw new Error("FFmpeg workspace must be a directory");
 
   function assertWithin(path: string) {
     const offset = relative(root, path);
     if (offset === ".." || offset.startsWith(`..${sep}`) || isAbsolute(offset)) {
-      throw Object.assign(new Error("FFmpeg 只能操作当前工作区内的文件"), { status: 403 });
+      throw Object.assign(new Error("FFmpeg can only operate files in the current workspace"), { status: 403 });
     }
   }
 
   function resolvePath(path: string, folder = false): string {
     if (!path || /[\x00-\x1f]/.test(path) || (/^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path))) {
-      throw new Error("FFmpeg 文件路径无效，不能使用协议或设备路径");
+      throw new Error("FFmpeg file path is invalid, protocol or device path cannot be used");
     }
     const target = resolve(root, path);
     assertWithin(target);
     if (process.platform === "win32" && target.slice(parse(target).root.length).split(/[\\/]/).some(part =>
       /[:<>"|?*]|[. ]$/.test(part) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) {
-      throw new Error("FFmpeg 文件路径无效");
+      throw new Error("FFmpeg file path is invalid");
     }
     let parent = target;
     while (true) {
       try {
         const actual = resolve(realpathSync(parent), relative(parent, target));
         assertWithin(actual);
-        if (!folder && actual === root) throw new Error("FFmpeg 文件路径不能是工作区根目录");
+        if (!folder && actual === root) throw new Error("FFmpeg file path cannot be the workspace root directory");
         return actual;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
         // A dangling link must not be treated as an ordinary file to create;
         // if the parent directory is missing, keep checking the nearest existing ancestor.
-        if (lstatSync(parent, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("FFmpeg 不能操作悬空符号链接");
+        if (lstatSync(parent, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error("FFmpeg cannot operate dangling symbolic links");
         const ancestor = dirname(parent);
         if (ancestor === parent) throw error;
         parent = ancestor;

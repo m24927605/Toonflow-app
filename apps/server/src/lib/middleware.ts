@@ -13,9 +13,9 @@ export function validateFields(
     const data = req[source];
     const parseResult = schema.safeParse(data, validationOptions());
     if (!parseResult.success) {
-      const errors = parseResult.error.issues.map((issue) => t`字段 ${issue.path.join(".")} ${translateMessage(issue.message)}`);
+      const errors = parseResult.error.issues.map((issue) => t`Field ${issue.path.join(".")} ${translateMessage(issue.message)}`);
       console.error(errors);
-      return res.status(400).json(error("参数错误", errors));
+      return res.status(400).json(error("Parameter error", errors));
     }
     next();
   };

@@ -18,30 +18,32 @@ async function main() {
     help: { type: "boolean" },
   } });
   if (values.help) {
-    process.stderr.write(t`toonflow-mcp --url <MCP URL> --token-env <环境变量名>\ntoonflow-mcp --runtime <运行信息文件>\n`);
+    process.stderr.write(t`toonflow-mcp --url <MCP URL> --token-env <environment variable name>
+toonflow-mcp --runtime <run information file>
+`);
     return;
   }
-  if (Boolean(values.url) === Boolean(values.runtime)) throw new Error("请指定 --url 或 --runtime，二者只能选择一个");
+  if (Boolean(values.url) === Boolean(values.runtime)) throw new Error("Please specify --url or --runtime, you can only choose one of the two.");
   let endpoint = values.url;
   let token = process.env[values["token-env"]];
   if (values.runtime) {
     const info = await stat(values.runtime);
     if (process.platform !== "win32" && ((info.mode & 0o077) !== 0 || info.uid !== process.getuid?.())) {
-      throw new Error("运行信息文件必须属于当前用户，且仅允许当前用户访问（chmod 600）");
+      throw new Error("The running information file must belong to the current user and is only allowed to be accessed by the current user (chmod 600)");
     }
     const runtime = z.object({ pid: z.number().int().positive(), url: z.url(), token: z.string().min(1) }).parse(JSON.parse(await readFile(values.runtime, "utf8")));
     process.kill(runtime.pid, 0);
     endpoint = runtime.url;
     token = runtime.token;
   }
-  if (!token) throw new Error(t`未找到 MCP 访问凭证，请设置 ${values["token-env"]}`);
+  if (!token) throw new Error(t`MCP access credential not found, please set ${values["token-env"]}`);
   const url = new URL(endpoint!);
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
   if (!(["http:", "https:"].includes(url.protocol)) || (url.protocol === "http:" && !local)) {
-    throw new Error("远程 MCP 必须使用 HTTPS；本机连接允许 HTTP");
+    throw new Error("Remote MCP must use HTTPS; local connection allows HTTP");
   }
-  if (values.runtime && !local) throw new Error("运行信息文件只允许指向本机 Toonflow");
-  if (url.username || url.password) throw new Error("MCP URL 不允许包含账号或密码");
+  if (values.runtime && !local) throw new Error("The running information file is only allowed to point to the local Toonflow");
+  if (url.username || url.password) throw new Error("The MCP URL cannot contain a username or password");
   const transport = new StreamableHTTPClientTransport(url, {
     requestInit: { headers: { Authorization: `Bearer ${token}`, "Accept-Language": locale } },
   });
@@ -49,7 +51,7 @@ async function main() {
   await client.connect(transport);
   if (!client.getServerCapabilities()?.tools) {
     await client.close();
-    throw new Error("目标服务未提供 MCP 工具");
+    throw new Error("Target service does not provide MCP tools");
   }
   const bridge = serveStdio(() => {
     const resources = client.getServerCapabilities()?.resources;

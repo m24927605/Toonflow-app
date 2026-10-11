@@ -21,34 +21,34 @@ function invalid(message: string): never {
 export async function convertAudio(input: Uint8Array, options: AudioConvertOptions, signal?: AbortSignal): Promise<{ data: Uint8Array; mimeType: string }> {
   signal?.throwIfAborted();
   // Provider code runs in a separate VM realm where cross-realm TypedArrays fail instanceof, so check with util.types.
-  if (!types.isUint8Array(input)) invalid("音频输入必须是 Uint8Array");
-  if (input.byteLength === 0 || input.byteLength > maxInputBytes) invalid("音频输入大小无效");
-  if (options.format !== "wav" && options.format !== "mp3") invalid("输出格式仅支持 wav 或 mp3");
+  if (!types.isUint8Array(input)) invalid("Audio input must be a Uint8Array");
+  if (input.byteLength === 0 || input.byteLength > maxInputBytes) invalid("Invalid audio input size");
+  if (options.format !== "wav" && options.format !== "mp3") invalid("The output format only supports wav or mp3");
   const { startSeconds, endSeconds, sampleRate: targetSampleRate, bitrateKbps } = options;
-  if (startSeconds !== undefined && !(Number.isFinite(startSeconds) && startSeconds >= 0)) invalid("裁剪起点无效");
-  if (endSeconds !== undefined && !(Number.isFinite(endSeconds) && endSeconds > 0)) invalid("裁剪终点无效");
-  if (startSeconds !== undefined && endSeconds !== undefined && startSeconds >= endSeconds) invalid("裁剪区间无效");
-  if (targetSampleRate !== undefined && !(Number.isInteger(targetSampleRate) && targetSampleRate >= 4000 && targetSampleRate <= 192000)) invalid("采样率无效");
-  if (bitrateKbps !== undefined && !(Number.isInteger(bitrateKbps) && bitrateKbps >= 32 && bitrateKbps <= 320)) invalid("MP3 比特率无效");
+  if (startSeconds !== undefined && !(Number.isFinite(startSeconds) && startSeconds >= 0)) invalid("Invalid audio trim start time");
+  if (endSeconds !== undefined && !(Number.isFinite(endSeconds) && endSeconds > 0)) invalid("Invalid audio trim end time");
+  if (startSeconds !== undefined && endSeconds !== undefined && startSeconds >= endSeconds) invalid("Invalid audio trim range");
+  if (targetSampleRate !== undefined && !(Number.isInteger(targetSampleRate) && targetSampleRate >= 4000 && targetSampleRate <= 192000)) invalid("Invalid sampling rate");
+  if (bitrateKbps !== undefined && !(Number.isInteger(bitrateKbps) && bitrateKbps >= 32 && bitrateKbps <= 320)) invalid("Invalid MP3 bitrate");
 
   let wave: WaveFile;
   try { wave = new WaveFile(Uint8Array.from(input)); }
-  catch { invalid("音频输入不是有效的 WAV 数据"); }
+  catch { invalid("The audio input is not valid WAV data"); }
 
   const fmt = wave.fmt as { numChannels: number; sampleRate: number };
   const numChannels = fmt.numChannels;
   const sourceSampleRate = fmt.sampleRate;
-  if (!Number.isInteger(numChannels) || numChannels < 1 || numChannels > 2) invalid("仅支持单声道或双声道音频");
-  if (!Number.isInteger(sourceSampleRate) || sourceSampleRate <= 0) invalid("音频采样率无效");
+  if (!Number.isInteger(numChannels) || numChannels < 1 || numChannels > 2) invalid("Only supports mono or two-channel audio");
+  if (!Number.isInteger(sourceSampleRate) || sourceSampleRate <= 0) invalid("Invalid audio sampling rate");
 
   const raw = wave.getSamples(false, Int16Array) as unknown as Int16Array | Int16Array[];
   const channels = numChannels === 1 ? [raw as Int16Array] : raw as Int16Array[];
   const totalSamples = channels[0]?.length ?? 0;
-  if (totalSamples === 0 || totalSamples > maxSamplesPerChannel) invalid("音频时长无效或超出限制");
+  if (totalSamples === 0 || totalSamples > maxSamplesPerChannel) invalid("The audio duration is invalid or exceeds the limit");
 
   const startSample = startSeconds !== undefined ? Math.round(startSeconds * sourceSampleRate) : 0;
   const endSample = endSeconds !== undefined ? Math.round(endSeconds * sourceSampleRate) : totalSamples;
-  if (startSample < 0 || endSample > totalSamples || startSample >= endSample) invalid("裁剪区间超出音频长度");
+  if (startSample < 0 || endSample > totalSamples || startSample >= endSample) invalid("The trim range exceeds the audio duration");
   const trimmed = channels.map(channel => channel.subarray(startSample, endSample));
 
   signal?.throwIfAborted();
@@ -74,7 +74,7 @@ export async function convertAudio(input: Uint8Array, options: AudioConvertOptio
   const flushed = encoder.flush();
   if (flushed.length) chunks.push(new Uint8Array(flushed));
   const size = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  if (size === 0) invalid("MP3 编码失败");
+  if (size === 0) invalid("MP3 encoding failed");
   const data = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }

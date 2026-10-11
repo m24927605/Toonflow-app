@@ -60,7 +60,7 @@ import { translate } from "@toonflow/i18n/vue";
 import axios from "axios";
 import { computed, defineAsyncComponent, ref, shallowRef, toRaw, watch, type Component } from "vue";
 import { IconPlus, IconTrash, IconDeviceFloppy, IconEdit } from "@tabler/icons-vue";
-import formCreate, { type Api, type Options } from "../../formCreate";
+import formCreate, { type Api, type Options, type Rule } from "../../formCreate";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import type { MediaProvider, MediaProviderModel } from "./types";
@@ -84,7 +84,7 @@ const formError = ref("");
 const modelTypes = { get image() { return translate("图片"); }, get video() { return translate("视频"); }, get audio() { return translate("音频"); } };
 const modeLabels: Record<string, string> = {
   singleImage: "单图参考", multiReference: "多图参考", startEndRequired: "首尾帧必填",
-  endFrameOptional: "尾帧可选", startFrameOptional: "首帧可选", videoExtension: "延长视频",
+  endFrameOptional: "尾帧可选", startFrameOptional: "首帧可选", videoExtension: "延长视频", videoControl: "控制视频（深度／姿势）",
   imageReference: "图片参考", videoReference: "视频参考", audioReference: "音频参考",
 };
 
@@ -94,11 +94,21 @@ watch(visible, isVisible => {
   modelEditorVisible.value = false;
   editingModelIndex.value = undefined;
   const configs = settings.value.mediaProviderConfigs as Record<string, Record<string, unknown>> | undefined;
-  formRules.value = formCreate.copyRules(provider?.rules ?? []);
+  formRules.value = [...formCreate.copyRules(provider?.rules ?? []), ...budgetRules(provider?.id)];
   formValues.value = structuredClone(toRaw((provider && configs?.[provider.id]) ?? {}));
   revision.value = provider?.revision ?? "";
   models.value = JSON.parse(JSON.stringify(provider?.models ?? []));
 }, { immediate: true });
+
+// Daily caps checked by the server before each generation; empty or 0 means no cap.
+function budgetRules(providerId?: string) {
+  const rules: Rule[] = [{ type: "inputNumber", field: "dailyLimit", title: "Daily generation limit", props: { min: 0, step: 1, precision: 0, valueOnClear: null, placeholder: "No limit" } }];
+  // Providers that run on Colab also meter measured A100 time against compute units.
+  if (providerId === "qwenImage" || providerId === "minimaxH3") {
+    rules.push({ type: "inputNumber", field: "dailyComputeUnits", title: "Daily Colab compute unit limit", props: { min: 0, step: 1, precision: 2, valueOnClear: null, placeholder: "No limit" } });
+  }
+  return rules;
+}
 
 function modelTags(model: MediaProviderModel) {
   const modes = Array.isArray(model.mode) ? model.mode.flat().filter((mode): mode is string => typeof mode === "string") : [];

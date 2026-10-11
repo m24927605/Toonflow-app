@@ -13,11 +13,11 @@ export default Router().post("/", validateFields({
   }),
   token: z.string().max(8192).optional(),
 }), async (req, res) => {
-  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在服务器本机连接远端团队", null, 403));
+  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("Please connect to remote teams locally on the server", null, 403));
   const { name, cardUrl, token } = req.body as { name: string; cardUrl: string; token?: string };
   const signal = AbortSignal.timeout(20000);
   const client = await createTeamA2aClient({ url: cardUrl, token, fetch: ((input, init) => fetch(input, { ...init, signal })) as typeof fetch });
   const card = await client.getAgentCard();
   await u.teams.saveRemoteTeam({ name, cardUrl, ...(token ? { token } : {}), enabled: true, card });
-  res.json(success({ name }, "远端团队已连接"));
+  res.json(success({ name }, "The remote team is connected"));
 });

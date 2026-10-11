@@ -19,7 +19,7 @@ function wavData(bytes: Uint8Array) {
   for (let offset = 12; offset + 8 <= bytes.length; offset += 8 + view.getUint32(offset + 4, true)) {
     if (String.fromCharCode(...bytes.subarray(offset, offset + 4)) === "data") return bytes.subarray(offset + 8, offset + 8 + view.getUint32(offset + 4, true));
   }
-  throw new Error("Gemini 返回的 WAV 缺少音频数据");
+  throw new Error("The WAV returned by Gemini is missing audio data");
 }
 
 export default {
@@ -70,14 +70,14 @@ export default {
   ] satisfies ProviderModel[],
   async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
-    if (!apiKey) throw new Error("请填写 API Key");
+    if (!apiKey) throw new Error("Please fill in the API Key");
     const text = request.text?.trim() || request.prompt?.trim();
-    if (!text) throw new Error("请输入待朗读文本");
+    if (!text) throw new Error("Enter the text to read aloud");
     if ([request.speed ?? 1, request.volume ?? 0, request.pitch ?? 0].join() !== "1,0,0") {
-      throw new Error("Gemini TTS 不支持数值语速、音量和音调，请在风格提示中描述");
+      throw new Error("Gemini TTS does not support numeric speed, volume or pitch; describe them in the style prompt");
     }
     const format = request.format ?? "wav";
-    if (!["wav", "mp3", "pcm"].includes(format)) throw new Error(`Gemini TTS 不支持输出格式：${format}`);
+    if (!["wav", "mp3", "pcm"].includes(format)) throw new Error(`Gemini TTS does not support the output format: ${format}`);
     // The text field is read aloud verbatim, so tone and pace go into the style metadata instead.
     const style = [request.text ? request.prompt?.trim() : "", request.emotion?.trim()].filter(Boolean).join(", ");
     const languageCode = request.language ? languageCodes[request.language] : undefined;
@@ -94,10 +94,10 @@ export default {
       }),
       signal,
     });
-    if (!response.ok) throw new Error(`请求失败：HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Request failed: HTTP ${response.status}`);
     const result = await response.json() as { candidates?: { content?: { parts?: { inlineData?: { data?: string } }[] } }[] };
     const audio = result.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.data)?.inlineData?.data;
-    if (!audio) throw new Error("未返回生成结果");
+    if (!audio) throw new Error("No generation result returned");
     // Non-streaming responses are complete 24 kHz mono 16-bit WAV files.
     let bytes: Uint8Array = Buffer.from(audio, "base64");
     if (format !== "wav" || (request.sampleRate && request.sampleRate !== 24000)) {

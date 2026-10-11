@@ -13,12 +13,12 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
   const { components, ...toolConfig } = config;
   if (components !== undefined && (!components || Array.isArray(components) || typeof components !== "object" ||
     Object.entries(components).some(([name, entry]) => !name.trim() || typeof entry !== "string" || !entry.trim()))) {
-    throw new Error("工具组件必须是工具名称到组件入口路径的映射");
+    throw new Error("Tool components must be a mapping from tool names to component entry paths");
   }
   const root = fileURLToPath(new URL(".", configUrl));
   const { version } = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
   if (typeof version !== "string" || !version.trim() || version.trim().length > 100) {
-    throw new Error("工具 package.json 的 version 必须是长度不超过 100 的非空字符串");
+    throw new Error("The version in the tool package.json must be a non-empty string of at most 100 characters");
   }
   const readme = await readFile(resolve(root, "readme.md"), "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return "";
@@ -89,7 +89,7 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
     const output = Array.isArray(clientResult) ? clientResult.flatMap(result => result.output) : "output" in clientResult ? clientResult.output : [];
     const chunks = output.filter(item => item.type === "chunk");
     if (chunks.length !== 1 || output.some(item => item.type === "asset" && !item.fileName.endsWith(".css"))) {
-      throw new Error(`工具组件必须构建为单个脚本，且不能包含未内联的资源：${metadata.name}`);
+      throw new Error(`Tool components must be built as a single script and cannot contain non-inlined assets: ${metadata.name}`);
     }
     const css = output.filter(item => item.type === "asset").map(item =>
       typeof item.source === "string" ? item.source : new TextDecoder().decode(item.source)).join("\n");
@@ -129,7 +129,7 @@ export async function createToolConfig(config: Omit<ToolMetadata, "components" |
     external: ["toonflow:tool-zod"],
     minify: true,
   });
-  if (!result.success) throw new AggregateError(result.logs, `工具构建失败：${metadata.name}`);
+  if (!result.success) throw new AggregateError(result.logs, `Tool build failed: ${metadata.name}`);
   // Bun puts the @bun marker before the banner, so write the first-line metadata after the build completes.
   const builtPath = resolve(outDir, fileName);
   await write(builtPath, `/*! toonflowTool:${metadataJson} */\n${clientBanner}${await result.outputs[0].text()}`);

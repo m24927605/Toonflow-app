@@ -8,7 +8,7 @@ import { directory, isEnabled } from "@/utils/skills/files";
 import { isWithin, lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
 export function loadAgentSkills(cwd: string, scope?: SkillScope) {
-  if (scope !== undefined && scope !== "workspace" && scope !== "global") throw new Error("技能范围无效");
+  if (scope !== undefined && scope !== "workspace" && scope !== "global") throw new Error("Invalid skill range");
   const result = loadSkills({
     cwd,
     agentDir: join(cwd, ".agent"),
@@ -29,18 +29,18 @@ export function createSkillContext(cwd: string): SkillContext {
   async function locate(request: SkillLocation, create = false) {
     const scope = create ? request.scope ?? "workspace" : request.scope;
     const skill = loadAgentSkills(cwd, scope).skills.find(skill => skill.name === request.name);
-    if (!skill && !create) throw new Error(t`技能不存在：${request.name}`);
-    if (!skill && (request.name.length > 64 || !/^[a-z][a-zA-Z0-9]*$/.test(request.name))) throw new Error("新技能名称必须为不超过 64 字符的小驼峰");
+    if (!skill && !create) throw new Error(t`Skill does not exist: ${request.name}`);
+    if (!skill && (request.name.length > 64 || !/^[a-z][a-zA-Z0-9]*$/.test(request.name))) throw new Error("New skill names must be in lowerCamelCase and at most 64 characters");
     const targetScope = scope ?? skillScope(skill!.filePath);
     const root = await realpath(targetScope === "workspace" ? cwd : dirname(conf.path));
     const { path: scopeDirectory } = await resolveWorkspacePath(root, targetScope === "workspace" ? "skill" : "skills", true);
     const baseDirectory = skill?.baseDir ?? join(scopeDirectory, request.name);
-    if (!isWithin(scopeDirectory, baseDirectory)) throw new Error("技能目录超出指定范围");
+    if (!isWithin(scopeDirectory, baseDirectory)) throw new Error("The skill directory exceeds the specified range");
     const { path: skillDirectory } = await resolveWorkspacePath(scopeDirectory, relative(scopeDirectory, baseDirectory), true);
     const path = request.path ?? (skill ? basename(skill.filePath) : "SKILL.md");
     const { path: target } = await resolveWorkspacePath(skillDirectory, path, true);
     const filePath = relative(skillDirectory, target).split(sep).join("/");
-    if (!skill && filePath !== "SKILL.md") throw new Error("请先创建技能的 SKILL.md，再添加参考资料");
+    if (!skill && filePath !== "SKILL.md") throw new Error("Please create the SKILL.md of the skill first, and then add reference materials");
     return { name: request.name, scope: targetScope, path: filePath, target, manifest: basename(target).toLowerCase() === "skill.md" || target === skill?.filePath };
   }
 
@@ -50,12 +50,12 @@ export function createSkillContext(cwd: string): SkillContext {
     if (manifest) {
       const { frontmatter } = parseFrontmatter(request.content);
       if (frontmatter.name !== request.name || typeof frontmatter.description !== "string" || !frontmatter.description.trim()) {
-        throw new Error("SKILL.md 必须包含匹配的 name 和非空 description");
+        throw new Error("SKILL.md must contain matching name and non-empty description");
       }
     }
     const release = lockWorkspaceFiles([target]);
     try {
-      if (!create && !(await stat(target)).isFile()) throw new Error("只能修改已有的普通文件");
+      if (!create && !(await stat(target)).isFile()) throw new Error("can only modify existing ordinary files");
       signal?.throwIfAborted();
       if (create) await mkdir(dirname(target), { recursive: true });
       signal?.throwIfAborted();
@@ -71,7 +71,7 @@ export function createSkillContext(cwd: string): SkillContext {
     async read(request, signal) {
       signal?.throwIfAborted();
       const { target, manifest, ...document } = await locate(request);
-      if (!(await stat(target)).isFile()) throw new Error("只能读取普通文件");
+      if (!(await stat(target)).isFile()) throw new Error("can only read ordinary files");
       return { ...document, content: await readFile(target, { encoding: "utf8", signal }) };
     },
     create: (request, signal) => write(request, true, signal),

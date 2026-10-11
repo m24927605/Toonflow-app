@@ -101,6 +101,9 @@
         @keydown.enter.stop.prevent="editLabel">
         {{ displayLabel }}
       </span>
+      <icon-loader2 v-if="generationStatus === 'running'" class="generationStatus running" :size="16" role="status" aria-label="生成中" />
+      <icon-circle-check v-else-if="generationStatus === 'succeeded'" class="generationStatus succeeded" :size="16" role="status" aria-label="生成完成" />
+      <icon-alert-circle v-else-if="generationStatus === 'failed'" class="generationStatus failed" :size="16" role="status" aria-label="生成失败" />
       <div class="nodeActions nodrag nopan" @pointerdown.stop @mousedown.stop @dblclick.stop>
         <el-button
           :icon="IconRefresh"
@@ -173,6 +176,8 @@ import {
   IconCircleDashed,
   IconCircleDot,
   IconLoader2,
+  IconCircleCheck,
+  IconAlertCircle,
 } from "@tabler/icons-vue";
 import { ElCard, ElButton, ElDivider, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage } from "element-plus";
 import { translate } from "@toonflow/i18n/vue";
@@ -199,6 +204,8 @@ const props = withDefaults(
       downloadUrl?: string;
       downloadName?: string;
       fullscreenVisible?: boolean;
+      /** Shown on the title bar so a node's generation state is visible without selecting it. */
+      generationStatus?: "idle" | "running" | "succeeded" | "failed";
     }
   >(),
   {
@@ -644,6 +651,18 @@ watch(
 
     .titleIcon {
       flex-shrink: 0;
+    }
+
+    .generationStatus {
+      flex-shrink: 0;
+
+      &.running {
+        color: var(--el-color-primary);
+        animation: nodeLoading 1s linear infinite;
+      }
+
+      &.succeeded { color: var(--el-color-success); }
+      &.failed { color: var(--el-color-danger); }
     }
 
     .labelText {

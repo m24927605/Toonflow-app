@@ -48,7 +48,7 @@ const sessions = new Map<string, SingleSession>();
 
 function getSession(sessionId: string) {
   const session = sessions.get(sessionId);
-  if (!session || session.closed) throw Object.assign(new Error("临时对话不存在或已关闭"), { status: 404 });
+  if (!session || session.closed) throw Object.assign(new Error("The temporary chat does not exist or has been closed"), { status: 404 });
   return session;
 }
 
@@ -83,7 +83,7 @@ function createClientTool(session: SingleSession, descriptor: SingleAgentToolDes
     executionMode: descriptor.executionMode ?? "sequential",
     async execute(toolCallId, args, signal, onUpdate) {
       const active = session.active;
-      if (!active || session.closed) throw new Error("临时对话已结束");
+      if (!active || session.closed) throw new Error("Temporary chat ended");
       signal?.throwIfAborted();
       const callId = crypto.randomUUID();
       return new Promise<SingleAgentToolResult>((resolve, reject) => {
@@ -93,7 +93,7 @@ function createClientTool(session: SingleSession, descriptor: SingleAgentToolDes
           if (result instanceof Error) reject(result);
           else resolve(result);
         };
-        const abort = () => finish(new Error("工具调用已取消"));
+        const abort = () => finish(new Error("Tool call cancelled"));
         active.clientCalls.set(callId, { finish, onUpdate });
         signal?.addEventListener("abort", abort, { once: true });
         active.send({ type: "clientTool", callId, toolCallId, name: descriptor.name, args: args as Record<string, unknown> });
@@ -118,7 +118,7 @@ export async function create(options: {
   try {
     const question: QuestionContext = { ask: (...args) => {
       const active = session.active;
-      if (!active?.questions) throw new Error("临时对话未在运行");
+      if (!active?.questions) throw new Error("The temporary chat is not running");
       return active.questions.context.ask(...args);
     } };
     const context = createAgentToolContext(cwd, {}, undefined, question, session.workspaceAvailable);
@@ -131,19 +131,19 @@ export async function create(options: {
       else {
         const pluginName = typeof reference === "string" ? reference : reference.plugin;
         const info = available.get(pluginName);
-        if (!info?.enabled) throw Object.assign(new Error(t`工具插件 ${pluginName} 未安装或未启用`), { status: 400 });
+        if (!info?.enabled) throw Object.assign(new Error(t`Tool plugin ${pluginName} is not installed or enabled`), { status: 400 });
         if (info.loadError) throw new Error(info.loadError);
         const { plugin, metadata } = await loadTool(pluginName);
         definitions = await plugin.createTools({ ...context, config: validateToolConfig(plugin, info.config) });
         const selected = typeof reference === "string" ? undefined : reference.names;
-        if (selected?.some(name => !definitions.some(tool => tool.name === name))) throw Object.assign(new Error(t`插件 ${pluginName} 未提供所选工具`), { status: 400 });
+        if (selected?.some(name => !definitions.some(tool => tool.name === name))) throw Object.assign(new Error(t`Plugin ${pluginName} does not provide the selected tool`), { status: 400 });
         definitions = definitions.filter(tool => !selected || selected.includes(tool.name)).map(tool => ({
           ...tool, promptGuidelines: [...(metadata.prompt ? [metadata.prompt] : []), ...(tool.promptGuidelines ?? [])],
         }));
       }
       for (const tool of definitions) {
-        if (!tool.name || typeof tool.execute !== "function") throw new Error("插件返回了无效的工具");
-        if (names.has(tool.name)) throw Object.assign(new Error(t`工具名称重复：${tool.name}`), { status: 400 });
+        if (!tool.name || typeof tool.execute !== "function") throw new Error("The plugin returned an invalid tool");
+        if (names.has(tool.name)) throw Object.assign(new Error(t`Duplicate tool name: ${tool.name}`), { status: 400 });
         names.add(tool.name);
         session.tools.push(tool);
       }
@@ -165,7 +165,7 @@ export async function run(options: {
   thinkingLevel?: CreateAgentSessionOptions["thinkingLevel"];
 }, send: (event: SingleAgentEvent) => void, signal?: AbortSignal, onStart?: () => void) {
   const state = getSession(options.sessionId);
-  if (state.active) throw Object.assign(new Error("此对话正在运行，请等待当前回复完成"), { status: 409 });
+  if (state.active) throw Object.assign(new Error("This chat is running. Wait for the current reply to finish."), { status: 409 });
   const active: RunState = {
     id: options.runId, controller: new AbortController(), status: "idle", pauseRequested: false, activeActions: 0,
     finished: Promise.withResolvers<void>(), send, questionIds: new Set(), clientCalls: new Map(),
@@ -184,7 +184,7 @@ export async function run(options: {
     active.questions = createQuestionContext(state.id, event => {
       active.questionIds.add(event.callId);
       send(event);
-    }, () => active.controller.abort(new Error("用户取消了提问")));
+    }, () => active.controller.abort(new Error("The user cancelled the question")));
     const tools = state.tools.map(tool => ({
       ...tool,
       async execute(...args: Parameters<ToolDefinition["execute"]>) {
@@ -200,7 +200,7 @@ export async function run(options: {
     active.controller.signal.throwIfAborted();
     const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } });
     const agentDir = join(state.cwd, ".agent");
-    const systemPrompt = [...new Set([state.systemPrompt || "请根据用户要求完成当前任务，按需使用提供的工具。", ...tools.flatMap(tool => tool.promptGuidelines ?? [])])].filter(Boolean).join("\n\n");
+    const systemPrompt = [...new Set([state.systemPrompt || "Complete the current task as the user requested, using the provided tools as needed.", ...tools.flatMap(tool => tool.promptGuidelines ?? [])])].filter(Boolean).join("\n\n");
     const resourceLoader = new DefaultResourceLoader({
       cwd: state.cwd, agentDir, settingsManager,
       noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
@@ -269,17 +269,17 @@ export async function run(options: {
     await session.prompt(options.prompt, { expandPromptTemplates: false });
     active.controller.signal.throwIfAborted();
     const reply = session.messages.findLast(message => message.role === "assistant");
-    if (!reply || reply.role !== "assistant") throw new Error("模型未返回回复");
-    if (reply.stopReason === "error" || reply.stopReason === "aborted") throw new Error(reply.errorMessage || "模型请求失败");
-    if (reply.stopReason === "length") throw new Error("模型回复因长度限制被截断，未能完整生成回答。");
+    if (!reply || reply.role !== "assistant") throw new Error("The model returned no response");
+    if (reply.stopReason === "error" || reply.stopReason === "aborted") throw new Error(reply.errorMessage || "Model request failed");
+    if (reply.stopReason === "length") throw new Error("The model response was truncated due to length restrictions and failed to generate a complete response.");
     send({ type: "complete", text: reply.content.filter(part => part.type === "text").map(part => part.text).join("\n"), toolResults });
   } catch (error) {
-    send({ type: "error", message: active.controller.signal.aborted ? "本次回复已停止" : error instanceof Error ? error.message : "临时对话执行失败" });
+    send({ type: "error", message: active.controller.signal.aborted ? "This reply has been stopped" : error instanceof Error ? error.message : "Temporary chat execution failed" });
   } finally {
     active.controller.signal.removeEventListener("abort", stopSdk);
     signal?.removeEventListener("abort", abort);
     active.questions?.dispose();
-    for (const call of active.clientCalls.values()) call.finish(new Error("临时对话已结束"));
+    for (const call of active.clientCalls.values()) call.finish(new Error("Temporary chat ended"));
     try {
       if (active.session) {
         try { await active.session.abort(); }
@@ -297,7 +297,7 @@ export async function control(sessionId: string, action: "pause" | "resume" | "s
   if (action === "close") { await close(sessionId); return { status: "idle" as const }; }
   const active = getSession(sessionId).active;
   if (!active) return { status: "idle" as const };
-  if (active.id !== runId) throw Object.assign(new Error("当前回复已变化，控制请求已失效"), { status: 409 });
+  if (active.id !== runId) throw Object.assign(new Error("The current reply has changed. This control request is no longer valid."), { status: 409 });
   if (action === "pause") {
     active.pauseRequested = true;
     setStatus(active, active.activeActions ? "pausing" : "paused");
@@ -307,7 +307,7 @@ export async function control(sessionId: string, action: "pause" | "resume" | "s
     active.gate = undefined;
     setStatus(active, "running");
   } else {
-    active.controller.abort(new Error("本次回复已停止"));
+    active.controller.abort(new Error("This reply has been stopped"));
     await active.finished.promise;
     return { status: "idle" as const };
   }
@@ -316,14 +316,14 @@ export async function control(sessionId: string, action: "pause" | "resume" | "s
 
 export function toolResult(sessionId: string, callId: string, response: { result?: SingleAgentToolResult; error?: string; partial?: boolean }) {
   const call = getSession(sessionId).active?.clientCalls.get(callId);
-  if (!call) throw Object.assign(new Error("工具调用不存在或已结束"), { status: 404 });
+  if (!call) throw Object.assign(new Error("Tool call does not exist or has ended"), { status: 404 });
   if (response.partial) { if (response.result) call.onUpdate?.(response.result); return; }
   call.finish(response.error !== undefined ? new Error(response.error) : response.result!);
 }
 
 export function answer(sessionId: string, callId: string, response: Parameters<typeof answerQuestion>[2]) {
   const session = getSession(sessionId);
-  if (!session.active?.questionIds.has(callId)) throw Object.assign(new Error("提问不属于此对话或已结束"), { status: 404 });
+  if (!session.active?.questionIds.has(callId)) throw Object.assign(new Error("The question does not belong to this chat or has ended"), { status: 404 });
   const result = answerQuestion(session.id, callId, response);
   session.active.questionIds.delete(callId);
   return result;
@@ -331,7 +331,7 @@ export function answer(sessionId: string, callId: string, response: Parameters<t
 
 export function getBrowserScope(sessionId: string, browserSessionId: string): string {
   const session = getSession(sessionId);
-  if (!browserRuntime.hasOwner(session.cwd, session.history.getSessionId(), browserSessionId)) throw Object.assign(new Error("浏览器会话不属于此临时对话"), { status: 404 });
+  if (!browserRuntime.hasOwner(session.cwd, session.history.getSessionId(), browserSessionId)) throw Object.assign(new Error("The browser session does not belong to this temporary chat"), { status: 404 });
   return session.cwd;
 }
 
@@ -339,7 +339,7 @@ export function assertWorkspaceBrowserAccess(browserSessionId: string) {
   // ACT: The number of temporary conversations is bounded by open dialogs; if
   // many long-lived tasks are supported later, index tasks by browser session.
   for (const session of sessions.values()) {
-    if (browserRuntime.hasOwner(session.cwd, session.history.getSessionId(), browserSessionId)) throw Object.assign(new Error("请通过临时对话身份访问此浏览器"), { status: 403 });
+    if (browserRuntime.hasOwner(session.cwd, session.history.getSessionId(), browserSessionId)) throw Object.assign(new Error("Access this browser using the temporary chat identity"), { status: 403 });
   }
 }
 
@@ -349,9 +349,9 @@ export async function close(sessionId: string) {
   if (session.closing) return session.closing;
   session.closed = true;
   const active = session.active;
-  active?.controller.abort(new Error("临时对话已关闭"));
+  active?.controller.abort(new Error("Temporary chat closed"));
   active?.questions?.dispose();
-  if (active) for (const call of active.clientCalls.values()) call.finish(new Error("临时对话已关闭"));
+  if (active) for (const call of active.clientCalls.values()) call.finish(new Error("Temporary chat closed"));
   session.closing = (async () => {
     try {
       try { await browserRuntime.closeOwner(session.cwd, session.history.getSessionId()); }

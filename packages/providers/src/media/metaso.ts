@@ -9,7 +9,7 @@ const rules = [
   {
     type: "input",
     field: "baseUrl" as const,
-    title: "请求地址",
+    title: "Request URL",
     value: "https://metaso.cn/api/minimax",
     props: { placeholder: "https://metaso.cn/api/minimax" },
   },
@@ -44,22 +44,22 @@ async function pollVideo(context: ProviderContext, baseUrl: string, apiKey: stri
       headers: { Authorization: `Bearer ${apiKey}` },
       signal,
     });
-    if (!response.ok) throw new Error(`查询任务失败：HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to query task: HTTP ${response.status}`);
     const data = await response.json() as { task?: { status?: string; content?: { url?: string } } };
     const status = data?.task?.status;
     if (status === "succeeded") {
       const url = data.task?.content?.url;
-      if (!url) throw new Error("视频生成成功但未返回视频地址");
+      if (!url) throw new Error("Video generated successfully but no video URL was returned");
       return url;
     }
-    if (status === "failed") throw new Error(context.tool.errorMessage?.(data) || "视频生成失败");
+    if (status === "failed") throw new Error(context.tool.errorMessage?.(data) || "Video generation failed.");
     await wait(signal, 5000);
   }
 }
 
 export default {
   id: "metaso",
-  label: "秘塔版MiniMax H3",
+  label: "MiniMax H3 (Metaso)",
   icon: "data:image/svg+xml;base64,PCEtLSBTb3VyY2U6IGh0dHBzOi8vbWV0YXNvLmNuLyAtLT4NCjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iNDkiIGhlaWdodD0iMzAiIGZpbGw9Im5vbmUiIHZpZXdCb3g9IjAgMCA0OSAzMCI+PHBhdGggZmlsbD0idXJsKCNwYWludDBfbGluZWFyXzE1NjVfMjYyNSkiIGQ9Ik0xNS44NDYgMTMuOTFhMS43NCAxLjc0IDAgMCAxIDMuMDA4IDBsOC4yMzMgMTQuMjAzYzEuMTUzIDEuOTkgMy44NjcgMi41MzQgNS43MjIuOTk1IDEuNDQ4LTEuMTk4IDEuNjUxLTMuMzQ3LjcyNC00Ljk3NUwyMC41OTUgMS44OTgiPjwvcGF0aD48cGF0aCBmaWxsPSIjMTc1Q0QzIiBkPSJtNDguMTIyIDI0LjMxNC03Ljk0LTEzLjczYy0xLjA0LTEuODEtMy4zNy0yLjQyLTUuMTc5LTEuMzhzLTIuNDIgMy4zNy0xLjM4IDUuMThsNy45NCAxMy43M2MxLjA0IDEuODA5IDMuMzcgMi40MiA1LjE3OSAxLjM3OXMyLjQyLTMuMzcgMS4zOC01LjE4TTM1LjExNiAxLjg5OWMtMS4wNC0xLjgxLTMuMzctMi40Mi01LjE4LTEuMzhzLTIuNDIgMy4zNy0xLjM4IDUuMTggMy4zNyAyLjQyIDUuMTggMS4zOGMxLjgxLTEuMDY0IDIuNDQzLTMuMzcgMS4zOC01LjE4TTE5LjIxNi41MmEzIDMgMCAwIDAtLjM2Mi0uMTgyIDMuNzUgMy43NSAwIDAgMC00LjYxNCAxLjI0NGwtLjAyMy4wMjNjLS4wMjMuMDQ1LS4wNDUuMDY4LS4wNjguMTEzcy0uMDY4LjExMy0uMDkuMTU4TDEuMTY2IDI0LjExYTQgNCAwIDAgMC0uNDk3IDEuNDAydi4wOTFhMi44IDIuOCAwIDAgMC0uMDY4LjU4OGMtLjAyMyAxLjA4Ni40MDcgMi4xNzEgMS4yODkgMi44OTUuNzI0LjYxIDEuNTYuODgyIDIuMzk4LjkwNWguMTM1YzEuMjkgMCAyLjU1Ni0uNjc5IDMuMjU3LTEuODc4bDguMzAxLTE0LjQwNyA0LjYzNy04LjAzQTMuNzggMy43OCAwIDAgMCAxOS4yMTYuNTIiPjwvcGF0aD48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9InBhaW50MF9saW5lYXJfMTU2NV8yNjI1IiB4MT0iMTUuODQ1IiB4Mj0iMzQuMDk1IiB5MT0iMTUuOTQ1IiB5Mj0iMTUuOTQ1IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHN0b3Agb2Zmc2V0PSIwLjE0NCIgc3RvcC1jb2xvcj0iIzE5NDE4NSI+PC9zdG9wPjxzdG9wIG9mZnNldD0iMC4yMTgiIHN0b3AtY29sb3I9IiMxODQ5QTkiPjwvc3RvcD48c3RvcCBvZmZzZXQ9IjAuMzc1IiBzdG9wLWNvbG9yPSIjMTc1Q0QzIj48L3N0b3A+PHN0b3Agb2Zmc2V0PSIwLjU3OSIgc3RvcC1jb2xvcj0iIzE3NUNEMyI+PC9zdG9wPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzE3NUNEMyI+PC9zdG9wPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjwvc3ZnPg0K",
   version,
   readme: "MiniMax H3 video generation through the Metaso API. Create an API key at [metaso.cn](https://metaso.cn/minimax-h3/); enter `env:VARIABLE_NAME` to read it from the Toonflow process environment or `~/.env` instead of storing it.",
@@ -76,7 +76,7 @@ export default {
   ] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
-    if (!apiKey) throw new Error("请填写 API Key");
+    if (!apiKey) throw new Error("Please fill in the API Key");
     const baseUrl = (this.config.baseUrl?.trim() || "https://metaso.cn/api/minimax").replace(/\/$/, "");
 
     const images = (request.images ?? []).map(mediaUrl);
@@ -109,10 +109,10 @@ export default {
       body: JSON.stringify({ model: request.model, duration: request.duration, resolution: request.resolution, ratio: request.ratio, content }),
       signal,
     });
-    if (!submitResponse.ok) throw new Error(`提交任务失败：HTTP ${submitResponse.status}`);
+    if (!submitResponse.ok) throw new Error(`Failed to submit task: HTTP ${submitResponse.status}`);
     const submitData = await submitResponse.json() as { task_id?: string };
     const taskId = submitData?.task_id;
-    if (!taskId) throw new Error("提交任务未返回任务 ID");
+    if (!taskId) throw new Error("Task submission returned no task ID");
 
     const videoUrl = await pollVideo(this, baseUrl, apiKey, taskId, signal);
     return [{ mediaType: "video", type: "url", url: videoUrl }];

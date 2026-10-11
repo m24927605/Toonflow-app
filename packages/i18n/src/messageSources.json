@@ -208,6 +208,7 @@
     "apps/web/src/pages/workspace/components/workspaceMenu.vue",
     "packages/nodes/videoNode/src/components/videoActions.vue",
     "packages/nodes/audioNode/src/components/audioActions.vue",
+    "packages/nodes/videoGenerationNode/src/index.vue",
     "packages/nodes/textNode/src/index.vue",
     "packages/ext/md/src/index.vue"
   ],
@@ -252,8 +253,7 @@
   "节点": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/server/src/utils/plugins/install.ts"
+    "apps/web/src/components/agent/mentionMenu.vue"
   ],
   "选择脚手架打包的 .umd.js 文件。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
@@ -261,24 +261,21 @@
   "文件扩展": [
     "apps/web/src/components/settings/panels/developer/index.vue",
     "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/web/src/pages/workspace/panels/document/components/openWithDialog.vue",
-    "apps/server/src/utils/plugins/install.ts"
+    "apps/web/src/pages/workspace/panels/document/components/openWithDialog.vue"
   ],
   "选择扩展脚手架打包的 ext-*.umd.js 文件。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "技能": [
     "apps/web/src/components/settings/panels/developer/index.vue",
-    "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/server/src/utils/plugins/install.ts"
+    "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "支持包含技能与资源的 .zip 包、SKILL.md，以及 .tar、.tar.gz、.tgz 包。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "工具": [
     "apps/web/src/components/settings/panels/developer/index.vue",
-    "apps/web/src/components/settings/panels/plugins/index.vue",
-    "apps/server/src/utils/plugins/install.ts"
+    "apps/web/src/components/settings/panels/plugins/index.vue"
   ],
   "选择脚手架打包的 .tool.js 文件。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
@@ -424,7 +421,8 @@
   ],
   "时长（秒）": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
-    "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue"
+    "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
   "视频时长": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
@@ -483,8 +481,7 @@
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
   ],
   "成功": [
-    "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
-    "apps/server/src/lib/responseFormat.ts"
+    "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
   ],
   "运行中…": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue"
@@ -525,7 +522,6 @@
   ],
   "请输入提示词": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
-    "apps/server/src/utils/media/debug.ts",
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "请检查供应商配置": [
@@ -1007,8 +1003,7 @@
   ],
   "已取消": [
     "apps/web/src/components/settings/panels/plugins/ffmpeg.vue",
-    "apps/web/src/components/agent/menu.vue",
-    "apps/server/src/utils/ai/claudeCode.ts"
+    "apps/web/src/components/agent/menu.vue"
   ],
   "读取下载进度失败": [
     "apps/web/src/components/settings/panels/plugins/ffmpeg.vue"
@@ -1058,10 +1053,7 @@
   ],
   "已保存": [
     "apps/web/src/components/settings/panels/plugins/agentEditorDialog.vue",
-    "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue",
-    "apps/server/src/routes/settings/personalization/save.ts",
-    "apps/server/src/routes/agents/save.ts",
-    "apps/server/src/routes/skills/save.ts"
+    "apps/web/src/components/settings/panels/plugins/skillEditorDialog.vue"
   ],
   "{0}配置": [
     "apps/web/src/components/settings/panels/plugins/pluginConfigDialog.vue"
@@ -1557,8 +1549,6 @@
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
     "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/server/src/utils/media/generation.ts",
-    "packages/nodes/imageNode/vite.config.ts",
     "packages/nodes/imageNode/src/index.vue",
     "packages/nodes/director3dNode/src/index.vue",
     "packages/ext/image/src/metadata.ts",
@@ -1569,8 +1559,6 @@
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
     "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/server/src/utils/media/generation.ts",
-    "packages/nodes/videoNode/vite.config.ts",
     "packages/nodes/videoNode/src/index.vue",
     "packages/nodes/director3dNode/src/index.vue",
     "packages/nodeShared/src/components/mediaHistory.vue",
@@ -1580,8 +1568,6 @@
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
     "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/server/src/utils/media/generation.ts",
-    "packages/nodes/audioNode/vite.config.ts",
     "packages/nodes/audioNode/src/index.vue",
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
@@ -1610,6 +1596,10 @@
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
   ],
   "延长视频": [
+    "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
+    "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
+  ],
+  "控制视频（深度／姿势）": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
   ],
@@ -2181,9 +2171,7 @@
     "apps/web/src/components/singleAgentDialog.vue"
   ],
   "新对话": [
-    "apps/web/src/components/agent/index.vue",
-    "apps/server/src/agent/runtime/index.ts",
-    "apps/server/src/agent/runtime/sessions.ts"
+    "apps/web/src/components/agent/index.vue"
   ],
   "请先打开项目": [
     "apps/web/src/components/agent/index.vue",
@@ -2541,8 +2529,7 @@
     "apps/web/src/components/agent/menu.vue"
   ],
   "等待补充": [
-    "apps/web/src/components/agent/menu.vue",
-    "apps/server/src/agent/teams/index.ts"
+    "apps/web/src/components/agent/menu.vue"
   ],
   "读取工具配置失败": [
     "apps/web/src/components/agent/menu.vue"
@@ -2581,8 +2568,7 @@
     "apps/web/src/components/agent/mentionMenu.vue"
   ],
   "暂无输出": [
-    "apps/web/src/components/agent/mentionMenu.vue",
-    "apps/server/src/agent/mentionSources.ts"
+    "apps/web/src/components/agent/mentionMenu.vue"
   ],
   "加载更多": [
     "apps/web/src/components/agent/mentionMenu.vue"
@@ -2611,7 +2597,6 @@
   ],
   "文本": [
     "apps/web/src/components/agent/mentionMenu.vue",
-    "packages/nodes/textNode/vite.config.ts",
     "packages/nodes/textNode/src/index.vue",
     "packages/nodes/imageNode/src/components/imageEditor.vue"
   ],
@@ -3389,8 +3374,7 @@
     "apps/web/src/pages/workspace/panels/document/components/editorTab.vue"
   ],
   "工作区文件": [
-    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue",
-    "packages/tools/workspace/build.ts"
+    "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
   ],
   "在当前目录新建文件": [
     "apps/web/src/pages/workspace/panels/document/components/fileTree.vue"
@@ -3745,8 +3729,7 @@
     "apps/web/src/pages/workspace/panels/canvas/index.vue"
   ],
   "文件不是有效画布": [
-    "apps/web/src/pages/workspace/panels/canvas/index.vue",
-    "apps/server/src/agent/mentionFiles.ts"
+    "apps/web/src/pages/workspace/panels/canvas/index.vue"
   ],
   "节点数据无效": [
     "apps/web/src/pages/workspace/panels/canvas/index.vue"
@@ -4184,6 +4167,13 @@
   "打组": [
     "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
   ],
+  "对选中的生成节点同时发出生成": [
+    "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
+  ],
+  "生成": [
+    "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue",
+    "packages/nodes/textNode/src/index.vue"
+  ],
   "水平排列": [
     "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue",
     "apps/web/src/pages/workspace/panels/canvas/components/nodeMenu.vue"
@@ -4206,6 +4196,12 @@
     "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
   ],
   "选区操作失败": [
+    "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
+  ],
+  "已对 {0} 个节点发出生成，正在生成的节点会保持当前任务": [
+    "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
+  ],
+  "选中的节点都不能生成": [
     "apps/web/src/pages/workspace/panels/canvas/components/selectionToolbar.vue"
   ],
   "选区操作": [
@@ -4353,13 +4349,10 @@
     "apps/web/src/pages/workspace/panels/canvas/canvasHost.vue"
   ],
   "节点已删除，请重新选择": [
-    "apps/web/src/pages/workspace/panels/canvas/canvasHost.vue",
-    "apps/server/src/agent/mentionFiles.ts"
+    "apps/web/src/pages/workspace/panels/canvas/canvasHost.vue"
   ],
   "文本引用最多支持 100000 个字符，请缩小内容后重试": [
-    "apps/web/src/pages/workspace/panels/canvas/canvasHost.vue",
-    "apps/server/src/agent/mentionSources.ts",
-    "apps/server/src/agent/mentionFiles.ts"
+    "apps/web/src/pages/workspace/panels/canvas/canvasHost.vue"
   ],
   "AI 对话": [
     "apps/web/src/pages/workspace/components/floatingAgent.vue"
@@ -4407,2217 +4400,1775 @@
   "保存引导状态失败，请重试": [
     "apps/web/src/pages/hello/index.vue"
   ],
-  "当前操作需要 FFmpeg，请在插件设置中下载安装或配置可用版本后重试。": [
+  "The current operation requires FFmpeg. Download and install it in Plugins settings, or configure an available version, then try again.": [
     "apps/server/src/utils/ffmpeg/index.ts"
   ],
-  "正在下载，请等待完成或取消后再试": [
+  "Downloading, please wait for completion or cancel before trying again": [
     "apps/server/src/utils/ffmpeg/index.ts"
   ],
-  "暂不支持自动下载 {0} 版本": [
+  "does not currently support automatic download of {0} version": [
     "apps/server/src/utils/ffmpeg/index.ts",
     "packages/ffmpeg/src/index.ts"
   ],
-  "文件扩展元数据无效，请使用扩展脚手架重新构建，且文件名必须与扩展 ID 一致": [
+  "metadata": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "文件扩展必须是普通文件": [
+  "github": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "文件扩展不能超过 20 MB": [
+  "Invalid file extension metadata. Rebuild it using the extension scaffold; the file name must match the extension ID": [
+    "apps/server/src/utils/plugins/ext.ts"
+  ],
+  "A file extension must be a regular file": [
+    "apps/server/src/utils/plugins/ext.ts"
+  ],
+  "File extensions cannot exceed 20 MB": [
     "apps/server/src/utils/plugins/ext.ts",
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}必须为数字": [
+  "{0} must be a number": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "{0}不能小于{1}": [
+  "{0} must not be less than {1}": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "{0}不能大于{1}": [
+  "{0} must not exceed {1}": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "{0}的开关值无效": [
+  "Invalid switch value for {0}": [
     "apps/server/src/utils/plugins/ext.ts"
   ],
-  "节点不存在": [
-    "apps/server/src/utils/plugins/nodes.ts",
-    "apps/server/src/routes/nodes/setEnabled.ts",
-    "apps/server/src/routes/nodes/uninstall.ts",
-    "apps/server/src/routes/nodes/files.ts"
-  ],
-  "节点文件无效": [
+  "The node file is invalid": [
     "apps/server/src/utils/plugins/nodes.ts"
   ],
-  "节点配置表单规则无效，请重新构建节点": [
+  "The node configuration form rule is invalid, please rebuild the node": [
     "apps/server/src/utils/plugins/nodes.ts"
   ],
-  "请填写{0}": [
+  "Please fill in {0}": [
     "apps/server/src/utils/plugins/nodes.ts"
   ],
-  "{0}已安装，但现有或待安装版本缺失或无效，无法判断更新顺序；请在开发者设置中使用强制安装": [
+  "{0} has been installed, but the existing or to-be-installed version is missing or invalid, and the update sequence cannot be determined; please use forced installation in developer settings": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}已安装版本 {1}，待安装版本 {2} 不高于现有版本；如需覆盖或降级，请在开发者设置中使用强制安装": [
+  "{0} version {1} is installed; version {2} is not newer. To overwrite or downgrade, use Force Install in developer settings": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载地址格式无效，请提供完整的 HTTP / HTTPS 文件地址": [
+  "The download address format is invalid, please provide the complete HTTP / HTTPS file address": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "仅支持不含账号密码的 HTTP / HTTPS 地址": [
+  "Only HTTP / HTTPS URLs without a username or password are supported": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败：服务器重定向响应缺少 Location 地址": [
+  "{0} Download failed: Server redirect response is missing Location address": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败：重定向超过 5 次，请使用文件的直接下载地址": [
+  "{0} Download failed: redirected more than 5 times, please use the direct download address of the file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败：重定向目标不是有效的 HTTP / HTTPS 地址": [
+  "{0} Download failed: Redirect target is not a valid HTTP/HTTPS address": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载被拒绝，链接可能已过期、签名无效或没有访问权限，请重新生成下载链接": [
+  "{0} download failed (HTTP {1}): {2}": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "文件不存在，请确认上传路径和文件名；改名后需要重新生成下载链接": [
+  "{0} Download failed: The server did not return the file content": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "文件已失效，请获取新的下载链接": [
+  "{0} file cannot exceed {1} MB": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载请求过于频繁，请稍后重试": [
+  "{0} Download failed: The file content is empty, please re-upload the file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载服务器暂时异常，请稍后重试": [
+  "{0} Download timeout (30 seconds), please check the network or obtain the download link again": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "服务器未返回文件，请检查下载地址": [
+  "{0} Download connection failed, please check the network, download domain name and HTTPS certificate and try again": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败（HTTP {1}）：{2}": [
+  "The download address is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败：服务器没有返回文件内容": [
+  "The plugin text content is not a valid UTF-8 encoding. Please check the file encoding and re-upload it.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}文件不能超过 {1} MB": [
+  "The file name needs to be in lowerCamelCase format, such as imageNode.umd.js": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载失败：文件内容为空，请重新上传文件": [
+  "The node file content is empty, please re-upload the node script.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载超时（30 秒），请检查网络或重新获取下载链接": [
+  "Node file cannot exceed 20 MB": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "{0}下载连接失败，请检查网络、下载域名和 HTTPS 证书后重试": [
+  "The node file is actually an HTML web page, not a node script. Please re-upload the .umd.js file generated by the build.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载地址无效": [
+  "file is not compatible with Toonflow node, please use node scaffolding to build the generated .umd.js file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "插件文本内容不是有效的 UTF-8 编码，请检查文件编码后重新上传": [
+  "The file name is inconsistent with the node export name: {0} needs to export toonflowNodes.{1}, please modify the file name according to the actual node name.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "文件名需为小驼峰格式，例如 imageNode.umd.js": [
+  "Invalid node script syntax, please rebuild and upload the complete .umd.js file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "节点文件内容为空，请重新上传节点脚本": [
+  "Node directory cannot be a symbolic link": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "节点文件不能超过 20 MB": [
+  "The existing node must be a normal file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "节点文件实际是 HTML 网页，不是节点脚本，请重新上传构建生成的 .umd.js 文件": [
+  "The file name must use ext- followed by a lowerCamelCase name, such as ext-image.umd.js": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "文件不是兼容的 Toonflow 节点，请使用节点脚手架构建生成的 .umd.js 文件": [
+  "The file extension is empty. Please upload the extension script again": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "文件名与节点导出名不一致：{0} 需要导出 toonflowNodes.{1}，请按实际节点名修改文件名": [
+  "This file is not a compatible Toonflow file extension. Build it using the extension scaffold and retain the original file name": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "节点脚本语法无效，请重新构建并上传完整的 .umd.js 文件": [
+  "The file extension script has invalid syntax. Please rebuild the complete .umd.js file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "节点目录不能是符号链接": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "现有节点必须是普通文件": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "文件名需为 ext-小驼峰格式，例如 ext-image.umd.js": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "文件扩展内容为空，请重新上传扩展脚本": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "文件不是兼容的 Toonflow 文件扩展，请使用扩展脚手架构建并保留原文件名": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "文件扩展脚本语法无效，请重新构建完整的 .umd.js 文件": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "文件扩展目录不能是符号链接": [
+  "The file extension directory cannot be a symbolic link": [
     "apps/server/src/utils/plugins/install.ts",
     "apps/server/src/utils/plugins/initializeExt.ts"
   ],
-  "现有文件扩展必须是普通文件": [
+  "The existing file extension must be a regular file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "工具文件名无效，请选择小驼峰命名的 .tool.js 文件": [
+  "The tool file name is invalid, please choose the .tool.js file named in lowerCamelCase.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "工具文件内容为空，请重新上传工具脚本": [
+  "The tool file content is empty, please re-upload the tool script.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "工具文件不能超过 20 MB": [
+  "Tool file cannot exceed 20 MB": [
     "apps/server/src/utils/plugins/install.ts",
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "工具脚本语法无效或缺少默认导出": [
+  "default": [
+    "apps/server/src/utils/plugins/install.ts",
+    "apps/server/src/utils/teams/files.ts"
+  ],
+  "Tool script syntax is invalid or default export is missing": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "工具目录不能是符号链接": [
+  "The tools directory cannot be a symbolic link": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "现有工具必须是普通文件": [
+  "Existing tools must be ordinary files": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包包含不安全的文件路径": [
+  "Skill pack contains an unsafe file path": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包包含重名文件或目录": [
+  "The skill package contains files or directories with duplicate names.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包最多包含 2000 个文件和目录": [
+  "Skill package contains up to 2000 files and directories": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包包含冲突的文件或目录路径": [
+  "Skill pack contains conflicting file or directory paths": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包结尾无效": [
+  "Invalid end of ZIP skill package": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "请使用未分卷的普通 ZIP 技能包，不支持 ZIP64": [
+  "Please use the ordinary ZIP skill package that is not divided into volumes. ZIP64 is not supported.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包目录无效": [
+  "ZIP skill package directory is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包文件头无效": [
+  "ZIP skill package file header is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包不能加密，仅支持存储或 Deflate 压缩": [
+  "ZIP skill package cannot be encrypted and only supports storage or Deflate compression.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包不能包含链接、设备或其他特殊文件": [
+  "ZIP skill pack cannot contain links, devices, or other special files": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包解压后不能超过 20 MB": [
+  "The skill package cannot exceed 20 MB after decompression.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包文件大小无效": [
+  "ZIP skill pack file size is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包条目不一致": [
+  "ZIP skill package entries are inconsistent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包条目大小或校验值不一致": [
+  "ZIP skill package entry size or check value is inconsistent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包目录长度不一致": [
+  "ZIP skill package directory length is inconsistent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包包含重叠条目": [
+  "ZIP skills package contains overlapping entries": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包损坏或实际解压大小超过声明值": [
+  "The ZIP skill package is damaged or the actual decompressed size exceeds the declared value": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "ZIP 技能包文件大小或校验值错误": [
+  "ZIP skill package file size or check value error": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能压缩包损坏": [
+  "The skill compressed package is damaged": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能压缩包无效或解压后超过 20 MB": [
+  "The skill compressed package is invalid or exceeds 20 MB after decompression.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包结尾包含额外数据": [
+  "Skill pack contains additional data at the end": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包文件头无效": [
+  "The skill package file header is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包不能包含链接、设备或 PAX/GNU 扩展条目，请使用普通 tar 格式": [
+  "Skill pack cannot contain link, device or PAX/GNU extension entries, please use plain tar format": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包文件大小无效": [
+  "The skill pack file size is invalid.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能压缩包无法读取": [
+  "The skill compressed package cannot be read.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包条目不一致": [
+  "Skill package entries are inconsistent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能包条目不完整": [
+  "The skill package entry is incomplete": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "请选择 .zip、.md、.tar、.tar.gz 或 .tgz 技能文件": [
+  "Please select a .zip, .md, .tar, .tar.gz or .tgz skill file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能文件不能为空": [
+  "Skill file cannot be empty": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能文件不能超过 20 MB": [
+  "Skill file cannot exceed 20 MB": [
     "apps/server/src/utils/plugins/install.ts",
     "apps/server/src/utils/mcp/resources.ts",
     "apps/server/src/utils/skills/files.ts",
     "apps/server/src/routes/skills/read.ts",
     "apps/server/src/routes/skills/save.ts"
   ],
-  "技能包必须包含且仅包含一个 SKILL.md": [
+  "The skill package must contain one and only one SKILL.md": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能资源必须位于 SKILL.md 所在目录内": [
+  "Skill resources must be located in the directory where SKILL.md is located": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "SKILL.md 前言格式无效": [
+  "Invalid SKILL.md frontmatter": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能 name 必须为不超过 64 字符的小驼峰或短横线名称": [
+  "Skill name must be at most 64 characters in lowerCamelCase or kebab-case": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能 description 必须为 1 至 1024 字符": [
+  "Skill description must be 1 to 1024 characters": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能目录不能是符号链接": [
+  "The skills directory cannot be a symbolic link": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能目录“{0}”与“{1}”大小写冲突，请先统一名称": [
+  "The skill directory \"{0}\" and \"{1}\" have a case conflict. Please unify the names first.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "现有技能必须是独立的普通目录": [
+  "Existing skills must be in separate normal directories": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "现有技能主文件必须是普通文件": [
+  "The existing skill master file must be a normal file": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "目录中包含其他技能，不能整体替换": [
+  "The directory contains other skills and cannot be replaced as a whole.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能暂存目录无效": [
+  "The skill temporary storage directory is invalid.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "技能资源路径无效": [
+  "The skill resource path is invalid": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载地址中的文件名编码无效，请重新生成下载链接": [
+  "The file name encoding in the download address is invalid, please regenerate the download link.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "example.zip、SKILL.md、example.tar、example.tar.gz 或 example.tgz": [
+  "Unsupported plugin type. Valid values: node, ext, tool, skill, agent": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "不支持此插件类型，可选值为 node、ext、tool、skill、agent": [
+  "The download address is missing a file name, please use an address pointing to the file, for example {0}": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载地址缺少文件名，请使用指向文件的地址，例如 {0}": [
+  "The plugin file name is invalid and cannot contain a directory path or exceed 128 characters.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "插件文件名无效，不能包含目录路径或超过 128 字符": [
+  "The download file name \"{0}\" does not comply with the {1} type specification. Example of file name: {2}; please regenerate the download link after changing the name.": [
     "apps/server/src/utils/plugins/install.ts"
   ],
-  "下载文件名“{0}”不符合 {1} 类型规范，文件名示例：{2}；改名后请重新生成下载链接": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "团队": [
-    "apps/server/src/utils/plugins/install.ts"
-  ],
-  "工具元数据无效，或文件名与工具名称不一致": [
+  "name": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "工具声明了组件但缺少客户端界面": [
+  "The tool metadata is invalid, or the file name is inconsistent with the tool name.": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "工具客户端界面格式或脚本语法无效": [
+  "Tool declares component but lacks client interface": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "工具文件无效": [
+  "The tool client interface format or script syntax is invalid.": [
+    "apps/server/src/utils/plugins/tools.ts"
+  ],
+  "The tool file is invalid": [
     "apps/server/src/utils/plugins/tools.ts",
     "apps/server/src/routes/tools/setEnabled.ts",
     "apps/server/src/routes/tools/uninstall.ts"
   ],
-  "工具文件无法读取": [
+  "{0} did not export a valid tool plugin": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "{0} 未导出有效的工具插件": [
+  "Tool configuration is invalid": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
-  "工具配置无效": [
-    "apps/server/src/utils/plugins/tools.ts"
-  ],
-  "全局记忆": [
-    "apps/server/src/utils/personalization.ts",
-    "apps/server/src/agent/tools/memory.ts"
-  ],
-  "全局 AGENTS.md": [
+  "Invalid personalization document type": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "个性化文档类型无效": [
+  "Personalization document cannot be accessed through a symbolic link": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "不能通过符号链接访问个性化文档": [
+  "The path to the personalized document is not a directory": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "个性化文档所在路径不是目录": [
+  "Personalized documents must be ordinary files": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "个性化文档必须是普通文件": [
+  "Personalized document cannot exceed {0} characters": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "个性化文档不能超过 {0} 个字符": [
+  "Failed to read {0}: {1}": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "个性化文档": [
+  "Failed to save {0}: {1}": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "读取{0}失败：{1}": [
+  "The document has been updated by other operations. Please reload and save to avoid overwriting the latest content.": [
     "apps/server/src/utils/personalization.ts"
   ],
-  "保存{0}失败：{1}": [
-    "apps/server/src/utils/personalization.ts"
-  ],
-  "文档已被其他操作更新，请重新加载后再保存，避免覆盖最新内容": [
-    "apps/server/src/utils/personalization.ts"
-  ],
-  "图片地址无效，请使用完整的 HTTP/HTTPS 地址": [
+  "Invalid image URL. Use a complete HTTP/HTTPS URL.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "图片仅支持不含账号密码的 HTTP/HTTPS 地址": [
+  "Images only support HTTP/HTTPS URLs without usernames or passwords": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "不能下载本机、内网或特殊网络地址的图片": [
+  "Images cannot be downloaded from local, private, or special-use network addresses": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "不能下载解析到本机、内网或特殊网络地址的图片": [
+  "Images cannot be downloaded from addresses that resolve to local, private, or special-use networks": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "暂不支持网络 SVG 图片，请使用 PNG、JPEG、WebP、GIF、AVIF 或 BMP": [
+  "Remote SVG images are not yet supported. Use PNG, JPEG, WebP, GIF, AVIF, or BMP.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "下载内容不是支持的图片，可能返回了网页或登录页面": [
+  "The downloaded content is not a supported image. A webpage or sign-in page may have been returned.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "图片重定向无效或超过 5 次，请使用图片直接地址": [
+  "Image redirects are invalid or exceed 5. Use a direct image URL.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "下载图片失败（HTTP {0}），链接可能失效或需要登录": [
+  "Image download failed (HTTP {0}). The link may have expired or require sign-in.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "聊天图片不能超过 20 MB": [
+  "Chat images must not exceed 20 MB": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "图片重定向无效": [
+  "Invalid image redirect": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "图片下载超时（30 秒），请检查网络后重试": [
+  "Image download timed out (30 seconds). Check the network and try again.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "图片下载连接失败，请检查图片地址、网络或 HTTPS 证书": [
+  "Failed to connect for image download. Check the image URL, network, or HTTPS certificate.": [
     "apps/server/src/utils/workspace/chatImages.ts"
   ],
-  "工作目录必须是绝对路径": [
+  "The working directory must be an absolute path": [
     "apps/server/src/utils/workspace/index.ts"
   ],
-  "工作目录不存在，请重新选择文件夹": [
+  "The working directory does not exist, please select the folder again.": [
     "apps/server/src/utils/workspace/index.ts"
   ],
-  "工作目录不是文件夹，请重新选择": [
+  "The working directory is not a folder, please select again.": [
     "apps/server/src/utils/workspace/index.ts"
   ],
-  "服务器部署只能使用服务器工作区": [
+  "Server deployment can only use server workspace": [
     "apps/server/src/utils/workspace/index.ts",
     "apps/server/src/agent/a2a/settings.ts"
   ],
-  "只能复制普通文件或文件夹": [
+  "Only regular files or folders can be copied": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "不能把文件夹复制到自身或子目录": [
+  "A folder cannot be copied into itself or one of its subfolders": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "不能复制包含符号链接或特殊文件的文件夹": [
+  "Folders containing symbolic links or special files cannot be copied": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "请检查文件权限后重试": [
-    "apps/server/src/utils/workspace/files.ts"
-  ],
-  "已存在同名文件或目录": [
+  "A file or directory with the same name already exists": [
     "apps/server/src/utils/workspace/files.ts",
     "apps/server/src/utils/skills/files.ts",
     "apps/server/src/routes/skills/move.ts",
     "apps/server/src/routes/skills/create.ts"
   ],
-  "文件路径无效": [
+  "Invalid file path": [
     "apps/server/src/utils/workspace/files.ts",
-    "apps/server/src/utils/skills/files.ts",
-    "packages/nodeShared/src/markdownContent.ts"
+    "apps/server/src/utils/skills/files.ts"
   ],
-  "不能通过符号链接操作文件": [
+  "Cannot operate file through symbolic link": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "只能操作当前工作区内的文件": [
+  "File operations are limited to the current workspace": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "文件正在使用，请等待操作完成": [
+  "The file is in use, please wait for the operation to complete.": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "不能修改工作区根目录": [
+  "Cannot modify the workspace root directory": [
     "apps/server/src/utils/workspace/files.ts"
   ],
-  "技能资源地址无效": [
+  "The skill resource address is invalid": [
     "apps/server/src/utils/mcp/resources.ts"
   ],
-  "技能已禁用": [
+  "Skill disabled": [
     "apps/server/src/utils/mcp/resources.ts"
   ],
-  "技能资源不存在": [
+  "Skill resource does not exist": [
     "apps/server/src/utils/mcp/resources.ts"
   ],
-  "列出已安装节点的元数据、说明和启用状态。": [
+  "Unknown application operation: {0}": [
     "apps/server/src/utils/mcp/operations.ts"
   ],
-  "启用或禁用已安装节点。": [
+  "Toonflow service is not ready yet": [
     "apps/server/src/utils/mcp/operations.ts"
   ],
-  "通过 fileName/source 安装节点 UMD，或使用 url 下载；force 显式允许覆盖。下载和版本检查沿用现有安装接口。": [
+  "Asset file cannot exceed 20 MB": [
     "apps/server/src/utils/mcp/operations.ts"
   ],
-  "提供 url 或 fileName/source，不能同时提供 url 和 source": [
+  "Cannot save a masked placeholder; enter the actual value": [
     "apps/server/src/utils/mcp/operations.ts"
   ],
-  "卸载指定节点插件，不删除工作区的画布和节点输出。": [
+  "Application operation failed ({0})": [
     "apps/server/src/utils/mcp/operations.ts"
   ],
-  "列出已安装工具、说明、启用状态和配置。访问凭证由 MCP 输出统一脱敏。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "启用或禁用工具；启用时沿用工具配置校验。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "保存指定工具的完整 config，按该工具的配置规则校验。不要回写脱敏占位符。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "通过 fileName/source 安装 .tool.js，或使用 url 下载；force 显式允许覆盖。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "卸载指定工具并删除其配置。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "列出全局已安装技能的元数据；工作区技能复用 skillOperator 工具。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "列出指定全局技能的文件及主文件路径。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "读取指定全局技能的 UTF-8 文件；省略 path 时读取主 SKILL.md。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "在已安装技能内新建空白文件，不覆盖已有文件；新技能请使用 installSkill 或 skillOperator。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "保存已有技能文件；主 SKILL.md 必须保留相同的 frontmatter name 和有效 description。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "在指定技能内移动或重命名文件，不覆盖已有目标。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "使用 fileName/base64 安装技能文件或压缩包，或使用 url 下载；force 显式允许覆盖。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "提供 url 或 fileName/base64，不能同时提供 url 和 base64": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "卸载全局技能及其文件，不影响工作区内的同名技能。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "读取媒体供应商及预置 models、配置 revision；保存与删除时使用最新 revision。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "从完整 TypeScript source 添加媒体供应商，沿用现有供应商结构检查。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "修改供应商 TS 中的 models；revision 不匹配时拒绝覆盖。API Key 等凭证通过 updateSettings 配置。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "删除指定媒体供应商及其保存的配置；必须提供当前 revision。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "列出全局素材库的文件和文件夹树；与工作区 assets 目录不同。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "在全局素材库创建文件夹，path 为素材库内相对路径。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "在全局素材库移动或重命名文件、文件夹，不覆盖已有目标。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "从全局素材库删除文件或空文件夹，不递归删除内容。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "读取不超过 20 MB 的全局素材文件，返回 base64 和 MIME 类型。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "以 base64 上传不超过 20 MB 的文件到全局素材库；不覆盖已有文件，父文件夹须存在。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "列出目标工作区的内置 Agent 历史对话。directory 由 target.directory 注入。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "在目标工作区创建新的内置 Agent 对话，不启动生成。directory 由 target.directory 注入。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "读取内置 Agent 对话历史，sessionFile 来自 listAgentSessions。directory 由 target.directory 注入。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "修改内置 Agent 对话名称；directory 由 target.directory 注入。": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "未知应用操作：{0}": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "Toonflow 服务尚未就绪": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "素材文件不能超过 20 MB": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "不能保存脱敏占位符，请填写实际值": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "应用操作失败（{0}）": [
-    "apps/server/src/utils/mcp/operations.ts"
-  ],
-  "清理 MCP 运行信息失败：": [
+  "MCP ports {0}–{1} are all occupied, please modify the preferred port": [
     "apps/server/src/utils/mcp/runtime.ts"
   ],
-  "MCP 端口 {0}–{1} 均已占用，请修改首选端口": [
-    "apps/server/src/utils/mcp/runtime.ts"
-  ],
-  "，继续使用原地址": [
-    "apps/server/src/utils/mcp/runtime.ts"
-  ],
-  "重载 MCP 失败：": [
-    "apps/server/src/utils/mcp/runtime.ts"
-  ],
-  "只允许 Toonflow 页面访问控制连接": [
+  "Only Toonflow pages may access the control connection": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "页面来源无效": [
+  "Invalid page origin": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "页面来源与服务地址不一致": [
+  "The page origin does not match the service address": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "MCP 未开启或访问凭证无效": [
+  "MCP is not enabled or the access credentials are invalid": [
     "apps/server/src/utils/mcp/control.ts",
     "packages/mcp/src/index.ts"
   ],
-  "Toonflow 页面已断开，请重新调用 getAppState": [
+  "Toonflow page has been disconnected, please call getAppState again": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "存在多个 Toonflow 页面，请用 target.connectionId 指定操作目标": [
+  "There are multiple Toonflow pages. Please use target.connectionId to specify the operation target.": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "控制连接已存在": [
+  "Control connection already exists": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "Toonflow 页面已断开，操作已取消": [
+  "The control command has been canceled or does not exist": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "控制命令已取消或不存在": [
+  "This page is executing another control command, please wait for completion": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "此页面正在执行另一条控制命令，请等待完成": [
+  "The workspace has been switched, please call getAppState again": [
     "apps/server/src/utils/mcp/control.ts"
   ],
-  "工作区已切换，请重新调用 getAppState": [
-    "apps/server/src/utils/mcp/control.ts"
-  ],
-  "控制命令已取消或超时": [
-    "apps/server/src/utils/mcp/control.ts"
-  ],
-  "MCP 设置已修改，控制命令已取消": [
-    "apps/server/src/utils/mcp/control.ts"
-  ],
-  "请在 target.directory 指定绝对工作目录，或先打开项目": [
+  "Please specify the absolute working directory in target.directory, or open the project first": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "工作目录不是文件夹": [
+  "The working directory is not a folder": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "服务器部署只能使用 data/workspaces 内的工作区": [
+  "Server deployment can only use workspaces within data/workspaces": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "目标页面的工作区已切换，请重新获取 getAppState": [
+  "The workspace of the target page has been switched, please obtain getAppState again": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "目标画布已切换，请重新获取 getAppState": [
+  "The target canvas has been switched, please obtain getAppState again": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "不能通过 MCP 修改连接凭证或项目列表": [
+  "The file is open in Toonflow. Modify it using the canvas or document tools, or close it before performing file operations.": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "在目标 Toonflow 页面打开已有工作目录，并等待工作区就绪；操作前获取 getAppState 的 connectionId。": [
+  "Open the Toonflow web page first": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "切换工作区的 canvas 画布或 document 文档面板，先保存当前编辑。": [
+  "The canvas has not been bound yet": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "读取当前文档内容和选择状态。writeDocument 必须携带本次读取的 text 作为 expectedText。": [
+  "Duplicate MCP tool name: {0}": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "打开工作区中的文档文件(path)，或画布中的文本节点(canvasPath、nodeId，可选handleId)。": [
+  "The tool is disabled, or the required Toonflow page is not connected, please re-read the tool list": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "通过文档编辑器保存当前文档；expectedText 必须匹配当前内容，防止覆盖用户新输入。": [
+  "MCP does not provide built-in Agent session capabilities: {0}": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "读取页面当前设置，访问凭证脱敏。": [
+  "The workspace file tool is not enabled or failed to load": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "合并保存指定顶层设置项，同时更新页面；不修改 mcp 凭证与 stores 项目列表，嵌套设置应先读取再合并。": [
+  "The current workspace file tool is in read-only mode": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "文件正在 Toonflow 中打开，请使用画布或文档工具修改，关闭后再执行文件操作": [
+  "The file must be an ordinary file no larger than 20MB": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "列出连接的 Toonflow 页面及其 connectionId、工作目录、画布、项目列表和节点能力。多个页面时必须用 target.connectionId 明确操作对象；无页面连接时只有显式 target.directory 的服务端工具可用。": [
+  "Renaming requires args.target": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "请先打开 Toonflow 网页": [
+  "Writing binary files requires base64": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "尚未绑定画布": [
+  "The file cannot exceed 20MB": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "MCP 工具名称重复：{0}": [
+  "The application operation does not exist, please query listAppOperations": [
     "apps/server/src/utils/mcp/tools.ts"
   ],
-  "工具已禁用，或所需 Toonflow 页面未连接，请重新读取工具列表": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "MCP 不提供内置 Agent 会话能力：{0}": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "列出、创建目录、重命名或删除工作区文件；readBinary/writeBinary通过base64传输不超过20MB的媒体，写入默认不覆盖。文本读写复用已启用的文件工具；打开中的画布或文档必须通过专门工具修改。": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "工作区文件工具未启用或加载失败": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "当前工作区文件工具为只读模式": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "文件必须是不超过20MB的普通文件": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "重命名需要提供 args.target": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "写入二进制文件需要 base64": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "文件不能超过20MB": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "按需查询插件、媒体供应商、素材库和 Agent 历史管理操作及其参数。先查询 schema，再调用 appOperation。": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "执行 listAppOperations 公布的应用管理操作，parameters 必须符合对应 schema。文件与节点操作使用专门工具；安装来源、覆盖和卸载须符合用户请求。": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "应用操作不存在，请查询 listAppOperations": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "按用户请求调用 Toonflow 内置 Agent，等待本轮完成并返回对话文件与回复；会使用配置的模型。外部 Agent 可直接操作其他工具，仅需要委托内置 Agent 时调用。支持 MCP 取消，历史保存到工作区。": [
-    "apps/server/src/utils/mcp/tools.ts"
-  ],
-  "临时对话不存在或已关闭": [
+  "The temporary chat does not exist or has been closed": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "临时对话已结束": [
+  "Temporary chat ended": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "工具调用已取消": [
+  "Tool call cancelled": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "临时对话未在运行": [
+  "The temporary chat is not running": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "工具插件 {0} 未安装或未启用": [
+  "Tool plugin {0} is not installed or enabled": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "插件 {0} 未提供所选工具": [
+  "Plugin {0} does not provide the selected tool": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "插件返回了无效的工具": [
+  "The plugin returned an invalid tool": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "工具名称重复：{0}": [
+  "Duplicate tool name: {0}": [
     "apps/server/src/utils/singleAgent/index.ts",
     "apps/server/src/agent/tools/index.ts"
   ],
-  "此对话正在运行，请等待当前回复完成": [
+  "This chat is running. Wait for the current reply to finish.": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "用户取消了提问": [
+  "The user cancelled the question": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "模型未返回回复": [
+  "The model returned no response": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "模型请求失败": [
-    "apps/server/src/utils/singleAgent/index.ts",
-    "apps/server/src/agent/runtime/index.ts",
-    "apps/server/src/routes/ai/generate.ts"
-  ],
-  "模型回复因长度限制被截断，未能完整生成回答。": [
-    "apps/server/src/utils/singleAgent/index.ts",
-    "apps/server/src/agent/runtime/index.ts"
-  ],
-  "本次回复已停止": [
+  "The model response was truncated due to length restrictions and failed to generate a complete response.": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "临时对话执行失败": [
+  "The current reply has changed. This control request is no longer valid.": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "当前回复已变化，控制请求已失效": [
+  "This reply has been stopped": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "工具调用不存在或已结束": [
+  "Tool call does not exist or has ended": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "提问不属于此对话或已结束": [
+  "The question does not belong to this chat or has ended": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "浏览器会话不属于此临时对话": [
+  "The browser session does not belong to this temporary chat": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "请通过临时对话身份访问此浏览器": [
+  "Access this browser using the temporary chat identity": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "临时对话已关闭": [
+  "Temporary chat closed": [
     "apps/server/src/utils/singleAgent/index.ts"
   ],
-  "Claude Code 会话已结束": [
+  "The service is not ready yet. Please try again shortly.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "未找到 Claude Code，请先在运行 Toonflow 的电脑上安装并登录 Claude Code": [
+  "Invalid Claude Code model ID": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "服务尚未就绪，请稍后重试": [
+  "Claude Code tool calls need a session ID.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "Claude Code 会话不存在": [
+  "A Claude Code request must start with a user message.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "Claude Code 请求失败": [
+  "The Claude Code session has ended. Please generate again.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "Claude Code 输出无法解析": [
+  "A Claude Code session can only continue with this turn's tool results. Please generate again.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
-  "Claude Code 模型 ID 无效": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 工具调用需要会话 ID": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 请求必须以用户消息开始": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 会话已结束，请重新生成": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "Claude Code 会话只能继续提交本轮工具结果，请重新生成": [
-    "apps/server/src/utils/ai/claudeCode.ts"
-  ],
-  "登录已取消": [
+  "Unsupported login step": [
     "apps/server/src/utils/ai/codex.ts"
   ],
-  "登录超时，请重新登录": [
+  "Sign-in canceled": [
     "apps/server/src/utils/ai/codex.ts"
   ],
-  "登录失败": [
+  "No sign-in is in progress. Please sign in again.": [
     "apps/server/src/utils/ai/codex.ts"
   ],
-  "没有等待中的登录，请重新登录": [
-    "apps/server/src/utils/ai/codex.ts"
-  ],
-  "请先在设置中配置模型供应商": [
+  "Please configure the model provider in settings first": [
     "apps/server/src/utils/ai/index.ts"
   ],
-  "所选模型不存在，请重新选择": [
-    "apps/server/src/utils/ai/index.ts",
-    "packages/nodeScaffold/src/nodeAi.ts"
-  ],
-  "媒体参考需要工作目录": [
+  "The selected model does not exist, please select again.": [
     "apps/server/src/utils/ai/index.ts"
   ],
-  "请先在设置中登录 OpenAI Codex": [
+  "Media reference requires working directory": [
     "apps/server/src/utils/ai/index.ts"
   ],
-  "获取模型列表失败（HTTP {0}），请检查 API 地址、协议和密钥": [
+  "Sign in to OpenAI Codex in Settings first": [
+    "apps/server/src/utils/ai/index.ts"
+  ],
+  "Failed to get model list (HTTP {0}), please check API address, protocol and key": [
     "apps/server/src/utils/ai/models.ts"
   ],
-  "模型列表包含无效的模型 ID": [
+  "Model list contains an invalid model ID": [
     "apps/server/src/utils/ai/models.ts"
   ],
-  "模型列表缺少分页游标": [
+  "Model list is missing paging cursor": [
     "apps/server/src/utils/ai/models.ts"
   ],
-  "模型列表分页游标重复": [
+  "Duplicate paging cursor in model list": [
     "apps/server/src/utils/ai/models.ts"
   ],
-  "请选择小驼峰命名的 .agent.zip 团队包": [
+  "Select a team package with a lowerCamelCase filename ending in .agent.zip": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队包不能为空且不能超过 20 MB": [
+  "Team package cannot be empty and cannot exceed 20 MB": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队包须在根目录或同名目录下包含 team.json，所有文件须位于该目录内": [
+  "The team package must contain team.json in the root directory or a directory with the same name, and all files must be located in this directory": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队目录必须是普通目录": [
+  "The team directory must be a normal directory": [
     "apps/server/src/utils/teams/install.ts",
     "apps/server/src/utils/teams/files.ts"
   ],
-  "已存在同名远端团队连接": [
+  "A remote team connection with the same name already exists": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队目录名称大小写冲突": [
+  "Team directory name case conflict": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队存在本地修改或缺少安装记录，请先导出备份；确定覆盖时使用开发者强制安装": [
+  "This team has local changes or no installation record. Export a backup first. If you are sure you want to overwrite it, use Force Install in developer settings.": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "团队文件路径无效": [
+  "Invalid team file path": [
     "apps/server/src/utils/teams/install.ts"
   ],
-  "已存在同名团队或远端连接": [
+  "A team or remote connection with the same name already exists": [
     "apps/server/src/utils/teams/index.ts"
   ],
-  "团队状态文件无效": [
+  "The team status file is invalid": [
     "apps/server/src/utils/teams/index.ts"
   ],
-  "只能编辑团队配置、成员说明、技能或知识文件": [
+  "Only team configuration, member descriptions, skills or knowledge files can be edited": [
     "apps/server/src/utils/teams/index.ts"
   ],
-  "文件内容不能包含空字符": [
+  "The file content cannot contain null characters": [
     "apps/server/src/utils/teams/index.ts"
   ],
-  "团队文件不能超过 20 MB": [
+  "Team files cannot exceed 20 MB": [
     "apps/server/src/utils/teams/index.ts"
   ],
-  "团队名称须为不超过 96 字符的小驼峰名称，且不能使用保留字": [
+  "The team name must be a lowerCamelCase name of no more than 96 characters and cannot use reserved words.": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队包缺少 team.json": [
+  "Team package is missing team.json": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "team.json 无效：{0}": [
+  "team.json Invalid: {0}": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队名称、目录及安装文件名必须一致": [
+  "The team name, directory and installation file name must be consistent": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队包包含不支持的文件：{0}": [
+  "The team package contains unsupported files: {0}": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队包含大小写冲突的文件路径": [
+  "Team file path contains case conflict": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "私有工具语法无效或缺少默认导出：{0}": [
+  "Invalid private tool syntax or missing default export: {0}": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队包最多包含 2000 个文件，文件总大小不能超过 20 MB": [
+  "Team packages can contain up to 2000 files, and the total file size cannot exceed 20 MB": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队目录超出范围": [
+  "Team directory is out of scope": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队最多包含 2000 个文件和目录": [
+  "Teams contain up to 2000 files and directories": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队目录包含大小写冲突的路径": [
+  "The team directory contains a path with a case conflict": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队文件不能包含链接或越界路径": [
+  "Team files cannot contain links or out-of-bounds paths": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队不能包含特殊文件": [
+  "Team cannot contain special files": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "团队文件总大小不能超过 20 MB": [
+  "Total team file size cannot exceed 20 MB": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "技能根目录必须是非符号链接目录": [
+  "The skill root directory must be a non-symbolic link directory": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "文件不存在": [
+  "The skill path cannot contain symbolic links, special files, or out-of-bounds directories": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "技能路径无效": [
-    "apps/server/src/utils/skills/files.ts"
-  ],
-  "技能路径不能包含符号链接、特殊文件或越界目录": [
-    "apps/server/src/utils/skills/files.ts"
-  ],
-  "技能不存在": [
+  "Skill does not exist": [
     "apps/server/src/utils/skills/files.ts",
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "技能文件超出目录范围": [
+  "The skill file exceeds the directory range": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "目录中包含其他技能，不能整体卸载": [
+  "The directory contains other skills and cannot be uninstalled as a whole.": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "该技能没有可编辑的附属文件": [
+  "This skill has no editable attachments.": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "该文件由系统管理，不能直接编辑": [
+  "This file is managed by the system and cannot be edited directly.": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "文件路径超出技能目录": [
+  "File path exceeds skill directory": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "不能创建或移动为该保留文件名": [
+  "Cannot create or move a file to this reserved filename": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "不能移动主文件": [
+  "Cannot move main file": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "技能文件过多，无法列出": [
+  "There are too many skill files to list.": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "顺序列表包含重复路径": [
+  "The file order list contains duplicate paths": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "顺序列表包含无效或不存在的文件": [
+  "The file order list contains invalid or nonexistent files": [
     "apps/server/src/utils/skills/files.ts"
   ],
-  "只能读取普通素材文件": [
+  "Only regular asset files can be read": [
     "apps/server/src/utils/assets/index.ts"
   ],
-  "素材文件不能超过 100 MB": [
+  "Asset files must not exceed 100 MB": [
     "apps/server/src/utils/assets/index.ts",
     "apps/server/src/agent/assets.ts"
   ],
-  "素材已被修改，请重新读取后再更新": [
+  "The asset has been modified. Read it again before updating.": [
     "apps/server/src/utils/assets/index.ts"
   ],
-  "不能把素材文件夹移动到自身的子目录": [
+  "An asset folder cannot be moved into its own subfolder": [
     "apps/server/src/utils/assets/index.ts"
   ],
-  "只能删除普通素材文件或空文件夹": [
+  "Only regular asset files or empty folders can be deleted": [
     "apps/server/src/utils/assets/index.ts"
   ],
-  "分页已失效，请重新搜索": [
+  "Pagination has expired, please search again": [
     "apps/server/src/utils/assets/index.ts",
     "apps/server/src/agent/mentionSources.ts"
   ],
-  "素材分页游标关闭失败": [
+  "The previous page is still being read, please try again later.": [
     "apps/server/src/utils/assets/index.ts"
   ],
-  "上一页仍在读取，请稍后重试": [
-    "apps/server/src/utils/assets/index.ts"
-  ],
-  "素材查询及游标关闭失败": [
-    "apps/server/src/utils/assets/index.ts"
-  ],
-  "环境变量 {0} 未设置，请在 Toonflow 进程环境或 ~/.env 中设置": [
+  "Environment variable {0} is not set. Set it in the Toonflow process environment or in ~/.env.": [
     "apps/server/src/utils/conf/env.ts"
   ],
-  "MiniMax H3 提示词不能为空": [
+  "MiniMax H3 prompt cannot be empty": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "MiniMax H3 时长须为 4 到 15 秒的整数": [
+  "MiniMax H3 duration must be a whole number of seconds from 4 to 15": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "MiniMax H3 只支持 480p、720p 和 1080p": [
+  "MiniMax H3 only supports 480p, 720p and 1080p": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "MiniMax H3 画面比例无效": [
+  "Invalid MiniMax H3 aspect ratio": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "MiniMax H3 最多支持 9 张参考图片": [
+  "MiniMax H3 supports at most 9 reference images": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
-  "音频输入必须是 Uint8Array": [
+  "MiniMax H3 supports at most 3 reference videos": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "Audio input must be a Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "音频输入大小无效": [
+  "Invalid audio input size": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "输出格式仅支持 wav 或 mp3": [
+  "The output format only supports wav or mp3": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "裁剪起点无效": [
+  "Invalid audio trim start time": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "裁剪终点无效": [
+  "Invalid audio trim end time": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "裁剪区间无效": [
+  "Invalid audio trim range": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "采样率无效": [
+  "Invalid sampling rate": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "MP3 比特率无效": [
+  "Invalid MP3 bitrate": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "音频输入不是有效的 WAV 数据": [
+  "The audio input is not valid WAV data": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "仅支持单声道或双声道音频": [
+  "Only supports mono or two-channel audio": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "音频采样率无效": [
+  "Invalid audio sampling rate": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "音频时长无效或超出限制": [
+  "The audio duration is invalid or exceeds the limit": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "裁剪区间超出音频长度": [
+  "The trim range exceeds the audio duration": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "MP3 编码失败": [
+  "MP3 encoding failed": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
-  "[{0} 个字符]": [
+  "[{0} characters]": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "[二进制或表单请求体]": [
+  "[Binary or form request body]": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "[请求体 {0} 个字符]": [
+  "[request body {0} characters]": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "\n…响应已截断": [
+  "\n…response truncated": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "模型已变更，请重新选择模型": [
+  "The model has changed, please select the model again": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "供应商没有实现此模型的媒体生成方法": [
+  "The provider does not implement a media generation method for this model": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "供应商未返回媒体数组": [
+  "Please enter the prompt": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "返回的媒体类型与模型不一致": [
+  "Provider did not return media array": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "媒体结果需要 HTTP 或 HTTPS 地址": [
+  "The returned media type is inconsistent with the model": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "媒体结果格式无效": [
+  "Media results require HTTP or HTTPS address": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "调试预览的媒体总量不能超过 32 MB": [
+  "Media result format is invalid": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "媒体编码或 MIME 类型无效": [
+  "The total media size for debug preview cannot exceed 32 MB": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "Higgsfield 模型 ID 无效": [
+  "Invalid media encoding or MIME type": [
+    "apps/server/src/utils/media/debug.ts"
+  ],
+  "Generation cancelled: no page is waiting for it": [
+    "apps/server/src/utils/media/jobs.ts"
+  ],
+  "Generation job not found; it may have expired or the server restarted": [
+    "apps/server/src/utils/media/jobs.ts"
+  ],
+  "Invalid Higgsfield model ID": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "未找到 Higgsfield CLI，请先在运行 Toonflow 的电脑上安装并执行 higgsfield auth login": [
+  "Higgsfield reference media must be local data; remote URLs are not supported": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "Higgsfield 参考素材需为本地数据，不支持远程地址": [
+  "Higgsfield returned an invalid character identity.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "Higgsfield 返回的角色身份格式无效": [
+  "Invalid character identity ID.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "角色身份 ID 无效": [
+  "Character names can only contain letters, numbers, spaces, dots, hyphens and underscores, up to 64 characters.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "角色名称只能包含文字、数字、空格、点、横线和下划线，最多 64 个字符": [
-    "apps/server/src/utils/media/higgsfield.ts",
-    "apps/server/src/routes/higgsfield/souls/create.ts"
-  ],
-  "不支持此角色身份类型": [
+  "This character identity type is not supported.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "训练角色身份需要 5 到 20 张图片": [
+  "Training a character identity needs 5 to 20 images.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
-  "未找到 Colab CLI，请先安装 google-colab-cli 并在终端执行 colab sessions 完成 Google 登录": [
+  "Colab reference media must be local data; remote URLs are not supported": [
     "apps/server/src/utils/media/colab.ts"
   ],
-  "Colab 参考素材需为本地数据，不支持远程地址": [
-    "apps/server/src/utils/media/colab.ts"
-  ],
-  "Qwen-Image 提示词不能为空": [
+  "Qwen-Image prompt cannot be empty": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
-  "Qwen-Image 只支持 1K 和 2K": [
+  "Qwen-Image only supports 1K and 2K": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
-  "Qwen-Image 画面比例无效": [
+  "Invalid Qwen-Image aspect ratio": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
-  "Qwen-Image 最多支持 16 张参考图片": [
+  "Qwen-Image supports at most 16 reference images": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
-  "供应商 ID 不能是系统保留文件名": [
+  "Failed to read image: HTTP {0}": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件名无效": [
+  "Specify at least a width or height to resize the image": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "模型 ID 不能重复": [
+  "Provider objects and model configurations cannot use spread syntax or computed properties": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "读取图片失败：HTTP {0}": [
+  "Provider object and model configuration contain invalid or duplicate attributes": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "图片缩放至少需要指定宽度或高度": [
+  "Numeric values in models must be finite": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商对象和模型配置不能使用展开或计算属性": [
+  "models only support JSON literals": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商对象和模型配置包含无效或重复属性": [
+  "Provider metadata and models must use literals directly": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "models 数值必须有限": [
+  "Provider file cannot exceed 2 MB": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "models 仅支持 JSON 字面量": [
+  "Provider TypeScript syntax error: {0}": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商元数据和 models 必须直接使用字面量": [
+  "Providers must export objects via export default": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件不能超过 2 MB": [
+  "The provider must directly export an object literal": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商 TypeScript 语法错误：{0}": [
+  "{0} must be used directly as a literal": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商须通过 export default 导出对象": [
+  "{0} must use a literal or a top-level const constant": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商须直接导出对象字面量": [
+  "Provider ID must be a lowerCamelCase filename": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "{0} 必须直接使用字面量": [
+  "Invalid provider name": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "{0} 必须使用字面量或顶层 const 常量": [
+  "The provider icon must be a string": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商 ID 必须为小驼峰文件名": [
+  "Provider version must be a non-empty string": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商名称无效": [
+  "Provider description must be a string": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商图标必须为字符串": [
+  "The model list address must be an HTTP URL without credentials or fragments": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商版本必须为非空字符串": [
+  "Provider rules must be an array of form configuration objects": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商说明必须为字符串": [
+  "Provider ID does not match file name": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "模型列表地址须为不含凭据或片段的 HTTP URL": [
+  "Provider directory cannot be a symbolic link or file": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商 rules 必须为表单配置对象数组": [
+  "Invalid provider file name": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商 ID 与文件名不一致": [
+  "The provider file cannot be a symbolic link or directory": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商目录不能是符号链接或文件": [
+  "Invalid provider ID": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件不能是符号链接或目录": [
+  "Please add the provider in the media model settings first": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商 ID 无效": [
+  "The media provider \"{0}\" has been installed. Please edit it in \"Settings → Media Model\", or delete it and then reinstall it.": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "请先在媒体模型设置中添加供应商": [
+  "Provider file does not exist": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件无法读取": [
+  "The provider file has been modified, please refresh the page before editing.": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "媒体供应商“{0}”已安装，请在「设置 → 媒体模型」中编辑，或先删除后重新安装。": [
+  "The provider configuration has changed, please try again": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件不存在": [
+  "The provider file has been modified, please refresh the page and obtain it again.": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件已被修改，请刷新页面后再编辑": [
+  "Provider not configured modelsUrl": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商配置已变更，请重试": [
+  "Failed to obtain media model list (HTTP {0})": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件已被修改，请刷新页面后再获取": [
+  "No media models were retrieved; the existing list has been kept": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商未配置 modelsUrl": [
+  "Model {0} is missing type, please specify it in the return data or the type parameter of modelsUrl": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "获取媒体模型列表失败（HTTP {0}）": [
+  "The type of model {0} does not match the request type": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "未获取到媒体模型，保留原有列表": [
+  "The provider file has been modified, please refresh the page before deleting it.": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "模型 {0} 缺少 type，请在返回数据或 modelsUrl 的 type 参数中指定": [
+  "The provider cannot import the module, please use the host tool in this.tool": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "模型 {0} 的 type 与请求类型不一致": [
+  "The current operation does not have a working directory and cannot use FFmpeg.": [
     "apps/server/src/utils/media/provider.ts"
   ],
-  "供应商文件已被修改，请刷新页面后再删除": [
-    "apps/server/src/utils/media/provider.ts"
-  ],
-  "供应商不能导入模块，请使用 this.tool 中的宿主工具": [
-    "apps/server/src/utils/media/provider.ts"
-  ],
-  "当前操作没有工作目录，无法使用 FFmpeg": [
-    "apps/server/src/utils/media/provider.ts"
-  ],
-  "参考媒体须为不超过 100 MB 的文件": [
+  "Reference media must be a file no larger than 100 MB": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "参考媒体为空或超过 100 MB": [
+  "Reference media is empty or exceeds 100 MB": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "参考媒体类型须为 {0}": [
+  "The reference media type must be {0}": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成结果必须使用 HTTP 或 HTTPS 地址": [
+  "Generated results must use HTTP or HTTPS URLs": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "下载生成结果失败（HTTP {0}）": [
+  "Failed to download generated results (HTTP {0})": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成文件不能超过 100 MB": [
+  "The generated file cannot exceed 100 MB": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成结果为空": [
+  "The generation result is empty": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "供应商返回的媒体类型不正确": [
+  "Incorrect media type returned by provider": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成结果的 base64 内容无效或超过 100 MB": [
+  "The base64 content of the generated result is invalid or exceeds 100 MB": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "供应商返回了无效的媒体结果": [
+  "The provider returned an invalid media result": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成文件为空或超过 100 MB": [
+  "The generated file is empty or exceeds 100 MB": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "生成结果不是支持的图片、视频或音频格式": [
+  "The generated result is not in a supported image, video or audio format": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "请输入生成提示词": [
-    "apps/server/src/utils/media/generation.ts",
-    "packages/nodes/videoGenerationNode/src/index.vue",
-    "packages/nodes/imageGenerationNode/src/index.vue"
-  ],
-  "所选媒体模型不存在或类型不匹配，请重新选择": [
+  "Enter a generation prompt": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "所选模型不支持角色身份，请改用支持角色身份的图片模型": [
+  "The selected media model does not exist or the type does not match, please select again.": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "此供应商不支持{0}生成": [
+  "Video generation needs the previs depth video connected in control video mode. Skip it only with the user's explicit consent.": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "请先在媒体模型设置中配置供应商 API Key": [
+  "The selected model does not support character identities. Use an image model that does.": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "供应商未返回生成结果": [
+  "This provider does not support {0} generation": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "向父 Agent 上报的结论、进展或需要协调的问题": [
-    "apps/server/src/agent/tools/report.ts"
+  "Please configure the provider API Key in the media model settings first": [
+    "apps/server/src/utils/media/generation.ts"
   ],
-  "上报父 Agent": [
-    "apps/server/src/agent/tools/report.ts"
+  "The provider did not return any generation results": [
+    "apps/server/src/utils/media/generation.ts"
   ],
-  "把当前子任务的重要进展或最终结论提交给父 Agent。报告进入父 Agent 的上下文；不替代当前与用户的直接对话，也不会自动启动空闲父 Agent。": [
-    "apps/server/src/agent/tools/report.ts"
-  ],
-  "已上报父 Agent": [
-    "apps/server/src/agent/tools/report.ts"
-  ],
-  "read 读取最新全局记忆；save 保存合并后的完整 Markdown": [
+  "Local memory has been turned off. Please follow the user's settings and no longer read or save memory.": [
     "apps/server/src/agent/tools/memory.ts"
   ],
-  "save 时必填；保留仍有效的记忆，空字符串表示清空": [
+  "To save a memory, you need to provide content and the most recently read revision.": [
     "apps/server/src/agent/tools/memory.ts"
   ],
-  "save 时必填；必须使用最近一次 read 返回的 revision，禁止猜测": [
-    "apps/server/src/agent/tools/memory.ts"
-  ],
-  "读取或更新所有工作区共用的长期 Markdown 记忆。只能操作全局记忆文件，不能修改全局 AGENTS.md、设置或任意路径。保存前先 read，合并仍有效的内容再 save；若版本冲突，重新读取并合并，不能覆盖用户的新修改。": [
-    "apps/server/src/agent/tools/memory.ts"
-  ],
-  "本地记忆已关闭，请遵循用户的设置，不再读取或保存记忆": [
-    "apps/server/src/agent/tools/memory.ts"
-  ],
-  "保存记忆需要提供 content 和最近读取的 revision": [
-    "apps/server/src/agent/tools/memory.ts"
-  ],
-  "此对话未提供工作目录，无法使用文件或媒体操作": [
+  "This chat has no working directory. File and media operations are unavailable.": [
     "apps/server/src/agent/tools/index.ts"
   ],
-  "{0} 返回了无效的工具": [
+  "{0} returned an invalid tool": [
     "apps/server/src/agent/tools/index.ts"
   ],
-  "本次任务名称": [
+  "The tool name subAgent is already occupied by the built-in subtask tool": [
     "apps/server/src/agent/tools/subAgent.ts"
   ],
-  "完整任务、必要背景、相对路径、已获授权和预期交付；不继承主对话历史": [
+  "Only the remote A2A team supports taskId/contextId": [
     "apps/server/src/agent/tools/subAgent.ts"
   ],
-  "已安装团队或远端 A2A 连接名；省略则创建临时子 Agent": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "继续远端等待补充的 A2A task 时原样传回": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "继续远端 A2A 会话时原样传回": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "工具名称 subAgent 已被内置子任务工具占用": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "子任务与团队": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "准备执行": [
-    "apps/server/src/agent/tools/subAgent.ts",
-    "apps/server/src/agent/runtime/delegation.ts",
-    "apps/server/src/agent/runtime/subAgent.ts"
-  ],
-  "只有远端 A2A 团队支持 taskId/contextId": [
-    "apps/server/src/agent/tools/subAgent.ts"
-  ],
-  "请配置 A2A 工作目录的绝对路径": [
+  "Please configure the absolute path of the A2A working directory": [
     "apps/server/src/agent/a2a/settings.ts"
   ],
-  "A2A 工作目录不存在，请重新选择": [
+  "The A2A working directory does not exist, please select again.": [
     "apps/server/src/agent/a2a/settings.ts"
   ],
-  "A2A 工作目录必须是文件夹": [
+  "The A2A working directory must be a folder": [
     "apps/server/src/agent/a2a/settings.ts"
   ],
-  "A2A 设置已修改，当前任务已取消": [
+  "A2A settings have been modified and the current task has been cancelled.": [
     "apps/server/src/agent/a2a/settings.ts"
   ],
-  "团队已禁用，不能接收新消息": [
+  "The team is disabled and cannot receive new messages": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "此团队入口只接受文本，不下载远端附件；请在文本中提供已授权工作区的相对路径": [
+  "This team endpoint accepts text only and does not download remote attachments. Provide relative paths within an authorized workspace in the text": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "团队任务文本应为 1 到 24000 字符": [
+  "Team task text should be 1 to 24000 characters": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "任务不属于当前调用方": [
+  "The task does not belong to the current caller": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "任务上下文已释放，请创建新任务": [
+  "The task context has been released, please create a new task": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "A2A 工作目录已变化，请在设置中重新授权": [
+  "The A2A working directory has changed, please re-authorize it in the settings": [
     "apps/server/src/agent/a2a/index.ts"
   ],
-  "团队未完成任务": [
-    "apps/server/src/agent/a2a/index.ts"
-  ],
-  "团队结果": [
-    "apps/server/src/agent/a2a/index.ts"
-  ],
-  "画布调用所属对话已结束": [
+  "The conversation to which the canvas call belongs has ended": [
     "apps/server/src/agent/bridge/canvas.ts"
   ],
-  "画布操作不存在": [
+  "Canvas operation does not exist": [
     "apps/server/src/agent/bridge/canvas.ts"
   ],
-  "画布调用失败": [
+  "Canvas call does not exist or has ended": [
     "apps/server/src/agent/bridge/canvas.ts"
   ],
-  "画布调用已取消": [
-    "apps/server/src/agent/bridge/canvas.ts"
-  ],
-  "画布调用超时，请确认画布仍然打开": [
-    "apps/server/src/agent/bridge/canvas.ts"
-  ],
-  "发送画布调用失败": [
-    "apps/server/src/agent/bridge/canvas.ts"
-  ],
-  "画布调用不存在或已结束": [
-    "apps/server/src/agent/bridge/canvas.ts"
-  ],
-  "提问所属对话已结束": [
+  "The conversation to which the question belongs has ended": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "提问已取消": [
+  "Question has been canceled": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "发送提问失败": [
+  "Failed to send question": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "提问不存在或已结束": [
+  "The question does not exist or has ended": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "用户跳过了本次提问": [
+  "Please fill in the form as required": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "选项不能重复": [
+  "Please enter your answer": [
     "apps/server/src/agent/bridge/question.ts"
   ],
-  "请按要求填写表单": [
-    "apps/server/src/agent/bridge/question.ts"
-  ],
-  "是": [
-    "apps/server/src/agent/bridge/question.ts"
-  ],
-  "否": [
-    "apps/server/src/agent/bridge/question.ts"
-  ],
-  "未填写可选项": [
-    "apps/server/src/agent/bridge/question.ts"
-  ],
-  "请输入回答": [
-    "apps/server/src/agent/bridge/question.ts"
-  ],
-  "来源必须是当前工作区内的普通文件": [
+  "The source must be a regular file in the current workspace": [
     "apps/server/src/agent/assets.ts"
   ],
-  "只能读取本次已授权的素材快照": [
+  "Only asset snapshots authorized for this request can be read": [
     "apps/server/src/agent/assets.ts"
   ],
-  "子任务执行失败": [
-    "apps/server/src/agent/runtime/delegation.ts",
-    "apps/server/src/agent/runtime/subAgent.ts"
+  "Subtask execution failed": [
+    "apps/server/src/agent/runtime/delegation.ts"
   ],
-  "引用内容须为深度不超过 32、长度不超过 100000 的 JSON 值": [
+  "The mention is invalid or does not match the text. Please delete it and select again.": [
     "apps/server/src/agent/runtime/mentions.ts"
   ],
-  "引用内容与输出类型不匹配": [
+  "Must be a non-empty file and no larger than 100 MB": [
     "apps/server/src/agent/runtime/mentions.ts"
   ],
-  "引用内容总长度不能超过 500000": [
+  "Reference \"{0}\" is not available: {1}": [
     "apps/server/src/agent/runtime/mentions.ts"
   ],
-  "提及已失效或与正文不匹配，请删除后重新选择": [
+  "The reference \"{0}\" is empty or exceeds 100 MB after copying": [
     "apps/server/src/agent/runtime/mentions.ts"
   ],
-  "须为非空且不超过 100 MB 的文件": [
-    "apps/server/src/agent/runtime/mentions.ts"
-  ],
-  "引用「{0}」不可用：{1}": [
-    "apps/server/src/agent/runtime/mentions.ts"
-  ],
-  "文件读取失败": [
-    "apps/server/src/agent/runtime/mentions.ts"
-  ],
-  "引用「{0}」复制后为空或超过 100 MB": [
-    "apps/server/src/agent/runtime/mentions.ts"
-  ],
-  "读取工作区 AGENTS.md 失败：{0}": [
+  "Failed to read workspace AGENTS.md: {0}": [
     "apps/server/src/agent/runtime/resources.ts"
   ],
-  "Claude Code 仅用于节点生成，请为 Agent 选择其他模型": [
+  "Claude Code is only used for node generation. Choose another model for the Agent.": [
     "apps/server/src/agent/runtime/model.ts"
   ],
-  "请输入消息、提及或添加附件": [
+  "Please enter a message, add a mention, or attach a file": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "附件必须是工作区内非空且不超过 100 MB 的文件": [
+  "The attachment must be a non-empty file in the workspace and no larger than 100 MB": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "文本附件最多支持 100000 个字符，请缩小内容后重试": [
+  "Text attachments support up to 100000 characters. Please shorten the content and try again": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "文本附件必须是 UTF-8 纯文本": [
+  "Text attachments must be UTF-8 plain text": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "重发需要指定原对话": [
+  "Retransmission requires specifying the original conversation": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "对话正在运行，请等待回复完成": [
+  "The conversation is running, please wait for the reply to complete": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "子 Agent 运行时不能重发历史消息": [
+  "Historical messages cannot be resent when the sub-Agent is running.": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "子 Agent 正在准备或结束回复，请稍后发送": [
+  "The sub-Agent is preparing or finishing the reply, please send it later.": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "请等子 Agent 当前回复结束后发送附件或提及": [
+  "Wait for the sub-Agent's current reply to finish before sending attachments or mentions.": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "会话不存在，请重新打开对话": [
+  "The conversation does not exist, please reopen the conversation.": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "会话必须是普通文件": [
+  "Session must be a normal file": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "工具名称 memory 已被内置全局记忆工具占用": [
+  "Tool name memory has been occupied by the built-in global memory tool": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "工具名称 report 已被内置上报工具占用": [
+  "Tool name report has been occupied by the built-in reporting tool": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "重发消息不在当前对话中，请重新打开对话": [
+  "The resent message is not in the current conversation, please reopen the conversation.": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "模型返回了空摘要，已保留原上下文": [
+  "The model returned an empty summary, the original context has been preserved": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "上下文压缩失败：{0}": [
+  "Context compression failed: {0}": [
     "apps/server/src/agent/runtime/index.ts"
   ],
-  "任务正在等待调用方补充输入，不能继续执行工具": [
+  "The task is waiting for additional input from the caller and cannot continue to execute the tool.": [
     "apps/server/src/agent/runtime/subAgent.ts"
   ],
-  "正在处理": [
+  "The subtask did not return a reply": [
     "apps/server/src/agent/runtime/subAgent.ts"
   ],
-  "子任务没有返回回复": [
+  "Subtask did not return text result": [
     "apps/server/src/agent/runtime/subAgent.ts"
   ],
-  "子任务没有返回文本结果": [
-    "apps/server/src/agent/runtime/subAgent.ts"
-  ],
-  "\n[结果过长，已截断；请读取工作区产物]": [
-    "apps/server/src/agent/runtime/subAgent.ts"
-  ],
-  "\n[模型输出达到长度限制，任务可能未完成]": [
-    "apps/server/src/agent/runtime/subAgent.ts"
-  ],
-  "父会话标识无效": [
+  "The parent session ID is invalid": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "请选择要删除的消息": [
+  "Please select the message you want to delete": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "会话文件损坏，无法删除消息": [
+  "The session file is damaged and the message cannot be deleted.": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "会话文件无效": [
+  "Invalid session file": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "会话记录结构无效，无法删除消息": [
+  "The session record structure is invalid and the message cannot be deleted.": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "消息不在当前对话中，请重新打开对话": [
+  "The message is not in the current conversation, please reopen the conversation": [
     "apps/server/src/agent/runtime/sessions.ts"
   ],
-  "上次运行已中断": [
-    "apps/server/src/agent/runtime/sessions.ts"
-  ],
-  "文本输出": [
-    "apps/server/src/agent/mentionSources.ts",
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "文本内容": [
-    "apps/server/src/agent/mentionSources.ts",
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "这个输出暂无内容，请重新选择": [
+  "This output has no content, please select again.": [
     "apps/server/src/agent/mentionSources.ts"
   ],
-  "准备连接远端团队": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端返回的任务标识不匹配": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端团队正在执行": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端任务已完成，未返回文本产物": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端任务已确认取消": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端任务需要额外认证，请由用户处理后继续": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端任务需要补充信息": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端任务失败或被拒绝": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "\n[远端结果过长，已截断；可使用 taskId 查询完整产物]": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端团队 {0} 不存在": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端团队 {0} 已禁用": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端响应结束，但没有返回完成、失败或等待输入状态": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端调用失败": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "远端没有确认取消": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "无法确认远端已取消": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "无法确认远端任务状态": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "；本次请求尚未提交，原远端任务未执行取消": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "；尚未获得任务标识，远端状态未知，未自动重试": [
-    "apps/server/src/agent/teams/remote.ts"
-  ],
-  "团队 {0} 已禁用": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "团队私有工具无效或名称重复：{0}": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "成员 {0} 配置的工具当前不可用：{1}": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "团队资料": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "按需读取或维护当前成员获准的私有资料。list 返回路径，read 读取正文，write 新建或完整修改文本。内容只属于此团队，不会注册到全局技能。修改成员指令在下一团队任务生效；新增经验应真实、通用且避免写入项目私密内容。": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "资料不属于当前成员的授权范围": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "写入资料需要 content": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "团队资料不存在": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "团队委派": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "不能委派给未授权的成员": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "需要调用方补充信息或明确授权时提出问题。调用后任务暂停，等待调用方继续当前 A2A task。不得把未回答或沉默当作同意。": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "等待调用方回答：": [
-    "apps/server/src/agent/teams/index.ts"
-  ],
-  "画布文件无效或超过 256 MB 的读取上限": [
+  "Text quotation supports up to 100000 characters, please reduce the content and try again": [
+    "apps/server/src/agent/mentionSources.ts",
     "apps/server/src/agent/mentionFiles.ts"
   ],
-  "画布正在保存，请重试": [
+  "The task ID returned by the remote end does not match": [
+    "apps/server/src/agent/teams/remote.ts"
+  ],
+  "Remote team {0} does not exist": [
+    "apps/server/src/agent/teams/remote.ts"
+  ],
+  "Remote Team {0} Disabled": [
+    "apps/server/src/agent/teams/remote.ts"
+  ],
+  "The remote response ends but does not return completion, failure or waiting for input status": [
+    "apps/server/src/agent/teams/remote.ts"
+  ],
+  "The remote end did not confirm the cancellation.": [
+    "apps/server/src/agent/teams/remote.ts"
+  ],
+  "Team {0} is disabled": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "The team private tool is invalid or has a duplicate name: {0}": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "The tools configured for member {0} are currently unavailable: {1}": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "The information does not fall within the authorization scope of the current member": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "content is required to write data": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "Team information does not exist": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "cannot be delegated to unauthorized members": [
+    "apps/server/src/agent/teams/index.ts"
+  ],
+  "The canvas file is invalid or exceeds the 256 MB read limit": [
     "apps/server/src/agent/mentionFiles.ts"
   ],
-  "请选择非空且不超过 100 MB 的素材文件": [
+  "The canvas is being saved, please try again": [
     "apps/server/src/agent/mentionFiles.ts"
   ],
-  "技能范围无效": [
+  "The file is not a valid canvas": [
+    "apps/server/src/agent/mentionFiles.ts"
+  ],
+  "The node has been deleted, please select again.": [
+    "apps/server/src/agent/mentionFiles.ts"
+  ],
+  "Please select a asset file that is not empty and does not exceed 100 MB": [
+    "apps/server/src/agent/mentionFiles.ts"
+  ],
+  "Invalid skill range": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "技能不存在：{0}": [
+  "Skill does not exist: {0}": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "新技能名称必须为不超过 64 字符的小驼峰": [
+  "New skill names must be in lowerCamelCase and at most 64 characters": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "技能目录超出指定范围": [
+  "The skill directory exceeds the specified range": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "请先创建技能的 SKILL.md，再添加参考资料": [
+  "Please create the SKILL.md of the skill first, and then add reference materials": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "SKILL.md 必须包含匹配的 name 和非空 description": [
+  "SKILL.md must contain matching name and non-empty description": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "只能修改已有的普通文件": [
+  "can only modify existing ordinary files": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "只能读取普通文件": [
+  "can only read ordinary files": [
     "apps/server/src/agent/skills/index.ts"
   ],
-  "字段 {0} {1}": [
+  "Field {0} {1}": [
     "apps/server/src/lib/middleware.ts"
   ],
-  "参数错误": [
+  "Parameter error": [
     "apps/server/src/lib/middleware.ts",
     "apps/server/src/lib/responseFormat.ts",
     "apps/server/src/routes/ai/media/generate.ts"
   ],
-  "找不到这个文件或文件夹，可能已被移动、删除，或者位置选错了。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "你选中的是文件，但这里需要选择文件夹。请重新选择。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "这个名称已经被占用了，请换一个名称。原来的内容不会被覆盖。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "这个文件夹里还有内容，不能直接删除。请先清空或移走里面的文件。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "没有权限访问这个文件或文件夹。请检查权限，或换一个位置重试。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "系统不允许这次操作。文件可能正在被其他程序使用，请关闭后重试。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "你选中的是文件夹，但这里需要的是文件。请重新选择具体文件。": [
-    "apps/server/src/lib/responseFormat.ts"
-  ],
-  "训练图片只支持 PNG、JPEG 或 WebP": [
+  "Training images must be PNG, JPEG or WebP.": [
     "apps/server/src/routes/higgsfield/souls/create.ts"
   ],
-  "单张训练图片不能超过 20 MB": [
+  "Each training image must be 20 MB or smaller.": [
     "apps/server/src/routes/higgsfield/souls/create.ts"
   ],
-  "系统提示词不能超过 {0} 个字符": [
+  "Saved": [
+    "apps/server/src/routes/settings/personalization/save.ts",
+    "apps/server/src/routes/agents/save.ts",
+    "apps/server/src/routes/skills/save.ts"
+  ],
+  "The system prompt cannot exceed {0} characters": [
     "apps/server/src/routes/settings/save.ts"
   ],
-  "设置已保存": [
+  "Settings saved": [
     "apps/server/src/routes/settings/save.ts"
   ],
-  "FFmpeg 请求已在执行": [
+  "FFmpeg request is already being executed": [
     "apps/server/src/routes/ffmpeg/execute.ts"
   ],
-  "请在服务器本机管理工具": [
+  "Please manage tools locally on the server": [
     "apps/server/src/routes/tools/setEnabled.ts",
     "apps/server/src/routes/tools/install.ts",
     "apps/server/src/routes/tools/uninstall.ts",
     "apps/server/src/routes/tools/save.ts"
   ],
-  "工具状态文件无效": [
+  "Tool status file is invalid": [
     "apps/server/src/routes/tools/setEnabled.ts"
   ],
-  "请选择文件或填写远端地址": [
+  "Please select a file or fill in the remote address": [
     "apps/server/src/routes/tools/install.ts",
     "apps/server/src/routes/nodes/install.ts",
     "apps/server/src/routes/ext/install.ts",
     "apps/server/src/routes/agents/install.ts",
     "apps/server/src/routes/skills/install.ts"
   ],
-  "工具已安装": [
+  "Tool installed": [
     "apps/server/src/routes/tools/install.ts"
   ],
-  "工具已卸载": [
+  "Tool has been uninstalled": [
     "apps/server/src/routes/tools/uninstall.ts"
   ],
-  "工具已禁用": [
+  "Tool disabled": [
     "apps/server/src/routes/tools/client.ts"
   ],
-  "工具不存在": [
+  "Tool does not exist": [
     "apps/server/src/routes/tools/client.ts"
   ],
-  "工具界面不存在或版本已更新": [
+  "The tool interface does not exist or the version has been updated.": [
     "apps/server/src/routes/tools/client.ts"
   ],
-  "工具配置已保存": [
+  "Tool configuration saved": [
     "apps/server/src/routes/tools/save.ts"
   ],
-  "节点状态文件无效": [
+  "Node does not exist": [
+    "apps/server/src/routes/nodes/setEnabled.ts",
+    "apps/server/src/routes/nodes/uninstall.ts",
+    "apps/server/src/routes/nodes/files.ts"
+  ],
+  "The node status file is invalid": [
     "apps/server/src/routes/nodes/setEnabled.ts",
     "apps/server/src/routes/nodes/uninstall.ts"
   ],
-  "节点文件无法读取": [
-    "apps/server/src/routes/nodes/get.ts"
-  ],
-  "请在服务器本机安装节点": [
+  "Please install the node locally on the server": [
     "apps/server/src/routes/nodes/install.ts"
   ],
-  "节点已安装": [
+  "Node is installed": [
     "apps/server/src/routes/nodes/install.ts"
   ],
-  "节点已卸载": [
+  "Node has been uninstalled": [
     "apps/server/src/routes/nodes/uninstall.ts"
   ],
-  "节点已禁用": [
+  "Node disabled": [
     "apps/server/src/routes/nodes/files.ts"
   ],
-  "请在服务器本机管理节点配置": [
+  "Please manage node configuration locally on the server": [
     "apps/server/src/routes/nodes/save.ts"
   ],
-  "节点配置已保存": [
+  "Node configuration saved": [
     "apps/server/src/routes/nodes/save.ts"
   ],
-  "请在服务器本机导出插件": [
+  "Please export plugins locally on the server": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "团队 ZIP 文件不能超过 20 MB": [
+  "Team ZIP file cannot exceed 20 MB": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "插件目录无效": [
+  "The plugin directory is invalid": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "插件资源超出目录范围": [
+  "The plugin resource exceeds the directory range": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "插件不能包含链接或特殊文件": [
+  "Plug-ins cannot contain links or special files": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "插件文件总大小不能超过 20 MB": [
+  "The total size of plugin files cannot exceed 20 MB": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "插件名称无效": [
+  "Invalid plugin name": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "技能最多包含 2000 个文件和目录": [
+  "Skill contains up to 2000 files and directories": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "技能目录无效": [
+  "The skill directory is invalid": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "技能 ZIP 文件不能超过 20 MB": [
+  "Skill ZIP file cannot exceed 20 MB": [
     "apps/server/src/routes/plugins/export.ts"
   ],
-  "请填写不含查询参数的 HTTP API 基础地址": [
-    "apps/server/src/routes/providers/models.ts"
-  ],
-  "函数参数必须是 object JSON Schema": [
+  "Agent failed to run": [
     "apps/server/src/routes/agent.ts"
   ],
-  "Agent 运行失败": [
-    "apps/server/src/routes/agent.ts"
-  ],
-  "文件扩展不存在": [
+  "The file extension does not exist": [
     "apps/server/src/routes/ext/read.ts",
     "apps/server/src/routes/ext/setEnabled.ts",
     "apps/server/src/routes/ext/uninstall.ts"
   ],
-  "文件扩展已禁用": [
+  "File extension disabled": [
     "apps/server/src/routes/ext/read.ts"
   ],
-  "请在服务器本机管理文件扩展": [
+  "Please manage file extensions locally on the server": [
     "apps/server/src/routes/ext/setEnabled.ts"
   ],
-  "文件扩展状态文件无效": [
+  "Invalid file extension state file": [
     "apps/server/src/routes/ext/setEnabled.ts",
     "apps/server/src/routes/ext/uninstall.ts"
   ],
-  "请在服务器本机安装文件扩展": [
+  "Please install file extensions locally on the server": [
     "apps/server/src/routes/ext/install.ts"
   ],
-  "文件扩展已安装": [
+  "File extension installed": [
     "apps/server/src/routes/ext/install.ts"
   ],
-  "请在服务器本机卸载文件扩展": [
+  "Please uninstall file extensions locally on the server": [
     "apps/server/src/routes/ext/uninstall.ts"
   ],
-  "文件扩展已卸载": [
+  "File extension uninstalled": [
     "apps/server/src/routes/ext/uninstall.ts"
   ],
-  "文件扩展无法读取": [
-    "apps/server/src/routes/ext/list.ts"
-  ],
-  "请在服务器本机管理文件扩展配置": [
+  "Please manage file extension settings locally on the server": [
     "apps/server/src/routes/ext/save.ts"
   ],
-  "文件扩展配置已保存": [
+  "File extension settings saved": [
     "apps/server/src/routes/ext/save.ts"
   ],
-  "请在服务器本机读取团队文件": [
+  "Please read team files locally on the server": [
     "apps/server/src/routes/agents/read.ts"
   ],
-  "请在服务器本机管理团队": [
+  "Please manage teams locally on the server": [
     "apps/server/src/routes/agents/setEnabled.ts"
   ],
-  "请在服务器本机安装团队": [
+  "Please install the team locally on the server": [
     "apps/server/src/routes/agents/install.ts"
   ],
-  "团队已安装": [
+  "Team is installed": [
     "apps/server/src/routes/agents/install.ts"
   ],
-  "请在服务器本机读取 A2A 设置": [
+  "Please read A2A settings locally on the server": [
     "apps/server/src/routes/agents/a2a/get.ts"
   ],
-  "请在服务器本机管理 A2A 设置": [
+  "Please manage A2A settings locally on the server": [
     "apps/server/src/routes/agents/a2a/save.ts"
   ],
-  "请在服务器本机卸载团队": [
+  "Please uninstall teams locally on the server": [
     "apps/server/src/routes/agents/uninstall.ts"
   ],
-  "团队已卸载": [
+  "Team has been uninstalled": [
     "apps/server/src/routes/agents/uninstall.ts"
   ],
-  "请在服务器本机连接远端团队": [
+  "Please connect to remote teams locally on the server": [
     "apps/server/src/routes/agents/connect.ts"
   ],
-  "远端团队已连接": [
+  "The remote team is connected": [
     "apps/server/src/routes/agents/connect.ts"
   ],
-  "请在服务器本机编辑团队文件": [
+  "Please edit team files locally on the server": [
     "apps/server/src/routes/agents/save.ts"
   ],
-  "查询已取消": [
+  "Query canceled": [
     "apps/server/src/routes/agent/mentionSource.ts"
   ],
-  "请选择素材": [
+  "Please select asset": [
     "apps/server/src/routes/agent/mentionSource.ts"
   ],
-  "请选择画布": [
+  "Please select canvas": [
     "apps/server/src/routes/agent/mentionSource.ts"
   ],
-  "请选择节点输出": [
+  "Please select node output": [
     "apps/server/src/routes/agent/mentionSource.ts"
   ],
-  "只能读取文件": [
+  "can only read files": [
     "apps/server/src/routes/workspaces/files/read.ts",
     "apps/server/src/routes/assets/read.ts"
   ],
-  "文件超过本次文本读取的大小限制": [
+  "The file exceeds the size limit for this text read": [
     "apps/server/src/routes/workspaces/files/read.ts"
   ],
-  "文件不是受支持的 UTF-8 或带 BOM 的 UTF-16 文本，请先用原编辑器转换编码后再打开，原文件未修改": [
+  "binary": [
     "apps/server/src/routes/workspaces/files/read.ts"
   ],
-  "仅支持本机开发页面打开文件所在位置": [
+  "This file is neither supported UTF-8 text nor UTF-16 text with a BOM. Convert its encoding in the original editor before opening it again. The original file has not been modified": [
+    "apps/server/src/routes/workspaces/files/read.ts"
+  ],
+  "Showing a file in its folder only works on the local development page": [
     "apps/server/src/routes/workspaces/files/reveal.ts"
   ],
-  "请发送文件原始内容": [
+  "Please send the original content of the file": [
     "apps/server/src/routes/workspaces/files/write.ts",
     "apps/server/src/routes/assets/save.ts"
   ],
-  "文件已被删除或移动，未覆盖磁盘内容": [
+  "The file was deleted or moved. No content on disk was overwritten": [
     "apps/server/src/routes/workspaces/files/write.ts"
   ],
-  "文件已被其他编辑器修改，当前修改已保留，请重新载入磁盘版本或另存副本": [
+  "The file was modified in another editor. Your current changes have been retained. Reload the version on disk or save a copy": [
     "apps/server/src/routes/workspaces/files/write.ts"
   ],
-  "只能选择服务器工作区内的目录": [
+  "Only directories within the server workspace can be selected": [
     "apps/server/src/routes/workspaces/list.ts"
   ],
-  "目录不存在": [
+  "Directory does not exist": [
     "apps/server/src/routes/workspaces/list.ts"
   ],
-  "没有权限访问此目录": [
+  "No permission to access this directory": [
     "apps/server/src/routes/workspaces/list.ts"
   ],
-  "仅允许本机开发页面选择目录": [
+  "Only development pages running on this computer can select directories": [
     "apps/server/src/routes/workspaces/selectDirectory.ts"
   ],
-  "无法打开本机文件夹选择器，请重试": [
+  "Unable to open native folder selector, please try again": [
     "apps/server/src/routes/workspaces/selectDirectory.ts"
   ],
-  "必须提供工具结果或错误信息": [
-    "apps/server/src/routes/singleAgent/toolResult.ts"
-  ],
-  "工具增量必须提供结果": [
-    "apps/server/src/routes/singleAgent/toolResult.ts"
-  ],
-  "工具名称不能重复": [
-    "apps/server/src/routes/singleAgent/create.ts",
-    "apps/server/src/routes/ai/generate.ts",
-    "packages/nodeScaffold/src/nodeAi.ts"
-  ],
-  "工具参数必须是 JSON 对象结构，且不超过 100 KB": [
-    "apps/server/src/routes/singleAgent/create.ts",
-    "apps/server/src/routes/ai/generate.ts"
-  ],
-  "清理临时对话失败：": [
-    "apps/server/src/routes/singleAgent/create.ts"
-  ],
-  "请提供工作目录或临时对话身份，不能同时提供": [
-    "apps/server/src/routes/browser/input.ts",
-    "apps/server/src/routes/browser/stream.ts"
-  ],
-  "浏览器操作仅在本机开发模式中可用": [
+  "Browser actions are only available in local development mode": [
     "apps/server/src/routes/browser/input.ts"
   ],
-  "浏览器画面仅在本机开发模式中可用": [
+  "The browser view is only available in local development mode": [
     "apps/server/src/routes/browser/stream.ts"
   ],
-  "浏览器会话不存在或已关闭": [
+  "The browser session does not exist or has been closed": [
     "apps/server/src/routes/browser/stream.ts"
   ],
-  "浏览器画面连接失败": [
-    "apps/server/src/routes/browser/stream.ts"
-  ],
-  "登录成功": [
+  "Signed in": [
     "apps/server/src/routes/ai/codex/code.ts"
   ],
-  "已退出登录": [
+  "Signed out": [
     "apps/server/src/routes/ai/codex/logout.ts"
   ],
-  "模型上下文不能超过 8 MB": [
+  "Model request failed": [
     "apps/server/src/routes/ai/generate.ts"
   ],
-  "请在服务器本机读取技能": [
+  "Please read skills locally on the server": [
     "apps/server/src/routes/skills/read.ts"
   ],
-  "该文件不是文本内容，无法在编辑器中打开": [
+  "The file is not text content and cannot be opened in an editor": [
     "apps/server/src/routes/skills/read.ts"
   ],
-  "该文件不是有效的 UTF-8 文本，无法在编辑器中打开": [
+  "The file is not valid UTF-8 text and cannot be opened in an editor": [
     "apps/server/src/routes/skills/read.ts"
   ],
-  "请在服务器本机管理技能": [
+  "Manage skills locally on the server": [
     "apps/server/src/routes/skills/setEnabled.ts"
   ],
-  "请在服务器本机安装技能": [
+  "Please install the skill locally on the server": [
     "apps/server/src/routes/skills/install.ts"
   ],
-  "技能已安装": [
+  "Skill has been installed": [
     "apps/server/src/routes/skills/install.ts"
   ],
-  "请在服务器本机移动技能文件": [
+  "Please move skill files locally on the server": [
     "apps/server/src/routes/skills/move.ts"
   ],
-  "文件已移动": [
+  "File moved": [
     "apps/server/src/routes/skills/move.ts"
   ],
-  "请在服务器本机卸载技能": [
+  "Please uninstall skills locally on the server": [
     "apps/server/src/routes/skills/uninstall.ts"
   ],
-  "技能已卸载": [
+  "The skill has been uninstalled": [
     "apps/server/src/routes/skills/uninstall.ts"
   ],
-  "请在服务器本机调整技能文件顺序": [
+  "Please reorder skill files locally on the server": [
     "apps/server/src/routes/skills/order.ts"
   ],
-  "顺序已保存": [
+  "Order saved": [
     "apps/server/src/routes/skills/order.ts"
   ],
-  "请在服务器本机新增技能文件": [
+  "Please add skill files locally on the server": [
     "apps/server/src/routes/skills/create.ts"
   ],
-  "文件已创建": [
+  "file created": [
     "apps/server/src/routes/skills/create.ts"
   ],
-  "请在服务器本机查看技能文件": [
+  "Please view skill files locally on the server": [
     "apps/server/src/routes/skills/list.ts"
   ],
-  "请在服务器本机编辑技能": [
+  "Please edit skills locally on the server": [
     "apps/server/src/routes/skills/save.ts"
   ],
-  "内容不能包含空字符": [
+  "content cannot contain null characters": [
     "apps/server/src/routes/skills/save.ts"
   ],
-  "SKILL.md 必须包含合法 YAML、与原技能相同的字符串 name，以及非空且不超过 1024 字符的 description": [
+  "frontmatter": [
     "apps/server/src/routes/skills/save.ts"
   ],
-  "toonflow-mcp --url <MCP URL> --token-env <环境变量名>\ntoonflow-mcp --runtime <运行信息文件>\n": [
+  "SKILL.md must contain valid YAML, the same string name as the original skill, and a non-empty description that does not exceed 1024 characters.": [
+    "apps/server/src/routes/skills/save.ts"
+  ],
+  "toonflow-mcp --url <MCP URL> --token-env <environment variable name>\ntoonflow-mcp --runtime <run information file>\n": [
     "packages/mcp/src/stdio.ts"
   ],
-  "请指定 --url 或 --runtime，二者只能选择一个": [
+  "Please specify --url or --runtime, you can only choose one of the two.": [
     "packages/mcp/src/stdio.ts"
   ],
-  "运行信息文件必须属于当前用户，且仅允许当前用户访问（chmod 600）": [
+  "The running information file must belong to the current user and is only allowed to be accessed by the current user (chmod 600)": [
     "packages/mcp/src/stdio.ts"
   ],
-  "未找到 MCP 访问凭证，请设置 {0}": [
+  "MCP access credential not found, please set {0}": [
     "packages/mcp/src/stdio.ts"
   ],
-  "远程 MCP 必须使用 HTTPS；本机连接允许 HTTP": [
+  "Remote MCP must use HTTPS; local connection allows HTTP": [
     "packages/mcp/src/stdio.ts"
   ],
-  "运行信息文件只允许指向本机 Toonflow": [
+  "The running information file is only allowed to point to the local Toonflow": [
     "packages/mcp/src/stdio.ts"
   ],
-  "MCP URL 不允许包含账号或密码": [
+  "The MCP URL cannot contain a username or password": [
     "packages/mcp/src/stdio.ts"
   ],
-  "目标服务未提供 MCP 工具": [
+  "Target service does not provide MCP tools": [
     "packages/mcp/src/stdio.ts"
   ],
-  "工具不存在或已停用：{0}": [
+  "Tool does not exist or is disabled: {0}": [
     "packages/mcp/src/index.ts"
   ],
-  "MCP 会话不存在，请重新连接": [
+  "MCP session does not exist, please reconnect": [
     "packages/mcp/src/index.ts"
   ],
-  "FFmpeg 工作区必须是目录": [
+  "FFmpeg workspace must be a directory": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "FFmpeg 只能操作当前工作区内的文件": [
+  "FFmpeg can only operate files in the current workspace": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "FFmpeg 文件路径无效，不能使用协议或设备路径": [
+  "FFmpeg file path is invalid, protocol or device path cannot be used": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "FFmpeg 文件路径无效": [
+  "FFmpeg file path is invalid": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "FFmpeg 文件路径不能是工作区根目录": [
+  "FFmpeg file path cannot be the workspace root directory": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "FFmpeg 不能操作悬空符号链接": [
+  "FFmpeg cannot operate dangling symbolic links": [
     "packages/ffmpeg/src/runtime.ts"
   ],
-  "浏览器 FFmpeg 输入、输出必须使用工作区文件路径": [
+  "Browser FFmpeg input and output must use the workspace file path": [
     "packages/ffmpeg/src/remote.ts"
   ],
-  "FFmpeg 配置方法不可用：{0}": [
+  "FFmpeg configuration method is not available: {0}": [
     "packages/ffmpeg/src/remote.ts"
   ],
-  "FFmpeg 执行方法不可用：{0}": [
+  "FFmpeg execution method is not available: {0}": [
     "packages/ffmpeg/src/remote.ts"
   ],
-  "FFmpeg 已取消": [
-    "packages/ffmpeg/src/remote.ts"
-  ],
-  "{0} 无法运行，请检查平台兼容性或重新下载": [
+  "{0} cannot run, please check platform compatibility or download again": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "未找到可用程序": [
+  "The installation directory must be a normal folder: {0}": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "安装目录必须是普通文件夹：{0}": [
+  "{0} Download failed (HTTP {1})": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "{0} 下载失败（HTTP {1}）": [
+  "Download file exceeds allowed size": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "下载文件超过允许大小": [
+  "{0} File verification failed, please try again.": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "{0} 文件校验失败，请重试": [
+  "The decompressed file exceeds the allowed size": [
     "packages/ffmpeg/src/index.ts"
   ],
-  "解压文件超过允许大小": [
+  "Installation failed and old version cannot be restored, old files remain in {0}": [
     "packages/ffmpeg/src/index.ts"
-  ],
-  "安装失败且无法恢复旧版本，旧文件保留在 {0}": [
-    "packages/ffmpeg/src/index.ts"
-  ],
-  "角色身份": [
-    "packages/nodes/characterNode/vite.config.ts",
-    "packages/nodes/characterNode/src/index.vue"
   ],
   "已有角色": [
     "packages/nodes/characterNode/src/index.vue"
@@ -6689,6 +6240,9 @@
     "packages/nodes/characterNode/src/index.vue"
   ],
   "角色输出": [
+    "packages/nodes/characterNode/src/index.vue"
+  ],
+  "角色身份": [
     "packages/nodes/characterNode/src/index.vue"
   ],
   "Higgsfield 请求失败（HTTP {0}）": [
@@ -6950,10 +6504,6 @@
   "截帧中断，临时图片清理失败": [
     "packages/nodes/videoNode/src/components/videoPlayer.vue"
   ],
-  "音频生成": [
-    "packages/nodes/audioGenerationNode/vite.config.ts",
-    "packages/nodes/audioGenerationNode/src/index.vue"
-  ],
   "截取音频": [
     "packages/nodes/audioGenerationNode/src/index.vue",
     "packages/nodes/audioNode/src/index.vue"
@@ -7069,6 +6619,9 @@
   "图片或音频限1个，文本不限": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
+  "音频生成": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
   "音频生成设置": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
@@ -7091,6 +6644,9 @@
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
   "音频语气": [
+    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+  ],
+  "音乐或音效时长": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
   "采样率": [
@@ -7286,10 +6842,6 @@
   "临时音频清理失败": [
     "packages/nodes/audioNode/src/components/audioActions.vue"
   ],
-  "视频生成": [
-    "packages/nodes/videoGenerationNode/vite.config.ts",
-    "packages/nodes/videoGenerationNode/src/index.vue"
-  ],
   "选择替换视频": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
@@ -7337,7 +6889,23 @@
   "请先选择视频模型": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
+  "请输入生成提示词": [
+    "packages/nodes/videoGenerationNode/src/index.vue",
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
   "当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "没有以控制视频模式连接粗模试演的深度视频。粗模试演是成本最低的把关，确定跳过并直接生成吗？": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "跳过粗模试演": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "跳过并生成": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "已取消生成：请先在导演台导出深度视频，并以控制视频模式连接到此节点": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "供应商未返回视频": [
@@ -7375,6 +6943,9 @@
   "图片、视频、音频、文本输入": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
+  "视频生成": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
   "视频生成设置": [
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
   ],
@@ -7396,10 +6967,6 @@
   "比例 {0}": [
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue",
     "packages/nodes/imageGenerationNode/src/components/generationSettings.vue"
-  ],
-  "配音合成": [
-    "packages/nodes/dubbingNode/vite.config.ts",
-    "packages/nodes/dubbingNode/src/index.vue"
   ],
   "配音合成视频": [
     "packages/nodes/dubbingNode/src/index.vue"
@@ -7452,6 +7019,9 @@
   "配音输入": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
+  "配音合成": [
+    "packages/nodes/dubbingNode/src/index.vue"
+  ],
   "音量须在 0% 至 200% 之间": [
     "packages/nodes/dubbingNode/src/dubbing.ts"
   ],
@@ -7476,7 +7046,7 @@
   "重新读取磁盘": [
     "packages/nodes/textNode/src/index.vue"
   ],
-  "生成": [
+  "文本内容": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "编辑文本": [
@@ -7525,6 +7095,9 @@
     "packages/nodes/textNode/src/index.vue"
   ],
   "视频、图片、文本输入": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "文本输出": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Markdown 编辑工具": [
@@ -8455,10 +8028,6 @@
   "截图失败，请重试": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
   ],
-  "3D导演台": [
-    "packages/nodes/director3dNode/vite.config.ts",
-    "packages/nodes/director3dNode/src/index.vue"
-  ],
   "打开导演台": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
@@ -8504,6 +8073,18 @@
   "导出中断，临时素材清理失败": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
+  "粗模试演检查失败": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "粗模试演检查发现问题": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "仍然导出": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "返回修改": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
   "模型加载失败": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
@@ -8520,6 +8101,9 @@
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "文本、图片、视频输入": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "3D导演台": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "动画": [
@@ -8606,7 +8190,7 @@
   "导出到画布": [
     "packages/nodes/director3dNode/src/directorTour.vue"
   ],
-  "选中方案后，点击这里导出视频节点。关键帧缩略图上的导出按钮可以生成图片节点。视频导出期间请保持窗口可见，完成后回到画布查看结果。": [
+  "选中方案后，点击这里导出视频节点。关键帧缩略图上的导出按钮可以生成图片节点。导出完成后回到画布查看结果。": [
     "packages/nodes/director3dNode/src/directorTour.vue"
   ],
   "镜头截图失败": [
@@ -8711,6 +8295,12 @@
   "导出视频 {0}%": [
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
+  "近白远黑的深度视频，作为视频生成的控制视频，只传递走位与运镜": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
+  "导出深度视频": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
   "WASD 移动 · 空格上升 · Shift 下降 · 滚轮调焦 · 右键记录 · 左键 / Esc 退出取景": [
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
@@ -8748,18 +8338,6 @@
     "packages/nodes/director3dNode/src/renderMedia.ts"
   ],
   "当前浏览器不支持 MP4 导出，请更新浏览器": [
-    "packages/nodes/director3dNode/src/renderMedia.ts"
-  ],
-  "请在当前窗口保持可见时导出视频": [
-    "packages/nodes/director3dNode/src/renderMedia.ts"
-  ],
-  "窗口已隐藏，视频导出已停止，请保持窗口可见后重试": [
-    "packages/nodes/director3dNode/src/renderMedia.ts"
-  ],
-  "导出视频超过 100 MB，请缩短动画时长": [
-    "packages/nodes/director3dNode/src/renderMedia.ts"
-  ],
-  "MP4 编码失败，请重试": [
     "packages/nodes/director3dNode/src/renderMedia.ts"
   ],
   "未能生成视频内容": [
@@ -8855,10 +8433,6 @@
   "下": [
     "packages/nodes/director3dNode/src/lightDirection.vue"
   ],
-  "图片生成": [
-    "packages/nodes/imageGenerationNode/vite.config.ts",
-    "packages/nodes/imageGenerationNode/src/index.vue"
-  ],
   "选择替换图片": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
@@ -8940,6 +8514,9 @@
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片、文本、角色输入": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "图片生成": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片生成设置": [
@@ -9183,6 +8760,9 @@
   "编辑器已关闭": [
     "packages/ext/md/src/index.vue"
   ],
+  "Markdown": [
+    "packages/ext/md/src/metadata.ts"
+  ],
   "采样率（Hz）": [
     "packages/ext/media/src/index.vue"
   ],
@@ -9258,114 +8838,132 @@
   "PCM 数据超出 RIFF 4 GiB 范围": [
     "packages/ext/media/src/pcmPreview.ts"
   ],
-  "FFmpeg 媒体处理": [
+  "FFmpeg Media Processing": [
     "packages/tools/ffmpeg/build.ts"
   ],
-  "使用本机 FFmpeg 处理工作区音视频、图片，并通过 FFprobe 查询媒体信息。": [
+  "Processes workspace audio, video and images with the local FFmpeg, and reads media information with FFprobe.": [
     "packages/tools/ffmpeg/build.ts"
   ],
-  "提问器": [
+  "Ask User": [
     "packages/tools/askUser/build.ts"
   ],
-  "一次向用户提出一个或多个问题，支持回答或跳过本次提问。": [
+  "Asks the user one or more questions at once; the user can answer or skip them.": [
     "packages/tools/askUser/build.ts"
   ],
-  "全局资产管理": [
+  "Global Asset Manager": [
     "packages/tools/assetOperator/build.ts"
   ],
-  "查询、读取和维护全局素材库，将素材导入工作区或将生成结果归档入库。": [
+  "Queries, reads and maintains the global asset library, imports assets into the workspace and archives generated results.": [
     "packages/tools/assetOperator/build.ts"
   ],
-  "只读模式": [
+  "Read-only mode": [
     "packages/tools/assetOperator/build.ts",
     "packages/tools/workspace/build.ts"
   ],
-  "读取、列出和编辑当前工作区内的文件，下载远程图片到工作区。": [
+  "Workspace files": [
     "packages/tools/workspace/build.ts"
   ],
-  "联网搜索": [
+  "Reads, lists and edits files in the current workspace, and downloads remote images into it.": [
+    "packages/tools/workspace/build.ts"
+  ],
+  "Web Search": [
     "packages/tools/webSearch/build.ts"
   ],
-  "默认免密钥搜索网页，可切换 DeepSeek 或 Tavily，返回标题、链接和摘要。": [
+  "Searches the web without a key by default, or with DeepSeek or Tavily, and returns titles, links and snippets.": [
     "packages/tools/webSearch/build.ts"
   ],
-  "搜索服务": [
+  "Search service": [
     "packages/tools/webSearch/build.ts"
   ],
-  "DuckDuckGo（免 Key）": [
+  "DuckDuckGo (no key)": [
     "packages/tools/webSearch/build.ts"
   ],
-  "请输入官方 DeepSeek API Key": [
+  "DeepSeek": [
     "packages/tools/webSearch/build.ts"
   ],
-  "请输入 Tavily API Key": [
+  "Tavily": [
     "packages/tools/webSearch/build.ts"
   ],
-  "最多返回结果": [
+  "DeepSeek API Key": [
     "packages/tools/webSearch/build.ts"
   ],
-  "超时（毫秒）": [
+  "Enter an official DeepSeek API key": [
+    "packages/tools/webSearch/build.ts"
+  ],
+  "Tavily API Key": [
+    "packages/tools/webSearch/build.ts"
+  ],
+  "Enter a Tavily API key": [
+    "packages/tools/webSearch/build.ts"
+  ],
+  "Maximum results": [
+    "packages/tools/webSearch/build.ts"
+  ],
+  "Timeout (ms)": [
     "packages/tools/webSearch/build.ts",
     "packages/tools/webFetch/build.ts"
   ],
-  "画布操作": [
+  "Canvas Operations": [
     "packages/tools/canvas/build.ts"
   ],
-  "新增、切换、重命名和自动整理画布，操作节点、连线和视口，并调用节点注册的函数。": [
+  "Adds, switches, renames and auto-arranges canvases, works with nodes, edges and the viewport, and calls functions that nodes register.": [
     "packages/tools/canvas/build.ts"
   ],
-  "网页浏览器": [
+  "Web Browser": [
     "packages/tools/browser/build.ts"
   ],
-  "在本机独立浏览器中搜索、浏览和操作网页，并查看浏览器画面。": [
+  "Searches, browses and operates web pages in a separate local browser, and shows its view.": [
     "packages/tools/browser/build.ts"
   ],
-  "浏览器程序路径": [
+  "Browser executable path": [
     "packages/tools/browser/build.ts"
   ],
-  "留空自动查找本机 Chrome 或 Edge": [
+  "Leave empty to find the local Chrome or Edge automatically": [
     "packages/tools/browser/build.ts"
   ],
-  "媒体生成": [
+  "Media Generation": [
     "packages/tools/mediaGeneration/build.ts"
   ],
-  "查询已配置的媒体模型，生成图片、视频或音频并保存到工作区。": [
+  "Lists the configured media models and generates images, videos or audio into the workspace.": [
     "packages/tools/mediaGeneration/build.ts"
   ],
-  "允许 AI 生成图片": [
+  "Allow AI to generate images": [
     "packages/tools/mediaGeneration/build.ts"
   ],
-  "允许 AI 生成视频": [
+  "Allow AI to generate videos": [
     "packages/tools/mediaGeneration/build.ts"
   ],
-  "允许 AI 生成音频": [
+  "Allow AI to generate audio": [
     "packages/tools/mediaGeneration/build.ts"
   ],
-  "Skill 操作器": [
+  "Skill Operator": [
     "packages/tools/skillOperator/build.ts"
   ],
-  "统一列出、读取、新建和修改工作区及全局技能。": [
+  "Lists, reads, creates and edits workspace and global skills.": [
     "packages/tools/skillOperator/build.ts"
   ],
-  "允许读取": [
+  "Allow reading": [
     "packages/tools/skillOperator/build.ts"
   ],
-  "允许新建": [
+  "Allow creating": [
     "packages/tools/skillOperator/build.ts"
   ],
-  "允许修改": [
+  "Allow editing": [
     "packages/tools/skillOperator/build.ts"
   ],
-  "读取网页": [
+  "Read Web Page": [
     "packages/tools/webFetch/build.ts"
   ],
-  "读取公开网页、文本和 JSON，自动提取静态正文。": [
+  "Reads public web pages, text and JSON, and extracts the static body text.": [
     "packages/tools/webFetch/build.ts"
   ],
-  "正文最大字符数": [
+  "Maximum body characters": [
     "packages/tools/webFetch/build.ts"
   ],
   "文件路径必须位于工作区内": [
+    "packages/nodeShared/src/markdownContent.ts"
+  ],
+  "文件路径无效": [
     "packages/nodeShared/src/markdownContent.ts"
   ],
   "文件路径超出工作区": [
@@ -9467,6 +9065,9 @@
   "读取引用文件失败": [
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
+  "（{0}）": [
+    "packages/nodeShared/src/components/referenceCard.vue"
+  ],
   "节点正在生成，请等待完成": [
     "packages/nodeShared/src/useNodeGeneration.ts"
   ],
@@ -9474,7 +9075,8 @@
     "packages/nodeShared/src/useNodeGeneration.ts"
   ],
   "生成失败": [
-    "packages/nodeShared/src/useNodeGeneration.ts"
+    "packages/nodeShared/src/useNodeGeneration.ts",
+    "packages/nodeScaffold/src/nodeSkeleton.vue"
   ],
   "当前画布未提供工作区文件能力": [
     "packages/nodeScaffold/src/workspaceFiles.ts"
@@ -9489,6 +9091,12 @@
     "packages/nodeScaffold/src/nodeSkeleton.vue"
   ],
   "节点名称": [
+    "packages/nodeScaffold/src/nodeSkeleton.vue"
+  ],
+  "生成中": [
+    "packages/nodeScaffold/src/nodeSkeleton.vue"
+  ],
+  "生成完成": [
     "packages/nodeScaffold/src/nodeSkeleton.vue"
   ],
   "刷新节点": [
@@ -9555,6 +9163,12 @@
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "模型单轮响应超过 10 分钟，已停止": [
+    "packages/nodeScaffold/src/nodeAi.ts"
+  ],
+  "工具名称不能重复": [
+    "packages/nodeScaffold/src/nodeAi.ts"
+  ],
+  "所选模型不存在，请重新选择": [
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "工具参数必须是对象": [

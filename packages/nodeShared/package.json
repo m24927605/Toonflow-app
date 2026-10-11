@@ -13,7 +13,11 @@
     "./useNodeGeneration": "./src/useNodeGeneration.ts",
     "./groupNodeModels": "./src/groupNodeModels.ts",
     "./markdownContent": "./src/markdownContent.ts",
-    "./markdownExtensions": "./src/markdownExtensions.ts"
+    "./markdownExtensions": "./src/markdownExtensions.ts",
+    "./confirmOnScreenText": "./src/confirmOnScreenText.ts",
+    "./scriptCheck": "./src/scriptCheck.ts",
+    "./gradeControl": "./src/components/gradeControl.vue",
+    "./grading": "./src/grading.ts"
   },
   "scripts": {
     "typecheck": "vue-tsc --noEmit"
@@ -40,7 +44,8 @@
   "dependencies": {
     "@tabler/icons-vue": "^3.46.0",
     "vue-draggable-plus": "^0.6.1",
-    "x-sender": "1.4.6"
+    "x-sender": "1.4.6",
+    "@toonflow/tools-scaffold": "workspace:*"
   },
   "devDependencies": {
     "@toonflow/i18n": "workspace:*",

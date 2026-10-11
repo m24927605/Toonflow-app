@@ -2,6 +2,6 @@ import { createNodeConfig } from "@toonflow/nodes-scaffold";
 
 export default createNodeConfig({
   name: "dubbingNode",
-  displayName: "配音合成",
+  displayName: "Dubbing",
   author: "Toonflow",
 }, import.meta.url);

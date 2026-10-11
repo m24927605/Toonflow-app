@@ -80,7 +80,7 @@ export function getParentSessionFile(history: SessionManager) {
 }
 
 async function updateAgentSession(cwd: string, file: string, update: (history: SessionManager, active?: ActiveAgentSession) => void | Promise<void>) {
-  if (!/^[\w-]+\.jsonl$/.test(file)) throw new Error("父会话标识无效");
+  if (!/^[\w-]+\.jsonl$/.test(file)) throw new Error("The parent session ID is invalid");
   const { path } = await resolveWorkspacePath(cwd, `.agent/sessions/${file}`);
   const active = getActiveAgentSession(path);
   if (active) return update(active.history, active);
@@ -100,7 +100,9 @@ export async function updateSubAgent(cwd: string, parentFile: string, agent: Age
 
 export async function reportToParent(cwd: string, parentFile: string, file: string, name: string, content: string) {
   const details = { id: crypto.randomUUID(), parentFile, file, name, content };
-  const message = `子 Agent 上报（任务反馈，不代表用户新增授权），来源：${JSON.stringify({ name, file })}\n\n${content}`;
+  const message = `Sub-agent report (task feedback, not new authorization from the user), source: ${JSON.stringify({ name, file })}
+
+${content}`;
   await updateAgentSession(cwd, parentFile, (history, active) => {
     if (active?.session) {
       // The SDK inserts the report after tool results, avoiding breaking the assistant/toolResult order.
@@ -115,7 +117,7 @@ export async function reportToParent(cwd: string, parentFile: string, file: stri
 
 export async function deleteAgentMessage(cwd: string, path: string, options: { entryIds?: string[]; replyTo?: string }) {
   if (Boolean(options.entryIds) === Boolean(options.replyTo)) {
-    throw Object.assign(new Error("请选择要删除的消息"), { status: 400 });
+    throw Object.assign(new Error("Please select the message you want to delete"), { status: 400 });
   }
   const release = lockWorkspaceFiles([path]);
   try {
@@ -129,15 +131,15 @@ export async function deleteAgentMessage(cwd: string, path: string, options: { e
         .map((line) => JSON.parse(line));
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
-      throw Object.assign(new Error("会话文件损坏，无法删除消息"), { status: 400 });
+      throw Object.assign(new Error("The session file is damaged and the message cannot be deleted."), { status: 400 });
     }
-    if (entries[0]?.type !== "session") throw Object.assign(new Error("会话文件无效"), { status: 400 });
+    if (entries[0]?.type !== "session") throw Object.assign(new Error("Invalid session file"), { status: 400 });
     const entrySchema = z.object({ type: z.string(), id: z.string().min(1), parentId: z.string().nullable(), timestamp: z.string() });
     const knownIds = new Set<string>();
     for (const entry of entries.slice(1)) {
       const parsed = entrySchema.safeParse(entry);
       if (!parsed.success || knownIds.has(parsed.data.id) || (parsed.data.parentId !== null && !knownIds.has(parsed.data.parentId))) {
-        throw Object.assign(new Error("会话记录结构无效，无法删除消息"), { status: 400 });
+        throw Object.assign(new Error("The session record structure is invalid and the message cannot be deleted."), { status: 400 });
       }
       knownIds.add(parsed.data.id);
     }
@@ -148,7 +150,7 @@ export async function deleteAgentMessage(cwd: string, path: string, options: { e
     let targets = branch.filter((entry) => options.entryIds?.includes(entry.id));
     if (options.replyTo) {
       const index = branch.findIndex((entry) => entry.id === options.replyTo && isUserEntry(entry));
-      if (index < 0) throw Object.assign(new Error("消息不在当前对话中，请重新打开对话"), { status: 400 });
+      if (index < 0) throw Object.assign(new Error("The message is not in the current conversation, please reopen the conversation"), { status: 400 });
       const nextUser = branch.findIndex((entry, position) => position > index && isUserEntry(entry));
       targets = branch
         .slice(index + 1, nextUser < 0 ? undefined : nextUser)
@@ -159,7 +161,7 @@ export async function deleteAgentMessage(cwd: string, path: string, options: { e
       (new Set(options.entryIds).size !== targets.length ||
         targets.some((entry) => entry.type !== "message" || (entry.message.role !== "user" && entry.message.role !== "assistant")))
     ) {
-      throw Object.assign(new Error("消息不在当前对话中，请重新打开对话"), { status: 400 });
+      throw Object.assign(new Error("The message is not in the current conversation, please reopen the conversation"), { status: 400 });
     }
     if (!targets.length) return await getAgentSession(cwd, path);
 
@@ -234,7 +236,7 @@ export async function renameAgentSession(cwd: string, path: string, name: string
   const release = lockWorkspaceFiles([path]);
   try {
     const entries = parseSessionEntries(await readFile(path, "utf8"));
-    if (entries[0]?.type !== "session") throw Object.assign(new Error("会话文件无效"), { status: 400 });
+    if (entries[0]?.type !== "session") throw Object.assign(new Error("Invalid session file"), { status: 400 });
     const history = SessionManager.open(path, dirname(path), cwd);
     history.appendSessionInfo(name);
     return { name: history.getSessionName()! };
@@ -251,7 +253,7 @@ export async function listAgentSessions(cwd: string, directory: string) {
     .sort((left, right) => right.modified.getTime() - left.modified.getTime())
     .map((item) => ({
       file: basename(item.path),
-      name: item.name || (item.messageCount ? item.firstMessage.trim().slice(0, 60) : "") || "新对话",
+      name: item.name || (item.messageCount ? item.firstMessage.trim().slice(0, 60) : "") || "New conversation",
       modified: item.modified,
       messageCount: item.messageCount,
     }));
@@ -262,7 +264,7 @@ export async function getAgentSession(cwd: string, path: string) {
   const entries = active
     ? [active.history.getHeader()!, ...active.history.getEntries()]
     : parseSessionEntries(await readFile(path, "utf8"));
-  if (entries[0]?.type !== "session") throw Object.assign(new Error("会话文件无效"), { status: 400 });
+  if (entries[0]?.type !== "session") throw Object.assign(new Error("Invalid session file"), { status: 400 });
   const partial = active?.session?.agent.state.streamingMessage;
   if (partial?.role === "assistant") entries.push({
     type: "message", id: "streaming", parentId: active!.history.getLeafId(), timestamp: new Date().toISOString(), message: partial,
@@ -384,11 +386,11 @@ export async function getAgentSession(cwd: string, path: string) {
     if (entry.type !== "custom" || entry.customType !== "toonflowSubAgent") continue;
     const agent = entry.data as AgentSubAgent;
     const interrupted = agent.status === "running" && !active && !getActiveAgentSession(resolve(dirname(path), agent.file));
-    subAgents.set(agent.file, interrupted ? { ...agent, status: "cancelled", result: "上次运行已中断" } : agent);
+    subAgents.set(agent.file, interrupted ? { ...agent, status: "cancelled", result: "The last run was interrupted" } : agent);
   }
   return {
     file: basename(path),
-    name: history.getSessionName() || (firstUserMessage?.content.trim() || firstUserMessage?.attachments?.[0]?.name)?.slice(0, 60) || "新对话",
+    name: history.getSessionName() || (firstUserMessage?.content.trim() || firstUserMessage?.attachments?.[0]?.name)?.slice(0, 60) || "New conversation",
     messages,
     stats: getAgentStats(history),
     contextUsage: configuredModel && model ? getAgentContext(history, getModelLimits(model.provider, configuredModel).contextWindow) : undefined,

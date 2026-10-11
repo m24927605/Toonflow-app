@@ -16,7 +16,7 @@ export default Router().get("/", async (req, res) => {
       const metadata = await u.extPlugins.readExt(name).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return null;
         return { name, id: name, displayName: name, extensions: [], resourceKind: "file", version: "", readme: "", author: "", github: "", configRules: [],
-          loadError: translateMessage(error instanceof Error ? error.message : "文件扩展无法读取") };
+          loadError: translateMessage(error instanceof Error ? error.message : "The file extension could not be read") };
       });
       return metadata && { loadError: "", ...metadata, canManage, canConfigure: canManage, config: canManage ? u.extPlugins.getExtConfig(metadata) : {},
         enabled: !files.some(entry => entry.name === `${name}.disabled`), url: `/api/ext/read?name=${name}` };

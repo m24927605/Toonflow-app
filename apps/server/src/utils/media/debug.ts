@@ -31,7 +31,7 @@ export async function runProviderSource(
   function redact(value: unknown) {
     let text = typeof value === "string" ? value : JSON.stringify(value, (key, item) => {
       if (secretFields.test(key)) return "••••••";
-      if (typeof item === "string" && item.length > 4000) return t`[${item.length} 个字符]`;
+      if (typeof item === "string" && item.length > 4000) return t`[${item.length} characters]`;
       return item;
     }, 2) ?? "";
     for (const secret of secrets) text = text.replaceAll(secret, "••••••");
@@ -40,8 +40,8 @@ export async function runProviderSource(
       .slice(0, 16000);
   }
   function bodyText(body: unknown) {
-    if (typeof body !== "string") return body ? t`[二进制或表单请求体]` : "";
-    if (body.length > 1024 * 1024) return t`[请求体 ${body.length} 个字符]`;
+    if (typeof body !== "string") return body ? t`[Binary or form request body]` : "";
+    if (body.length > 1024 * 1024) return t`[request body ${body.length} characters]`;
     try { return redact(JSON.parse(body)); }
     catch { return redact(body); }
   }
@@ -70,7 +70,8 @@ export async function runProviderSource(
             body += decoder.decode(value.subarray(0, Math.max(0, 16000 - (size - value.byteLength))), { stream: true });
           }
           body += decoder.decode();
-          if (size >= 16000) body += t`\n…响应已截断`;
+          if (size >= 16000) body += t`
+…response truncated`;
         } finally { void reader.cancel().catch(() => {}); }
       }
       report({ state: response.ok ? "success" : "error", status: response.status, duration: Math.round(performance.now() - start), response: bodyText(body) });
@@ -85,28 +86,28 @@ export async function runProviderSource(
     const provider = await loadMediaProviderSource(source, config, signal, fetchRequest);
     for (const [key, value] of Object.entries(provider.config)) if (secretFields.test(key) && typeof value === "string" && value && !secrets.includes(value)) secrets.push(value);
     const model = provider.models.find(model => model.id === request.model);
-    if (!model) throw new Error("模型已变更，请重新选择模型");
+    if (!model) throw new Error("The model has changed, please select the model again");
     const method = model.type === "image" ? provider.generateImage : model.type === "video" ? provider.generateVideo : model.type === "audio" ? provider.generateAudio : undefined;
-    if (!method) throw new Error("供应商没有实现此模型的媒体生成方法");
+    if (!method) throw new Error("The provider does not implement a media generation method for this model");
     const prompt = request[model.type === "audio" ? "text" : "prompt"];
-    if (typeof prompt !== "string" || !prompt.trim()) throw new Error("请输入提示词");
+    if (typeof prompt !== "string" || !prompt.trim()) throw new Error("Please enter the prompt");
     const assets = await method.call(provider, request as unknown as ImageRequest & VideoRequest & AudioRequest);
     signal.throwIfAborted();
-    if (!Array.isArray(assets) || !assets.length) throw new Error("供应商未返回媒体数组");
+    if (!Array.isArray(assets) || !assets.length) throw new Error("Provider did not return media array");
     let size = 0;
     const result = assets.map(asset => {
-      if (!asset || asset.mediaType !== model.type) throw new Error("返回的媒体类型与模型不一致");
+      if (!asset || asset.mediaType !== model.type) throw new Error("The returned media type is inconsistent with the model");
       if (asset.type === "url") {
-        if (!/^https?:\/\//i.test(asset.url)) throw new Error("媒体结果需要 HTTP 或 HTTPS 地址");
+        if (!/^https?:\/\//i.test(asset.url)) throw new Error("Media results require HTTP or HTTPS address");
         return asset;
       }
       let data: string;
       if (asset.type === "binary" && ArrayBuffer.isView(asset.data) && asset.data.BYTES_PER_ELEMENT === 1) data = Buffer.from(asset.data).toString("base64");
       else if (asset.type === "base64" && typeof asset.data === "string") data = asset.data.replace(/^data:[^;,]+;base64,/, "").replace(/\s/g, "");
-      else throw new Error("媒体结果格式无效");
+      else throw new Error("Media result format is invalid");
       size += data.length;
-      if (size > 44 * 1024 * 1024) throw new Error("调试预览的媒体总量不能超过 32 MB");
-      if (!data || !/^[a-zA-Z0-9+/]*={0,2}$/.test(data) || data.length % 4 === 1 || !asset.mimeType?.startsWith(`${model.type}/`)) throw new Error("媒体编码或 MIME 类型无效");
+      if (size > 44 * 1024 * 1024) throw new Error("The total media size for debug preview cannot exceed 32 MB");
+      if (!data || !/^[a-zA-Z0-9+/]*={0,2}$/.test(data) || data.length % 4 === 1 || !asset.mimeType?.startsWith(`${model.type}/`)) throw new Error("Invalid media encoding or MIME type");
       return { mediaType: asset.mediaType, type: "base64" as const, data, mimeType: asset.mimeType };
     });
     send({ type: "result", assets: result, response: redact(result), duration: Math.round(performance.now() - startedAt) });

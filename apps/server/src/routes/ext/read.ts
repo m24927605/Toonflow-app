@@ -10,9 +10,9 @@ export default Router().get("/", validateFields({ name: u.extPlugins.extNameSche
   const name = req.query.name as string;
   const path = resolve(u.extPlugins.extDirectory, `${name}.umd.js`);
   const file = await lstat(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
-  if (!file?.isFile()) return res.status(404).json(error("文件扩展不存在", null, 404));
+  if (!file?.isFile()) return res.status(404).json(error("The file extension does not exist", null, 404));
   const disabled = await lstat(resolve(u.extPlugins.extDirectory, `${name}.disabled`)).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
-  if (disabled) return res.status(404).json(error("文件扩展已禁用", null, 404));
+  if (disabled) return res.status(404).json(error("File extension disabled", null, 404));
   res.set("Cache-Control", "no-cache");
   await sendFile(res, path);
 });

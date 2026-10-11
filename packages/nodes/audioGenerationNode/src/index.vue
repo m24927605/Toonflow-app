@@ -1,6 +1,7 @@
 <template>
   <nodeSkeleton
     v-bind="nodeProps"
+    :generationStatus="generationStatus"
     :topVisible="node.selected"
     :bottomVisible="node.selected"
     :bottomWidth="actions?.mode === 'speed' ? 440 : 660"
@@ -41,7 +42,7 @@
               <el-option v-for="item in provider.models" :key="item.modelId" :label="item.label" :value="JSON.stringify([item.providerId, item.modelId])" />
             </el-option-group>
           </el-select>
-          <generationSettings v-model:language="data.language" v-model:voice="data.voice" v-model:emotion="data.emotion" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :voices="selectedModel?.voices ?? []" :disabled="busy || !selectedModel" />
+          <generationSettings v-model:duration="data.duration" v-model:language="data.language" v-model:voice="data.voice" v-model:emotion="data.emotion" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :voices="selectedModel?.voices ?? []" :disabled="busy || !selectedModel" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -84,7 +85,7 @@ defineOptions({
 const vLoading = ElLoading.directive;
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({ label: "音频生成" });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; voice: string; emotion: string; sampleRate: number; format: string });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; voice: string; emotion: string; sampleRate: number; format: string; duration?: number });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -107,8 +108,8 @@ let disposed = false;
 let generationController: AbortController | undefined;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
-const generationState = useNodeGeneration(outputs, () => generationController?.abort());
-const { generating } = generationState;
+const generationState = useNodeGeneration(outputs, () => generationController?.abort(), () => void startGeneration().catch(error => showNodeError(error, translate("音频生成失败"))));
+const { generating, status: generationStatus } = generationState;
 const busy = computed(() => generating.value || uploading.value || deleting.value || !!actions.value?.processing);
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
 // A voice belongs to one model, so switching models drops a voice the new model does not offer.
@@ -117,7 +118,7 @@ watch(selectedModel, choice => {
 });
 const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() => [data.value.prompt.trim(), ...refList.value.flatMap((item, index) =>
-  item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])].filter(Boolean).join("\n\n"));
+  item.dataType === "STRING" && item.value?.trim() ? [`Reference ${index + 1}:\n${item.value.trim()}`] : [])].filter(Boolean).join("\n\n"));
 const outputFile = computed(() => outputs.value.audio?.dataType === "AUDIO" ? outputs.value.audio.value : undefined);
 const previewUrl = files.useFileUrl(outputFile, error => showNodeError(error, "音频读取失败"));
 
@@ -176,6 +177,7 @@ async function startGeneration() {
     emotion: data.value.emotion.trim() || undefined,
     sampleRate: data.value.sampleRate,
     format: data.value.format,
+    duration: data.value.duration ?? undefined,
     outputDirectory: `assets/${id}`,
     images: refList.value.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     audios: refList.value.flatMap(item => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
@@ -235,7 +237,7 @@ nodeEvent.on("delete", async () => {
 
 function getConfig() {
   return {
-    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, voice: data.value.voice, emotion: data.value.emotion, sampleRate: data.value.sampleRate, format: data.value.format },
+    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, voice: data.value.voice, emotion: data.value.emotion, sampleRate: data.value.sampleRate, format: data.value.format, duration: data.value.duration },
     models: models.value,
     languages: languageOptions,
     sampleRates: sampleRateOptions,
@@ -246,7 +248,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此音频生成节点的配置、可选音频模型（含各模型的 voices 声线）、语种、采样率、输出格式与输入数量限制，不含密钥；文本不限，图片与音频互斥且合计最多一个，具体模型能力由供应商校验",
+  description: "Read this audio generation node's configuration, available audio models (including each model's voices), languages, sample rates, output formats and input count limits, without keys; text is unlimited, images and audio are mutually exclusive with at most one in total, and specific model capabilities are validated by the provider",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -257,7 +259,7 @@ nodeTools.register({
 });
 nodeTools.register({
   name: "setConfig",
-  description: "修改音频生成模型、语种、声线、语气、采样率或格式；emotion 用文字描述情绪与语速（如“低沉缓慢”“愤怒大吼”），空字符串表示不指定；先用 getConfig 查询选项，providerId 与 modelId 必须同时提供；voice 取所选模型 voices 中的 voice，空字符串表示使用供应商默认声线；不修改提示词、不启动生成",
+  description: "Modify the audio generation model, language, voice, tone, sample rate, format or duration; duration is the length of music or sound effects in seconds, and null means the model default; emotion describes emotion and speaking pace in words (such as \"low and slow\" or \"angry shouting\"), and an empty string means unspecified; first use getConfig to query the options, and providerId and modelId must be provided together; voice takes a voice from the selected model's voices, and an empty string means the provider's default voice; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -266,6 +268,7 @@ nodeTools.register({
     emotion: z.string().max(500).optional(),
     sampleRate: z.number().int().positive().optional(),
     format: z.string().optional(),
+    duration: z.number().int().min(1).max(600).nullable().optional(),
   }).refine(args => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -285,12 +288,13 @@ nodeTools.register({
     if (args.emotion !== undefined) data.value.emotion = args.emotion;
     if (args.sampleRate !== undefined) data.value.sampleRate = args.sampleRate;
     if (args.format !== undefined) data.value.format = args.format;
+    if (args.duration !== undefined) data.value.duration = args.duration ?? undefined;
     return getConfig();
   },
 });
 nodeTools.register({
   name: "setPrompt",
-  description: "修改此节点的音频生成提示词或待朗读文本，支持 {{ref 1}} 等参考标记；只修改文本，不启动生成",
+  description: "Modify this node's audio generation prompt or text to be read aloud, supporting reference markers such as {{ref 1}}; only modifies the text and does not start generation",
   parameters: z.strictObject({ prompt: z.string() }),
   execute({ prompt }) {
     if (deleting.value || disposed) throw new Error("节点正在删除或已关闭，请稍后修改");
@@ -301,7 +305,7 @@ nodeTools.register({
 });
 nodeTools.register({
   name: "generateAudio",
-  description: "使用当前提示词、模型、语种、采样率、格式和可选参考图片或音频启动后台生成；图片与音频互斥且合计最多一个，文本不限；立即返回已开始，用 getGenerationStatus 查询结果、cancelGeneration 停止",
+  description: "Start background generation with the current prompt, model, language, sample rate, format and optional reference image or audio; images and audio are mutually exclusive with at most one in total, and text is unlimited; returns started immediately; use getGenerationStatus to query the result and cancelGeneration to stop",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

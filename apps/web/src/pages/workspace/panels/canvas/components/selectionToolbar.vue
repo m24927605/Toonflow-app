@@ -24,6 +24,8 @@
       <el-button text :icon="IconCopyPlus" :disabled="busy || disabled" @click="operate('duplicate')">创建副本</el-button>
       <el-button text :icon="IconBoxMultiple" :disabled="busy || disabled" @click="operate('group')">打组</el-button>
       <el-button text :icon="IconDeselect" :disabled="busy || disabled || !hasGroup" @click="operate('ungroup')">解组</el-button>
+      <span class="toolbarDivider" aria-hidden="true" />
+      <el-button text :icon="IconPlayerPlay" :disabled="busy || disabled" title="对选中的生成节点同时发出生成" @click="generateSelection">生成</el-button>
     </div>
   </el-card>
 </template>
@@ -33,7 +35,7 @@ import { computed, nextTick, ref } from "vue";
 import { getRectOfNodes, useVueFlow, type GraphNode, type Node, type XYPosition } from "@vue-flow/core";
 import { ElButton, ElCard, ElMessage } from "element-plus";
 import {
-  IconCopyPlus, IconBoxMultiple, IconDeselect,
+  IconCopyPlus, IconBoxMultiple, IconDeselect, IconPlayerPlay,
   IconLayoutGrid, IconLayoutColumns, IconLayoutRows,
 } from "@tabler/icons-vue";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
@@ -297,6 +299,14 @@ async function operate(command: "duplicate" | "group" | "ungroup" | "mergeGroup"
   } finally {
     busy.value = false;
   }
+}
+
+// Starts every selected generation node at once, so batching providers can gather them into one run.
+function generateSelection() {
+  if (busy.value || props.disabled) return;
+  const count = flow.getSelectedNodes.value.reduce((sum, node) => sum + useNodeEvent(node.id, flow).emit("generate"), 0);
+  if (count) ElMessage.success(`已对 ${count} 个节点发出生成，正在生成的节点会保持当前任务`);
+  else ElMessage.warning("选中的节点都不能生成");
 }
 
 defineExpose({ operate, startDragCopy, busy });

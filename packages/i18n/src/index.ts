@@ -1,6 +1,7 @@
 import { IntlMessageFormat } from "intl-messageformat";
 import { escapeMessageText } from "./messageText.ts";
 export { escapeMessageText } from "./messageText.ts";
+import zhCn from "./locales/zhCn.json";
 import zhTw from "./locales/zhTw.json";
 import en from "./locales/en.json";
 
@@ -9,7 +10,8 @@ export interface MessageDescriptor { id: string; values?: Record<string, unknown
 export const supportedLocales: { code: Locale; name: string }[] = [
   { code: "zh-CN", name: "简体中文" }, { code: "zh-TW", name: "繁體中文" }, { code: "en", name: "English" },
 ];
-const catalogs: Record<string, Record<string, string>> = { "zh-TW": zhTw, en };
+// Chinese source strings are their own Simplified Chinese text; English source strings need the zh-CN catalog too.
+const catalogs: Record<string, Record<string, string>> = { "zh-CN": zhCn, "zh-TW": zhTw, en };
 let activeLocale: Locale = "zh-CN";
 const listeners = new Set<(locale: Locale) => void>();
 const formatters = new Map<string, IntlMessageFormat>();

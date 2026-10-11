@@ -71,8 +71,8 @@ export default {
       "audio-references": request.audios ?? [],
     };
     if (request.mode === "videoExtension") {
-      if (request.model !== "seedance_2_5") throw new Error("只有 Seedance 2.5 支持延长视频");
-      if (request.videos?.length !== 1) throw new Error("延长视频需要连接且只连接一个视频");
+      if (request.model !== "seedance_2_5") throw new Error("Only Seedance 2.5 supports video extension");
+      if (request.videos?.length !== 1) throw new Error("Extending a video requires connecting exactly one video");
       params.mode = "video_extension";
       params.extension_mode = "forward";
     // Seedance 2.5 needs an explicit mode: text-only jobs are t2v, anything with frames or references is omni_reference.

@@ -68,7 +68,7 @@ function closeSession(session: Session) {
   if (session.id && sessions.get(session.id) === session) sessions.delete(session.id);
   bridges.delete(session.token);
   session.child.kill();
-  for (const item of session.waiting.splice(0)) item.resolve({ isError: true, content: [{ type: "text", text: "Claude Code 会话已结束" }] });
+  for (const item of session.waiting.splice(0)) item.resolve({ isError: true, content: [{ type: "text", text: "The Claude Code session has ended." }] });
   void session.mcp?.close();
   void rm(session.directory, { recursive: true, force: true }).catch(() => {});
 }
@@ -90,9 +90,9 @@ function send(session: Session, content: object[], last: boolean) {
 
 async function startSession(modelId: string, context: Context, id?: string) {
   const tools = context.tools ?? [];
-  const command = findCommand("claude", "未找到 Claude Code，请先在运行 Toonflow 的电脑上安装并登录 Claude Code");
+  const command = findCommand("claude", "Claude Code was not found. Install and sign in to Claude Code on the computer running Toonflow.");
   const origin = getMcpRuntime().appOrigin;
-  if (tools.length && !origin) throw new Error("服务尚未就绪，请稍后重试");
+  if (tools.length && !origin) throw new Error("The service is not ready yet. Please try again shortly.");
   // Free text never goes into argv: on Windows an npm `.cmd` shim runs through cmd.exe, which would re-parse it.
   // The prompt goes through stdin; the system prompt and the MCP config (with its token) go through private temporary files.
   const directory = await mkdtemp(join(tmpdir(), "toonflow-claude-"));
@@ -144,7 +144,7 @@ export const claudeCodeToolsRouter = Router().use((request, response, next) => {
   const session = token ? bridges.get(token) : undefined;
   const local = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress ?? "");
   if (!local || !session?.mcp) {
-    response.status(401).json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Claude Code 会话不存在" } });
+    response.status(401).json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "The Claude Code session does not exist." } });
     return;
   }
   session.mcp(request, response, next);
@@ -163,7 +163,7 @@ function readTurn(session: Session, providerId: string, modelId: string, signal:
     const calls: ToolCall[] = [];
     for (;;) {
       const { value: line, done } = await session.lines.next();
-      if (done) throw new Error(signal.aborted ? "已取消" : (await session.stderr).trim() || `Claude Code 异常退出（${session.child.exitCode}）`);
+      if (done) throw new Error(signal.aborted ? "Canceled" : (await session.stderr).trim() || `Claude Code exited unexpectedly (${session.child.exitCode})`);
       const event = JSON.parse(line);
       if (event.type === "assistant") {
         // The CLI reports each finished content block; tool calls run as soon as their block is complete.
@@ -174,7 +174,7 @@ function readTurn(session: Session, providerId: string, modelId: string, signal:
           calls.push({ type: "toolCall", id: block.id, name, arguments: block.input as JsonObject });
         }
       } else if (event.type === "result") {
-        if (event.is_error) throw new Error(event.result || "Claude Code 请求失败");
+        if (event.is_error) throw new Error(event.result || "The Claude Code request failed.");
         const usage = event.usage ?? {};
         output.usage = { ...output.usage, input: usage.input_tokens ?? 0, output: usage.output_tokens ?? 0,
           cacheRead: usage.cache_read_input_tokens ?? 0, cacheWrite: usage.cache_creation_input_tokens ?? 0 };
@@ -212,7 +212,7 @@ function readTurn(session: Session, providerId: string, modelId: string, signal:
   })().catch((error: unknown) => {
     closeSession(session);
     const reason = signal.aborted ? "aborted" : "error";
-    stream.push({ type: "error", reason, error: { ...output, stopReason: reason, errorMessage: error instanceof Error ? error.message : "Claude Code 输出无法解析" } });
+    stream.push({ type: "error", reason, error: { ...output, stopReason: reason, errorMessage: error instanceof Error ? error.message : "Could not parse the Claude Code output" } });
   }).finally(() => signal.removeEventListener("abort", abort));
   return stream;
 }
@@ -222,14 +222,14 @@ function readTurn(session: Session, providerId: string, modelId: string, signal:
  * tools need the page's session ID: the first turn starts the CLI, and later turns only bring the tool results.
  */
 export async function streamClaudeCode(providerId: string, modelId: string, context: Context, signal: AbortSignal, attachments: object[], sessionId?: string) {
-  if (!/^[\w.[\]-]+$/.test(modelId)) throw Object.assign(new Error("Claude Code 模型 ID 无效"), { status: 400 });
+  if (!/^[\w.[\]-]+$/.test(modelId)) throw Object.assign(new Error("Invalid Claude Code model ID"), { status: 400 });
   const tools = context.tools ?? [];
-  if (tools.length && !sessionId) throw Object.assign(new Error("Claude Code 工具调用需要会话 ID"), { status: 400 });
+  if (tools.length && !sessionId) throw Object.assign(new Error("Claude Code tool calls need a session ID."), { status: 400 });
   let session = sessionId ? sessions.get(sessionId) : undefined;
   if (!session) {
     const [first, ...rest] = context.messages;
-    if (!first || first.role !== "user") throw Object.assign(new Error("Claude Code 请求必须以用户消息开始"), { status: 400 });
-    if (rest.length) throw Object.assign(new Error("Claude Code 会话已结束，请重新生成"), { status: 409 });
+    if (!first || first.role !== "user") throw Object.assign(new Error("A Claude Code request must start with a user message."), { status: 400 });
+    if (rest.length) throw Object.assign(new Error("The Claude Code session has ended. Please generate again."), { status: 409 });
     session = await startSession(modelId, context, sessionId);
     send(session, [...blocks(first.content), ...attachments], !tools.length);
   } else {
@@ -237,7 +237,7 @@ export async function streamClaudeCode(providerId: string, modelId: string, cont
     const results = context.messages.slice(session.delivered);
     if (session.model !== modelId || !results.length || results.some(message => message.role !== "toolResult" || !session!.calls.has(message.toolCallId))) {
       closeSession(session);
-      throw Object.assign(new Error("Claude Code 会话只能继续提交本轮工具结果，请重新生成"), { status: 409 });
+      throw Object.assign(new Error("A Claude Code session can only continue with this turn's tool results. Please generate again."), { status: 409 });
     }
     for (const message of results) {
       if (message.role !== "toolResult") continue;

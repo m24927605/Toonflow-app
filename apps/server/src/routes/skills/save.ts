@@ -12,10 +12,10 @@ export default router.put("/", validateFields({
   path: z.string().min(1).max(1024).optional(),
   content: z.string(),
 }), async (req, res) => {
-  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("请在服务器本机编辑技能", null, 403));
+  if (!u.workspace.isLocalWorkspaceRequest(req)) return res.status(403).json(error("Please edit skills locally on the server", null, 403));
   const { name, path, content } = req.body as { name: string; path?: string; content: string };
-  if (Buffer.byteLength(content, "utf8") > u.skillFile.maxBytes) return res.status(413).json(error("技能文件不能超过 20 MB", null, 413));
-  if (content.includes("\u0000")) return res.status(400).json(error("内容不能包含空字符", null, 400));
+  if (Buffer.byteLength(content, "utf8") > u.skillFile.maxBytes) return res.status(413).json(error("Skill file cannot exceed 20 MB", null, 413));
+  if (content.includes("\u0000")) return res.status(400).json(error("content cannot contain null characters", null, 400));
   // ACT: Lock the skills root across scan and replace to avoid interleaving with
   // in-process installs/file operations; narrow the lock scope if concurrency grows.
   const release = u.workspaceFile.lockWorkspaceFiles([u.skillFile.directory()]);
@@ -32,10 +32,10 @@ export default router.put("/", validateFields({
         const { frontmatter } = parseFrontmatter(content);
         z.object({ name: z.literal(name), description: z.string().max(1024).refine(value => Boolean(value.trim())) }).parse(frontmatter);
       } catch {
-        return res.status(400).json(error("SKILL.md 必须包含合法 YAML、与原技能相同的字符串 name，以及非空且不超过 1024 字符的 description", null, 400));
+        return res.status(400).json(error("SKILL.md must contain valid YAML, the same string name as the original skill, and a non-empty description that does not exceed 1024 characters.", null, 400));
       }
     }
     await u.workspaceFile.writeWorkspaceFile(target, content);
-    res.json(success(null, "已保存"));
+    res.json(success(null, "Saved"));
   } finally { release(); }
 });

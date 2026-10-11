@@ -8,6 +8,9 @@
     :downloadName="`${nodeProps.label || '文本'}.md`"
     :bottomWidth="660"
     @fullscreen="fullscreen = true; editing = true">
+    <template #topActions>
+      <el-button text size="small" :icon="IconListCheck" :disabled="!outputs.text.value.trim()" title="Check the shot list timing of this script" @click="showScriptCheck">Check script</el-button>
+    </template>
     <div class="textContent" :class="{ empty: !outputs.text.value.trim() }">
       <el-alert v-if="documentState.error" :title="documentState.error" type="error" :closable="false" showIcon>
         <el-button text size="small" :disabled="generating || textReloading" @click="editing = true">查看并复制当前正文</el-button>
@@ -51,8 +54,9 @@
 <script setup lang="ts">
 import { translate } from "@toonflow/i18n/vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
+import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { ElAlert, ElButton, ElCard, ElSelect, ElDialog, ElOption, ElOptionGroup, ElMessage, ElMessageBox } from "element-plus";
-import { IconEdit, IconFileText, IconSparkles, IconArrowUp } from "@tabler/icons-vue";
+import { IconEdit, IconFileText, IconSparkles, IconArrowUp, IconListCheck } from "@tabler/icons-vue";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeAiModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
@@ -255,9 +259,27 @@ async function generateText() {
 }
 const promptModel = computed({ get: () => data.value.promptModel ?? [], set: (value: PromptModel) => { data.value.promptModel = value; } });
 
+function showScriptCheck() {
+  const { shots, total, median, issues } = checkScript(outputs.value.text.value);
+  const summary = `${shots.length} shots, ${total.toFixed(2)} s in total, median shot ${median.toFixed(2)} s.`;
+  void ElMessageBox.alert(issues.length ? `${summary}\n\n${issues.join("\n")}` : `${summary}\nNo timing issues found.`, "Script check", {
+    type: issues.length ? "warning" : "success", customStyle: { whiteSpace: "pre-line", maxWidth: "640px" },
+  }).catch(() => {});
+}
+
+nodeTools.register({
+  name: "checkScript",
+  description: "Check the shot list of this script: shot count, total and median length, shots over 8 s, gaps or overlaps between time ranges, and an optional target total length in seconds",
+  parameters: z.strictObject({ target: z.number().positive().max(36000).optional() }),
+  async execute({ target }) {
+    if (!textReady.value) throw new Error("文本尚未加载");
+    return checkScript(outputs.value.text.value, target);
+  },
+});
+
 nodeTools.register({
   name: "setText",
-  description: "修改此节点的文本输出",
+  description: "Modify this node's text output",
   parameters: z.strictObject({ text: z.string() }),
   async execute({ text }) {
     if (!textReady.value) throw new Error("文本尚未加载");

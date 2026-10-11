@@ -37,11 +37,11 @@ function allowedHost(req: Request) {
 
 export function getAppOrigin(req: Request) {
   const source = req.get("origin") ?? req.get("referer");
-  if (!source || !allowedHost(req)) throw Object.assign(new Error("只允许 Toonflow 页面访问控制连接"), { status: 403 });
+  if (!source || !allowedHost(req)) throw Object.assign(new Error("Only Toonflow pages may access the control connection"), { status: 403 });
   let url: URL;
   try { url = new URL(source); }
-  catch { throw Object.assign(new Error("页面来源无效"), { status: 403 }); }
-  if (!["http:", "https:"].includes(url.protocol) || url.host !== req.get("host")) throw Object.assign(new Error("页面来源与服务地址不一致"), { status: 403 });
+  catch { throw Object.assign(new Error("Invalid page origin"), { status: 403 }); }
+  if (!["http:", "https:"].includes(url.protocol) || url.host !== req.get("host")) throw Object.assign(new Error("The page origin does not match the service address"), { status: 403 });
   return url.origin;
 }
 
@@ -58,12 +58,12 @@ export function authorizeMcp(req: Request) {
 
 export function assertAppRequest(req: Request) {
   getAppOrigin(req);
-  if (req.get("x-toonflow-workspace") !== "1") throw Object.assign(new Error("只允许 Toonflow 页面访问控制连接"), { status: 403 });
+  if (req.get("x-toonflow-workspace") !== "1") throw Object.assign(new Error("Only Toonflow pages may access the control connection"), { status: 403 });
 }
 
 export function assertControlRequest(req: Request) {
   assertAppRequest(req);
-  if (!authorizeMcp(req)) throw Object.assign(new Error("MCP 未开启或访问凭证无效"), { status: 403 });
+  if (!authorizeMcp(req)) throw Object.assign(new Error("MCP is not enabled or the access credentials are invalid"), { status: 403 });
 }
 
 export function listConnections() {
@@ -73,16 +73,16 @@ export function listConnections() {
 export function getConnection(id?: string, directory?: string) {
   if (id) {
     const connection = connections.get(id);
-    if (!connection) throw new Error("Toonflow 页面已断开，请重新调用 getAppState");
+    if (!connection) throw new Error("Toonflow page has been disconnected, please call getAppState again");
     return connection;
   }
   const matches = [...connections.values()].filter(item => !directory || item.state.directory === directory);
-  if (matches.length > 1) throw new Error("存在多个 Toonflow 页面，请用 target.connectionId 指定操作目标");
+  if (matches.length > 1) throw new Error("There are multiple Toonflow pages. Please use target.connectionId to specify the operation target.");
   return matches[0];
 }
 
 export function connectControl(id: string, response: Response) {
-  if (connections.has(id)) throw Object.assign(new Error("控制连接已存在"), { status: 409 });
+  if (connections.has(id)) throw Object.assign(new Error("Control connection already exists"), { status: 409 });
   const connection: Connection = { id, response, revision: 0, state: { directory: null, canvasId: null, panel: "home", projectList: [], tools: [] } };
   response.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
   response.flushHeaders();
@@ -95,7 +95,7 @@ export function connectControl(id: string, response: Response) {
     response.off("close", close);
     socket?.off("close", close);
     if (connections.get(id) === connection) connections.delete(id);
-    connection.pending?.finish({ error: "Toonflow 页面已断开，操作已取消" });
+    connection.pending?.finish({ error: "The Toonflow page has been disconnected and the operation has been cancelled." });
   };
   response.once("close", close);
   socket?.once("close", close);
@@ -110,15 +110,15 @@ export function updateControlState(id: string, revision: number, state: ControlS
 
 export function finishControlCall(connectionId: string, callId: string, result: ControlResult) {
   const connection = getConnection(connectionId)!;
-  if (connection.pending?.id !== callId) throw Object.assign(new Error("控制命令已取消或不存在"), { status: 404 });
+  if (connection.pending?.id !== callId) throw Object.assign(new Error("The control command has been canceled or does not exist"), { status: 404 });
   connection.pending.finish(result);
 }
 
 export function callControl(connectionId: string, name: string, args: Record<string, unknown>, signal: AbortSignal, directory?: string) {
   signal.throwIfAborted();
   const connection = getConnection(connectionId)!;
-  if (connection.pending) throw new Error("此页面正在执行另一条控制命令，请等待完成");
-  if (directory && connection.state.directory !== directory) throw new Error("工作区已切换，请重新调用 getAppState");
+  if (connection.pending) throw new Error("This page is executing another control command, please wait for completion");
+  if (directory && connection.state.directory !== directory) throw new Error("The workspace has been switched, please call getAppState again");
   const callId = crypto.randomUUID();
   return new Promise<unknown>((resolve, reject) => {
     const finish = ({ result, error }: ControlResult) => {
@@ -131,7 +131,7 @@ export function callControl(connectionId: string, name: string, args: Record<str
     };
     const abort = () => {
       if (!connection.response.destroyed) connection.response.write(`data: ${JSON.stringify({ type: "cancel", callId })}\n\n`);
-      finish({ error: "控制命令已取消或超时" });
+      finish({ error: "The control command has been canceled or timed out" });
     };
     const timer = setTimeout(abort, 120000);
     connection.pending = { id: callId, finish };
@@ -142,7 +142,7 @@ export function callControl(connectionId: string, name: string, args: Record<str
 
 for (const key of ["settings.mcp.enabled", "settings.mcp.token"] as const) conf.onDidChange(key, () => {
   for (const connection of connections.values()) {
-    connection.pending?.finish({ error: "MCP 设置已修改，控制命令已取消" });
+    connection.pending?.finish({ error: "MCP settings have been modified and control commands have been cancelled." });
     connection.response.end();
   }
   connections.clear();

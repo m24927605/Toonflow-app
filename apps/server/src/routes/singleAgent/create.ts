@@ -8,10 +8,10 @@ const toolName = z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/);
 const inputSchema = z.strictObject({
   tools: z.array(z.union([
     toolName,
-    z.strictObject({ plugin: toolName, names: z.array(toolName).min(1).refine(names => new Set(names).size === names.length, "工具名称不能重复").optional() }),
+    z.strictObject({ plugin: toolName, names: z.array(toolName).min(1).refine(names => new Set(names).size === names.length, "Tool names cannot be repeated").optional() }),
     z.strictObject({
       name: toolName, label: z.string().trim().min(1).max(200).optional(), description: z.string().trim().min(1).max(20000),
-      parameters: z.record(z.string(), z.json()).refine(value => value.type === "object" && JSON.stringify(value).length <= 100000, "工具参数必须是 JSON 对象结构，且不超过 100 KB"),
+      parameters: z.record(z.string(), z.json()).refine(value => value.type === "object" && JSON.stringify(value).length <= 100000, "Tool parameters must be a JSON object structure and no larger than 100 KB"),
       executionMode: z.enum(["sequential", "parallel"]).optional(),
     }),
   ])).max(128),
@@ -28,7 +28,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const abort = () => {
     if (res.writableFinished) return;
     controller.abort();
-    if (sessionId) void u.singleAgent.close(sessionId).catch(error => console.error("清理临时对话失败：", error));
+    if (sessionId) void u.singleAgent.close(sessionId).catch(error => console.error("Failed to clean up the temporary chat: ", error));
     cleanup();
   };
   const cleanup = () => {

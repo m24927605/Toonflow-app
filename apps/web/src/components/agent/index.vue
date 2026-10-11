@@ -51,10 +51,10 @@ type OpenConversation = { key: number; name: string; file?: string; parentFile?:
 const conversations = ref<OpenConversation[]>([]);
 const conversationKey = ref(0);
 const selectedConversation = computed(() => conversations.value.find(item => item.key === conversationKey.value));
-// ACT: "新对话" is reserved by the existing auto-naming logic; translate only the display, not the stored or compared value.
+// ACT: "New conversation" is the reserved default name from the server; translate only the display, not the stored or compared value.
 const name = computed(() => {
   const value = selectedConversation.value?.name;
-  return value && value !== "新对话" ? value : translate("新对话");
+  return value && value !== "New conversation" ? value : translate("新对话");
 });
 const sessionFile = computed(() => selectedConversation.value?.file);
 const workspaceStore = useWorkspaceStore();
@@ -74,7 +74,7 @@ function showConversation(session: AgentConversation | null, activate = true) {
     return existing;
   }
   const key = ++nextConversationKey;
-  const item = { key, name: session?.name || "新对话", file: session?.file, parentFile: session?.parentFile, subAgents: session?.subAgents ?? [], session };
+  const item = { key, name: session?.name || "New conversation", file: session?.file, parentFile: session?.parentFile, subAgents: session?.subAgents ?? [], session };
   conversations.value.push(item);
   if (activate) conversationKey.value = key;
   return conversations.value[conversations.value.length - 1]!;
@@ -131,7 +131,7 @@ function backToParent() {
 }
 
 function updateConversationName(item: OpenConversation, prompt: string) {
-  if (item.name !== "新对话") return;
+  if (item.name !== "New conversation") return;
   item.name = prompt.slice(0, 80);
   const entry = history.value.find(entry => entry.file === item.file);
   if (entry) entry.name = item.name;

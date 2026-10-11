@@ -9,11 +9,11 @@ import { t } from "@/lib/i18n";
 const router = Router();
 
 export default router.put("/", validateFields({ settings: z.record(z.string(), z.json()).and(z.object({
-  agentSystemPrompt: z.string().max(maxSystemPromptLength, { error: () => t`系统提示词不能超过 ${maxSystemPromptLength} 个字符` }).optional(),
+  agentSystemPrompt: z.string().max(maxSystemPromptLength, { error: () => t`The system prompt cannot exceed ${maxSystemPromptLength} characters` }).optional(),
   mcp: z.object({ enabled: z.boolean().optional(), token: z.string().optional(), port: z.number().int().min(1).max(65535).optional() }).optional(),
 })) }), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
   u.conf.set("settings", req.body.settings);
   await u.mcpRuntime.reloadMcpRuntime();
-  res.json(success(null, "设置已保存"));
+  res.json(success(null, "Settings saved"));
 });

@@ -38,7 +38,7 @@ async function readVersion(path: string, name: string, signal?: AbortSignal) {
   const [output, code] = await Promise.all([child.stdout.text(), child.exited]);
   signal?.throwIfAborted();
   const version = output.split(/\r?\n/, 1)[0];
-  if (code !== 0 || !version?.startsWith(`${name} version `)) throw messageError(msg`${name} 无法运行，请检查平台兼容性或重新下载`);
+  if (code !== 0 || !version?.startsWith(`${name} version `)) throw messageError(msg`${name} cannot run, please check platform compatibility or download again`);
   return version;
 }
 
@@ -49,7 +49,7 @@ export async function getToolStatus(directory: string, mode: FfmpegMode, formatE
     const path = hasDownload ? downloaded : mode === "download" ? null : Bun.which(executableName(name));
     const origin = path ? hasDownload ? "download" as const : "system" as const : null;
     try {
-      return [name, { path, origin, version: path ? await readVersion(path, name) : null, error: path ? null : "未找到可用程序" }] as const;
+      return [name, { path, origin, version: path ? await readVersion(path, name) : null, error: path ? null : "No available program found" }] as const;
     } catch (error) {
       return [name, { path, origin, version: null, error: formatError(error) }] as const;
     }
@@ -62,12 +62,12 @@ async function checkDirectory(path: string) {
     if (error.code !== "ENOENT") throw error;
     return null;
   });
-  if (stat && (!stat.isDirectory() || stat.isSymbolicLink())) throw messageError(msg`安装目录必须是普通文件夹：${path}`);
+  if (stat && (!stat.isDirectory() || stat.isSymbolicLink())) throw messageError(msg`The installation directory must be a normal folder: ${path}`);
   return stat !== null;
 }
 
 export async function installFfmpeg(directory: string, signal: AbortSignal, report: (state: DownloadState) => void) {
-  if (!build) throw messageError(msg`暂不支持自动下载 ${target} 版本`);
+  if (!build) throw messageError(msg`does not currently support automatic download of ${target} version`);
   signal = AbortSignal.any([signal, AbortSignal.timeout(15 * 60 * 1000)]);
   signal.throwIfAborted();
   const parent = dirname(resolve(directory));
@@ -87,7 +87,7 @@ export async function installFfmpeg(directory: string, signal: AbortSignal, repo
       const asset = build[name];
       report({ phase: "downloading", file: name, received: 0 });
       const response = await fetch(`${downloadUrl}${asset.fileName}`, { signal });
-      if (!response.ok || !response.body) throw messageError(msg`${name} 下载失败（HTTP ${response.status}）`);
+      if (!response.ok || !response.body) throw messageError(msg`${name} Download failed (HTTP ${response.status})`);
       const total = Number(response.headers.get("content-length")) || undefined;
       let received = 0;
       const hash = createHash("sha256");
@@ -95,20 +95,20 @@ export async function installFfmpeg(directory: string, signal: AbortSignal, repo
       await pipeline(Readable.from(response.body), new Transform({
         transform(chunk: Buffer, _encoding, callback) {
           received += chunk.length;
-          if (received > 128 * 1024 * 1024) return callback(new Error("下载文件超过允许大小"));
+          if (received > 128 * 1024 * 1024) return callback(new Error("Download file exceeds allowed size"));
           hash.update(chunk);
           report({ phase: "downloading", file: name, received, total });
           callback(null, chunk);
         },
       }), createWriteStream(compressed, { flags: "wx", signal }), { signal });
       report({ phase: "verifying", file: name, received, total });
-      if (hash.digest("hex") !== asset.sha256) throw messageError(msg`${name} 文件校验失败，请重试`);
+      if (hash.digest("hex") !== asset.sha256) throw messageError(msg`${name} File verification failed, please try again.`);
       const binary = join(staged, executableName(name));
       let extracted = 0;
       await pipeline(createReadStream(compressed, { signal }), createGunzip(), new Transform({
         transform(chunk: Buffer, _encoding, callback) {
           extracted += chunk.length;
-          callback(extracted > 256 * 1024 * 1024 ? new Error("解压文件超过允许大小") : null, chunk);
+          callback(extracted > 256 * 1024 * 1024 ? new Error("The decompressed file exceeds the allowed size") : null, chunk);
         },
       }), createWriteStream(binary, { flags: "wx", signal }), { signal });
       if (process.platform !== "win32") await chmod(binary, 0o755);
@@ -127,7 +127,7 @@ export async function installFfmpeg(directory: string, signal: AbortSignal, repo
         try { await rename(previous, destination); }
         catch {
           preserveBackup = true;
-          throw messageError(msg`安装失败且无法恢复旧版本，旧文件保留在 ${previous}`, { cause: error });
+          throw messageError(msg`Installation failed and old version cannot be restored, old files remain in ${previous}`, { cause: error });
         }
       }
       throw error;
@@ -136,7 +136,7 @@ export async function installFfmpeg(directory: string, signal: AbortSignal, repo
     // Only clean up the temp directory created by this mkdtemp call that is still inside the data directory.
     if (!preserveBackup && dirname(temporary) === root) {
       await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(error => {
-        console.warn(`FFmpeg 临时目录清理失败：${temporary}`, error);
+        console.warn(`Failed to clean up FFmpeg temporary directory: ${temporary}`, error);
       });
     }
   }
