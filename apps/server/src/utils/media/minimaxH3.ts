@@ -1,12 +1,15 @@
 import type { ProviderTools } from "@toonflow/providers";
-import { inputBytes, inputExtension, randomSeed, runColabJob } from "@/utils/media/colab";
+import { createColabWorker, inputBytes, inputExtension, randomSeed } from "@/utils/media/colab";
 import pipeline from "./minimaxH3Colab.py" with { type: "text" };
 
 export type MinimaxH3Request = Parameters<ProviderTools["minimaxH3"]>[0];
 
 const resolutions = new Set(["480p", "720p", "1080p"]);
+// Clips share one high-RAM A100 kept for five idle minutes, so a batch of shots pays the ComfyUI install and the
+// 30+ GB model download once; the high-RAM shape is needed for those weights to pass through host memory.
+const worker = createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000);
 
-/** Renders one MiniMax H3 video on Colab and returns the MP4 bytes. */
+/** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
 export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio }: MinimaxH3Request, signal?: AbortSignal) {
   if (!prompt.trim()) throw new Error("MiniMax H3 prompt cannot be empty");
   if (!Number.isInteger(duration) || duration < 4 || duration > 15) throw new Error("MiniMax H3 duration must be a whole number of seconds from 4 to 15");
@@ -16,22 +19,23 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
   if (videos.length > 3) throw new Error("MiniMax H3 supports at most 3 reference videos");
   if (audios.length > 3) throw new Error("MiniMax H3 supports at most 3 reference audio clips");
   if (loras.length > 4) throw new Error("MiniMax H3 loads at most 4 LoRAs");
-  const [video] = await runColabJob({
-    provider: "minimaxH3",
+  const job = crypto.randomUUID().slice(0, 8);
+  const name = (rest: string) => `h3in_${job}_${rest}`;
+  const [video] = await worker.run((session, sessionSignal) => session.job({
     script: pipeline,
     uploads: [
-      { name: "h3in_prompt.txt", data: prompt },
-      ...images.map((image, index) => ({ name: `h3in_ref_${index}.${inputExtension(image)}`, data: inputBytes(image) })),
-      ...videos.map((video, index) => ({ name: `h3in_vid_${index}.${inputExtension(video)}`, data: inputBytes(video) })),
-      ...audios.map((audio, index) => ({ name: `h3in_aud_${index}.${inputExtension(audio)}`, data: inputBytes(audio) })),
-      ...controlVideo ? [{ name: `h3in_control.${inputExtension(controlVideo)}`, data: inputBytes(controlVideo) }] : [],
-      ...firstFrame ? [{ name: `h3in_first.${inputExtension(firstFrame)}`, data: inputBytes(firstFrame) }] : [],
-      ...lastFrame ? [{ name: `h3in_last.${inputExtension(lastFrame)}`, data: inputBytes(lastFrame) }] : [],
-      ...loras.map((lora, index) => ({ name: `h3in_lora_${index}.safetensors`, data: inputBytes(lora.file) })),
-      ...loras.length ? [{ name: "h3in_loras.json", data: JSON.stringify(loras.map(lora => lora.strength)) }] : [],
+      { name: name("prompt.txt"), data: prompt },
+      ...images.map((image, index) => ({ name: name(`ref_${index}.${inputExtension(image)}`), data: inputBytes(image) })),
+      ...videos.map((video, index) => ({ name: name(`vid_${index}.${inputExtension(video)}`), data: inputBytes(video) })),
+      ...audios.map((audio, index) => ({ name: name(`aud_${index}.${inputExtension(audio)}`), data: inputBytes(audio) })),
+      ...controlVideo ? [{ name: name(`control.${inputExtension(controlVideo)}`), data: inputBytes(controlVideo) }] : [],
+      ...firstFrame ? [{ name: name(`first.${inputExtension(firstFrame)}`), data: inputBytes(firstFrame) }] : [],
+      ...lastFrame ? [{ name: name(`last.${inputExtension(lastFrame)}`), data: inputBytes(lastFrame) }] : [],
+      ...loras.map((lora, index) => ({ name: name(`lora_${index}.safetensors`), data: inputBytes(lora.file) })),
+      ...loras.length ? [{ name: name("loras.json"), data: JSON.stringify(loras.map(lora => lora.strength)) }] : [],
     ],
-    env: { H3_SEED: randomSeed(), H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0 },
+    env: { H3_JOB: job, H3_SEED: randomSeed(), H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0 },
     outputs: ["/content/h3out/final.mp4"],
-  }, signal);
+  }, sessionSignal), signal);
   return { data: video!, mimeType: "video/mp4" as const };
 }

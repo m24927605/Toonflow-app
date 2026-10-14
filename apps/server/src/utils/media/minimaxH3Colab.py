@@ -1,6 +1,6 @@
 # MiniMax H3 Ref2VA pipeline executed on a Colab GPU session by minimaxH3.ts.
-# Inputs: /content/h3in_prompt.txt, optional /content/h3in_ref_* images, /content/h3in_vid_* videos, /content/h3in_aud_* audio,
-# /content/h3in_first.* and /content/h3in_last.* frames, an optional /content/h3in_control.* structure video
+# Inputs, named h3in_<H3_JOB>_*: /content/h3in_<job>_prompt.txt, optional ref_* images, vid_* videos, aud_* audio,
+# first.* and last.* frames, an optional control.* structure video
 # (depth, pose or edges) for the Fun ControlNet Union 2.0, and the H3_* environment variables.
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
 # 480p samples just above the target size; 720p samples at the model's native ~768p and downscales;
@@ -19,6 +19,10 @@ import torch
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
 
 inputs = Path("/content")
+# Each job's files carry its own name, so a session that renders several clips never mixes one job's inputs, or
+# ComfyUI's per-name caches of images, audio and LoRAs, into the next.
+job = os.environ["H3_JOB"]
+prefix = f"h3in_{job}_"
 outputs = Path("/content/h3out")
 comfy = Path("/content/ComfyUI")
 upscalerNode = comfy / "custom_nodes" / "Comfyui_Minimax_h3_latent_Upscaler"
@@ -85,7 +89,7 @@ videoVae = "minimax_h3_video_vae_int8_convrot.safetensors" if variant == "int8_c
 lora = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
 upscaler = "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
 controlPatch = f"minimax_h3_fun_controlnet_union_2.0_pruned_{'int8_convrot' if variant == 'int8_convrot' else 'bf16'}.safetensors"
-controlSource = next(inputs.glob("h3in_control.*"), None)
+controlSource = next(inputs.glob(f"{prefix}control.*"), None)
 print("Ref2VA variant:", variant)
 
 weights = [
@@ -107,16 +111,16 @@ for repo, remote, folder in weights:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
 
-refs = sorted(inputs.glob("h3in_ref_*"))
-firstFrame = next(inputs.glob("h3in_first.*"), None)
-lastFrame = next(inputs.glob("h3in_last.*"), None)
+refs = sorted(inputs.glob(f"{prefix}ref_*"))
+firstFrame = next(inputs.glob(f"{prefix}first.*"), None)
+lastFrame = next(inputs.glob(f"{prefix}last.*"), None)
 (comfy / "input").mkdir(exist_ok=True)
 for image in [*refs, *filter(None, [firstFrame, lastFrame])]:
     shutil.copy(image, comfy / "input" / image.name)
 # Reference videos are re-encoded to 24 fps, silent and at most 15 s, the shape H3 expects for <Video N>.
 videos = []
-for index, source in enumerate(sorted(inputs.glob("h3in_vid_*"))):
-    target = comfy / "input" / f"h3vid{index}.mp4"
+for index, source in enumerate(sorted(inputs.glob(f"{prefix}vid_*"))):
+    target = comfy / "input" / f"h3vid{job}_{index}.mp4"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True)
     seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(target)], capture_output=True, text=True, check=True).stdout)
     if seconds < 2:
@@ -125,15 +129,15 @@ for index, source in enumerate(sorted(inputs.glob("h3in_vid_*"))):
 # Standalone reference audio (<Audio N>), resampled to the audio VAE's 32 kHz stereo; a clip marked fully_copy in the
 # prompt becomes the soundtrack and the speaker lip-syncs to it.
 audios = []
-for index, source in enumerate(sorted(inputs.glob("h3in_aud_*"))):
-    target = comfy / "input" / f"h3aud{index}.wav"
+for index, source in enumerate(sorted(inputs.glob(f"{prefix}aud_*"))):
+    target = comfy / "input" / f"h3aud{job}_{index}.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-ar", "32000", "-ac", "2", str(target)], check=True)
     audios.append(target.name)
 if controlSource:
     # The control video only drives structure and motion; its look never reaches the output.
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(controlSource), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    str(comfy / "input" / "h3control.mp4")], check=True)
-prompt = (inputs / "h3in_prompt.txt").read_text()
+                    str(comfy / "input" / f"h3control{job}.mp4")], check=True)
+prompt = (inputs / f"{prefix}prompt.txt").read_text()
 
 base = "http://127.0.0.1:8188"
 log = Path("/content/comfyui.log")
@@ -234,10 +238,10 @@ graph.update({
 
 # LoRAs ride after the Turbo LoRA at their strength; every node that used the Turbo model takes the last one.
 characterModel = ["2", 0]
-loraStrengths = json.loads((inputs / "h3in_loras.json").read_text()) if (inputs / "h3in_loras.json").exists() else []
-for index, source in enumerate(sorted(inputs.glob("h3in_lora_*.safetensors"))):
-    shutil.copy(source, comfy / "models" / "loras" / f"character_{index}.safetensors")
-    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": f"character_{index}.safetensors", "strength_model": float(loraStrengths[index]) if index < len(loraStrengths) else 1.0}}
+loraStrengths = json.loads((inputs / f"{prefix}loras.json").read_text()) if (inputs / f"{prefix}loras.json").exists() else []
+for index, source in enumerate(sorted(inputs.glob(f"{prefix}lora_*.safetensors"))):
+    shutil.copy(source, comfy / "models" / "loras" / f"character_{job}_{index}.safetensors")
+    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": f"character_{job}_{index}.safetensors", "strength_model": float(loraStrengths[index]) if index < len(loraStrengths) else 1.0}}
     characterModel = [f"lora{index}", 0]
 if characterModel != ["2", 0]:
     for key, node in graph.items():
@@ -262,4 +266,7 @@ subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), "-t", str(du
                 "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
                 *(["-c:a", "aac", "-b:a", "192k"] if audio else ["-an"]),
                 "-movflags", "+faststart", str(outputs / "final.mp4")], check=True)
+# The job's inputs are deleted so a long session does not fill the disk.
+for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*"), *(comfy / "models" / "loras").glob(f"character_{job}_*")]:
+    leftover.unlink(missing_ok=True)
 print("COLAB_DONE", resolution, f"{outputWidth}x{outputHeight}")
