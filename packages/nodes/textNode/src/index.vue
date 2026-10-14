@@ -94,7 +94,7 @@ import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
 import { planPromptDistribution } from "./distributePrompts";
 import { planShotNodes, type ShotNodesPlan } from "./shotNodes";
 import { castNames, shotSpans, templateForCast, type ShotSpan } from "@toonflow/node-shared/shotList";
-import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "./videoPrompt";
+import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
 import { checkVideoPrompt, parseReview, passingScore, reviewInstructions, type VideoPreflight } from "./videoPreflight";
 import shotNodesDialog, { type LoraRow, type ShotNodesChoice } from "./shotNodesDialog.vue";
 import { ElAlert, ElButton, ElCard, ElSelect, ElDialog, ElOption, ElOptionGroup, ElMessage, ElMessageBox, ElRadioButton, ElRadioGroup } from "element-plus";

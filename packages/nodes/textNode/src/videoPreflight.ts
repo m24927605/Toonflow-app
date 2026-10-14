@@ -1,6 +1,6 @@
 import { locale, t } from "@toonflow/i18n/vue";
 import type { ShotSpan } from "@toonflow/node-shared/shotList";
-import { languageOf, parseDialogue } from "./videoPrompt";
+import { languageOf, parseDialogue } from "@toonflow/node-shared/videoPrompt";
 
 /**
  * Stored on a video node as `preflight`, and read by the video generation node: the prompt that was checked, so

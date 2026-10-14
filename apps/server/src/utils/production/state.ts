@@ -2,6 +2,7 @@ import { dirname, join } from "node:path";
 import { mkdir, readFile, writeAtomic } from "@toonflow/file";
 import type { MessageDescriptor } from "@toonflow/i18n";
 import conf from "@/utils/conf";
+import type { ProductionDub } from "./dub";
 import type { ProductionKeyframe } from "./keyframes";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
@@ -55,6 +56,9 @@ export type Production = {
    */
   assets?: { characters: ProductionAsset[]; places: ProductionAsset[] };
   keyframes?: { master: number; shots: ProductionKeyframe[] };
+  dub?: ProductionDub;
+  /** Each shot's clip length in whole seconds, set by its dubbed lines. */
+  clips?: { shot: number; clip: number }[];
   updatedAt: string;
 };
 

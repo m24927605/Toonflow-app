@@ -20,6 +20,7 @@
     "./shotList": "./src/shotList.ts",
     "./keyframePrompt": "./src/keyframePrompt.ts",
     "./loraTriggers": "./src/loraTriggers.ts",
+    "./videoPrompt": "./src/videoPrompt.ts",
     "./gradeControl": "./src/components/gradeControl.vue",
     "./grading": "./src/grading.ts",
     "./confirmReferences": "./src/confirmReferences.ts",

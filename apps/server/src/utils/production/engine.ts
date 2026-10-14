@@ -4,6 +4,7 @@ import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/s
 import { getConfiguredModel, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { assetDrawn, castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
+import { planDub, recordDub } from "./dub";
 import { estimateProduction } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, parseDescriptions, planKeyframes } from "./keyframes";
 import {
@@ -200,8 +201,21 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
 
-  // ACT: The production currently ends with the approved keyframes; dubbing and video follow in phase 2.
-  Object.assign(production, { status: "done", message: "keyframesDone", review: undefined });
+  // Dubbing comes before video: H3 lip-syncs to each shot's track, and a shot is as long as its lines need. Gemini TTS
+  // bills its own API, not Colab units.
+  if (!production.dub) {
+    production.dub = planDub(await readProductionText(cwd, production.shotList), production.assets);
+    await saveProduction(cwd, production);
+    return true;
+  }
+  if (!production.clips) {
+    production.clips = await recordDub(cwd, production, signal, () => saveProduction(cwd, production));
+    await saveProduction(cwd, production);
+    return true;
+  }
+
+  // ACT: The production currently ends with the dubbing; the previs, video and rough cut follow.
+  Object.assign(production, { status: "done", message: "dubDone", review: undefined });
   await saveProduction(cwd, production);
   return false;
 }

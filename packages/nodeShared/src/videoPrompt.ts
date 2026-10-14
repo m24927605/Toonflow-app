@@ -1,4 +1,4 @@
-import type { ShotSpan } from "@toonflow/node-shared/shotList";
+import type { ShotSpan } from "./shotList";
 
 export type DialogueLine = { speaker?: string; words: string };
 
