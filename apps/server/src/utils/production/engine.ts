@@ -3,7 +3,7 @@ import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { getConfiguredModel, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
-import { castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
+import { assetDrawn, castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
 import { estimateProduction } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, parseDescriptions, planKeyframes } from "./keyframes";
 import {
@@ -49,7 +49,7 @@ function scriptPrompt(input: ProductionInput) {
     `Write the complete screenplay of a short film of ${input.seconds} seconds from the outline below.`,
     "Keep the outline's people, places and events, and add only what the story needs to play out. Call every person and place exactly by the name the outline uses; never rename or translate a name or add a reading or translation after it.",
     `The film lasts ${input.seconds} seconds: every line is spoken aloud, so all dialogue together must take at most half of that time.`,
-    "Start with a \"Characters\" section giving each person one fixed name and their look (age, build, face, hair, clothing), then a \"Places\" section giving each place one fixed name and its look, then the scenes: a heading, the action in present tense, and dialogue as \"Name: line\".",
+    `Start with a section listing the characters: each person's fixed name, their look (age, build, face, hair) and every outfit they wear in the story, each with a short name such as "home clothes" and a description; then a section listing the places, each with a fixed name and its look; then the scenes: a heading, the action in present tense naming the outfit when someone changes, and dialogue as "Name: line". Title the sections in ${language}.`,
     ...named.length ? [`These characters have photos, so use exactly these names for them: ${named.join(", ")}.`] : [],
     `Write everything (section titles, scene headings, action and dialogue) in ${language}; never switch to English or to another script. Output only the screenplay.`,
     "",
@@ -82,6 +82,7 @@ function shotListPrompt(script: string, names: string[], input: ProductionInput)
     `Write in ${language} only.`,
     ...english(shotListInstructions("The script below", names)),
     `The film lasts ${input.seconds} seconds: the time ranges must end at ${input.seconds} s. Write every cell in ${language}.`,
+    "In State, name each person's outfit by the short name the script's character section gives it.",
     "",
     "Script:",
     script,
@@ -156,7 +157,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
-  if ([...production.assets.characters, ...production.assets.places].some(item => !item.views)) {
+  if ([...production.assets.characters, ...production.assets.places].some(item => !assetDrawn(item))) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "assets")!.units, signal)) return false;
     await drawAssets(cwd, production, production.input.ratio, signal, () => saveProduction(cwd, production));
     return true;

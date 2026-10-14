@@ -105,7 +105,7 @@ type Production = {
   keyframes?: { master: number; shots: Keyframe[] };
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
-type Asset = { name: string; views?: string[]; loras?: { family: string; trigger: string }[] };
+type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
 type State = { production: Production; script?: string; shotList?: string; estimate: Estimate };
 type TextKind = "script" | "shotList";
 // `texts` are the text nodes this production made, each with the text last put into it, so a revision by the AI
@@ -164,7 +164,7 @@ const headline = computed(() => {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
-    if (!production.assets || assets.some(item => !item.views)) return translate("Designing the characters and places…");
+    if (!production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views))) return translate("Designing the characters and places…");
     if (assets.some(item => !item.loras)) return translate("Training LoRAs so faces and places stay the same (about an hour)…");
     return translate("Drawing the keyframes, the master shot first…");
   }
@@ -259,19 +259,25 @@ function syncText(kind: TextKind, text: string) {
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.webp$/i.test(path) ? "image/webp" : "image/png";
 
 /**
- * Puts the characters' and places' images on the canvas below this node, one row per person or place, as image nodes
- * with the Character or Scene role and its name, which "Build shot nodes" and the LoRA buttons read.
+ * Puts the characters' and places' images on the canvas below this node, as image nodes with the Character role, name
+ * and outfit or the Scene role and name, which "Build shot nodes" and the LoRA buttons read: a row per person's face
+ * close-ups, one per outfit, and one per place.
  */
 function syncAssets(assets: NonNullable<Production["assets"]>) {
   const images = data.value.images ??= {};
-  const rows = [...assets.characters.map(item => ({ item, role: "character" as const })), ...assets.places.map(item => ({ item, role: "scene" as const }))];
+  const rows = [
+    ...assets.characters.flatMap(item => [
+      { name: item.name, views: item.views ?? [], data: { role: "character", character: item.name } },
+      ...(item.outfits ?? []).map(outfit => ({ name: `${item.name} · ${outfit.name}`, views: outfit.views ?? [], data: { role: "character", character: item.name, outfit: outfit.name } })),
+    ]),
+    ...assets.places.map(item => ({ name: item.name, views: item.views ?? [], data: { role: "scene", scene: item.name } })),
+  ];
   const top = data.value.top ??= Math.max(...flow.getNodes.value.map(item => item.computedPosition.y + (item.dimensions.height || 240))) + 160;
-  rows.forEach(({ item, role }, row) => (item.views ?? []).forEach((path, column) => {
+  rows.forEach((row, index) => row.views.forEach((path, column) => {
     if (images[path]) return;
     const imageId = crypto.randomUUID();
-    flow.addNodes([{ id: imageId, type: "remote-imageNode", position: { x: node.computedPosition.x + column * 260, y: top + row * 320 }, data: {
-      label: item.name, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: mimeOf(path) } } }, role,
-      ...role === "character" ? { character: item.name } : { scene: item.name },
+    flow.addNodes([{ id: imageId, type: "remote-imageNode", position: { x: node.computedPosition.x + column * 260, y: top + index * 320 }, data: {
+      label: row.name, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: mimeOf(path) } } }, ...row.data,
     } }]);
     images[path] = imageId;
   }));
@@ -286,7 +292,8 @@ async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
   const ready = keyframes.shots.filter(item => item.image && item.prompt && !placed[item.shot]);
   if (!ready.length) return;
   const records = await listLoras(files.getWorkspaceFiles()).catch(() => []);
-  const rows = Object.keys(data.value.images ?? {}).length ? Math.ceil(Object.keys(data.value.images ?? {}).length / 6) + 1 : 1;
+  const assets = state.value?.production.assets;
+  const rows = assets ? assets.characters.reduce((sum, item) => sum + 1 + (item.outfits?.length ?? 0), 0) + assets.places.length : 0;
   const top = (data.value.top ??= Math.max(...flow.getNodes.value.map(entry => entry.computedPosition.y + (entry.dimensions.height || 240))) + 160) + rows * 320;
   // The master keyframe is placed first, so the others can connect to it.
   for (const item of [...ready].sort((a, b) => Number(b.shot === keyframes.master) - Number(a.shot === keyframes.master))) {

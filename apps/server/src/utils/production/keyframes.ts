@@ -9,6 +9,8 @@ import { productionDirectory, type Production, type ProductionAsset } from "./st
 export type ProductionKeyframe = {
   /** `row` is the shot's shot-list row, the description's fallback when the model skipped the shot. */
   shot: number; time: string; cast: string[]; state?: string; place?: string; row?: string;
+  /** The outfit each person in the shot wears, by name. */
+  outfits?: Record<string, string>;
   description?: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string;
 };
 
@@ -19,11 +21,26 @@ const seconds = (value: number) => Number(value.toFixed(2));
 export function planKeyframes(shotList: string, assets: NonNullable<Production["assets"]>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
   const people = new Set(assets.characters.map(item => item.name));
-  const shots: ProductionKeyframe[] = spans.map(span => ({
-    shot: span.shot, time: `${seconds(span.start)}–${seconds(span.end)}s`, state: span.state, row: span.row,
-    cast: castNames(span).filter(name => people.has(name)),
-    place: (assets.places.find(item => span.row?.includes(item.name)) ?? assets.places[0])?.name,
-  }));
+  // Each person wears the outfit the shot's state (or else its row) names, or else what they wore in their last shot,
+  // or else their first outfit, so clothes only change where the shot list says so.
+  const worn = new Map<string, string>();
+  const shots: ProductionKeyframe[] = spans.map(span => {
+    const cast = castNames(span).filter(name => people.has(name));
+    const outfits = Object.fromEntries(cast.map(name => {
+      const options = assets.characters.find(item => item.name === name)!.outfits ?? [];
+      // Within the person's part of the state ("日男：…；"), the outfit named first is the one worn: "白襯衫（已脫下西裝外套）".
+      const named = [segmentOf(span.state ?? "", name, cast.length), segmentOf(span.row ?? "", name, cast.length)]
+        .map(text => options.filter(outfit => text.includes(outfit.name)).sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name))[0])
+        .find(Boolean);
+      const outfit = named?.name ?? worn.get(name) ?? options[0]?.name ?? "";
+      worn.set(name, outfit);
+      return [name, outfit];
+    }));
+    return {
+      shot: span.shot, time: `${seconds(span.start)}–${seconds(span.end)}s`, state: span.state, row: span.row, cast, outfits,
+      place: (assets.places.find(item => span.row?.includes(item.name)) ?? assets.places[0])?.name,
+    };
+  });
   return { master: suggestMasterShot(shotList, spans)?.shot ?? 1, shots };
 }
 
@@ -51,6 +68,12 @@ export function parseDescriptions(text: string) {
 
 const byName = (list: ProductionAsset[], name?: string) => list.find(item => item.name === name);
 
+/** The part of a state or row cell about one person: from "Name:" to the next semicolon, or all of it for one person. */
+function segmentOf(text: string, name: string, castSize: number) {
+  const part = text.split(/[；;]/).find(item => item.trimStart().startsWith(name));
+  return part ?? (castSize === 1 ? text : "");
+}
+
 /**
  * The prompt, references and LoRAs of one keyframe: the place's base image, each person's front view, and the master
  * keyframe for every other shot; Qwen-Image LoRAs of the cast and place, at most 4, people first.
@@ -58,7 +81,9 @@ const byName = (list: ProductionAsset[], name?: string) => list.find(item => ite
 export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, masterImage?: string) {
   const place = byName(assets.places, item.place);
   const people = item.cast.flatMap(name => byName(assets.characters, name) ?? []);
-  const references = [...place?.views?.[0] ? [place.views[0]] : [], ...people.map(person => person.views![0]!)];
+  // A person's reference is the front view of the outfit they wear in this shot, so the keyframe draws those clothes.
+  const outfitView = (person: ProductionAsset) => (person.outfits?.find(outfit => outfit.name === item.outfits?.[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base!;
+  const references = [...place?.views?.[0] ? [place.views[0]] : [], ...people.map(outfitView)];
   // A person's trigger word stands next to their name, so the LoRA binds to that person rather than the whole picture.
   const trigger = (asset: ProductionAsset) => asset.loras?.find(lora => lora.family === "qwen")?.trigger;
   const template = keyframeTemplate(place ? 1 : 0, people.map((person, index) => ({ name: trigger(person) ? `${person.name} (${trigger(person)})` : person.name, ref: (place ? 2 : 1) + index })));

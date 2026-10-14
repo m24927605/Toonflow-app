@@ -59,11 +59,14 @@ export type Production = {
 };
 
 /**
- * A person or place: `base` is the photo or design every view is drawn from, `views` the reference images; `loras`
- * are its trained LoRAs, empty when it appears in too few shots to be worth one.
+ * A person or place: `base` is the photo or design every view is drawn from, `views` its reference images (for a
+ * person the face close-ups) and `outfits` a person's clothes in the story, each with its full-body views. A photo
+ * fixes who someone is, never what they wear: the script decides that. `loras` are its trained LoRAs, empty when it
+ * appears in too few shots to be worth one.
  */
 export type ProductionAsset = {
   name: string; look: string; photo?: string; base?: string; views?: string[];
+  outfits?: { name: string; look: string; views?: string[] }[];
   loras?: { family: "h3" | "qwen"; path: string; trigger: string }[];
 };
 

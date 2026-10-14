@@ -8,7 +8,10 @@ import { generateMedia } from "@/utils/media/generation";
 import { productionDirectory, type Production, type ProductionAsset } from "./state";
 
 const castSchema = z.object({
-  characters: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })),
+  characters: z.array(z.object({
+    name: z.string().trim().min(1), look: z.string().trim().min(1),
+    outfits: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })).min(1),
+  })),
   places: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })),
 });
 
@@ -16,8 +19,8 @@ const castSchema = z.object({
 export function castPrompt(script: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
-    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\"}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. look: one English sentence a photographer could shoot from; for a person their apparent age, ethnicity, build, face, hair and clothing (fitting where the story is set), for a place its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
+    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\"}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
     "Output only the JSON.",
     "",
     "Screenplay:",
@@ -33,8 +36,9 @@ export function parseCast(text: string, photos: Production["input"]["photos"]) {
   // Models add readings or translations in brackets, such as 日女 (Nichi-onna); the shot list's cast uses the bare name.
   const bare = <T extends { name: string }>(item: T) => ({ ...item, name: item.name.replace(/\s*[(（][^)）]*[)）]\s*$/, "").trim() || item.name });
   const characters: ProductionAsset[] = cast.characters.map(bare).map(item => ({ ...item, photo: photos.find(photo => photo.name === item.name)?.path }));
+  // Someone with a photo but no part in the script keeps the clothes of the photo.
   for (const photo of photos) {
-    if (!characters.some(item => item.name === photo.name)) characters.push({ name: photo.name, look: "the person in the photo", photo: photo.path });
+    if (!characters.some(item => item.name === photo.name)) characters.push({ name: photo.name, look: "the person in the photo", photo: photo.path, outfits: [{ name: "photo", look: "exactly the clothes shown in the photo" }] });
   }
   return { characters, places: cast.places.map(bare) };
 }
@@ -43,14 +47,16 @@ const qwen = { providerId: "qwenImage", modelId: "qwen_image_2_1_turbo" };
 const finish = "Photorealistic, sharp focus, natural texture, one single photograph, no text.";
 const studio = "plain light grey studio background, even soft light";
 
-// The views every character gets from its base image: the turnaround and close-ups a LoRA and keyframes need.
-const characterViews: [ratio: string, view: string][] = [
-  ["2:3", `Full-body shot facing the camera, standing, arms relaxed, ${studio}.`],
-  ["2:3", `Full-body shot in three-quarter view facing left, standing, ${studio}.`],
-  ["2:3", `Full-body side profile facing right, standing, ${studio}.`],
-  ["2:3", `Full-body back view, standing, ${studio}.`],
+// A person's face close-ups, drawn once from their base image, and the full-body views drawn for every outfit; the
+// first outfit view, facing the camera, is the reference keyframes use.
+const faceViews: [ratio: string, view: string][] = [
   ["1:1", `Tight close-up of the face, front view, neutral expression, ${studio}.`],
   ["1:1", `Close-up of the face in three-quarter view, slight smile, ${studio}.`],
+];
+const outfitViews: [ratio: string, view: string][] = [
+  ["2:3", `Full-body shot facing the camera, standing, arms relaxed, ${studio}.`],
+  ["2:3", `Full-body shot in three-quarter view facing left, standing, ${studio}.`],
+  ["2:3", `Full-body back view, standing, ${studio}.`],
 ];
 // Places keep the base image's side: views it does not show would be invented and teach a different room.
 const placeViews = [
@@ -74,7 +80,7 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
   const assets = production.assets!;
   await Promise.all([
     ...assets.characters.filter(item => !item.base).map(async item => {
-      item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal);
+      item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${item.outfits![0]!.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal);
     }),
     ...assets.places.filter(item => !item.base).map(async item => {
       item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, empty, no people. ${finish}`, ratio, [], signal);
@@ -83,9 +89,13 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
   await save();
   await Promise.all([
     ...assets.characters.filter(item => !item.views).map(async item => {
-      const rule = "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle, body and clothing.";
-      item.views = await Promise.all(characterViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
+      const rule = "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body.";
+      item.views = await Promise.all(faceViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
     }),
+    ...assets.characters.flatMap(item => (item.outfits ?? []).filter(outfit => !outfit.views).map(async outfit => {
+      const rule = `The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body, now wearing ${outfit.look}.`;
+      outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
+    })),
     ...assets.places.filter(item => !item.views).map(async item => {
       const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, layout and light.";
       item.views = [item.base!, ...await Promise.all(placeViews.map(view => draw(cwd, production.id, `${view} ${rule} ${finish}`, ratio, [item.base!], signal)))];
@@ -134,7 +144,7 @@ export async function planAssetLoras(cwd: string, production: Production, shotLi
 /** Trains the planned LoRAs all at once; Colab hands out the L4s as they free up. */
 export async function trainAssetLoras(cwd: string, plan: Awaited<ReturnType<typeof planAssetLoras>>, signal: AbortSignal, save: () => Promise<void>) {
   await Promise.all(plan.jobs.map(async ({ item, kind, kept, missing }) => {
-    const trained = missing.length ? await trainLora(cwd, { kind, families: missing, name: item.name, items: item.views!.map(path => ({ path })) }, signal) : [];
+    const trained = missing.length ? await trainLora(cwd, { kind, families: missing, name: item.name, items: assetViews(item).map(path => ({ path })) }, signal) : [];
     item.loras = [...kept, ...trained].map(record => ({ family: record.family, path: record.path, trigger: record.trigger }));
     await save();
   }));
@@ -147,3 +157,9 @@ async function workspaceLoras(cwd: string) {
   const records = await Promise.all(names.map(name => readFile(`${folder}/${name}`, "utf8").then(text => JSON.parse(text) as LoraRecord, () => undefined)));
   return records.filter((record): record is LoraRecord => !!record?.trigger && !!record.path).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+/** Every reference image of a person or place, across outfits, as a LoRA learns them. */
+export const assetViews = (item: ProductionAsset) => [...item.views ?? [], ...(item.outfits ?? []).flatMap(outfit => outfit.views ?? [])];
+
+/** Whether every image of a person or place is drawn. */
+export const assetDrawn = (item: ProductionAsset) => !!item.views && (item.outfits ?? []).every(outfit => !!outfit.views);
