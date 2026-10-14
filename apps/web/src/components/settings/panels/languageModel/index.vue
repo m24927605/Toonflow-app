@@ -20,6 +20,7 @@
             <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
+            <el-button v-if="item.protocol === 'colab-cli'" text :icon="IconPlayerStop" :loading="stoppingColab" @click="stopColab">{{ translate("Stop Colab session") }}</el-button>
             <el-button v-if="!builtinProtocols.includes(item.protocol)" text :icon="IconEdit" :disabled="!!deletingId" @click="openCustomProvider(item)">编辑</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item.id)">
               <template #reference><el-button text type="danger" :icon="IconTrash" :loading="deletingId === item.id" :disabled="!!deletingId">删除</el-button></template>
@@ -40,20 +41,23 @@
 <script setup lang="ts">
 import { defineAsyncComponent, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
+import axios from "axios";
+import { translate } from "@toonflow/i18n/vue";
 import { customProviders, saveSettings, type CustomProvider } from "@/stores/settings";
-import { IconPlus, IconSettings, IconEdit, IconTrash } from "@tabler/icons-vue";
+import { IconPlus, IconSettings, IconEdit, IconTrash, IconPlayerStop } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
 import codexLogin from "../../codexLogin.vue";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();
-// Codex and Claude Code have no editable endpoint or key, so the custom-provider editor does not apply.
-const builtinProtocols = ["openai-codex-responses", "claude-code"];
+// Managed CLI providers have no editable endpoint or key.
+const builtinProtocols = ["openai-codex-responses", "claude-code", "colab-cli"];
 const addProviderDialog = shallowRef<Component>();
 const addCustomProviderDialog = shallowRef<Component>();
 const providerDialogVisible = ref(false);
 const customProviderDialogVisible = ref(false);
 const editingProvider = ref<CustomProvider>();
 const deletingId = ref("");
+const stoppingColab = ref(false);
 
 function getProviderVersion(provider: CustomProvider) {
   const version = languageProviders.find(item => item.id.toLowerCase() === provider.id.toLowerCase())?.version ?? provider.version;
@@ -69,6 +73,19 @@ function openCustomProvider(provider?: CustomProvider) {
   addCustomProviderDialog.value ??= defineAsyncComponent(() => import("./addCustomProviderDialog.vue"));
   editingProvider.value = provider;
   customProviderDialogVisible.value = true;
+}
+
+// The Colab session also stops by itself after two idle minutes; this stops it, and any running request, at once.
+async function stopColab() {
+  stoppingColab.value = true;
+  try {
+    await axios.post("/api/ai/colab/stop", null, { headers: { "x-toonflow-workspace": "1" } });
+    ElMessage.success(translate("Colab session stopped"));
+  } catch (error) {
+    ElMessage.error(axios.isAxiosError(error) && error.response?.data?.message || translate("Failed to stop the Colab session"));
+  } finally {
+    stoppingColab.value = false;
+  }
 }
 
 async function deleteProvider(id: string) {

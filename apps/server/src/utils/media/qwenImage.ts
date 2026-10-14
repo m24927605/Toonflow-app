@@ -49,6 +49,7 @@ async function drawBatch() {
       seed: randomSeed(),
       refs: (request.images ?? []).map((image, refIndex) => `qwin_${index}_${refIndex}.${inputExtension(image)}`),
       control: request.controlImage ? `qwin_${index}_control.${inputExtension(request.controlImage)}` : null,
+      loras: (request.loras ?? []).map((lora, loraIndex) => ({ name: `qwin_${index}_lora_${loraIndex}.safetensors`, strength: lora.strength })),
     }));
     const results = await runColabJob({
       provider: "qwenImage",
@@ -57,6 +58,7 @@ async function drawBatch() {
         { name: "qwin_job.json", data: JSON.stringify(items) },
         ...batch.flatMap(({ request }, index) => (request.images ?? []).map((image, refIndex) => ({ name: items[index]!.refs[refIndex]!, data: inputBytes(image) }))),
         ...batch.flatMap(({ request }, index) => request.controlImage ? [{ name: items[index]!.control!, data: inputBytes(request.controlImage) }] : []),
+        ...batch.flatMap(({ request }, index) => (request.loras ?? []).map((lora, loraIndex) => ({ name: items[index]!.loras[loraIndex]!.name, data: inputBytes(lora.file) }))),
       ],
       env: {},
       outputs: batch.map((_, index) => `/content/qwout/image_${index}.png`),
@@ -76,6 +78,7 @@ export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");
   if (!/^[1-9]\d?:[1-9]\d?$/.test(request.ratio)) throw new Error("Invalid Qwen-Image aspect ratio");
   if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
+  if ((request.loras?.length ?? 0) > 4) throw new Error("Qwen-Image loads at most 4 LoRAs");
   for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []]) inputBytes(image);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {

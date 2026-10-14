@@ -1,0 +1,407 @@
+<template>
+  <nodeSkeleton v-bind="nodeProps" v-model:bottomVisible="node.selected" topWidth="max-content" :generationStatus="generationStatus" :bottomWidth="520">
+    <div class="productionContent nopan">
+      <template v-if="state">
+        <strong>{{ headline }}</strong>
+        <span v-if="state.production.status === 'failed'" class="failure">{{ state.production.message }}</span>
+        <span v-if="state.production.detail" class="failure">{{ state.production.detail }}</span>
+        <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
+        <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
+        <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
+      </template>
+      <span v-else>{{ translate("Give an outline and a length; the AI writes the script and makes the film, stopping for your review.") }}</span>
+    </div>
+    <template #bottom>
+      <el-card class="productionCard" shadow="never" :bodyStyle="{ padding: '14px 16px 12px' }">
+        <template v-if="!state">
+          <el-input v-model="form.outline" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" :placeholder="translate('Story outline: who, where, what happens')" :aria-label="translate('Story outline')" />
+          <div class="formRow">
+            <label>{{ translate("Length (seconds)") }} <el-input-number v-model="form.seconds" size="small" :min="10" :max="600" :step="10" controlsPosition="right" /></label>
+            <label>{{ translate("Ratio") }}
+              <el-select v-model="form.ratio" size="small" class="shortSelect"><el-option v-for="ratio in ratios" :key="ratio" :label="ratio" :value="ratio" /></el-select>
+            </label>
+            <label>{{ translate("Final quality") }}
+              <el-select v-model="form.quality" size="small" class="shortSelect"><el-option v-for="quality in qualities" :key="quality" :label="quality" :value="quality" /></el-select>
+            </label>
+          </div>
+          <div v-if="photos.length" class="photos">
+            <span class="hint">{{ translate("Connected photos keep these people; name each as the outline does:") }}</span>
+            <el-input v-for="photo in photos" :key="photo.key" v-model="form.names[photo.key]" size="small" :placeholder="translate('Character name')" :aria-label="translate('Character name')" class="photoName" />
+          </div>
+          <span v-else-if="!canvasCast.length" class="hint">{{ translate("Optional: connect a photo of each character to keep their look; without photos the AI designs them.") }}</span>
+          <span v-if="canvasCast.length" class="hint">{{ t`Characters already on the canvas keep their look: ${canvasCast.map(item => item.name).join(", ")}` }}</span>
+          <div class="formRow">
+            <el-checkbox v-model="form.reviewScript">{{ translate("Let me review the script") }}</el-checkbox>
+            <el-checkbox v-model="form.reviewKeyframes">{{ translate("Let me review the keyframes") }}</el-checkbox>
+          </div>
+          <div v-if="quote" class="quote">
+            <span>{{ t`Estimated cost: about ${quote.total} Colab compute units for ${quote.shots} shots.` }}</span>
+            <label>{{ translate("Spend at most (units)") }} <el-input-number :modelValue="form.budget" size="small" :min="1" :max="1000" :step="1" controlsPosition="right" @update:modelValue="setBudget" /></label>
+          </div>
+          <div class="footer">
+            <el-button type="primary" :loading="busy" :disabled="!form.outline.trim() || !form.budget" @click="start">{{ translate("Start") }}</el-button>
+          </div>
+        </template>
+        <template v-else>
+          <div v-if="state.production.review?.gate === 'script' && state.production.status === 'waiting'" class="review">
+            <span>{{ translate("The script is ready in the Script node to the right. Edit it there, or write what to change here.") }}</span>
+            <el-input v-model="notes" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :placeholder="translate('What to change (leave empty to approve)')" :aria-label="translate('What to change')" />
+            <div class="footer">
+              <el-button :loading="busy" :disabled="!notes.trim()" @click="answer(true)">{{ translate("Revise") }}</el-button>
+              <el-button type="primary" :loading="busy" @click="answer(false)">{{ translate("Approve") }}</el-button>
+            </div>
+          </div>
+          <div v-else-if="state.production.review?.gate === 'keyframes' && state.production.status === 'waiting'" class="review">
+            <span>{{ translate("The keyframes are on the canvas. Regenerate any you do not like in its own node, then approve.") }}</span>
+            <div class="footer">
+              <el-button type="primary" :loading="busy" @click="answer(false)">{{ translate("Approve") }}</el-button>
+            </div>
+          </div>
+          <div v-else-if="state.production.status === 'waiting' || state.production.status === 'failed'" class="review">
+            <label v-if="state.production.message === 'budget'">{{ translate("New budget (units)") }} <el-input-number v-model="newBudget" size="small" :min="1" :max="1000" controlsPosition="right" /></label>
+            <div class="footer">
+              <el-button type="primary" :loading="busy" @click="resume">{{ translate("Continue") }}</el-button>
+            </div>
+          </div>
+          <div v-else-if="state.production.status === 'running'" class="footer">
+            <el-button :loading="busy" @click="stop">{{ translate("Stop") }}</el-button>
+          </div>
+        </template>
+      </el-card>
+    </template>
+  </nodeSkeleton>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { useVueFlow } from "@vue-flow/core";
+import { IconMovie } from "@tabler/icons-vue";
+import { ElButton, ElCard, ElCheckbox, ElInput, ElInputNumber, ElMessage, ElMessageBox, ElOption, ElSelect } from "element-plus";
+import { t, translate } from "@toonflow/i18n/vue";
+import type { MessageDescriptor } from "@toonflow/i18n";
+import { nodeSkeleton, useNode, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
+import { listLoras } from "@toonflow/node-shared/loraRegistry";
+
+defineOptions({
+  inheritAttrs: false,
+  icon: IconMovie,
+  handles: [{ id: "in", type: "target", dataType: ["IMAGE"], label: "Character photos" }] satisfies NodeHandle[],
+});
+
+type Quality = "480p" | "720p" | "1080p";
+type Ratio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
+type Estimate = { shots: number; total: number; steps: { step: string; units: number }[] };
+type Production = {
+  id: string;
+  input: { budget: number; seconds: number; ratio: Ratio };
+  status: "running" | "waiting" | "failed" | "done";
+  message?: string;
+  detail?: string;
+  review?: { gate: "script" | "keyframes"; notes?: string };
+  script?: { path: string };
+  shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
+  assets?: { characters: Asset[]; places: Asset[] };
+  keyframes?: { master: number; shots: Keyframe[] };
+};
+type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
+type Asset = { name: string; views?: string[]; loras?: { family: string; trigger: string }[] };
+type State = { production: Production; script?: string; shotList?: string; estimate: Estimate };
+type TextKind = "script" | "shotList";
+// `texts` are the text nodes this production made, each with the text last put into it, so a revision by the AI
+// replaces it only while nobody has edited it.
+type Data = {
+  texts?: Partial<Record<TextKind, { node: string; synced: string }>>;
+  // The image nodes this production made, by the image they show, and its keyframe nodes by shot; `top` is where its
+  // rows of images start, below everything that was on the canvas when the first of them was placed.
+  images?: Record<string, string>;
+  top?: number;
+  keyframes?: Record<number, string>;
+  // The budget follows the estimate until someone sets it (`budgetSet`).
+  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; reviewKeyframes: boolean; names: Record<string, string> };
+  started?: boolean;
+};
+
+const ratios: Ratio[] = ["16:9", "9:16", "1:1", "4:3", "3:4"];
+const qualities: Quality[] = ["480p", "720p", "1080p"];
+const { id, node, nodeProps, files } = useNode({ label: "Auto production" });
+const flow = useVueFlow();
+const { refList } = useNodeReferences();
+const data = computed(() => node.data as typeof node.data & Data);
+data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, reviewKeyframes: true, names: {} };
+const form = reactive(data.value.form);
+const state = ref<State>();
+const quote = ref<Estimate>();
+const busy = ref(false);
+const notes = ref("");
+const newBudget = ref<number>();
+
+const photos = computed(() => refList.value.flatMap(item => {
+  const url = (item.value as { url?: string } | undefined)?.url;
+  return url ? [{ key: item.source, url }] : [];
+}));
+// People already on the canvas, one image each by their Character role name, join as photos, so the production keeps
+// them (and any LoRA trained of them) instead of designing new people.
+const canvasCast = computed(() => {
+  const found = new Map<string, string>();
+  for (const item of flow.getNodes.value) {
+    const name = String(item.data?.character ?? "").trim();
+    const url = (item.data?.outputs as { image?: { value?: { url?: string } } } | undefined)?.image?.value?.url;
+    if (item.data?.role === "character" && name && url && !found.has(name)) found.set(name, url);
+  }
+  return [...found].map(([name, url]) => ({ name, url })).filter(item => !photos.value.some(photo => form.names[photo.key]?.trim() === item.name));
+});
+
+// A photo's name defaults to the character name its image node carries.
+watch(photos, list => {
+  for (const photo of list) form.names[photo.key] ??= String(flow.findNode(photo.key)?.data?.character ?? "").trim();
+}, { immediate: true });
+
+const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
+const headline = computed(() => {
+  const production = state.value!.production;
+  if (production.status === "running") {
+    if (!production.script) return translate("Writing the script…");
+    if (!production.shotList) return translate("Writing the shot list…");
+    const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
+    if (!production.assets || assets.some(item => !item.views)) return translate("Designing the characters and places…");
+    if (assets.some(item => !item.loras)) return translate("Training LoRAs so faces and places stay the same (about an hour)…");
+    return translate("Drawing the keyframes, the master shot first…");
+  }
+  if (production.status === "failed") return translate("Stopped by an error; Continue tries again");
+  return ({
+    reviewScript: translate("Waiting for your review of the script"),
+    budget: translate("Stopped: the next step would go over the budget"),
+    balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
+    stopped: translate("Stopped"),
+    reviewKeyframes: translate("Waiting for your review of the keyframes"),
+    keyframesDone: translate("The keyframes are approved. Dubbing and video come in phase 2."),
+  } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
+});
+
+const headers = { "Content-Type": "application/json", "x-toonflow-workspace": "1" };
+async function api<T>(path: string, body?: object): Promise<T> {
+  const response = await fetch(`/api/production/${path}`, body ? { method: "POST", headers, body: JSON.stringify(body) } : { headers, cache: "no-store" });
+  const json = await response.json().catch(() => ({})) as { code?: number; data?: T; message?: string };
+  if (!response.ok || json.code !== 200) throw new Error(json.message || translate("Request failed"));
+  return json.data as T;
+}
+const directory = async () => (await files.getWorkspaceFiles().list()).directory;
+
+// The quote follows the form, so the budget starts at the estimate rounded up.
+let quoteTimer: ReturnType<typeof setTimeout> | undefined;
+watch(() => [form.seconds, form.quality, photos.value.length, canvasCast.value.length] as const, () => {
+  if (data.value.started) return;
+  clearTimeout(quoteTimer);
+  quoteTimer = setTimeout(async () => {
+    quote.value = await api<Estimate>("estimate", { seconds: form.seconds, quality: form.quality, people: photos.value.length + canvasCast.value.length }).catch(() => undefined);
+    if (quote.value && !form.budgetSet) form.budget = Math.ceil(quote.value.total);
+  }, 400);
+}, { immediate: true });
+
+function setBudget(value?: number) {
+  form.budget = value ?? 1;
+  form.budgetSet = true;
+}
+
+async function start() {
+  const unnamed = photos.value.some(photo => !form.names[photo.key]?.trim());
+  if (unnamed) return void ElMessage.warning(translate("Name every connected photo first"));
+  const go = await ElMessageBox.confirm(
+    t`Start an automatic production of about ${form.seconds} seconds? It spends at most ${form.budget} Colab compute units (estimate ${quote.value?.total ?? "?"}) and stops for your review where you asked. It keeps running if you close this page.`,
+    translate("Auto production"), { confirmButtonText: translate("Start"), cancelButtonText: translate("Cancel"), type: "info" },
+  ).then(() => true, () => false);
+  if (!go) return;
+  busy.value = true;
+  try {
+    await api("create", {
+      directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality, budget: form.budget,
+      gates: [...form.reviewScript ? ["script"] : [], ...form.reviewKeyframes ? ["keyframes"] : []],
+      photos: [...photos.value.map(photo => ({ name: form.names[photo.key]!.trim(), path: photo.url })), ...canvasCast.value.map(item => ({ name: item.name, path: item.url }))],
+    });
+    data.value.started = true;
+    await refresh();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));
+  } finally {
+    busy.value = false;
+  }
+}
+
+/**
+ * Puts a production text on the canvas as a text node with its role, to the right of the text it comes from, and keeps
+ * it in step until someone edits it.
+ */
+function syncText(kind: TextKind, text: string) {
+  const texts = data.value.texts ??= {};
+  const textOf = (nodeId: string) => (flow.findNode(nodeId)?.data?.outputs as { text?: { value?: string } } | undefined)?.text?.value;
+  const known = texts[kind];
+  // A node made once is never made again: right after the page loads it may not be on the canvas yet, and one a
+  // person deleted stays deleted.
+  if (known) {
+    const existing = flow.findNode(known.node);
+    if (existing && text !== known.synced && textOf(existing.id) === known.synced) {
+      (existing.data.outputs as { text: { value: string } }).text.value = text;
+      known.synced = text;
+    }
+    return;
+  }
+  const source = kind === "shotList" && texts.script ? flow.findNode(texts.script.node) : undefined;
+  const anchor = source ?? node;
+  const nodeId = crypto.randomUUID();
+  flow.addNodes([{ id: nodeId, type: "remote-textNode", position: { x: anchor.computedPosition.x + (anchor.dimensions.width || 360) + 120, y: anchor.computedPosition.y }, data: {
+    label: kind === "script" ? translate("Script") : translate("Shot list"), outputs: {}, textSnapshot: text, role: kind,
+  } }]);
+  if (source) flow.addEdges([{ id: crypto.randomUUID(), source: source.id, sourceHandle: "text", target: nodeId, targetHandle: "in" }]);
+  texts[kind] = { node: nodeId, synced: text };
+}
+
+const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.webp$/i.test(path) ? "image/webp" : "image/png";
+
+/**
+ * Puts the characters' and places' images on the canvas below this node, one row per person or place, as image nodes
+ * with the Character or Scene role and its name, which "Build shot nodes" and the LoRA buttons read.
+ */
+function syncAssets(assets: NonNullable<Production["assets"]>) {
+  const images = data.value.images ??= {};
+  const rows = [...assets.characters.map(item => ({ item, role: "character" as const })), ...assets.places.map(item => ({ item, role: "scene" as const }))];
+  const top = data.value.top ??= Math.max(...flow.getNodes.value.map(item => item.computedPosition.y + (item.dimensions.height || 240))) + 160;
+  rows.forEach(({ item, role }, row) => (item.views ?? []).forEach((path, column) => {
+    if (images[path]) return;
+    const imageId = crypto.randomUUID();
+    flow.addNodes([{ id: imageId, type: "remote-imageNode", position: { x: node.computedPosition.x + column * 260, y: top + row * 320 }, data: {
+      label: item.name, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: mimeOf(path) } } }, role,
+      ...role === "character" ? { character: item.name } : { scene: item.name },
+    } }]);
+    images[path] = imageId;
+  }));
+}
+
+/**
+ * Puts the keyframes on the canvas as image generation nodes with their shot number, prompt, LoRAs and references
+ * connected in prompt order, so any of them can be adjusted and regenerated by hand.
+ */
+async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
+  const placed = data.value.keyframes ??= {};
+  const ready = keyframes.shots.filter(item => item.image && item.prompt && !placed[item.shot]);
+  if (!ready.length) return;
+  const records = await listLoras(files.getWorkspaceFiles()).catch(() => []);
+  const rows = Object.keys(data.value.images ?? {}).length ? Math.ceil(Object.keys(data.value.images ?? {}).length / 6) + 1 : 1;
+  const top = (data.value.top ??= Math.max(...flow.getNodes.value.map(entry => entry.computedPosition.y + (entry.dimensions.height || 240))) + 160) + rows * 320;
+  // The master keyframe is placed first, so the others can connect to it.
+  for (const item of [...ready].sort((a, b) => Number(b.shot === keyframes.master) - Number(a.shot === keyframes.master))) {
+    const sources = item.references!.map(path => data.value.images?.[path] ?? keyframes.shots.flatMap(other => other.image === path && placed[other.shot] ? [placed[other.shot]!] : [])[0]);
+    if (sources.some(source => !source)) continue;
+    const nodeId = crypto.randomUUID();
+    const loras = item.loras!.flatMap(lora => {
+      const record = records.find(entry => entry.path === lora.path);
+      return record ? [{ path: record.path, trigger: record.trigger, name: record.name, kind: record.kind, family: record.family, strength: lora.strength }] : [];
+    });
+    flow.addNodes([{ id: nodeId, type: "remote-imageGenerationNode", position: { x: node.computedPosition.x + (item.shot - 1) * 400, y: top }, data: {
+      label: t`Shot ${item.shot} keyframe (${item.time})`, role: "keyframe", shot: item.shot, prompt: item.prompt, promptModel: item.prompt!.split("\n").map(text => [{ type: "Write", text }]),
+      model: JSON.stringify(["qwenImage", "qwen_image_2_1_turbo"]), ratio: state.value?.production.input.ratio ?? "16:9", size: "1K", loras,
+      outputs: { image: { dataType: "IMAGE", value: { url: item.image, mimeType: mimeOf(item.image!) } } },
+      referenceOrder: { in: sources.map(source => encodeURIComponent(JSON.stringify([source, "image"]))) },
+    } }]);
+    flow.addEdges(sources.map(source => ({ id: crypto.randomUUID(), source: source!, sourceHandle: "image", target: nodeId, targetHandle: "in" })));
+    placed[item.shot] = nodeId;
+  }
+}
+
+async function refresh() {
+  if (!data.value.started) return;
+  try {
+    state.value = await api<State>(`get?${new URLSearchParams({ directory: await directory(), id })}`);
+    if (state.value.script) syncText("script", state.value.script);
+    if (state.value.shotList) syncText("shotList", state.value.shotList);
+    if (state.value.production.assets) syncAssets(state.value.production.assets);
+    if (state.value.production.keyframes) await syncKeyframes(state.value.production.keyframes);
+    newBudget.value ??= state.value.production.input.budget;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));
+  }
+}
+
+async function act(run: () => Promise<unknown>) {
+  busy.value = true;
+  try {
+    await run();
+    await refresh();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** Approves the reviewed script, or sends change requests; an in-place edit of the Script node is sent along. */
+function answer(revise: boolean) {
+  const scriptNode = state.value?.production.review?.gate === "script" ? data.value.texts?.script?.node : undefined;
+  const edited = (scriptNode && (flow.findNode(scriptNode)?.data?.outputs as { text?: { value?: string } } | undefined)?.text?.value) || undefined;
+  return act(async () => {
+    await api("review", { directory: await directory(), id, ...revise ? { notes: notes.value } : {}, ...edited !== undefined && edited !== state.value?.script ? { script: edited } : {} });
+    if (edited !== undefined && data.value.texts?.script) data.value.texts.script.synced = edited;
+    notes.value = "";
+  });
+}
+const resume = () => act(async () => api("resume", { directory: await directory(), id, ...state.value?.production.message === "budget" ? { budget: newBudget.value } : {} }));
+const stop = () => act(async () => api("stop", { directory: await directory(), id }));
+
+// The page shows progress by asking every few seconds; the production itself runs on the server.
+let poll: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  void refresh();
+  poll = setInterval(() => { if (data.value.started && state.value?.production.status !== "done") void refresh(); }, 5000);
+});
+onBeforeUnmount(() => {
+  clearInterval(poll);
+  clearTimeout(quoteTimer);
+});
+</script>
+
+<style scoped lang="scss">
+.productionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 72px;
+  max-width: 360px;
+  padding: 8px 4px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+
+  strong { font-size: 14px; color: var(--el-text-color-primary); }
+  .failure { color: var(--el-color-danger); }
+  .warning { color: var(--el-color-warning); }
+}
+
+.productionCard {
+  .formRow, .photos, .quote {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+
+    .shortSelect { width: 96px; }
+    .photoName { width: 120px; }
+  }
+
+  .hint { display: block; margin-top: 10px; font-size: 12px; color: var(--el-text-color-secondary); }
+
+  .review {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+  }
+}
+</style>

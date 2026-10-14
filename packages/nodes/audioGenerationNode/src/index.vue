@@ -95,7 +95,7 @@ data.value.voice ??= "";
 data.value.emotion ??= "";
 data.value.sampleRate ??= 24000;
 data.value.format ??= "wav";
-const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
 const uploading = ref(false);
@@ -164,7 +164,7 @@ async function startGeneration() {
   if (!choice) throw new Error("请先选择音频模型");
   if (!generationPrompt.value) throw new Error("请输入生成提示词或待朗读文本");
   if (!referencesAllowed(refList.value)) throw new Error("图片和音频不能同时引用，且合计最多引用一个；文本数量不限");
-  if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  assertReferencesReady();
   if (!languageOptions.some(item => item.value === data.value.language) || !sampleRateOptions.includes(data.value.sampleRate) || !formatOptions.includes(data.value.format)) throw new Error("请重新选择有效的语种、采样率和输出格式");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();

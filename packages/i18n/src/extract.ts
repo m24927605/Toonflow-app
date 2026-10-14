@@ -25,7 +25,8 @@ async function scan(directory: string) {
     if (!/\.(ts|vue)$/.test(item.name) || /(?:\.d\.ts|providerPrompt|systemPrompt)\./i.test(item.name) || /packages[\\/]ffmpeg[\\/]src[\\/]browser\.ts$/.test(path)) continue;
     const source = await readFile(path, "utf8");
     if (translatedSource.test(path.replaceAll("\\", "/"))) {
-      for (const message of collectMessages(source, path)) add(message, path);
+      // These are implicit Chinese display text and explicit translate()/t``/msg`` messages in any language.
+      for (const message of collectMessages(source, path)) add(message, path, true);
     }
     const scripts = item.name.endsWith(".vue")
       ? (() => { const { descriptor } = parseSfc(source); return [descriptor.script?.content, descriptor.scriptSetup?.content].filter(Boolean) as string[]; })()
@@ -46,7 +47,7 @@ async function scan(directory: string) {
           add(node.quasi.quasis.map((part, index) => (node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw) + (index < node.quasi.expressions.length ? `{${index}}` : "")).join(""), path, true);
         }
         if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "translateMessage"].includes(node.callee.name) && node.arguments[0]?.type === "StringLiteral") add(node.arguments[0].value, path, true);
-        if (nodePackage && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["label", "displayName"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path);
+        if (nodePackage && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["label", "displayName"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path, true);
         if (pluginMetadata && node.type === "ObjectProperty" && node.key.type === "Identifier" && ["displayName", "description", "title", "label", "placeholder"].includes(node.key.name) && node.value.type === "StringLiteral") add(node.value.value, path, true);
         // Server messages reach users through translateError and the response helpers, so their literal text is a key.
         if (backend && (node.type === "NewExpression" || node.type === "CallExpression") && node.callee.type === "Identifier") {

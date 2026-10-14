@@ -182,6 +182,7 @@ Text AI only provides `generate({ ...input, onEvent, signal })`. The server acce
 
 
 - `ai.getMediaModels(signal?)`: reads the image and video models declared by installed providers and returns provider and model IDs, names, types, and mode parameters. Image models can declare supported resolution and aspect ratio options through `imageSizes` and `imageRatios`, and nodes pass the selected values as `size` and `ratio` when generating.
+- While any `ai.generateImage`, `ai.generateVideo` or `ai.generateAudio` call runs, it is counted through `window.toonflowNodeHost.generations`, and the host asks before the page is closed, reloaded or the workspace is left, because the server cancels a job that no page polls any more.
 - `ai.generateImage(input, signal?)`: generates without streaming, saves to disk, and returns `{ path, mimeType, mediaType: "image" }[]`. `input` contains the absolute workspace path `directory`, `providerId`, `modelId`, `prompt`, and the workspace-relative directory `outputDirectory`; `images: { path, mimeType }[]`, `ratio`, and `size` are optional. Image references pass only workspace-relative paths, which the backend reads.
 - `ai.generateVideo(input, signal?)`: generates video, saves it to disk, and returns `{ path, mimeType, mediaType: "video" }[]`. The basic fields are the same as for image generation. Configure the video with `duration`, `resolution`, `ratio`, `generateAudio`, and `mode`, and optionally pass `images`, `videos`, `audios`, `firstFrame`, and `lastFrame`, all as `{ path, mimeType }` references inside the workspace.
 
@@ -506,3 +507,5 @@ Write node text in Chinese, as in the Web app. Node builds run the `@toonflow/i1
 - Other dependencies are bundled independently with each node. Different nodes may use different UI frameworks and third-party library versions, and the same library may appear in several UMDs.
 - Prefer local imports for components from other UI libraries, and import the CSS they need in the node source as well. Vite's UMD mode with `cssCodeSplit: true` injects the CSS into the same JS file. For component libraries that need a provider, wrap that library's provider inside the node's root component.
 - Independent subpackages provide a dependency management boundary, not page style isolation. Global CSS, resets, or libraries that rely on global installation through `app.use()` need separate adaptation. Prefer `<style scoped>` for a node's own styles.
+
+Pass `generationStatus` (`idle`, `running`, `succeeded` or `failed`) to `nodeSkeleton` to show a node's generation state without selecting it: the title bar shows a status icon and the node frame blinks yellow while running, turns green when it succeeded and red when it failed. Blinking stops when the system asks for reduced motion.

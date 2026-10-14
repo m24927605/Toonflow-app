@@ -24,6 +24,7 @@
         "@toonflow/file": "workspace:*",
         "@toonflow/i18n": "workspace:*",
         "@toonflow/mcp": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
         "@toonflow/providers": "workspace:*",
         "@toonflow/teams-scaffold": "workspace:*",
         "@toonflow/tool-asset-operator": "workspace:*",
@@ -521,6 +522,67 @@
         "vue": "^3.5.42",
       },
     },
+    "packages/nodes/loraTrainingNode": {
+      "name": "@toonflow/node-lora-training",
+      "version": "1.0.0",
+      "dependencies": {
+        "@tabler/icons-vue": "^3.46.0",
+      },
+      "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
+        "@toonflow/nodes-scaffold": "workspace:*",
+        "typescript": "~6.0.3",
+        "vite": "^8.2.2",
+        "vue-tsc": "^3.3.11",
+      },
+      "peerDependencies": {
+        "@vue-flow/core": "^1.48.2",
+        "element-plus": "^2.14.5",
+        "vue": "^3.5.42",
+      },
+    },
+    "packages/nodes/productionNode": {
+      "name": "@toonflow/node-production",
+      "version": "1.0.0",
+      "dependencies": {
+        "@tabler/icons-vue": "^3.46.0",
+      },
+      "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
+        "@toonflow/nodes-scaffold": "workspace:*",
+        "typescript": "~6.0.3",
+        "vite": "^8.2.2",
+        "vue-tsc": "^3.3.11",
+      },
+      "peerDependencies": {
+        "@vue-flow/core": "^1.48.2",
+        "element-plus": "^2.14.5",
+        "vue": "^3.5.42",
+      },
+    },
+    "packages/nodes/soundtrackMixNode": {
+      "name": "@toonflow/node-soundtrack-mix",
+      "version": "1.0.0",
+      "dependencies": {
+        "@tabler/icons-vue": "^3.46.0",
+      },
+      "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
+        "@toonflow/node-video": "workspace:*",
+        "@toonflow/nodes-scaffold": "workspace:*",
+        "typescript": "~6.0.3",
+        "vite": "^8.2.2",
+        "vue-tsc": "^3.3.11",
+      },
+      "peerDependencies": {
+        "@vue-flow/core": "^1.48.2",
+        "element-plus": "^2.14.5",
+        "vue": "^3.5.42",
+      },
+    },
     "packages/nodes/textNode": {
       "name": "@toonflow/node-text",
       "version": "2.0.0",
@@ -553,6 +615,27 @@
         "dompurify": "3.4.16",
         "element-plus": "^2.14.5",
         "marked": "18.0.13",
+        "vue": "^3.5.42",
+      },
+    },
+    "packages/nodes/videoConcatNode": {
+      "name": "@toonflow/node-video-concat",
+      "version": "1.0.0",
+      "dependencies": {
+        "@tabler/icons-vue": "^3.46.0",
+      },
+      "devDependencies": {
+        "@toonflow/i18n": "workspace:*",
+        "@toonflow/node-shared": "workspace:*",
+        "@toonflow/node-video": "workspace:*",
+        "@toonflow/nodes-scaffold": "workspace:*",
+        "typescript": "~6.0.3",
+        "vite": "^8.2.2",
+        "vue-tsc": "^3.3.11",
+      },
+      "peerDependencies": {
+        "@vue-flow/core": "^1.48.2",
+        "element-plus": "^2.14.5",
         "vue": "^3.5.42",
       },
     },
@@ -1340,11 +1423,19 @@
 
     "@toonflow/node-image-generation": ["@toonflow/node-image-generation@workspace:packages/nodes/imageGenerationNode"],
 
+    "@toonflow/node-lora-training": ["@toonflow/node-lora-training@workspace:packages/nodes/loraTrainingNode"],
+
+    "@toonflow/node-production": ["@toonflow/node-production@workspace:packages/nodes/productionNode"],
+
     "@toonflow/node-shared": ["@toonflow/node-shared@workspace:packages/nodeShared"],
+
+    "@toonflow/node-soundtrack-mix": ["@toonflow/node-soundtrack-mix@workspace:packages/nodes/soundtrackMixNode"],
 
     "@toonflow/node-text": ["@toonflow/node-text@workspace:packages/nodes/textNode"],
 
     "@toonflow/node-video": ["@toonflow/node-video@workspace:packages/nodes/videoNode"],
+
+    "@toonflow/node-video-concat": ["@toonflow/node-video-concat@workspace:packages/nodes/videoConcatNode"],
 
     "@toonflow/node-video-generation": ["@toonflow/node-video-generation@workspace:packages/nodes/videoGenerationNode"],
 
@@ -2748,11 +2839,19 @@
 
     "@toonflow/node-image-generation/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
+    "@toonflow/node-lora-training/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+
+    "@toonflow/node-production/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+
     "@toonflow/node-shared/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+
+    "@toonflow/node-soundtrack-mix/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@toonflow/node-text/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@toonflow/node-video/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+
+    "@toonflow/node-video-concat/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
     "@toonflow/node-video-generation/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 

@@ -16,8 +16,20 @@
     "./markdownExtensions": "./src/markdownExtensions.ts",
     "./confirmOnScreenText": "./src/confirmOnScreenText.ts",
     "./scriptCheck": "./src/scriptCheck.ts",
+    "./shotListPrompt": "./src/shotListPrompt.ts",
+    "./shotList": "./src/shotList.ts",
+    "./keyframePrompt": "./src/keyframePrompt.ts",
+    "./loraTriggers": "./src/loraTriggers.ts",
     "./gradeControl": "./src/components/gradeControl.vue",
-    "./grading": "./src/grading.ts"
+    "./grading": "./src/grading.ts",
+    "./confirmReferences": "./src/confirmReferences.ts",
+    "./shotLabel": "./src/shotLabel.ts",
+    "./masterShot": "./src/masterShot.ts",
+    "./nodeRole": "./src/nodeRole.ts",
+    "./roleSelect": "./src/components/roleSelect.vue",
+    "./assetLora": "./src/components/assetLora.vue",
+    "./loraPicker": "./src/components/loraPicker.vue",
+    "./loraRegistry": "./src/loraRegistry.ts"
   },
   "scripts": {
     "typecheck": "vue-tsc --noEmit"

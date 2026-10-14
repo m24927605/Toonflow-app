@@ -152,7 +152,11 @@ async function splitImage() {
           id,
           type: "remote-imageNode",
           position: { x: 0, y: 0 },
-          data: { label: `${translate(node.data.label || "图片")} · ${row + 1}-${column + 1}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } },
+          data: {
+            label: `${translate(node.data.label || "图片")} · ${row + 1}-${column + 1}`, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } },
+            // The views cut from a character sheet are that character's views for the shot flow.
+            ...node.data.role === "character" ? { role: "character", character: node.data.character, ...node.data.outfit ? { outfit: node.data.outfit } : {} } : {},
+          },
         });
         completed.value++;
       }

@@ -4,6 +4,8 @@ import * as singleAgent from "@/utils/singleAgent";
 import * as providerDebug from "@/utils/media/debug";
 import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaJobs from "@/utils/media/jobs";
+import * as lora from "@/utils/media/lora";
+import * as production from "@/utils/production";
 import * as mediaProvider from "@/utils/media/provider";
 import * as higgsfield from "@/utils/media/higgsfield";
 import * as ffmpeg from "@/utils/ffmpeg";
@@ -34,6 +36,8 @@ export default {
   providerDebug,
   mediaGeneration,
   mediaJobs,
+  lora,
+  production,
   mediaProvider,
   higgsfield,
   ffmpeg,

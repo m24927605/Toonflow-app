@@ -1,5 +1,5 @@
 # MiniMax H3 Ref2VA pipeline executed on a Colab GPU session by minimaxH3.ts.
-# Inputs: /content/h3in_prompt.txt, optional /content/h3in_ref_* images, /content/h3in_vid_* videos,
+# Inputs: /content/h3in_prompt.txt, optional /content/h3in_ref_* images, /content/h3in_vid_* videos, /content/h3in_aud_* audio,
 # /content/h3in_first.* and /content/h3in_last.* frames, an optional /content/h3in_control.* structure video
 # (depth, pose or edges) for the Fun ControlNet Union 2.0, and the H3_* environment variables.
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
@@ -122,6 +122,13 @@ for index, source in enumerate(sorted(inputs.glob("h3in_vid_*"))):
     if seconds < 2:
         raise ValueError(f"reference video {index + 1} is shorter than 2 seconds")
     videos.append(target.name)
+# Standalone reference audio (<Audio N>), resampled to the audio VAE's 32 kHz stereo; a clip marked fully_copy in the
+# prompt becomes the soundtrack and the speaker lip-syncs to it.
+audios = []
+for index, source in enumerate(sorted(inputs.glob("h3in_aud_*"))):
+    target = comfy / "input" / f"h3aud{index}.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-ar", "32000", "-ac", "2", str(target)], check=True)
+    audios.append(target.name)
 if controlSource:
     # The control video only drives structure and motion; its look never reaches the output.
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(controlSource), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
@@ -159,7 +166,8 @@ graph = {
         "clip": ["3", 0], "vae": ["4", 0], "audio_vae": ["5", 0], "prompt": prompt,
         "width": generateWidth, "height": generateHeight, "length": length, "ref_image_size": "match",
         **{f"ref_images.ref_image_{index}": [f"ref{index}", 0] for index in range(len(refs))},
-        **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))}}},
+        **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))},
+        **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
     "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
     "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
     "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": 4, "denoise": 1.0}},
@@ -168,6 +176,8 @@ graph = {
 }
 for index, ref in enumerate(refs):
     graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
+for index, name in enumerate(audios):
+    graph[f"aud{index}"] = {"class_type": "LoadAudio", "inputs": {"audio": name}}
 for index, name in enumerate(videos):
     graph[f"vidFile{index}"] = {"class_type": "LoadVideo", "inputs": {"file": name}}
     graph[f"vid{index}"] = {"class_type": "GetVideoComponents", "inputs": {"video": [f"vidFile{index}", 0]}}
@@ -222,6 +232,17 @@ graph.update({
     "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": "toonflow/h3", **videoFormat}},
 })
 
+# LoRAs ride after the Turbo LoRA at their strength; every node that used the Turbo model takes the last one.
+characterModel = ["2", 0]
+loraStrengths = json.loads((inputs / "h3in_loras.json").read_text()) if (inputs / "h3in_loras.json").exists() else []
+for index, source in enumerate(sorted(inputs.glob("h3in_lora_*.safetensors"))):
+    shutil.copy(source, comfy / "models" / "loras" / f"character_{index}.safetensors")
+    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": f"character_{index}.safetensors", "strength_model": float(loraStrengths[index]) if index < len(loraStrengths) else 1.0}}
+    characterModel = [f"lora{index}", 0]
+if characterModel != ["2", 0]:
+    for key, node in graph.items():
+        if not key.startswith("lora"):
+            node["inputs"] = {name: characterModel if value == ["2", 0] else value for name, value in node["inputs"].items()}
 response = requests.post(base + "/prompt", json={"prompt": graph}, timeout=60)
 if not response.ok:
     raise RuntimeError(response.text[-4000:])

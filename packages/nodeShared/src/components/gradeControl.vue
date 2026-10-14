@@ -1,13 +1,13 @@
 <template>
   <el-popover trigger="click" placement="bottom-end" :width="320" :disabled="!outputUrl">
     <template #reference>
-      <el-button class="gradeButton" :class="current ? `level${current.level}` : 'ungraded'" text size="small" :disabled="!outputUrl" title="Quality grade of this output" aria-label="Quality grade" @click.stop>
+      <el-button class="gradeButton" :class="current ? `level${current.level}` : 'ungraded'" text size="small" :disabled="!outputUrl" :title="translate('Quality grade of this output')" :aria-label="translate('Quality grade')" @click.stop>
         {{ current ? `L${current.level}` : "L?" }}
       </el-button>
     </template>
     <div class="gradePanel nodrag nopan nowheel">
       <div class="gradeChecks">
-        <el-checkbox v-for="item in checks" :key="item.key" :modelValue="!!draft[item.key]" @update:modelValue="toggle(item.key, !!$event)">{{ item.label }}</el-checkbox>
+        <el-checkbox v-for="item in checks" :key="item.key" :modelValue="!!draft[item.key]" @update:modelValue="toggle(item.key, !!$event)">{{ translate(item.label) }}</el-checkbox>
       </div>
       <div class="gradeLevels">
         <el-button
@@ -16,13 +16,13 @@
           size="small"
           :type="current?.level === item.level ? 'primary' : 'default'"
           :disabled="item.level >= 3 && !allChecked"
-          :title="item.hint"
+          :title="translate(item.hint)"
           @click="setLevel(item.level)">
-          {{ item.label }}
+          {{ translate(item.label) }}
         </el-button>
       </div>
-      <p v-if="!allChecked" class="gradeNote">Tick every check to allow L3 or L4.</p>
-      <p v-if="lowKeeperRate(grades)" class="gradeWarning">Under 30% of this node's graded outputs reached L3: fix the prompt and references before generating more.</p>
+      <p v-if="!allChecked" class="gradeNote">{{ translate("Tick every check to allow L3 or L4.") }}</p>
+      <p v-if="lowKeeperRate(grades)" class="gradeWarning">{{ translate("Under 30% of this node's graded outputs reached L3: fix the prompt and references before generating more.") }}</p>
     </div>
   </el-popover>
 </template>
@@ -31,6 +31,7 @@
 import { computed, ref, watch } from "vue";
 import { ElButton, ElCheckbox, ElPopover } from "element-plus";
 import { useNode } from "@vue-flow/core";
+import { translate } from "@toonflow/i18n/vue";
 import { gradeChecks, gradeLevels, lowKeeperRate, type GradeLevel, type NodeGrades } from "../grading";
 
 const props = defineProps<{ outputUrl?: string; kind: "image" | "video" }>();

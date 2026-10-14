@@ -15,7 +15,8 @@
     "./nodeAi": "./src/nodeAi.ts",
     "./nodeFfmpeg": "./src/nodeFfmpeg.ts",
     "./workspaceFiles": "./src/workspaceFiles.ts",
-    "./nodeTools": "./src/nodeTools.ts"
+    "./nodeTools": "./src/nodeTools.ts",
+    "./flashNode": "./src/flashNode.ts"
   },
   "scripts": {
     "typecheck": "vue-tsc --noEmit"

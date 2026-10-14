@@ -1,11 +1,12 @@
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { getConfiguredModel } from "@/utils/ai";
+import { getConfiguredModel, requestApiKey } from "@/utils/ai";
 import { createCodexRuntime } from "@/utils/ai/codex";
 
 export async function createAgentModel(providerId: string, modelId: string, thinkingLevel = "off") {
   const configured = getConfiguredModel(providerId, modelId);
   const { provider, model, baseUrl } = configured;
+  if (provider.protocol === "colab-cli") throw Object.assign(new Error("Colab CLI is only used for text node generation. Choose another model for the Agent."), { status: 400 });
   if (provider.protocol === "claude-code") throw Object.assign(new Error("Claude Code is only used for node generation. Choose another model for the Agent."), { status: 400 });
   // ACT: Codex uses Pi's built-in provider so the OAuth credential in auth.json is refreshed per request and long
   // conversations do not outlive the access token.
@@ -22,6 +23,6 @@ export async function createAgentModel(providerId: string, modelId: string, thin
       contextWindow: model.contextWindow, maxTokens: model.maxOutputTokens,
     }],
   });
-  await runtime.setRuntimeApiKey(providerId, provider.apiKey);
+  await runtime.setRuntimeApiKey(providerId, requestApiKey(provider.apiKey));
   return { ...configured, runtime };
 }

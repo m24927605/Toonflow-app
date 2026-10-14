@@ -35,7 +35,7 @@ export default {
     // The depth map leaves the reference list, so {{ref 1}} names it and later markers shift down to the images sent.
     const prompt = depth ? request.prompt.replace(/\{\{ref (\d+)\}\}/g, (_, index) => index === "1" ? "the depth map" : `{{ref ${Number(index) - 1}}}`) : request.prompt;
     const { data, mimeType } = await this.tool.qwenImage({
-      prompt, ratio: request.ratio ?? "1:1", size,
+      prompt, ratio: request.ratio ?? "1:1", size, loras: request.loras,
       ...(depth ? { images: rest, controlImage: first } : { images: request.images ?? [] }),
     });
     return [{ mediaType: "image", type: "binary", data, mimeType }];

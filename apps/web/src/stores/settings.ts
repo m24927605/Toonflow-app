@@ -78,7 +78,7 @@ export const customProviders = computed<CustomProvider[]>(() => Array.isArray(se
   : []);
 
 // Claude Code only serves node generation, so agent model pickers leave it out.
-export const agentProviders = computed(() => customProviders.value.filter(provider => provider.protocol !== "claude-code"));
+export const agentProviders = computed(() => customProviders.value.filter(provider => !["claude-code", "colab-cli"].includes(provider.protocol)));
 
 export const modelChoices = computed(() => agentProviders.value.flatMap(provider => provider.models.map(model => ({
   value: JSON.stringify([provider.id, model.id]), providerId: provider.id, modelId: model.id, label: model.label, contextWindow: model.contextWindow,

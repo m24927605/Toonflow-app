@@ -1,5 +1,6 @@
 import type { BrowserFfmpegFactory } from "@toonflow/nodes-scaffold/runtime";
 import { probeMedia, runCommand } from "@toonflow/node-shared/ffmpegCommand";
+import { translate } from "@toonflow/i18n/vue";
 
 export type DubbingOptions = {
   videoPath: string;
@@ -37,7 +38,7 @@ export async function dubVideo(ffmpeg: BrowserFfmpegFactory, options: DubbingOpt
 
   if (options.musicPath) {
     const music = await probeMedia(ffmpeg, options.musicPath, signal);
-    if (!music.streams.some(stream => stream.codec_type === "audio")) throw new Error("Music input has no audio track");
+    if (!music.streams.some(stream => stream.codec_type === "audio")) throw new Error(translate("Music input has no audio track"));
   }
   const delay = `adelay=${Math.round(options.start * 1000)}:all=1`;
   const filters = options.musicPath ? [

@@ -117,6 +117,16 @@ def build(item):
     }
     for index, name in enumerate(refs):
         graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
+    # LoRAs sit between the model and its cache, so every sampler and the ControlNet patch see them.
+    model = ["1", 0]
+    for index, lora in enumerate(item.get("loras") or []):
+        target = comfy / "models" / "loras" / lora["name"]
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(inputs / lora["name"], target)
+        graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": model, "lora_name": lora["name"], "strength_model": float(lora["strength"])}}
+        model = [f"lora{index}", 0]
+    graph["2"]["inputs"]["model"] = model
     if item.get("control"):
         # The depth map is scaled to the output canvas so the structure lines up with the latent.
         graph["ctrl"] = {"class_type": "LoadImage", "inputs": {"image": item["control"]}}

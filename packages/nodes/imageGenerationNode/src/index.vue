@@ -12,6 +12,8 @@
     :style="{ width: (previewUrl || inpaintGuideUrl) && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
+      <roleSelect :roles="['keyframe', 'character', 'scene', 'layout']" />
+      <assetLora />
       <el-button :icon="IconPanoramaHorizontal" :disabled="generating || deleting || uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down :size="14" /></el-button>
       <el-button :icon="IconBrush" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
       <el-button :icon="IconSun" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="打光" aria-label="打光" @click.stop="openLighting">打光</el-button>
@@ -22,6 +24,7 @@
       <input ref="fileInput" type="file" accept="image/*" hidden aria-label="选择替换图片" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy" @change="replaceOutput" />
     </template>
     <template #topRightActions>
+      <el-button v-if="isKeyframe" :icon="IconStar" text size="small" :title="translate('Make this keyframe the master shot: every other shot keyframe references it for lighting, colour, clothing and props')" @click.stop="setAsMasterShot">{{ translate("Set as master shot") }}</el-button>
       <gradeControl :outputUrl="outputFile?.url" kind="image" />
       <el-button :icon="IconPencil" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="标记" aria-label="标记" @click.stop="startEditor('mark')" />
     </template>
@@ -55,6 +58,7 @@
           @remove="removeReference" />
         <promptInput v-if="editor?.mode === 'inpaint'" v-model="data.inpaintPromptModel" v-model:text="data.inpaintPrompt" :references="referenceMentions" expandable />
         <promptInput v-else v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" expandable />
+        <loraPicker v-if="loraFamily" v-model="loras" :family="loraFamily" class="loraRow" />
         <div class="promptFooter">
           <el-select
             v-if="editor?.mode !== 'inpaint'"
@@ -110,16 +114,26 @@
 </template>
 
 <script setup lang="ts">
+import loraPicker from "@toonflow/node-shared/loraPicker";
+import { activeLoras, listLoras, loraFamilyOf, pickLoras, type AttachedLora } from "@toonflow/node-shared/loraRegistry";
+import { withTriggers } from "@toonflow/node-shared/loraTriggers";
 import { t, translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
-import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
-import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
+import { useVueFlow } from "@vue-flow/core";
+import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer, ElMessage, ElMessageBox } from "element-plus";
+import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown, IconStar } from "@tabler/icons-vue";
+import { planMasterShot } from "@toonflow/node-shared/masterShot";
+import roleSelect from "@toonflow/node-shared/roleSelect";
+import assetLora from "@toonflow/node-shared/assetLora";
+import { roleOf } from "@toonflow/node-shared/nodeRole";
+import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import { useNodeGeneration } from "@toonflow/node-shared/useNodeGeneration";
 import gradeControl from "@toonflow/node-shared/gradeControl";
 import { confirmOnScreenText } from "@toonflow/node-shared/confirmOnScreenText";
+import { confirmReferences } from "@toonflow/node-shared/confirmReferences";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
@@ -145,7 +159,8 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "图片生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; inpaintPrompt: string; inpaintPromptModel: PromptModel; model: string; size: string; ratio: string; inpaint?: ImageInpaint });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; inpaintPrompt: string; inpaintPromptModel: PromptModel; model: string; size: string; ratio: string; inpaint?: ImageInpaint; loras?: AttachedLora[] });
+const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.inpaintPrompt ??= "";
@@ -153,7 +168,8 @@ data.value.inpaintPromptModel ??= [];
 data.value.model ??= "";
 data.value.size ??= "";
 data.value.ratio ??= "16:9";
-const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
+const { findNode, getNodes, getEdges, addEdges } = useVueFlow();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
 const uploading = ref(false);
@@ -175,11 +191,12 @@ const previewVisible = ref(false);
 const inpaintPreviewVisible = ref(false);
 const imageWidth = ref(0);
 let generationController: AbortController | undefined;
-const generationState = useNodeGeneration(outputs, () => generationController?.abort(), () => void startGeneration().catch(error => showNodeError(error, translate("图片生成失败"))));
+const generationState = useNodeGeneration(outputs, () => generationController?.abort(), batch => void startGeneration(batch).catch(error => showNodeError(error, translate("图片生成失败"))));
 const { generating, status: generationStatus } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
+const loraFamily = computed(() => loraFamilyOf(selectedModel.value?.providerId));
 const sizeOptions = computed(() => (selectedModel.value?.imageSizes?.length ? selectedModel.value.imageSizes : ["2K"]));
 const ratioOptions = computed(() => (selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : ["16:9"]));
 watch(
@@ -267,7 +284,7 @@ async function confirmInpaint() {
   if (!inpaintEditor || inpaintEditor.mode !== "inpaint") throw new Error("请先进入局部重绘");
   if (inpaintEditor.busy || generating.value || deleting.value || uploading.value) return;
   if (!generationPrompt.value) throw new Error("请输入重绘提示词");
-  if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  assertReferencesReady();
   let prompt = generationPrompt.value.replace(/\{\{ref (\d+)\}\}/g, "Inpaint reference $1").replace(/^Reference (\d+):/gm, "Inpaint reference $1:");
   const images = refList.value.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   const imageReferences = refList.value.flatMap((item, index) => item.dataType === "IMAGE" && item.value ? [index + 1] : []);
@@ -275,7 +292,7 @@ async function confirmInpaint() {
   await inpaintEditor.createInpaint({ prompt, images }, new AbortController().signal);
 }
 
-async function startGeneration() {
+async function startGeneration(batch = false) {
   const choice = selectedModel.value;
   if (generating.value) throw new Error("图片正在生成，请等待完成");
   if (panorama.value?.visible) throw new Error("请先关闭全景图，再启动图片生成");
@@ -287,7 +304,7 @@ async function startGeneration() {
   if (editor.value?.mode === "inpaint") throw new Error("请先确认局部重绘，再到子节点生成");
   if (!generationPrompt.value) throw new Error("请输入生成提示词");
   const references = refList.value.filter(item => !data.value.inpaint || item.dataType !== "IMAGE" || item.value?.url !== data.value.inpaint.source);
-  if (references.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  assertReferencesReady(references);
   if (!choice) throw new Error("请先选择图片模型");
   const characters = references.flatMap(item => item.dataType === "CHARACTER" && item.value ? [item.value] : []);
   if (characters.length > 1) throw new Error("一次只能引用一个角色身份");
@@ -296,20 +313,25 @@ async function startGeneration() {
     const supported = models.value.find(model => model.character === character.kind);
     throw new Error(supported ? t`角色“${character.name}”需要改用 ${supported.label} 模型生成` : t`没有可用于角色“${character.name}”的图片模型`);
   }
-  const skipTextCheck = await confirmOnScreenText(generationPrompt.value);
+  const skipTextCheck = await confirmOnScreenText(generationPrompt.value, !batch);
+  // Inpainting renumbers references itself, so the check only covers regular generation.
+  if (!data.value.inpaint) await confirmReferences(generationPrompt.value, refList.value.map(item => translate(findNode(item.source)?.data?.label ?? "")), /depth/i.test(choice.modelId), !batch);
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
+  const attached = activeLoras(loras.value, choice.providerId);
   const inpaintData = data.value.inpaint;
   const input = {
     skipTextCheck: skipTextCheck || undefined,
     providerId: choice.providerId,
     modelId: choice.modelId,
-    prompt: generationPrompt.value,
+    // Attached LoRAs only work when their trigger words are in the prompt.
+    prompt: withTriggers(generationPrompt.value, attached),
     size: data.value.size,
     ratio: data.value.ratio,
     outputDirectory: `assets/${id}`,
     images: references.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     characterId: character?.id,
+    ...attached.length ? { loras: attached.map(lora => ({ path: lora.path, strength: lora.strength })) } : {},
   };
   if (inpaintData) {
     let imageIndex = 3 + (inpaintData.images?.length ?? 0);
@@ -336,6 +358,41 @@ async function startGeneration() {
       generationController = undefined;
     });
   return { status: "generating" };
+}
+
+const isKeyframe = computed(() => roleOf(node) === "keyframe");
+
+/** Wires this keyframe as the master shot of every other shot keyframe, after confirming what changes. */
+async function setAsMasterShot() {
+  const plan = planMasterShot(findNode(id)!, getNodes.value, getEdges.value,
+    marker => translate("Lighting, colour, clothing and props match {0}, but the composition, camera angle and poses follow the description below.", { 0: marker }));
+  const shots = (list: number[]) => list.join(", ");
+  const notes = [
+    plan.already.length ? t`Already following this master: shots ${shots(plan.already)}.` : "",
+    plan.otherMaster.length ? t`Shots ${shots(plan.otherMaster)} follow another master shot and are left unchanged.` : "",
+  ].filter(Boolean);
+  if (!plan.changes.length) return void ElMessage.info([translate("No other shot keyframe needs this master shot."), ...notes].join(" "));
+  const regenerate = plan.changes.filter(item => item.hasImage).map(item => item.shot);
+  const summary = [
+    t`Connect this keyframe to ${plan.changes.length} shot keyframes (shots ${shots(plan.changes.map(item => item.shot))}) and add a line asking them to match its lighting, colour, clothing and props?`,
+    regenerate.length ? t`Shots ${shots(regenerate)} already have images; regenerate them to apply the master shot.` : "",
+    ...notes,
+  ].filter(Boolean).join("\n");
+  if (!await ElMessageBox.confirm(summary, translate("Set as master shot"), {
+    confirmButtonText: translate("Connect"), cancelButtonText: translate("Cancel"), type: "info", customStyle: { whiteSpace: "pre-line" },
+  }).then(() => true, () => false)) return;
+  for (const change of plan.changes) {
+    const target = findNode(change.nodeId);
+    if (!target) continue;
+    target.data = {
+      ...target.data, prompt: change.prompt, promptModel: change.prompt.split("\n").map(text => [{ type: "Write", text }]),
+      referenceOrder: { ...target.data.referenceOrder, in: change.referenceOrder }, masterShotId: id,
+    };
+    flashNode(target.data, translate("Master shot connected"));
+  }
+  addEdges(plan.changes.map(change => ({ id: crypto.randomUUID(), source: id, sourceHandle: "image", target: change.nodeId, targetHandle: "in" })));
+  flashNode(node.data, translate("Master shot"));
+  ElMessage.success(t`Connected the master shot to ${plan.changes.length} keyframes`);
 }
 
 nodeEvent.on("save", (reason) => {
@@ -402,13 +459,13 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "Read this image generation node's current model, resolution, aspect ratio and the capabilities of the available image models, without keys; when the resolution or aspect ratio is not declared, 2K and 16:9 are used respectively",
+  description: "Read this image generation node's current model, resolution, aspect ratio and the capabilities of the available image models, without keys; when the resolution or aspect ratio is not declared, 2K and 16:9 are used respectively; loras lists the LoRAs attached to this node and the trained ones its model can load (only Qwen-Image loads LoRAs)",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
     await loadModels();
     signal?.throwIfAborted();
-    return getConfig();
+    return { ...getConfig(), loras: await loraConfig() };
   },
 });
 
@@ -450,6 +507,29 @@ nodeTools.register({
     data.value.prompt = value;
     data.value.promptModel = value.split("\n").map((text) => [{ type: "Write", text }]);
     return { prompt: value };
+  },
+});
+
+// The trained LoRAs of the workspace that the selected model loads, with the ones attached to this node.
+async function loraConfig() {
+  const family = loraFamily.value;
+  const records = family ? (await listLoras(files.getWorkspaceFiles())).filter(item => item.family === family) : [];
+  return { family: family ?? null, attached: loras.value, available: records.map(({ path, name, kind, trigger }) => ({ path, name, kind, trigger })) };
+}
+
+nodeTools.register({
+  name: "setLoras",
+  description: "Replace the LoRAs loaded with this node's image generation by trained Qwen-Image LoRAs from getConfig's loras.available, at most 4; strength defaults to 1 (sliders take -4 to 4) and an empty list removes them all. Their trigger words are added to the prompt when generating. Select the Qwen-Image model with setConfig first; does not start generation",
+  parameters: z.strictObject({ loras: z.array(z.strictObject({ path: z.string().min(1), strength: z.number().min(-4).max(4).optional() })).max(4) }),
+  async execute(args, { signal }) {
+    signal?.throwIfAborted();
+    if (generating.value || deleting.value) throw new Error("The node is generating or being deleted; change its LoRAs later");
+    await loadModels();
+    signal?.throwIfAborted();
+    const family = loraFamily.value;
+    if (!family) throw new Error("The selected model loads no LoRAs; select Qwen-Image with setConfig first");
+    loras.value = pickLoras(await listLoras(files.getWorkspaceFiles()), family, args.loras);
+    return loraConfig();
   },
 });
 
@@ -495,6 +575,8 @@ nodeTools.register({
 
 .promptCard {
   .inpaintInfo { margin-bottom: 8px; }
+  .loraRow { margin-top: 8px; }
+
   .promptFooter {
     display: flex;
     align-items: center;

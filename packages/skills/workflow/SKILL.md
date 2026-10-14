@@ -2,7 +2,7 @@
 name: workflow
 description: Turns an idea, novel or finalized script into viewable text, image assets and video clips on the current Toonflow canvas, with support for reusing assets, sequels and partial revisions. Use it to actually produce or continue an existing project; do not operate the canvas when the user explicitly wants chat text only, and do not start production when discussing or editing the skill itself.
 metadata:
-  version: "2.8.0"
+  version: "2.9.0"
   displayName: 视频制作工作流
   author: Toonflow
 ---
@@ -1378,6 +1378,7 @@ Execution rules determine how to save, generate and continue in Toonflow; the me
 | Appearance, space, prop structure and persistent states | [Visual Design](references/methods/visualDesign.md) | Asset anchors, spatial masters and variants |
 | Style, inherent material color, how light falls, and grading | [Color and Light](references/methods/colorAndLight.md) | Shared visual basis, scene lighting and clip constraints |
 | Story writing/adaptation before finalization | Use only the story development and screen adaptation methods above | Produce a script that can be confirmed; once it is finalized and Seedance begins, stop using these methods immediately |
+| Keeping people, places, outfits or a look the same across shots with trained LoRAs (MiniMax H3 video, Qwen-Image keyframes): what to train, attaching, prompts | [LoRA](references/lora.md) | Asset plan, node LoRAs and generation records; never the finalized prompt text |
 | Media execution and acceptance after the finished Seedance prompts | [Canvas Execution](references/canvasExecution.md), [State and Delivery](references/stateAndDelivery.md) | Only execute the finalized prompts, connect real references and verify real results; do not write separate prompt rules |
 
 The conclusions of these methods go only into script/asset design results **before Seedance**; once Seedance prompt hard isolation is entered, no method conclusion may be written into or rewrite the final prompts directly, and PART A must reprocess them from the confirmed inputs. Method examples, genre rhythms and style candidates do not automatically become facts of this project.

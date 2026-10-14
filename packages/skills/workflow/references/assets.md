@@ -81,6 +81,10 @@ Characters who appear only as OS, VO, or off-screen dialogue keep their voice id
 When the current video model supports native audio, the confirmed written voice description may be used directly; use real audio as a voice reference only when such material actually exists and the capability supports it. Do not fabricate references, and do not make obtaining an external voice sample a prerequisite.
 Changes to visual assets do not automatically change voice identity. Record persistent variants as "original state → triggering event → new state → applicable scenes", and keep the old state for earlier segments.
 
+## LoRAs for recurring assets
+
+When a character, place, outfit or look recurs across many shots and the production uses MiniMax H3 video or Qwen-Image keyframes, propose training LoRAs as part of the asset plan and prepare the role-tagged, consistently named images they train from, as [LoRA](lora.md) describes. Training is the user's decision because it consumes compute.
+
 ## Preparing generation and review
 
 - First deliver the full list and designs for viewing, then produce missing items as the user authorizes; record prompt preparation and actual generation separately, and handle generation authorization uniformly through [Canvas Execution](canvasExecution.md).

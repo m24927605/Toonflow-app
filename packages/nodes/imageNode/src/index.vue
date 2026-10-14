@@ -11,6 +11,8 @@
     :style="{ width: previewUrl && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
+      <roleSelect :roles="['keyframe', 'character', 'scene', 'layout']" />
+      <assetLora />
       <el-button :icon="IconPanoramaHorizontal" :disabled="uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || inpaintPrompt?.creating || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down :size="14" /></el-button>
       <el-button :icon="IconBrush" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
       <el-button :icon="IconSun" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="打光" aria-label="打光" @click.stop="openLighting">打光</el-button>
@@ -76,6 +78,8 @@ import { computed, nextTick, ref } from "vue";
 import { IconPhoto, IconUpload, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";
 import gradeControl from "@toonflow/node-shared/gradeControl";
+import roleSelect from "@toonflow/node-shared/roleSelect";
+import assetLora from "@toonflow/node-shared/assetLora";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import imageGridSplit from "./components/imageGridSplit.vue";
 import imageEditor from "./components/imageEditor.vue";

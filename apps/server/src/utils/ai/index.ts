@@ -9,8 +9,10 @@ import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
 import { codexProviderId, createCodexRuntime, getCodexStatus } from "@/utils/ai/codex";
 import { streamClaudeCode } from "@/utils/ai/claudeCode";
+import { streamColab } from "@/utils/ai/colab";
 
 export { claudeCodeToolsRouter } from "@/utils/ai/claudeCode";
+export { stopColab } from "@/utils/ai/colab";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 export { startCodexLogin, submitCodexCode, getCodexStatus, logoutCodex } from "@/utils/ai/codex";
@@ -19,7 +21,7 @@ export const providerSchema = z.object({
   // Claude Code runs the local CLI and has no API URL.
   apiUrl: z.union([z.url({ protocol: /^https?$/ }), z.literal("")]),
   apiKey: z.string(),
-  protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages", "openai-codex-responses", "claude-code"]),
+  protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages", "openai-codex-responses", "claude-code", "colab-cli"]),
   models: z.array(z.object({
     id: z.string(), label: z.string(),
     contextWindow: z.number().int().positive().optional(),
@@ -49,6 +51,15 @@ export function getModelLimits(providerId: string, model: z.infer<typeof provide
     contextWindow: model.contextWindow ?? contextWindow ?? 262144,
     maxTokens: model.maxOutputTokens ?? maxTokens ?? 32768,
   };
+}
+
+/**
+ * The API key sent with a request. The settings allow an empty key for local services such as Ollama, but the model
+ * clients treat an empty key as missing, so a placeholder stands in; services that do check keys reject it with their
+ * own authentication error.
+ */
+export function requestApiKey(apiKey: string) {
+  return apiKey.trim() || "no-key";
 }
 
 export function getConfiguredModel(providerId: string, modelId: string) {
@@ -141,6 +152,9 @@ export async function streamAi(
   session?: string,
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
+  if (provider.protocol === "colab-cli") {
+    return streamColab(configured.providerId, configuredModel.id, context, signal, references);
+  }
   if (provider.protocol === "claude-code") {
     return await streamClaudeCode(configured.providerId, configuredModel.id, context, signal, referenceContent("anthropic-messages", "", references).slice(1), session);
   }
@@ -174,5 +188,5 @@ export async function streamAi(
     contextWindow: configuredModel.contextWindow,
     maxTokens: configuredModel.maxOutputTokens,
   };
-  return aiApis[provider.protocol].streamSimple(model, normalizeContext(context), { apiKey: provider.apiKey, signal, onPayload });
+  return aiApis[provider.protocol].streamSimple(model, normalizeContext(context), { apiKey: requestApiKey(provider.apiKey), signal, onPayload });
 }

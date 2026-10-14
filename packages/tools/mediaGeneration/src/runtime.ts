@@ -27,6 +27,7 @@ export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
   size: z.string().trim().min(1).max(64).optional(),
   characterId: z.string().regex(/^[\w-]{1,128}$/, "Invalid character identity ID.").optional(),
+  loras: z.array(z.strictObject({ path: relativePath, strength: z.number().min(-4).max(4).optional() })).max(4).describe("LoRA files (.safetensors) in the workspace with an optional strength (1 by default; sliders take -4 to 4); the prompt names each by its trigger word").optional(),
   skipTextCheck,
 });
 export const videoGenerationSchema = z.strictObject({
@@ -35,6 +36,7 @@ export const videoGenerationSchema = z.strictObject({
   audios: z.array(audioReference).max(64).optional(),
   firstFrame: imageReference.optional(),
   lastFrame: imageReference.optional(),
+  loras: z.array(z.strictObject({ path: relativePath, strength: z.number().min(-4).max(4).optional() })).max(4).describe("LoRA files (.safetensors) in the workspace with an optional strength (1 by default; sliders take -4 to 4); the prompt names each by its trigger word").optional(),
   resolution: z.string().trim().min(1).max(64).optional(),
   duration: z.number().finite().positive().max(3600).optional(),
   generateAudio: z.boolean().optional(),

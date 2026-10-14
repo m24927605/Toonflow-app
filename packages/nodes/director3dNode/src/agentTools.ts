@@ -80,6 +80,19 @@ function applyOperation(draft: Draft, operation: z.infer<typeof operationSchema>
   else object[key] = structuredClone(value);
 }
 
+/**
+ * Unless the user allowed mannequins, previs blocks people as cylinders, so an edit may not add a mannequin or a joint
+ * track. Ones already in the scene, such as a turnaround lineup, stay editable.
+ */
+function assertNoNewMannequins(before: Draft, after: Draft) {
+  const mannequins = (draft: Draft) => new Set(draft.scene.objectList.filter(object => object.objType === "mannequin").map(object => object.threeJsonId));
+  const jointTracks = (draft: Draft) => new Set((Array.isArray(draft.plan.tracks) ? draft.plan.tracks : []).filter(track => track?.joint).map(track => `${track.objectId}/${track.joint}`));
+  const existingMannequins = mannequins(before);
+  if ([...mannequins(after)].some(id => !existingMannequins.has(id))) throw new Error("Mannequins are not allowed for this generation; represent each person with one cylinder");
+  const existingTracks = jointTracks(before);
+  if ([...jointTracks(after)].some(key => !existingTracks.has(key))) throw new Error("Joint tracks are not allowed for this generation; move each person with one whole-object track");
+}
+
 function validateDraft(draft: Draft, complete = false) {
   checkSize(draft);
   const scene = sceneSchema.parse(draft.scene);
@@ -107,7 +120,7 @@ function validateDraft(draft: Draft, complete = false) {
   return { valid: plan.success, issues: [...issues.map(issue => `plan.${issue.path.join(".")}：${issue.message}`), ...warnings] };
 }
 
-export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, plans: DirectorPlanItem[] = []) {
+export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, plans: DirectorPlanItem[] = [], allowMannequins = false) {
   let draft: Draft = structuredClone({ scene, plan: plan ?? { tracks: [], cameraFrames: [] } });
   const history = structuredClone(plans);
   validateDraft(draft);
@@ -144,6 +157,7 @@ export function createDirectorDraft(scene: SceneDocument, plan?: DirectorPlan, p
       const next = structuredClone(draft);
       operations.forEach(operation => applyOperation(next, operation));
       const validation = validateDraft(next);
+      if (!allowMannequins) assertNoNewMannequins(draft, next);
       signal?.throwIfAborted();
       draft = next;
       edited = true;

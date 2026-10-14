@@ -1,4 +1,5 @@
 import { onScopeDispose } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import { runAgentLoop, type AgentTool, type AgentToolResult } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, createInitialSystemMessage, getCurrentSystemPrompt, getCurrentTools, type AssistantMessage, type Context, type Message, type Model, type TranscriptContext } from "@earendil-works/pi-ai";
 import { EventSourceParserStream } from "eventsource-parser/stream";
@@ -10,7 +11,7 @@ export type NodeAiModel = {
   providerLabel: string;
   modelId: string;
   label: string;
-  protocol: "openai-completions" | "openai-responses" | "anthropic-messages";
+  protocol: "openai-completions" | "openai-responses" | "anthropic-messages" | "openai-codex-responses" | "claude-code" | "colab-cli";
   contextWindow?: number;
   maxOutputTokens?: number;
 };
@@ -34,6 +35,19 @@ export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { director
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
 export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate" | "duration"> & { directory: string; outputDirectory: string };
 export type NodeAudioResult = { path: string; mimeType: string; mediaType: "audio" };
+export type NodeLoraKind = "character" | "scene" | "costume" | "style" | "motion" | "voice" | "slider";
+export type NodeLoraFamily = "h3" | "qwen";
+/**
+ * What to train: images, clips or recordings (a caption such as a voice line's transcript replaces the automatic one),
+ * or a slider's prompts; one LoRA per model family, trained side by side.
+ */
+export type NodeLoraTraining = {
+  directory: string; kind: NodeLoraKind; families: NodeLoraFamily[]; name: string;
+  items: { path: string; caption?: string }[];
+  slider?: { base: string; positive: string; negative: string };
+};
+/** A trained LoRA as recorded beside it in the workspace's `loras/` folder. */
+export type NodeLoraRecord = { name: string; kind: NodeLoraKind; family: NodeLoraFamily; trigger: string; path: string; createdAt: string };
 export type NodeAiRequest = {
   providerId: string;
   modelId: string;
@@ -60,7 +74,10 @@ export type NodeAiTool = {
 };
 
 async function readResult<T>(response: Response): Promise<T> {
-  const result = await response.json();
+  // An empty or non-JSON body means the server went away mid-request, typically a restart that also dropped the job.
+  const result = await response.json().catch(() => {
+    throw new Error(translate("The server did not respond, it may have restarted. This generation was stopped; please generate again."));
+  });
   if (!response.ok || result.code !== 200) throw new Error(result.message || `AI 请求失败（HTTP ${response.status}）`);
   return result.data;
 }
@@ -170,15 +187,39 @@ export function useNodeAi() {
     return readModels<NodeMediaModel>("/api/ai/media/models", requestSignal(signal));
   }
 
+  /** Runs host work that can take minutes; the host asks before leaving the page while it runs. */
+  async function guarded<T>(work: () => Promise<T>) {
+    // The server cancels background jobs no page polls, so leaving the page would stop the work.
+    const host = (window as { toonflowNodeHost?: { generations?: { begin(): () => void } } }).toonflowNodeHost;
+    const end = host?.generations?.begin();
+    try {
+      return await work();
+    } finally {
+      end?.();
+    }
+  }
+
   async function generateMedia<T extends "image" | "video" | "audio">(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal) {
+    return guarded(() => runJob<{ path: string; mimeType: string; mediaType: T }[]>("/api/ai/media/generate", { ...input, mediaType }, input.directory, signal));
+  }
+
+  /**
+   * Trains a LoRA per model family on Colab (about half an hour) and returns their records: the workspace path, the
+   * trigger word that names what it learned in prompts, and its kind and model family. Training keeps running on the
+   * server when the page closes, and its LoRAs then appear in the workspace's `loras/` folder.
+   */
+  async function trainLora(input: NodeLoraTraining, signal?: AbortSignal) {
+    return guarded(() => runJob<NodeLoraRecord[]>("/api/ai/lora/train", input, input.directory, signal, true));
+  }
+
+  /** `keepOnLeave` jobs are cancelled only through `signal`; leaving the page or the canvas just stops waiting. */
+  async function runJob<T>(url: string, body: object, directory: string, signal?: AbortSignal, keepOnLeave = false) {
     const jobSignal = requestSignal(signal);
     const headers = { "Content-Type": "application/json", "x-toonflow-workspace": "1" };
-    const { id } = await readResult<{ id: string }>(await fetch("/api/ai/media/generate", {
-      method: "POST", headers, body: JSON.stringify({ ...input, mediaType }), signal: jobSignal,
-    }));
+    const { id } = await readResult<{ id: string }>(await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: jobSignal }));
     // The server runs the job in the background, so polling keeps browser connections free for other requests;
     // Chrome allows only six per host and a long generation used to hold one for its whole run.
-    const query = new URLSearchParams({ id, directory: input.directory });
+    const query = new URLSearchParams({ id, directory });
     try {
       while (true) {
         jobSignal.throwIfAborted();
@@ -193,13 +234,13 @@ export function useNodeAi() {
           }, 2000);
           jobSignal.addEventListener("abort", abort, { once: true });
         });
-        const state = await readResult<{ done: boolean; files?: { path: string; mimeType: string; mediaType: T }[] }>(
+        const state = await readResult<{ done: boolean; result?: T }>(
           await fetch(`/api/ai/media/jobs/get?${query}`, { headers, cache: "no-store", signal: jobSignal }),
         );
-        if (state.done) return state.files ?? [];
+        if (state.done) return state.result as T;
       }
     } catch (error) {
-      if (jobSignal.aborted) void fetch("/api/ai/media/jobs/cancel", { method: "POST", headers, body: JSON.stringify({ id, directory: input.directory }) }).catch(() => {});
+      if (keepOnLeave ? signal?.aborted : jobSignal.aborted) void fetch("/api/ai/media/jobs/cancel", { method: "POST", headers, body: JSON.stringify({ id, directory }) }).catch(() => {});
       throw error;
     }
   }
@@ -271,5 +312,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, generate };
+  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, trainLora, generate };
 }

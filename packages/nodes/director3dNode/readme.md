@@ -1,12 +1,14 @@
 # 3D Director's Studio
 
-Generates scenes, model animations, and camera moves from text, then lets you adjust shots by framing them in 3D; well suited to previsualizing action and camera work. Humanoid characters use the built-in low-poly jointed mannequin, and sets and props can use basic geometry.
+Generates scenes, model animations, and camera moves from text, then lets you adjust shots by framing them in 3D; well suited to previsualizing action and camera work. Previs is about blocking and relative positions, so the AI represents every person with one cylinder and sets and props with basic geometry; it uses the low-poly jointed mannequin only after you tick "Allow mannequins" next to the model menu. The choice is stored on the node and off by default; while it is off, the AI's edit tool rejects any new mannequin or joint track, so the AI falls back to cylinders. Mannequins already in the scene, such as a turnaround, stay editable.
 
 ## Inputs and outputs
 
 - Inputs accept text, image, and video references that describe or illustrate the scene, motion, and camera moves.
 - Keyframes can be exported as PNG image nodes, and the selected animation can be exported as an MP4 video node.
 - Exporting requires the corresponding Image or Video node plugin to be enabled.
+- A node made by "Create previs" on a shot list blocks that shot list one shot at a time. A bar above the instruction box shows the next shot: "Block shot N" fills in its instruction and generates a plan; check and adjust it, generate variants if needed and select the one to keep; "Confirm shot N and block the next" then exports the selected plan's opening frame as a Previs layout image of shot N, with the blocking measured in the scene stored on it (where each person is in the frame and how far from the camera, and the camera's height and tilt), and the plan's colour render as the Previs video of shot N, the blocking reference of its video node; then it generates the next shot from where this one ends. The last shot only confirms.
+- Colour exports are marked on the canvas: a video as a **Previs** render, and a keyframe image as a **Previs layout**; set its shot number in its role menu and "Build shot nodes" connects it to that shot's keyframe for composition. Depth exports stay plain control maps.
 
 ## Usage
 
@@ -29,7 +31,7 @@ The tools are not registered in `nodeTools`, are not exposed to the external mai
 
 ## Low-poly jointed mannequin
 
-In the Director's Studio "Settings", click "Add mannequin" to add a low-poly jointed mannequin and save it. The mannequin uses reduced mesh subdivision, shows no extra joint spheres, and keeps 16 joints internally. You can also simply ask the AI to use the built-in mannequin instead of assembling a human body from scratch.
+In the Director's Studio "Settings", click "Add mannequin" to add a low-poly jointed mannequin and save it. The mannequin uses reduced mesh subdivision, shows no extra joint spheres, and keeps 16 joints internally. The AI adds mannequins only while "Allow mannequins" is ticked.
 
 The mannequin is about 1.8 units tall with its origin at the soles of its feet; +Y points up and +Z forward. Left and right follow the mannequin's own perspective, so +X is its left. The root object's position, rotation, and scale control its overall position, orientation, and size; material.color sets one uniform color for the whole mannequin, so different characters can use different colors.
 

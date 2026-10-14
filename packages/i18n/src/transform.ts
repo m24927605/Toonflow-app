@@ -68,6 +68,8 @@ function analyze(source: string, id: string) {
   };
   const sliceNode = (node: Node, code: string) => code.slice(node.start ?? 0, node.end ?? 0);
 
+  // Chinese display text is translated implicitly; any other language is translated only where the source marks it
+  // with translate(), t`` or msg``, since English text cannot be told apart from identifiers and data values.
   // ACT: Only display expressions are visited. Comparisons, keys, calls and user data retain their original semantics.
   function displayExpression(node: Node, code: string): string {
     const original = sliceNode(node, code);
@@ -121,11 +123,10 @@ function analyze(source: string, id: string) {
   function collectExplicit(node: Node) {
     if (node.type === "CallExpression" && node.callee.type === "Identifier" && ["translate", "t", "msg"].includes(node.callee.name)) {
       const message = node.arguments[0];
-      if (message?.type === "StringLiteral" && hasChinese(message.value)) messages.add(message.value);
+      if (message?.type === "StringLiteral") messages.add(message.value);
     }
     if (node.type === "TaggedTemplateExpression" && node.tag.type === "Identifier" && ["t", "msg"].includes(node.tag.name)) {
-      const template = node.quasi.quasis.map((part, index) => `${node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw}${index < node.quasi.expressions.length ? `{${index}}` : ""}`).join("");
-      if (hasChinese(template)) messages.add(template);
+      messages.add(node.quasi.quasis.map((part, index) => `${node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw}${index < node.quasi.expressions.length ? `{${index}}` : ""}`).join(""));
     }
     for (const value of Object.values(node)) {
       if (Array.isArray(value)) {
@@ -143,8 +144,7 @@ function analyze(source: string, id: string) {
         for (const value of node.init.elements) if (value?.type === "StringLiteral" && hasChinese(value.value)) messages.add(value.value);
       }
       if (node.type === "TaggedTemplateExpression" && node.tag.type === "Identifier" && ["t", "msg"].includes(node.tag.name)) {
-        const template = node.quasi.quasis.map((part, index) => `${node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw}${index < node.quasi.expressions.length ? `{${index}}` : ""}`).join("");
-        if (hasChinese(template)) messages.add(template);
+        messages.add(node.quasi.quasis.map((part, index) => `${node.quasi.expressions.length ? escapeMessageText(part.value.cooked ?? part.value.raw) : part.value.cooked ?? part.value.raw}${index < node.quasi.expressions.length ? `{${index}}` : ""}`).join(""));
         return;
       }
       if (node.type === "CallExpression") {
@@ -165,7 +165,7 @@ function analyze(source: string, id: string) {
         }
         if (callee.type === "Identifier" && ["translate", "t", "msg"].includes(callee.name)) {
           const message = node.arguments[0];
-          if (message?.type === "StringLiteral" && hasChinese(message.value)) messages.add(message.value);
+          if (message?.type === "StringLiteral") messages.add(message.value);
         }
       }
       if (node.type === "NewExpression" && node.callee.type === "Identifier" && /^(?:Error|TypeError|RangeError|DOMException)$/.test(node.callee.name)) {

@@ -52,7 +52,16 @@
         <div v-if="frameMode" class="referenceHint">
           {{ selectedMode === "startFrameOptional" ? "仅一张图片时作为尾帧；两张图片按顺序作为首帧、尾帧" : "图片引用按顺序作为首帧、尾帧" }}
         </div>
+        <div v-if="preflightState" class="preflightResult">
+          <el-tag size="small" :type="preflightState === 'passed' ? 'success' : preflightState === 'failed' ? 'warning' : 'info'">
+            {{ preflightState === "stale" ? translate("Prompt changed since preflight") : t`Preflight ${data.preflight!.score}/100` }}
+          </el-tag>
+          <ul v-if="preflightState !== 'stale' && data.preflight!.issues.length" class="preflightIssues" :class="{ failed: preflightState === 'failed' }">
+            <li v-for="issue in data.preflight!.issues" :key="issue">{{ issue }}</li>
+          </ul>
+        </div>
         <promptInput v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" expandable />
+        <loraPicker v-if="loraFamily" v-model="loras" :family="loraFamily" class="loraRow" />
         <div class="promptFooter">
           <el-select
             v-model="data.model"
@@ -98,9 +107,13 @@
 </template>
 
 <script setup lang="ts">
-import { translate } from "@toonflow/i18n/vue";
+import loraPicker from "@toonflow/node-shared/loraPicker";
+import { activeLoras, listLoras, loraFamilyOf, pickLoras, type AttachedLora } from "@toonflow/node-shared/loraRegistry";
+import { withTriggers } from "@toonflow/node-shared/loraTriggers";
+import { roleOf } from "@toonflow/node-shared/nodeRole";
+import { t, translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
-import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessageBox } from "element-plus";
+import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessageBox, ElTag } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
@@ -131,7 +144,9 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+// `preflight` is written by the text node's "Prepare videos" and covers the prompt it holds.
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean; preflight?: { prompt: string; score: number; issues: string[]; passed: boolean }; loras?: AttachedLora[] });
+const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -139,7 +154,7 @@ data.value.resolution ??= "";
 data.value.mode ??= "";
 data.value.generateAudio ??= true;
 data.value.ratio ??= "9:16";
-const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
 const uploading = ref(false);
@@ -158,6 +173,7 @@ let modelsRequest: Promise<void> | undefined;
 // ACT: Providers don't declare video ratio ranges, so use the UI's common ratios; the provider validates actual support.
 const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4"];
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
+const loraFamily = computed(() => loraFamilyOf(selectedModel.value?.providerId));
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
 const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
 const mediaCounts = computed(() => ({
@@ -178,7 +194,11 @@ function getMatchingModes(choice?: NodeMediaModel) {
     if (mode === "videoExtension") return video === 1 && audio === 0;
     // A control video (e.g. a previs depth pass) drives structure only; connected images stay look references.
     if (mode === "videoControl") return video === 1 && audio === 0;
-    if (video || audio) return false;
+    // Frame modes also take reference videos, such as the shot's previs, and reference audio, such as a dubbed line to
+    // lip-sync, when the model lists those references.
+    const limit = (type: string) => ["endFrameOptional", "startFrameOptional"].includes(mode)
+      ? Number((choice?.mode ?? []).flat().find(item => item.startsWith(`${type}Reference:`))?.split(":")[1] ?? 0) : 0;
+    if (video > limit("video") || audio > limit("audio")) return false;
     if (mode === "singleImage") return image === 1;
     if (mode === "startEndRequired") return image === 2;
     return ["endFrameOptional", "startFrameOptional"].includes(mode) && image >= 1 && image <= 2;
@@ -209,13 +229,20 @@ watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches])
 watch([selectedModel, () => data.value.duration], ([choice]) => {
   if (!choice) return;
   const durations = getDurations(choice);
-  if (!durations.includes(data.value.duration!)) data.value.duration = durations[0];
+  // A planned length (such as a shot from the shot list) keeps the shortest supported duration that covers it.
+  if (!durations.includes(data.value.duration!)) data.value.duration = [...durations].sort((a, b) => a - b).find(value => value >= (data.value.duration ?? 0)) ?? Math.max(...durations);
   const resolutions = getResolutions(choice, data.value.duration);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
   if (!ratioOptions.includes(data.value.ratio)) data.value.ratio = "9:16";
   if (choice.audio !== "optional") data.value.generateAudio = choice.audio === true;
 }, { flush: "sync" });
 const modelGroups = computed(() => groupNodeModels(models.value));
+const preflightState = computed(() => {
+  const preflight = data.value.preflight;
+  if (!preflight) return undefined;
+  if (preflight.prompt !== data.value.prompt.trim()) return "stale";
+  return preflight.passed ? "passed" : "failed";
+});
 const generationPrompt = computed(() =>
   [
     data.value.prompt.trim(),
@@ -224,6 +251,19 @@ const generationPrompt = computed(() =>
     .filter(Boolean)
     .join("\n\n")
 );
+/**
+ * MiniMax H3 names its references <Picture N> and <Video N>, numbered per media type in connection order, so the node's
+ * {{ref N}} markers are rewritten for it; other providers receive the markers unchanged.
+ */
+function providerPrompt(providerId: string, prompt: string) {
+  if (providerId !== "minimaxH3") return prompt;
+  const counts = { Picture: 0, Video: 0, Audio: 0 };
+  const labels = refList.value.map(item => {
+    const name = item.dataType === "IMAGE" ? "Picture" : item.dataType === "VIDEO" ? "Video" : item.dataType === "AUDIO" ? "Audio" : undefined;
+    return name && `<${name} ${++counts[name]}>`;
+  });
+  return prompt.replace(/\{\{ref (\d+)\}\}/g, (marker, index: string) => labels[Number(index) - 1] ?? marker);
+}
 const outputFile = computed(() => outputs.value.video?.dataType === "VIDEO" ? outputs.value.video.value : undefined);
 const previewUrl = files.useFileUrl(
   outputFile,
@@ -285,11 +325,12 @@ async function startGeneration() {
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
   if (!generationPrompt.value) throw new Error("请输入生成提示词");
-  if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  assertReferencesReady();
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   if (choice.mode?.length && !matchingModes.value.length) throw new Error("当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用");
   // Previs is the default gate for every video: skipping it needs the user's explicit consent each time.
-  const skipPrevis = selectedMode.value !== "videoControl";
+  // A previs video connected as a blocking reference counts as previs, like its depth video in video control mode.
+  const skipPrevis = selectedMode.value !== "videoControl" && !refList.value.some(item => roleOf(findNode(item.source)) === "previs");
   if (skipPrevis && !await ElMessageBox.confirm("没有以控制视频模式连接粗模试演的深度视频。粗模试演是成本最低的把关，确定跳过并直接生成吗？", "跳过粗模试演", {
     confirmButtonText: "跳过并生成", cancelButtonText: "取消", type: "warning", closeOnClickModal: false,
   }).then(() => true, () => false)) throw new Error("已取消生成：请先在导演台导出深度视频，并以控制视频模式连接到此节点");
@@ -300,18 +341,23 @@ async function startGeneration() {
     const grade = gradeOf(source?.data, item.value.url);
     return grade && grade.level >= 3 ? [] : [`${source?.data?.label || item.source}: ${grade ? `L${grade.level}` : "ungraded"}`];
   });
-  if (belowL3.length && !await ElMessageBox.confirm(`These input images are not graded L3 or above:\n${belowL3.join("\n")}\n\nGrade the keyframes first; generating from weak keyframes wastes the video run. Generate anyway?`, "Keyframe grade", {
-    confirmButtonText: "Generate anyway", cancelButtonText: "Cancel", type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
-  }).then(() => true, () => false)) throw new Error("Generation cancelled: grade the input keyframes L3 or above first");
+  if (belowL3.length && !await ElMessageBox.confirm(t`These input images are not graded L3 or above:\n${belowL3.join("\n")}\n\nGrade the keyframes first; generating from weak keyframes wastes the video run. Generate anyway?`, translate("Keyframe grade"), {
+    confirmButtonText: translate("Generate anyway"), cancelButtonText: translate("Cancel"), type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
+  }).then(() => true, () => false)) throw new Error(translate("Generation cancelled: grade the input keyframes L3 or above first"));
+  if (preflightState.value === "failed" && !await ElMessageBox.confirm(t`This prompt failed its preflight (${data.value.preflight!.score}/100):\n${data.value.preflight!.issues.map(issue => `- ${issue}`).join("\n")}\n\nGenerate anyway?`, translate("Preflight"), {
+    confirmButtonText: translate("Generate anyway"), cancelButtonText: translate("Cancel"), type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
+  }).then(() => true, () => false)) throw new Error(translate("Generation cancelled: fix the preflight issues first"));
   const skipTextCheck = await confirmOnScreenText(generationPrompt.value);
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
+  const attached = activeLoras(loras.value, choice.providerId);
   const input: Omit<NodeVideoRequest, "directory"> = {
     skipPrevis: skipPrevis || undefined,
     skipTextCheck: skipTextCheck || undefined,
     providerId: choice.providerId,
     modelId: choice.modelId,
-    prompt: generationPrompt.value,
+    // Attached LoRAs only work when their trigger words are in the prompt.
+    prompt: providerPrompt(choice.providerId, withTriggers(generationPrompt.value, attached)),
     mode: selectedMode.value,
     duration: data.value.duration,
     resolution: data.value.resolution || undefined,
@@ -322,6 +368,8 @@ async function startGeneration() {
     firstFrame: frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
     lastFrame: frameMode.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
     videos: refList.value.flatMap((item) => item.dataType === "VIDEO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
+    // LoRAs picked here or set for the shot's cast by Prepare videos.
+    ...attached.length ? { loras: attached.map(lora => ({ path: lora.path, strength: lora.strength })) } : {},
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
   };
   generationController = controller;
@@ -386,13 +434,13 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "Read this video generation node's current configuration, the capabilities of the available video models, common aspect ratios and the modes suitable for the current references, without keys; duration and resolution must match durationResolutionMap",
+  description: "Read this video generation node's current configuration, the capabilities of the available video models, common aspect ratios and the modes suitable for the current references, without keys; duration and resolution must match durationResolutionMap; loras lists the LoRAs attached to this node and the trained ones its model can load (only MiniMax H3 loads LoRAs)",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
     await loadModels();
     signal?.throwIfAborted();
-    return getConfig();
+    return { ...getConfig(), loras: await loraConfig() };
   },
 });
 
@@ -447,6 +495,29 @@ nodeTools.register({
   },
 });
 
+// The trained LoRAs of the workspace that the selected model loads, with the ones attached to this node.
+async function loraConfig() {
+  const family = loraFamily.value;
+  const records = family ? (await listLoras(files.getWorkspaceFiles())).filter(item => item.family === family) : [];
+  return { family: family ?? null, attached: loras.value, available: records.map(({ path, name, kind, trigger }) => ({ path, name, kind, trigger })) };
+}
+
+nodeTools.register({
+  name: "setLoras",
+  description: "Replace the LoRAs loaded with this node's video generation by trained MiniMax H3 LoRAs from getConfig's loras.available, at most 4; strength defaults to 1 (sliders take -4 to 4) and an empty list removes them all. Their trigger words are added to the prompt when generating. Select the MiniMax H3 model with setConfig first; does not start generation",
+  parameters: z.strictObject({ loras: z.array(z.strictObject({ path: z.string().min(1), strength: z.number().min(-4).max(4).optional() })).max(4) }),
+  async execute(args, { signal }) {
+    signal?.throwIfAborted();
+    if (generating.value || deleting.value) throw new Error("The node is generating or being deleted; change its LoRAs later");
+    await loadModels();
+    signal?.throwIfAborted();
+    const family = loraFamily.value;
+    if (!family) throw new Error("The selected model loads no LoRAs; select MiniMax H3 with setConfig first");
+    loras.value = pickLoras(await listLoras(files.getWorkspaceFiles()), family, args.loras);
+    return loraConfig();
+  },
+});
+
 nodeTools.register({
   name: "generateVideo",
   description: "Start this node's video generation in the background, using the current prompt, model, mode, duration, resolution, aspect ratio and reference assets; returns started immediately; use getGenerationStatus to query the result and cancelGeneration to stop generation",
@@ -480,12 +551,29 @@ nodeTools.register({
 
 }
 
+.preflightResult {
+  margin-bottom: 8px;
+
+  .preflightIssues {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+
+    &.failed {
+      color: var(--el-color-warning);
+    }
+  }
+}
+
 .promptCard {
   .referenceHint {
     margin: 8px 0;
     color: var(--el-text-color-secondary);
     font-size: 12px;
   }
+
+  .loraRow { margin-top: 8px; }
 
   .promptFooter {
     display: flex;

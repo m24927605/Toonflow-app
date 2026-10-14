@@ -19,6 +19,8 @@ interface ProviderModel {
   id: string;
   label: string;
   type: ModelType;
+  contextWindow?: number;
+  maxOutputTokens?: number;
   think?: boolean;
   mode?: (ImageMode | VideoMode)[];
   associationSkills?: string;
@@ -149,12 +151,20 @@ interface ProviderTools {
     images?: MediaInput[];
     /** Up to 3 reference videos (2–15 s, re-encoded to 24 fps), referred to as <Video 1>…<Video 3>; the model copies their look. */
     videos?: MediaInput[];
+    /**
+     * Up to 3 reference audio clips (resampled to 32 kHz stereo), referred to as <Audio 1>…<Audio 3>. Marked fully_copy
+     * in the prompt, a clip becomes the soundtrack and the speaker lip-syncs to it; marked reference, only its voice
+     * timbre and delivery are followed.
+     */
+    audios?: MediaInput[];
     /** Structure video (depth, pose or edges, e.g. a previs depth pass) applied with the Fun ControlNet Union 2.0; its look is never copied. */
     controlVideo?: MediaInput;
     /** Image pinned as the first frame. */
     firstFrame?: MediaInput;
     /** Image pinned as the last frame. */
     lastFrame?: MediaInput;
+    /** LoRAs (.safetensors) chained after the Turbo LoRA at their strength. */
+    loras?: LoraInput[];
     /** Whole seconds, 4–15. */
     duration: number;
     resolution: "480p" | "720p" | "1080p";
@@ -179,13 +189,23 @@ interface ProviderTools {
     size: "1K" | "2K";
     /** Structure map (a depth map: near white, far black) that fixes the composition and viewpoint through ControlNet. */
     controlImage?: MediaInput;
+    /** LoRAs (.safetensors) applied to the model at their strength. */
+    loras?: LoraInput[];
   }): Promise<{ data: Uint8Array; mimeType: "image/png" }>;
+}
+
+/** A LoRA file and the strength to apply it at. */
+interface LoraInput {
+  file: MediaInput;
+  strength: number;
 }
 
 interface ImageRequest extends MediaRequest {
   prompt: string;
   /** Reference images. */
   images?: MediaInput[];
+  /** LoRA files for models that load them; other providers ignore them. */
+  loras?: LoraInput[];
   mask?: MediaInput;
   /** Number of results to generate. */
   n?: number;
@@ -211,6 +231,8 @@ interface VideoRequest extends MediaRequest {
   audios?: MediaInput[];
   firstFrame?: MediaInput;
   lastFrame?: MediaInput;
+  /** LoRA files for models that load them; other providers ignore them. */
+  loras?: LoraInput[];
   /** Output duration in seconds; providers validate the supported range per model. */
   duration?: number;
   /** Aspect ratio, e.g. 16:9. */
@@ -306,7 +328,7 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
    * When set, models can be fetched manually.
    */
   modelsUrl?: string;
-  protocol?: "openai-completions" | "openai-responses" | "anthropic-messages" | "openai-codex-responses" | "claude-code";
+  protocol?: "openai-completions" | "openai-responses" | "anthropic-messages" | "openai-codex-responses" | "claude-code" | "colab-cli";
   /** Markdown content of the vendor description. */
   readme?: string;
   rules: TRules;

@@ -86,3 +86,6 @@ export function prepareSceneAnimation(runtime: SceneRuntime, value: DirectorPlan
     },
   };
 }
+
+/** The next shot of a shot list's previs; `confirm` once its plan is generated and waits for the user's check. */
+export type PrevisStep = { shot: number; total: number; confirm: boolean; last: boolean; running: boolean; error?: string };

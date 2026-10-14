@@ -8,10 +8,12 @@
     :style="{ width: previewUrl && videoWidth ? `${videoWidth + 18}px` : undefined }"
     @fullscreen="player?.enterFullscreen()">
     <template #topActions>
+      <roleSelect :roles="['previs']" />
       <el-button :icon="IconMusic" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
       <el-button :icon="IconLayersSubtract" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
       <el-button :icon="IconScissors" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
       <el-button :icon="IconClock" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('fps30')">30 fps</el-button>
+      <el-button :icon="IconPhotoDown" text :disabled="!outputFile || uploading || exporting || actions?.processing" :title="translate('Save the last frame as an image node, to start the next shot from it')" @click.stop="actions?.open('lastFrame')">{{ translate("Last frame") }}</el-button>
       <el-button
         :icon="IconTransfer"
         :loading="uploading"
@@ -61,8 +63,10 @@
 </template>
 
 <script setup lang="ts">
+import roleSelect from "@toonflow/node-shared/roleSelect";
+import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, ref } from "vue";
-import { IconVideo, IconUpload, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconClock, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
+import { IconVideo, IconUpload, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconClock, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward, IconPhotoDown } from "@tabler/icons-vue";
 import { ElButton, ElMessage, ElProgress, ElDropdown, ElDropdownMenu, ElDropdownItem } from "element-plus";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import videoPlayer from "./components/videoPlayer.vue";

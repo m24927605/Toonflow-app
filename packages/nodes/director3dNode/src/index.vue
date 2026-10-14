@@ -7,11 +7,11 @@
       </div>
     </button>
   </nodeSkeleton>
-  <sceneEditor v-if="editing" v-model:anchors="anchors" v-model:prompt="prompt" v-model:model="model" v-model:lighting="lighting" v-model:sceneSettings="sceneSettings"
+  <sceneEditor v-if="editing" v-model:anchors="anchors" v-model:prompt="prompt" v-model:model="model" v-model:allowMannequins="allowMannequins" :previsStep="previsStep" @previsStep="stepPrevis" v-model:lighting="lighting" v-model:sceneSettings="sceneSettings"
     :scene="scene" :result="selectedPlan" :models="models" :modelsLoading="modelsLoading" :addingMannequin="addingMannequin"
     :plans="plans" :selectedPlanId="data.selectedPlanId ?? ''" :tasks="tasks"
     :exportingVideo="exportingVideo" :exportingImage="exportingImage" :exportProgress="exportProgress"
-    @exportVideo="exportVideo" @exportImage="exportImage" @addMannequin="addMannequin"
+    @exportVideo="exportVideo" @exportImage="exportImage" @addMannequin="addMannequin" @addTurnaround="addTurnaround"
     @selectPlan="data.selectedPlanId = $event" @loadModels="loadModels" @generate="generate" @editInstruction="setPrompt" @close="editing = false">
     <template #input>
       <referenceItem v-if="refList.length" v-model="refList" @preview="setReferencePreview" @remove="removeReference" />
@@ -21,7 +21,9 @@
 </template>
 
 <script setup lang="ts">
-import { translate } from "@toonflow/i18n/vue";
+import { describeBlocking } from "./blocking";
+import type { NodeRole } from "@toonflow/node-shared/nodeRole";
+import { t, translate } from "@toonflow/i18n/vue";
 import { computed, h, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
@@ -31,9 +33,9 @@ import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
-import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
+import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, createTurnaround, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { createDirectorDraft } from "./agentTools";
-import { directorPrompt } from "./agentPrompt";
+import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
 import { anchorSchema, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
 import { directorPlanSchema, prepareSceneAnimation, type DirectorPlan, type DirectorGeneration } from "./sceneAnimation";
 import { renderImage, renderVideo, type RenderPass } from "./renderMedia";
@@ -68,14 +70,35 @@ const data = computed(() => node.data as typeof node.data & {
   prompt?: string;
   promptModel?: PromptModel;
   model?: string;
+  allowMannequins?: boolean;
+  previs?: PrevisQueue;
   anchors?: CameraAnchor[];
   selectedPlanId?: string;
 });
-const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
 const promptModel = computed({ get: () => data.value.promptModel ?? [], set: (value: PromptModel) => { data.value.promptModel = value; } });
 const anchors = computed({ get: () => data.value.anchors ?? [], set: (value: CameraAnchor[]) => { data.value.anchors = value; } });
 const prompt = computed({ get: () => data.value.prompt ?? "", set: (value: string) => { data.value.prompt = value; } });
 const model = computed({ get: () => data.value.model ?? "", set: (value: string) => { data.value.model = value; } });
+/**
+ * A shot list's previs, blocked one shot at a time: `shots` holds each shot's instruction, written by the shot list;
+ * `current` is the shot whose plan was just generated and awaits the user's check, and `done` lists the confirmed shots,
+ * each exported as that shot's layout image.
+ */
+type PrevisQueue = { shots: { shot: number; instruction: string }[]; done: number[]; current?: number };
+const previsStep = computed(() => {
+  const queue = data.value.previs;
+  const next = queue?.shots.find(item => !queue.done.includes(item.shot));
+  if (!queue || !next) return undefined;
+  const last = queue.shots.filter(item => !queue.done.includes(item.shot)).length === 1;
+  // The shot's own generation, matched by its instruction, so the bar can say it is running or why it failed.
+  const own = tasks.value.filter(task => task.instruction === next.instruction);
+  const running = own.some(task => !task.error);
+  const error = running ? undefined : own.findLast(task => task.error)?.error;
+  return { shot: next.shot, total: queue.shots.length, confirm: queue.current === next.shot && !!selectedPlan.value, last, running, error };
+});
+// Previs blocks people as cylinders; the AI may add mannequins only after the user ticks this for the node.
+const allowMannequins = computed({ get: () => data.value.allowMannequins === true, set: (value: boolean) => { data.value.allowMannequins = value; } });
 // ACT: Scene and animation are held only inside the node; canvas data stores just file references,
 // avoiding traversing many keyframes while dragging.
 const modelDocument = shallowRef<ModelDocument>({ version: 1, scene: createEmptyScene(), plans: [] });
@@ -183,6 +206,30 @@ async function addMannequin() {
   }
 }
 
+async function addTurnaround(aspect: number) {
+  if (modelLoading.value || modelError.value || addingMannequin.value || exportingVideo.value || exportingImage.value || tasks.value.some(task => !task.error)) return;
+  addingMannequin.value = true;
+  try {
+    const workspaceFiles = files.getWorkspaceFiles();
+    const saving = modelSaving.then(async () => {
+      if (disposed) return;
+      const { scene: nextScene, view } = createTurnaround(scene.value, aspect);
+      const value: ModelDocument = { ...modelDocument.value, scene: sceneSchema.parse(nextScene) };
+      const path = await writeModel(workspaceFiles, value);
+      if (disposed) return;
+      modelDocument.value = value;
+      data.value.modelPath = path;
+      anchors.value = [...anchors.value, anchorSchema.parse(view)];
+    });
+    modelSaving = saving.catch(() => {});
+    await saving;
+  } catch (error) {
+    if (!disposed) ElMessage.error(error instanceof Error ? error.message : translate("Failed to add the turnaround"));
+  } finally {
+    addingMannequin.value = false;
+  }
+}
+
 nodeEvent.on("copy", async () => {
   await nodeEvent.emit("save");
   if (modelError.value) throw new Error(`导演台模型未加载，无法复制：${modelError.value}`);
@@ -201,7 +248,9 @@ nodeEvent.on("save", async (reason) => {
   }
 });
 
-async function exportToCanvas(kind: "image" | "video", key: string, aspect: number, render: (signal: AbortSignal) => Promise<File>) {
+// Colour renders are marked as previs on the canvas: a video for timing and review only, an image as a keyframe's
+// layout once its shot is set. Depth renders stay plain control maps.
+async function exportToCanvas(kind: "image" | "video", key: string, aspect: number, render: (signal: AbortSignal) => Promise<File>, extra?: { role: NodeRole; shot?: number; blocking?: string }) {
   if (kind === "video" ? exportingVideo.value : exportingImage.value) return;
   const type = `remote-${kind}Node`;
   if (!nodeTypes?.value?.[type]) return void ElMessage.error(`请先启用${kind === "image" ? "图片" : "视频"}节点插件`);
@@ -224,13 +273,13 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
         y = position.y + (other.dimensions.height || 300) + 24;
       }
     }
-    addNodes({ id, type, position: { x, y }, data: { label, outputs: {} } });
+    addNodes({ id, type, position: { x, y }, data: { label, outputs: {}, ...extra } });
     return findNode(id)!;
   }
   try {
     workspaceFiles = files.getWorkspaceFiles();
     if (kind === "video") {
-      exportNode = addExportNode(selectedPlan.value?.name ?? "视频");
+      exportNode = addExportNode(extra?.shot ? t`Shot ${extra.shot} previs` : selectedPlan.value?.name ?? "视频");
       // ACT: Export progress only lives in the current run; never write it to the canvas or copy it to another node.
       Object.defineProperty(exportNode.data, "exportProgress", { value: 0, writable: true, configurable: true });
       stopWatching = watch([() => findNode(id), exportProgress], ([current, progress]) => {
@@ -270,6 +319,7 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
     if (kind === "video") exportingVideo.value = false;
     else exportingImage.value = "";
   }
+  return committed;
 }
 
 async function exportVideo(aspect: number, pass: RenderPass) {
@@ -294,7 +344,7 @@ async function exportVideo(aspect: number, pass: RenderPass) {
     }).then(() => true, () => false);
     if (!proceed || disposed || selectedPlan.value !== plan) return;
   }
-  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, pass));
+  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, pass), pass === "color" ? { role: "previs" } : undefined);
 }
 
 function exportImage(anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass) {
@@ -302,7 +352,7 @@ function exportImage(anchor: CameraAnchor, aspect: number, time: number, pass: R
   return exportToCanvas("image", anchor.id, aspect, async signal => {
     const file = await renderImage(scene.value, anchor, aspect, time, signal, selectedPlan.value, lighting.value, sceneSettings.value, pass);
     return new File([file], `${name}.png`, { type: file.type });
-  });
+  }, pass === "color" ? { role: "layout" } : undefined);
 }
 
 async function loadModels() {
@@ -358,7 +408,37 @@ function setPrompt(value: string) {
   promptModel.value = value ? value.split("\n").map(text => [{ type: "Write", text }]) : [];
 }
 
-async function generate() {
+/**
+ * Advances the shot list's previs: blocks the next shot, or, once its plan is generated and checked, exports the
+ * selected plan's opening frame as that shot's layout image and blocks the shot after it.
+ */
+async function stepPrevis(aspect: number) {
+  const queue = data.value.previs;
+  const step = previsStep.value;
+  if (!queue || !step) return;
+  if (step.confirm) {
+    const plan = selectedPlan.value!;
+    const anchor = anchorSchema.parse({ ...plan.cameraFrames[0]!.view, time: 0 });
+    // Measured once here, so keyframe prompts and text-only models get the same blocking the layout image shows.
+    const blocking = await describeBlocking(scene.value, plan, aspect);
+    const exported = await exportToCanvas("image", `previs-${step.shot}`, aspect, async signal => {
+      const file = await renderImage(scene.value, anchor, aspect, 0, signal, plan, lighting.value, sceneSettings.value, "color");
+      return new File([file], `${t`Shot ${step.shot} previs layout`}.png`, { type: file.type });
+    }, { role: "layout", shot: step.shot, blocking });
+    if (!exported || disposed) return;
+    // The shot's colour render goes to its video node as a blocking reference: where people stand and move, and the camera.
+    const rendered = await exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, "color"), { role: "previs", shot: step.shot });
+    if (!rendered || disposed) return;
+    queue.done = [...queue.done, step.shot];
+    delete queue.current;
+  }
+  const next = queue.shots.find(item => !queue.done.includes(item.shot));
+  if (!next) return void ElMessage.success(translate("Every shot of the previs is confirmed; Build shot nodes connects each layout to its keyframe"));
+  setPrompt(next.instruction);
+  await generate(next.shot);
+}
+
+async function generate(previsShot?: number) {
   if (modelLoading.value || modelError.value || addingMannequin.value) return;
   const choice = selectedModel.value;
   const requirement = prompt.value.trim();
@@ -372,7 +452,7 @@ async function generate() {
   setPrompt("");
   try {
     const workspaceFiles = files.getWorkspaceFiles();
-    if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+    assertReferencesReady();
     const mediaReferences = refList.value
       .filter(item => item.value !== undefined && (item.dataType === "STRING" || item.dataType === "IMAGE" || item.dataType === "VIDEO"))
       .map(item => item.dataType === "STRING" ? { dataType: item.dataType, value: item.value } : { dataType: item.dataType, value: { ...item.value } });
@@ -385,6 +465,7 @@ async function generate() {
       JSON.parse(JSON.stringify(baseScene)),
       basePlan ? directorPlanSchema.parse({ name: basePlan.name, duration: basePlan.duration, tracks: basePlan.tracks, cameraFrames: basePlan.cameraFrames }) : undefined,
       JSON.parse(JSON.stringify(plans.value)),
+      allowMannequins.value,
     );
     const directory = mediaReferences.some(item => item.dataType !== "STRING") ? (await workspaceFiles.list()).directory : undefined;
     if (disposed) return;
@@ -392,7 +473,7 @@ async function generate() {
       references: mediaReferences,
       providerId: choice.providerId,
       modelId: choice.modelId,
-      systemPrompt: directorPrompt,
+      systemPrompt: `${directorPrompt}\n${allowMannequins.value ? mannequinsAllowed : mannequinsForbidden}`,
       prompt: JSON.stringify({ instruction: requirement, references, selectedPlanId: basePlanId, document: draft.summary() }),
       directory,
       tools: draft.tools,
@@ -423,6 +504,11 @@ async function generate() {
       modelDocument.value = value;
       data.value.modelPath = path;
       if ((data.value.selectedPlanId ?? "") === basePlanId) data.value.selectedPlanId = plan.id;
+      // A previs shot waits for the user's check; the new plan is selected so confirming exports this one.
+      if (previsShot && data.value.previs) {
+        data.value.previs.current = previsShot;
+        data.value.selectedPlanId = plan.id;
+      }
     });
     modelSaving = saving.catch(() => {});
     await saving;

@@ -68,15 +68,15 @@ Run the following commands in the repository root:
 | `bun run build:tools` | Builds tools into `build/tools/` without writing to `data/tools/`. |
 | `bun run start:server` | Runs the built server in `build/server/`. |
 | `bun run typecheck` | Runs type checking for each workspace on its own. |
-| `bun run --cwd packages/i18n extract` | Manually extracts the Chinese source strings and the source index; does not generate translations for other languages. |
+| `bun run --cwd packages/i18n extract` | Manually extracts the source strings (Chinese display text and explicit `translate`/`t`/`msg` messages) and the source index; does not generate translations for other languages. |
 
 Builds and type checking run separately. After adding, moving, or deleting a business endpoint, run `bun run routes` in `apps/server` to generate the routes.
 
 ### i18n Maintenance
 
-The language dictionaries and translation runtime live in [`packages/i18n`](../packages/i18n/readme.md). Explicit display locations in Web are transformed at compile time by a Vite plugin, so business source code can keep using Chinese; dynamic text uses the `t` / `msg` tagged templates. The server uses a per-request language context so concurrent requests do not mix languages.
+The language dictionaries and translation runtime live in [`packages/i18n`](../packages/i18n/readme.md). Explicit display locations in Web are transformed at compile time by a Vite plugin, which translates existing Chinese display text implicitly. New display text is written in English and must be marked explicitly with `translate("...")` (also in templates) or the `t` / `msg` tagged templates for dynamic text; unmarked English is shown as is. The server uses a per-request language context so concurrent requests do not mix languages.
 
-After changing Chinese text, run the `extract` command above manually, then fill in the same keys in the other locale files in `packages/i18n/src/locales/` (English and Traditional Chinese), keeping the placeholders. Development startup and builds neither extract automatically nor generate translations automatically. Translations are for display only and do not change user data, model text, or values used in business logic; canvas nodes share the app dictionaries, while provider and tool plugins and skills are outside the translation scope. See the [i18n Maintenance Guide](../packages/i18n/readme.md) for usage details, language fallback rules, and verification records.
+After changing display text, run the `extract` command above manually, then fill in the same keys in the other locale files in `packages/i18n/src/locales/` (English and Traditional Chinese, plus Simplified Chinese in `zhCn.json` for English keys), keeping the placeholders. Development startup and builds neither extract automatically nor generate translations automatically. Translations are for display only and do not change user data, model text, or values used in business logic; canvas nodes share the app dictionaries, while provider and tool plugins and skills are outside the translation scope. See the [i18n Maintenance Guide](../packages/i18n/readme.md) for usage details, language fallback rules, and verification records.
 
 <details>
 <summary><strong>Running the built Web and Server locally</strong></summary>

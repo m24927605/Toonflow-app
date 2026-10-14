@@ -60,6 +60,7 @@
                 <el-switch :modelValue="sceneSettings.skyVisible" aria-label="显示天空盒" @change="sceneSettings = { ...sceneSettings, skyVisible: $event === true }" />
               </div>
               <el-button :icon="IconUserPlus" :loading="addingMannequin" :disabled="!ready || addingMannequin || exportingVideo || !!exportingImage || tasks.some(task => !task.error)" @click="emit('addMannequin')">添加人偶</el-button>
+              <el-button :icon="IconUsersGroup" :loading="addingMannequin" :disabled="!ready || addingMannequin || exportingVideo || !!exportingImage || tasks.some(task => !task.error)" :title="translate('Replace the mannequins with four turnaround figures (front, left, back, right three-quarter) and add a keyframe framing each one centred in a 1 x 4 grid split at the current aspect ratio')" @click="emit('addTurnaround', sceneAspect)">{{ translate("Turnaround") }}</el-button>
             </div>
           </el-popover>
           <el-button
@@ -136,13 +137,16 @@
             </button>
             <el-button class="removeReference" :icon="IconX" text circle :aria-label="'删除关键帧 ' + (index + 1)" @click="removeAnchor(anchor.id)" />
             <el-button class="exportReference" :icon="IconPhotoPlus" text circle size="small" title="导出画布" :disabled="!ready || !!exportingImage" :loading="exportingImage === anchor.id" :aria-label="'导出关键帧 ' + (index + 1) + ' 到画布'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime, 'color')" />
-            <el-button class="exportReference depthReference" :icon="IconStack2" text circle size="small" title="Export depth map (near white, far black) as an image control for image generation" :disabled="!ready || !!exportingImage" :aria-label="'Export depth map of keyframe ' + (index + 1) + ' to canvas'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime, 'depth')" />
+            <el-button class="exportReference depthReference" :icon="IconStack2" text circle size="small" :title="translate('Export depth map (near white, far black) as an image control for image generation')" :disabled="!ready || !!exportingImage" :aria-label="translate('Export depth map of keyframe {0} to canvas', { 0: index + 1 })" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime, 'depth')" />
           </div>
         </vue-draggable>
       </section>
       <directorPanel
         v-model:prompt="prompt"
         v-model:model="model"
+        v-model:allowMannequins="allowMannequins"
+        :previsStep="previsStep"
+        @previsStep="emit('previsStep', sceneAspect)"
         :result="result"
         :referenceCount="anchors.length"
         :plans="plans"
@@ -165,8 +169,9 @@
 <script setup lang="ts">
 import type { RenderPass } from "./renderMedia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import { ElButton, ElDialog, ElMessage, ElSlider, ElSelect, ElOption, ElPopover, ElSwitch, ElColorPicker, ElInputNumber } from "element-plus";
-import { IconCube3dSphere, IconCamera, IconLoader2, IconPlayerPause, IconPlayerPlay, IconPlus, IconX, IconMovie, IconPhotoPlus, IconStack2, IconSun, IconSettings, IconUserPlus } from "@tabler/icons-vue";
+import { IconCube3dSphere, IconCamera, IconLoader2, IconPlayerPause, IconPlayerPlay, IconPlus, IconX, IconMovie, IconPhotoPlus, IconStack2, IconSun, IconSettings, IconUserPlus, IconUsersGroup } from "@tabler/icons-vue";
 import directorPanel from "./directorPanel.vue";
 import directorTour from "./directorTour.vue";
 import lightDirection from "./lightDirection.vue";
@@ -177,7 +182,7 @@ import type { SceneRuntime } from "threejson/core";
 import type { NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import { applyLighting, applySceneSettings, captureCamera, createStage, disposeStage, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { anchorSchema, applyCamera, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
-import { prepareSceneAnimation, type DirectorPlan, type DirectorPlanItem, type DirectorGeneration } from "./sceneAnimation";
+import { prepareSceneAnimation, type DirectorPlan, type DirectorPlanItem, type DirectorGeneration, type PrevisStep } from "./sceneAnimation";
 
 const props = defineProps<{
   scene: SceneDocument;
@@ -191,8 +196,9 @@ const props = defineProps<{
   exportingVideo: boolean;
   exportingImage: string;
   exportProgress?: number;
+  previsStep?: PrevisStep;
 }>();
-const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportVideo: [aspect: number, pass: RenderPass]; exportImage: [anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass] }>();
+const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; previsStep: [aspect: number]; addMannequin: []; addTurnaround: [aspect: number]; exportVideo: [aspect: number, pass: RenderPass]; exportImage: [anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass] }>();
 const anchors = defineModel<CameraAnchor[]>("anchors", { default: () => [] });
 const lighting = defineModel<LightingSettings>("lighting", { required: true });
 const sceneSettings = defineModel<SceneSettings>("sceneSettings", { required: true });
@@ -200,6 +206,7 @@ const lightingDraft = ref({ ...lighting.value });
 const lightingReference = ref(0);
 const prompt = defineModel<string>("prompt", { default: "" });
 const model = defineModel<string>("model", { default: "" });
+const allowMannequins = defineModel<boolean>("allowMannequins", { default: false });
 const anchorPreviews = ref<Record<string, string>>({});
 const workspace = ref<HTMLElement>();
 const canvas = ref<HTMLCanvasElement>();

@@ -33,6 +33,8 @@ const leaving = ref(false);
 async function exitProject() {
   if (leaving.value) return;
   leaving.value = true;
+  // Leave guards may ask again, such as while a generation runs; staying must not leave this dialog behind.
+  exitVisible.value = false;
   try {
     await router.push("/home");
   } finally {

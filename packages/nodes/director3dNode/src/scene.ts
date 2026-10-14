@@ -49,6 +49,33 @@ export function createMannequinObject(id: string): SceneDocument["objectList"][n
   };
 }
 
+// Front, left profile, back and right three-quarter; the mannequin faces +Z, so these Y rotations show each side to a camera on +Z.
+const turnaroundRotations = [0, -Math.PI / 2, Math.PI, Math.PI / 4];
+
+/**
+ * Replaces the mannequins with a character turnaround lineup and returns the camera that frames it so each figure sits
+ * centred in its own cell of a 1 x 4 grid split of the exported image at the given aspect ratio.
+ */
+export function createTurnaround(document: SceneDocument, aspect: number): { scene: SceneDocument; view: CameraView } {
+  const fov = 30;
+  const target = { x: 0, y: 0.9, z: 0 };
+  // ACT: 1.1 m per cell clears a relaxed standing pose (arms about 0.6 m wide); 2.2 m of frame height keeps a 1.8 m
+  // figure in frame on wide ratios. Posed arms that reach past 0.55 m from the body centre still cross a cell edge.
+  const width = Math.max(turnaroundRotations.length * 1.1, 2.2 * aspect);
+  const distance = width / aspect / 2 / Math.tan(fov * Math.PI / 360);
+  const cell = width / turnaroundRotations.length;
+  const figures = turnaroundRotations.map((rotationY, index) => ({
+    ...createMannequinObject(crypto.randomUUID()),
+    position: { x: -width / 2 + cell * (index + 0.5), y: 0, z: 0 },
+    rotation: { rotationX: 0, rotationY, rotationZ: 0 },
+  }));
+  const view = { camera: { position: { x: 0, y: target.y, z: distance }, fov, near: 0.1, far: 1000 }, controls: { target } };
+  return {
+    scene: { ...document, sceneConfig: { ...document.sceneConfig, ...view }, objectList: [...document.objectList.filter(object => object.objType !== "mannequin"), ...figures] },
+    view,
+  };
+}
+
 export interface SceneSettings {
   gridVisible: boolean;
   skyVisible: boolean;

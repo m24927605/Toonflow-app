@@ -117,9 +117,10 @@
       </div>
     </div>
     <div class="cardContainer">
+      <span v-if="flashText" class="flashBadge" role="status">{{ flashText }}</span>
       <el-card
         class="contentCard"
-        :class="{ selected: node.selected }"
+        :class="{ selected: node.selected, statusRunning: generationStatus === 'running', statusSucceeded: generationStatus === 'succeeded', statusFailed: generationStatus === 'failed', flashing: flashText !== undefined }"
         shadow="never"
         :bodyStyle="{ padding: '8px' }"
         :style="{ minHeight: `${cardHeight}px` }">
@@ -267,6 +268,8 @@ onScopeDispose(() => {
 });
 const selectionConnection = inject<ShallowRef<NodeConnectionFeedback | undefined>>("selectionConnection");
 const nodeEvent = useNodeEvent();
+// Set by flashNode for a moment after another node changes this one; never saved or copied.
+const flashText = computed(() => (node.data as { flash?: string } | undefined)?.flash);
 node.isValidTargetPos = (...args) => nodeEvent.emit("canConnect", ...args);
 const {
   d3Zoom,
@@ -715,6 +718,55 @@ watch(
       border-color: color-mix(in srgb, var(--el-color-primary) 50%, var(--el-border-color-light));
     }
 
+    /* The frame shows the generation state from across the canvas in bright colours: blinking yellow while running,
+       green when done, red on failure. */
+    .contentCard.statusRunning {
+      --statusColor: #ffd400;
+      animation: statusBlink 1s ease-in-out infinite;
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+      }
+    }
+
+    .contentCard.statusSucceeded {
+      --statusColor: #00e64d;
+    }
+
+    .flashBadge {
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      z-index: 2;
+      padding: 2px 10px;
+      border-radius: 10px;
+      background: #00d5ff;
+      color: #002b33;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .contentCard.statusFailed {
+      --statusColor: #ff1a1a;
+    }
+
+    .contentCard:is(.statusRunning, .statusSucceeded, .statusFailed) {
+      border-color: var(--statusColor);
+      box-shadow: 0 0 0 2px var(--statusColor), 0 0 12px var(--statusColor);
+    }
+
+    /* After the status rules so the fill flash shows over a status frame. */
+    .contentCard.flashing {
+      border-color: #00d5ff;
+      animation: flashRipple 0.8s ease-out 3;
+      @media (prefers-reduced-motion: reduce) {
+        animation: none;
+        box-shadow: 0 0 0 2px #00d5ff;
+      }
+    }
+
     .contentCard .loadingContent {
       display: flex;
       min-height: 84px;
@@ -793,6 +845,15 @@ watch(
     }
   }
 }
+@keyframes flashRipple {
+  0% { box-shadow: 0 0 0 2px #00d5ff, 0 0 0 2px rgb(0 213 255 / 0.9); }
+  100% { box-shadow: 0 0 0 2px #00d5ff, 0 0 0 22px rgb(0 213 255 / 0); }
+}
+
+@keyframes statusBlink {
+  50% { border-color: var(--el-border-color-light); box-shadow: 0 0 0 2px transparent; }
+}
+
 @keyframes nodeLoading {
   to {
     transform: rotate(360deg);

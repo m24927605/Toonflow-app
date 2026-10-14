@@ -102,6 +102,8 @@ export interface MediaGenerationRequest {
   audios?: MediaReference[];
   firstFrame?: MediaReference;
   lastFrame?: MediaReference;
+  /** LoRA files in the workspace with their strength, for models that load them. */
+  loras?: { path: string; strength?: number }[];
   ratio?: string;
   size?: string;
   resolution?: string;

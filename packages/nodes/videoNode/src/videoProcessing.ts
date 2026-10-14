@@ -1,9 +1,11 @@
 import type { BrowserFfmpegFactory } from "@toonflow/ffmpeg/browser";
 import { probeMedia, runCommand } from "@toonflow/node-shared/ffmpegCommand";
+import { translate } from "@toonflow/i18n/vue";
 
 export type VideoProcessingOptions = {
-  action: "extractAudio" | "separate" | "trim" | "fps30";
+  action: "extractAudio" | "separate" | "trim" | "fps30" | "lastFrame";
   audioPath?: string;
+  imagePath?: string;
   videoPath?: string;
   start?: number;
   end?: number;
@@ -20,12 +22,14 @@ function normalizePath(path: string) {
 export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string, options: VideoProcessingOptions, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const sourcePath = normalizePath(source);
-  if (!["extractAudio", "separate", "trim", "fps30"].includes(options.action)) throw new Error("未知的视频处理操作");
+  if (!["extractAudio", "separate", "trim", "fps30", "lastFrame"].includes(options.action)) throw new Error("未知的视频处理操作");
+  const lastFrame = options.action === "lastFrame";
   const needsAudio = options.action === "extractAudio" || options.action === "separate";
-  const needsVideo = options.action !== "extractAudio";
+  const needsVideo = options.action !== "extractAudio" && !lastFrame;
+  if (lastFrame && !options.imagePath) throw new Error(translate("Missing the image output path"));
   if (needsAudio && !options.audioPath) throw new Error("缺少音轨输出路径");
   if (needsVideo && !options.videoPath) throw new Error("缺少视频输出路径");
-  const outputs = [needsAudio ? options.audioPath : undefined, needsVideo ? options.videoPath : undefined].filter((path): path is string => !!path).map(normalizePath);
+  const outputs = [needsAudio ? options.audioPath : undefined, needsVideo ? options.videoPath : undefined, lastFrame ? options.imagePath : undefined].filter((path): path is string => !!path).map(normalizePath);
   if (outputs.includes(sourcePath) || new Set(outputs).size !== outputs.length) throw new Error("输出文件不能覆盖原视频或彼此覆盖");
 
   const media = await probeMedia(ffmpeg, source, signal);
@@ -40,6 +44,16 @@ export async function processVideo(ffmpeg: BrowserFfmpegFactory, source: string,
   }
 
   const command = ffmpeg(source);
+  if (lastFrame) {
+    // The last frame becomes the first frame of the next shot, to continue the same take: decode the final second and
+    // keep overwriting one PNG so the file ends as the very last frame.
+    command.inputOptions("-sseof", "-1").output(options.imagePath!).format("image2")
+      .outputOptions("-map", `0:${video.index}`, "-update", "1");
+    await runCommand(command, signal);
+    const image = (await probeMedia(ffmpeg, options.imagePath!, signal)).streams.find(stream => stream.codec_type === "video");
+    if (!image?.width || !image.height) throw new Error(translate("The extracted frame is not a valid image"));
+    return { duration, width: image.width, height: image.height, sourceFps: 0 };
+  }
   if (options.action === "trim") command.seekInput(options.start!);
   if (needsAudio) {
     command.output(options.audioPath!).noVideo().audioCodec("aac").audioBitrate(192).format("ipod")

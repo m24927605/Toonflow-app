@@ -33,7 +33,7 @@
             <el-slider v-model="data.originalVolume" class="volumeSlider" :min="0" :max="200" :disabled="processing" aria-label="配音时原声音量" />
             <span class="settingUnit">{{ data.originalVolume }}%</span>
           </div>
-          <p class="mixRule">With music connected, the voice is levelled 6 dB above it and the music ducks while the voice plays.</p>
+          <p class="mixRule">{{ translate("With music connected, the voice is levelled 6 dB above it and the music ducks while the voice plays.") }}</p>
           <div class="settingsFooter">
             <el-button type="primary" :icon="processing ? IconPlayerStop : IconWand" @click="processing ? controller?.abort() : startCompose()">{{ processing ? "停止" : "合成" }}</el-button>
           </div>
@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import { ElButton, ElCard, ElInputNumber, ElLoading, ElSlider, ElMessage } from "element-plus";
 import { IconMicrophone, IconPlayerStop, IconWand } from "@tabler/icons-vue";
 import { nodeSkeleton, nodeTools, useNode, useNodeInputs, z, type NodeHandle, type NodeMediaValue } from "@toonflow/nodes-scaffold/runtime";

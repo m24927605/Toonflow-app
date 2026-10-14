@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "@toonflow/i18n/vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import type { NodeData } from "@toonflow/nodes-scaffold/connection";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
@@ -6,7 +7,7 @@ import type { NodeInputValue } from "@toonflow/nodes-scaffold/values";
 
 export function useNodeReferences(handleId = "in") {
   const { id, node } = useNode<NodeData & { referenceOrder?: Record<string, string[]> }>();
-  const { removeEdges } = useVueFlow();
+  const { removeEdges, findNode } = useVueFlow();
   const inputValues = ref<NodeInputValue[]>([]);
   const previews = ref(new Map<string, string>());
   const refList = computed({
@@ -47,7 +48,15 @@ export function useNodeReferences(handleId = "in") {
     ));
   }
 
-  return { refList, referenceMentions, setReferencePreview, removeReference };
+  /** Throws when a reference has no content yet, naming the referenced nodes so it is clear what to generate first. */
+  function assertReferencesReady(list = refList.value) {
+    const empty = list.filter(item => item.value === undefined);
+    if (!empty.length) return;
+    const labels = empty.map(item => `"${String(findNode(item.source)?.data?.label || item.source)}"`).join(", ");
+    throw new Error(t`${labels} has no content yet; generate or fill it before using it as a reference.`);
+  }
+
+  return { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady };
 }
 
 function referenceKey(item: NodeInputValue) {

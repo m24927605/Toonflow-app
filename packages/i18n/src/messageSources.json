@@ -1238,6 +1238,9 @@
     "apps/web/src/components/settings/panels/languageModel/index.vue",
     "apps/web/src/components/settings/panels/mediaModel/index.vue"
   ],
+  "Stop Colab session": [
+    "apps/web/src/components/settings/panels/languageModel/index.vue"
+  ],
   "确定删除此供应商及其模型？": [
     "apps/web/src/components/settings/panels/languageModel/index.vue",
     "apps/web/src/components/settings/panels/mediaModel/index.vue"
@@ -1251,6 +1254,13 @@
     "apps/web/src/components/settings/panels/languageModel/index.vue",
     "apps/web/src/components/settings/panels/languageModel/addCustomProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/index.vue"
+  ],
+  "Colab session stopped": [
+    "apps/web/src/components/settings/panels/languageModel/index.vue",
+    "apps/server/src/routes/ai/colab/stop.ts"
+  ],
+  "Failed to stop the Colab session": [
+    "apps/web/src/components/settings/panels/languageModel/index.vue"
   ],
   "配置格式错误": [
     "apps/web/src/components/settings/panels/languageModel/index.vue"
@@ -1614,6 +1624,15 @@
   "音频参考": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue"
+  ],
+  "Daily generation limit": [
+    "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue"
+  ],
+  "No limit": [
+    "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue"
+  ],
+  "Daily Colab compute unit limit": [
+    "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue"
   ],
   "文生图": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
@@ -2948,6 +2967,18 @@
   ],
   "分享": [
     "apps/web/src/lib/i18n.ts"
+  ],
+  "Generation is still running. Leaving the project stops it, and the time and credits already spent are lost. Leave anyway?": [
+    "apps/web/src/lib/generationGuard.ts"
+  ],
+  "Generation in progress": [
+    "apps/web/src/lib/generationGuard.ts"
+  ],
+  "Leave": [
+    "apps/web/src/lib/generationGuard.ts"
+  ],
+  "Stay": [
+    "apps/web/src/lib/generationGuard.ts"
   ],
   "工作区已切换，本次调用已停止": [
     "apps/web/src/lib/mcpControl.ts",
@@ -5021,6 +5052,18 @@
   "A Claude Code session can only continue with this turn's tool results. Please generate again.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
+  "Unsupported Colab CLI model": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
+  "Colab CLI text generation does not support tool calls.": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
+  "Colab CLI text generation only supports text inputs and text references.": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
+  "Colab CLI requires a non-empty text prompt.": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
   "Unsupported login step": [
     "apps/server/src/utils/ai/codex.ts"
   ],
@@ -5136,6 +5179,18 @@
   "Total team file size cannot exceed 20 MB": [
     "apps/server/src/utils/teams/files.ts"
   ],
+  "Not a Toonflow production file": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "The model did not list the cast as JSON": [
+    "apps/server/src/utils/production/assets.ts"
+  ],
+  "This production is not waiting for a review": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "This production has nothing to continue": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "The skill root directory must be a non-symbolic link directory": [
     "apps/server/src/utils/skills/files.ts"
   ],
@@ -5220,6 +5275,12 @@
   "MiniMax H3 supports at most 3 reference videos": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
+  "MiniMax H3 supports at most 3 reference audio clips": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
+  "MiniMax H3 loads at most 4 LoRAs": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
   "Audio input must be a Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
@@ -5301,10 +5362,10 @@
   "Invalid media encoding or MIME type": [
     "apps/server/src/utils/media/debug.ts"
   ],
-  "Generation cancelled: no page is waiting for it": [
+  "Job cancelled: no page is waiting for it": [
     "apps/server/src/utils/media/jobs.ts"
   ],
-  "Generation job not found; it may have expired or the server restarted": [
+  "Job not found; it may have expired or the server restarted": [
     "apps/server/src/utils/media/jobs.ts"
   ],
   "Invalid Higgsfield model ID": [
@@ -5328,6 +5389,12 @@
   "Training a character identity needs 5 to 20 images.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
+  "Could not read the Colab compute unit balance": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "The Colab session was stopped": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
   "Colab reference media must be local data; remote URLs are not supported": [
     "apps/server/src/utils/media/colab.ts"
   ],
@@ -5341,6 +5408,9 @@
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Qwen-Image supports at most 16 reference images": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Qwen-Image loads at most 4 LoRAs": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Failed to read image: HTTP {0}": [
@@ -5467,6 +5537,15 @@
     "apps/server/src/utils/media/generation.ts"
   ],
   "The reference media type must be {0}": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
+  "A LoRA must be a .safetensors file": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
+  "A LoRA must be a file no larger than 1 GB": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
+  "The LoRA file is not a valid safetensors file": [
     "apps/server/src/utils/media/generation.ts"
   ],
   "Generated results must use HTTP or HTTPS URLs": [
@@ -5615,6 +5694,9 @@
   ],
   "Failed to read workspace AGENTS.md: {0}": [
     "apps/server/src/agent/runtime/resources.ts"
+  ],
+  "Colab CLI is only used for text node generation. Choose another model for the Agent.": [
+    "apps/server/src/agent/runtime/model.ts"
   ],
   "Claude Code is only used for node generation. Choose another model for the Agent.": [
     "apps/server/src/agent/runtime/model.ts"
@@ -5992,6 +6074,9 @@
   "Showing a file in its folder only works on the local development page": [
     "apps/server/src/routes/workspaces/files/reveal.ts"
   ],
+  "Folder already exists": [
+    "apps/server/src/routes/workspaces/files/mkdir.ts"
+  ],
   "Please send the original content of the file": [
     "apps/server/src/routes/workspaces/files/write.ts",
     "apps/server/src/routes/assets/save.ts"
@@ -6034,6 +6119,15 @@
   ],
   "Model request failed": [
     "apps/server/src/routes/ai/generate.ts"
+  ],
+  "Qwen-Image learns from images only; train motion and voice for MiniMax H3": [
+    "apps/server/src/routes/ai/lora/train.ts"
+  ],
+  "This node has no production": [
+    "apps/server/src/routes/production/get.ts"
+  ],
+  "This node already has a production": [
+    "apps/server/src/routes/production/create.ts"
   ],
   "Please read skills locally on the server": [
     "apps/server/src/routes/skills/read.ts"
@@ -6170,6 +6264,9 @@
   "Installation failed and old version cannot be restored, old files remain in {0}": [
     "packages/ffmpeg/src/index.ts"
   ],
+  "Character identity": [
+    "packages/nodes/characterNode/vite.config.ts"
+  ],
   "已有角色": [
     "packages/nodes/characterNode/src/index.vue"
   ],
@@ -6248,6 +6345,166 @@
   "Higgsfield 请求失败（HTTP {0}）": [
     "packages/nodes/characterNode/src/souls.ts"
   ],
+  "Auto production": [
+    "packages/nodes/productionNode/vite.config.ts",
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Shot list: {0} shots": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Budget {0} units · estimate {1} units": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Give an outline and a length; the AI writes the script and makes the film, stopping for your review.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Story outline: who, where, what happens": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Story outline": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Length (seconds)": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Ratio": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Final quality": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Connected photos keep these people; name each as the outline does:": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Character name": [
+    "packages/nodes/productionNode/src/index.vue",
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Optional: connect a photo of each character to keep their look; without photos the AI designs them.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Characters already on the canvas keep their look: {0}": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Let me review the script": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Let me review the keyframes": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Estimated cost: about {0} Colab compute units for {1} shots.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Spend at most (units)": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Start": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "The script is ready in the Script node to the right. Edit it there, or write what to change here.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "What to change (leave empty to approve)": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "What to change": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Revise": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Approve": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "The keyframes are on the canvas. Regenerate any you do not like in its own node, then approve.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "New budget (units)": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Continue": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Stop": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Writing the script…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Writing the shot list…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Designing the characters and places…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Training LoRAs so faces and places stay the same (about an hour)…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Drawing the keyframes, the master shot first…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Stopped by an error; Continue tries again": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Waiting for your review of the script": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Stopped: the next step would go over the budget": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Stopped: the Colab balance could not be read, so nothing more is spent": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Stopped": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Waiting for your review of the keyframes": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "The keyframes are approved. Dubbing and video come in phase 2.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Request failed": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Name every connected photo first": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Start an automatic production of about {0} seconds? It spends at most {1} Colab compute units (estimate {2}) and stops for your review where you asked. It keeps running if you close this page.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Cancel": [
+    "packages/nodes/productionNode/src/index.vue",
+    "packages/nodes/videoGenerationNode/src/index.vue",
+    "packages/nodes/videoConcatNode/src/index.vue",
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodes/soundtrackMixNode/src/index.vue",
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodes/imageGenerationNode/src/index.vue",
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Script": [
+    "packages/nodes/productionNode/src/index.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Shot list": [
+    "packages/nodes/productionNode/src/index.vue",
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Shot {0} keyframe ({1})": [
+    "packages/nodes/productionNode/src/index.vue",
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Character photos": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Video": [
+    "packages/nodes/videoNode/vite.config.ts"
+  ],
   "提取音轨": [
     "packages/nodes/videoNode/src/index.vue",
     "packages/nodes/videoNode/src/components/videoActions.vue",
@@ -6262,6 +6519,13 @@
     "packages/nodes/videoNode/src/index.vue",
     "packages/nodes/videoNode/src/components/videoActions.vue",
     "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Save the last frame as an image node, to start the next shot from it": [
+    "packages/nodes/videoNode/src/index.vue"
+  ],
+  "Last frame": [
+    "packages/nodes/videoNode/src/index.vue",
+    "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
   "替换视频": [
     "packages/nodes/videoNode/src/index.vue",
@@ -6330,6 +6594,9 @@
   "未知的视频处理操作": [
     "packages/nodes/videoNode/src/videoProcessing.ts"
   ],
+  "Missing the image output path": [
+    "packages/nodes/videoNode/src/videoProcessing.ts"
+  ],
   "缺少音轨输出路径": [
     "packages/nodes/videoNode/src/videoProcessing.ts"
   ],
@@ -6350,6 +6617,9 @@
     "packages/nodes/videoNode/src/videoProcessing.ts"
   ],
   "截取范围须满足 0 ≤ 开始时间 < 结束时间 ≤ 视频时长": [
+    "packages/nodes/videoNode/src/videoProcessing.ts"
+  ],
+  "The extracted frame is not a valid image": [
     "packages/nodes/videoNode/src/videoProcessing.ts"
   ],
   "生成的媒体文件无效": [
@@ -6395,6 +6665,12 @@
   "请选择有效的起止时间。": [
     "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
+  "Saves the video's last frame as a new image node and keeps the video. Connect it to the next shot as its first frame to continue the same take.": [
+    "packages/nodes/videoNode/src/components/videoActions.vue"
+  ],
+  "Re-encodes to 30 fps for the edit timeline and keeps the original. A 24 fps source repeats one frame in five; that is expected, not stutter.": [
+    "packages/nodes/videoNode/src/components/videoActions.vue"
+  ],
   "提取音轨并生成音频节点，保留原视频。": [
     "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
@@ -6411,10 +6687,16 @@
     "packages/nodes/videoNode/src/components/videoActions.vue",
     "packages/nodes/audioNode/src/components/audioActions.vue"
   ],
+  "Convert to 30 fps": [
+    "packages/nodes/videoNode/src/components/videoActions.vue"
+  ],
   "视频处理中，请完成或取消后再刷新节点": [
     "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
   "请先启用所需的视频或音频节点插件": [
+    "packages/nodes/videoNode/src/components/videoActions.vue"
+  ],
+  "last frame": [
     "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
   "音轨": [
@@ -6425,6 +6707,9 @@
     "packages/nodes/videoNode/src/components/videoPlayer.vue"
   ],
   "{0}–{1} 秒": [
+    "packages/nodes/videoNode/src/components/videoActions.vue"
+  ],
+  " (from 24 fps: 1 repeated frame in 5, expected)": [
     "packages/nodes/videoNode/src/components/videoActions.vue"
   ],
   "画布节点已变化，请重新处理": [
@@ -6504,6 +6789,9 @@
   "截帧中断，临时图片清理失败": [
     "packages/nodes/videoNode/src/components/videoPlayer.vue"
   ],
+  "Audio generation": [
+    "packages/nodes/audioGenerationNode/vite.config.ts"
+  ],
   "截取音频": [
     "packages/nodes/audioGenerationNode/src/index.vue",
     "packages/nodes/audioNode/src/index.vue"
@@ -6563,13 +6851,6 @@
   ],
   "图片和音频不能同时引用，且合计最多引用一个；文本数量不限": [
     "packages/nodes/audioGenerationNode/src/index.vue"
-  ],
-  "引用节点暂无内容，请先补充引用内容": [
-    "packages/nodes/audioGenerationNode/src/index.vue",
-    "packages/nodes/videoGenerationNode/src/index.vue",
-    "packages/nodes/textNode/src/index.vue",
-    "packages/nodes/director3dNode/src/index.vue",
-    "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "请重新选择有效的语种、采样率和输出格式": [
     "packages/nodes/audioGenerationNode/src/index.vue"
@@ -6669,6 +6950,9 @@
   ],
   "日文": [
     "packages/nodes/audioGenerationNode/src/audioSettings.ts"
+  ],
+  "Audio": [
+    "packages/nodes/audioNode/vite.config.ts"
   ],
   "选择音频": [
     "packages/nodes/audioNode/src/index.vue"
@@ -6842,6 +7126,9 @@
   "临时音频清理失败": [
     "packages/nodes/audioNode/src/components/audioActions.vue"
   ],
+  "Video generation": [
+    "packages/nodes/videoGenerationNode/vite.config.ts"
+  ],
   "选择替换视频": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
@@ -6855,6 +7142,12 @@
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "图片引用按顺序作为首帧、尾帧": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Prompt changed since preflight": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Preflight {0}/100": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "生成模型": [
@@ -6906,6 +7199,27 @@
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "已取消生成：请先在导演台导出深度视频，并以控制视频模式连接到此节点": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "These input images are not graded L3 or above:\n{0}\n\nGrade the keyframes first; generating from weak keyframes wastes the video run. Generate anyway?": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Keyframe grade": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generate anyway": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generation cancelled: grade the input keyframes L3 or above first": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "This prompt failed its preflight ({0}/100):\n{1}\n\nGenerate anyway?": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Preflight": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generation cancelled: fix the preflight issues first": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "供应商未返回视频": [
@@ -6968,6 +7282,51 @@
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue",
     "packages/nodes/imageGenerationNode/src/components/generationSettings.vue"
   ],
+  "Join videos": [
+    "packages/nodes/videoConcatNode/vite.config.ts",
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Fade the sound in and out over 50 ms at every cut, to remove clicks; clip lengths stay the same": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Smooth cuts": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Join": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Failed to read the video": [
+    "packages/nodes/videoConcatNode/src/index.vue",
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Videos are being joined; wait or cancel before reloading the node": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Joined {0} videos, {1} s": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Failed to join the videos": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Videos to join": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Joined video": [
+    "packages/nodes/videoConcatNode/src/index.vue"
+  ],
+  "Connect at least two videos to join": [
+    "packages/nodes/videoConcatNode/src/concatVideos.ts"
+  ],
+  "{0} is not a playable video": [
+    "packages/nodes/videoConcatNode/src/concatVideos.ts",
+    "packages/nodes/soundtrackMixNode/src/mixSoundtrack.ts"
+  ],
+  "The joined video is not valid": [
+    "packages/nodes/videoConcatNode/src/concatVideos.ts"
+  ],
+  "Dubbing": [
+    "packages/nodes/dubbingNode/vite.config.ts"
+  ],
   "配音合成视频": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
@@ -6987,6 +7346,9 @@
     "packages/nodes/dubbingNode/src/index.vue"
   ],
   "配音时原声音量": [
+    "packages/nodes/dubbingNode/src/index.vue"
+  ],
+  "With music connected, the voice is levelled 6 dB above it and the music ducks while the voice plays.": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
   "合成": [
@@ -7019,6 +7381,9 @@
   "配音输入": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
+  "Music input": [
+    "packages/nodes/dubbingNode/src/index.vue"
+  ],
   "配音合成": [
     "packages/nodes/dubbingNode/src/index.vue"
   ],
@@ -7037,8 +7402,45 @@
   "无法读取有效的配音时长": [
     "packages/nodes/dubbingNode/src/dubbing.ts"
   ],
+  "Music input has no audio track": [
+    "packages/nodes/dubbingNode/src/dubbing.ts"
+  ],
   "生成的视频文件无效": [
     "packages/nodes/dubbingNode/src/dubbing.ts"
+  ],
+  "Text": [
+    "packages/nodes/textNode/vite.config.ts"
+  ],
+  "Create a text node connected to this script in which an uncensored model reads the whole script and writes its shot list": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Generate shot list": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Fill each generation node that belongs to a shot with the matching ### section of this text, such as ### Shot 3": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Distribute prompts": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Create a Director's Studio node that blocks this shot list in previs one shot at a time; each confirmed shot is exported as its layout for the keyframe": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Create previs": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Create a keyframe node for each shot of this shot list, connected to the scene and character images, and a video node for each shot whose keyframe is generated": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Build shot nodes": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "For every shot whose keyframe is generated, create its MiniMax H3 video node and have an uncensored model write its prompt; generation itself is not started": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Prepare videos": [
+    "packages/nodes/textNode/src/index.vue"
   ],
   "查看并复制当前正文": [
     "packages/nodes/textNode/src/index.vue"
@@ -7055,6 +7457,27 @@
   "编辑文本内容": [
     "packages/nodes/textNode/src/index.vue",
     "packages/nodes/textNode/src/markdownEditor.vue"
+  ],
+  "Video resolution": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Higher resolutions take longer on Colab and use more credits; 1080p takes about 35 minutes per clip.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Aspect ratio": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Same as keyframe": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "A ratio other than the keyframe's crops or pads its first frame.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Video generation is not started; review each prompt and start it yourself.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Prepare": [
+    "packages/nodes/textNode/src/index.vue"
   ],
   "文本尚未加载，无法保存": [
     "packages/nodes/textNode/src/index.vue"
@@ -7091,6 +7514,127 @@
   "文本尚未加载": [
     "packages/nodes/textNode/src/index.vue"
   ],
+  "Add the Colab CLI provider with {0} in Settings first": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "This shot list already has a previs node; continue the shots there": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} is the original script and {1} is the shot list.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} is the shot list.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Block shot {0} ({1}) for previs. First build the set at real-world scale from the shot list and the script: the room, the furniture, and every person who appears in any shot as one cylinder named as in the shot list. Then block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Block shot {0} ({1}) for previs. Keep the set and the people; each person starts where the previous shot left them unless the row says otherwise. Block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Previs": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Previs node created: open it and block the shots one at a time": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} shots, {1} s in total, median shot {2} s.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot list check": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "No generation node belongs to shot {0}.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Several nodes belong to shot {0}; give each of them a different shot.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0} has an empty section.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "No ### shot section matches a generation node.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Replace the prompts of {0} nodes (shots {1}) and disconnect {2} references they do not name?": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Distribute": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Prompt filled": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Prompts distributed": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Filled {0} nodes": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Add the MiniMax H3 (Colab) media provider in Settings first": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Every shot with a generated keyframe already has a video node with a written prompt.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "The chosen quality and ratio also apply to the existing video nodes of shots {0}.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Create MiniMax H3 video nodes for shots {0}, each starting from its keyframe.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Write and preflight the video prompts of shots {0} with {1}, one after another; a prompt scoring under {2} is rewritten once.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shots {0} wait for their keyframes.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Set shots {0} to {1}": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0} video ({1})": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Dialogue markers are misplaced ({0}).": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "The review did not return a valid score.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Prompt filled and preflighted": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Preflight failed": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0}: passed, {1}/100": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0}: needs attention, {1}/100": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Preflight report": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Failed to prepare the videos": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} is this shot''s previs layout: follow its composition, camera angle and where each person stands, but take no appearance, material or colour from it.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Previs blocking at the start of this shot: {0}.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0} prompt": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Created {0} shot nodes": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
   "文本生成中，请稍后修改": [
     "packages/nodes/textNode/src/index.vue"
   ],
@@ -7099,6 +7643,31 @@
   ],
   "文本输出": [
     "packages/nodes/textNode/src/index.vue"
+  ],
+  "{0} is the original script: use it for the story, each person''s intentions and continuity. {1} is the shot list; describe the shot from it and add detail from the script.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Write the motion of shot {0} ({1}) of the attached shot list as one paragraph of 100 to 200 words: what each person does from the first frame, how the camera moves, and the sounds of the scene (dialogue, footsteps, ambience) without any music. Do not write reference markers, the setting, anyone''s appearance or style words.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Name people as the shot list does.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "The previs fixes the opening frame: {0}. Place each person and the camera to match it.": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "At the start of this shot the character state is: {0}. Posture and what each person holds must match it.": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Read the earlier rows too: unless this row says otherwise, each person keeps the posture (sitting, standing, lying) and what they hold from the previous shots.": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Output only the heading line \"### Shot {0}\" followed by the paragraph.": [
+    "packages/nodes/textNode/src/index.vue",
+    "packages/nodeShared/src/keyframePrompt.ts"
   ],
   "Markdown 编辑工具": [
     "packages/nodes/textNode/src/markdownEditor.vue"
@@ -7152,6 +7721,152 @@
   ],
   "无法打开链接": [
     "packages/nodes/textNode/src/markdownPreview.vue"
+  ],
+  "The prompt does not start with the first-frame line for <Picture 1>.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The prompt is missing {0}.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "non_diegetic_music must be N/A: music is laid over the joined film later.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The spoken lines do not match the shot list's dialogue cell exactly.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "A spoken line has the wrong language tag.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The prompt does not name <Video 1> as a blocking-only previs.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The prompt never names the person with the trigger word {0}.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The prompt still contains unfilled markers.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The prompt is {0} characters; MiniMax H3 cuts it off after {1}.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "The duration of {0} s is outside MiniMax H3''s 4–15 s.": [
+    "packages/nodes/textNode/src/videoPreflight.ts"
+  ],
+  "Original script: {0}. Each shot''s text node also reads it.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Tip: connect the original script's text node into this shot list, so each shot's text node can read the whole story instead of one row.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Scenes": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Characters": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Default view": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "LoRA (keeps faces and places the same in every shot)": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "No scene name yet: type it in the box next to the Scene role on the image, then click Train LoRA": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Video ✓": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Video ✗": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Keyframe ✓": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Keyframe ✗": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "For each ✗, click Train LoRA on one of that person's or place's images and build after it finishes (about 30–60 minutes), so the new nodes load it. Building now works, but faces and rooms may drift between shots.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Cast per shot": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Preset from the shot list's cast column; untick anyone who is not in a shot.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "The shot list has no cast column, so everyone is ticked; untick anyone who is not in a shot.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Tick a person even when only part of them is in frame, such as a hand, their back or a silhouette, so their skin, hair and clothing stay consistent.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Shot": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Character state": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Not in shot": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Master shot": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "None": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Shot {0}": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Every other keyframe also references the master shot's keyframe for lighting, colour, clothing and props. Generate and approve the master shot first, then the rest.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Keyframe prompt template": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Video prompt template": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Also create one text node per shot, connected to this shot list": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Build": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Suggested by the shot list: shot {0}.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Suggested: shot {0}, the widest shot with the most characters in frame ({1}).": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Suggested: shot {0}, the widest shot{1}.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "No background music: only dialogue and the sounds of the scene.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "{{shot}} marks where Distribute prompts puts each shot's text.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Create {0} keyframe image generation nodes (shots {1}) connected to the references below.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Create {0} video generation nodes (shots {1}), each starting from its shot''s keyframe with the shot length as duration.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Shots {0} wait for their keyframes; generate them, then build again to add their videos.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Every shot already has its keyframe and video nodes.": [
+    "packages/nodes/textNode/src/shotNodesDialog.vue"
+  ],
+  "Image": [
+    "packages/nodes/imageNode/vite.config.ts"
   ],
   "全景图": [
     "packages/nodes/imageNode/src/index.vue",
@@ -8028,6 +8743,170 @@
   "截图失败，请重试": [
     "packages/nodes/imageNode/src/components/imagePanoramaPreview.vue"
   ],
+  "Add soundtrack": [
+    "packages/nodes/soundtrackMixNode/vite.config.ts",
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Track volume": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Fade in and out": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "s": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Lower the tracks while the video has sound, such as dialogue": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Mix": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "The soundtrack is being mixed; wait or cancel before reloading the node": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Connect exactly one video": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Mixed {0} tracks, {1} s": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Failed to mix the soundtrack": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Video and soundtrack": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Video with soundtrack": [
+    "packages/nodes/soundtrackMixNode/src/index.vue"
+  ],
+  "Connect at least one audio track": [
+    "packages/nodes/soundtrackMixNode/src/mixSoundtrack.ts"
+  ],
+  "{0} has no sound": [
+    "packages/nodes/soundtrackMixNode/src/mixSoundtrack.ts"
+  ],
+  "The mixed video is not valid": [
+    "packages/nodes/soundtrackMixNode/src/mixSoundtrack.ts"
+  ],
+  "Train LoRA": [
+    "packages/nodes/loraTrainingNode/vite.config.ts",
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "{0}: trigger word {1}": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Training on Colab, about half an hour. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "What the LoRA learns": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Model": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Video and image (recommended)": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Name": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "What the picture is, e.g. a close-up photo of a person who is": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Slider base prompt": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "The +1 end adds, e.g. laughing": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Slider +1 end": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "The -1 end adds, e.g. expressionless": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Slider -1 end": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Train": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Character": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Scene": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Costume": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Style": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Motion": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Voice": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Slider": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Video (MiniMax H3)": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Image (Qwen-Image)": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect images of one person, one is enough; with fewer than 12, variants of the first in other clothes and places are generated, and more real views make it better.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect images of one place, one is enough; with fewer than 12, variants of the first in other light and framing are generated.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect at least 4 images of the outfit, worn by anyone.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect at least 4 images in the look to learn, of varied subjects.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect at least 4 video clips of the movement, by varied people.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Connect at least 4 recordings of one voice; each recording's text becomes its caption.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "No material: the two ends are described in words.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Train a {0} LoRA for {1} on Colab? Each model trains on its own L4 at the same time, about 30–60 minutes and roughly 0.5–1.5 compute units each. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "{0} is trained; pick it in the LoRA menu of generation nodes": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "LoRA training failed": [
+    "packages/nodes/loraTrainingNode/src/index.vue",
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Training material": [
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "3D Director Studio": [
+    "packages/nodes/director3dNode/vite.config.ts"
+  ],
   "打开导演台": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
@@ -8052,6 +8931,9 @@
   "人偶添加失败": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
+  "Failed to add the turnaround": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
   "导演台模型未加载，无法复制：{0}": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
@@ -8059,6 +8941,9 @@
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "请先启用{0}节点插件": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "Shot {0} previs": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "画布节点已变化，请重新导出": [
@@ -8089,6 +8974,12 @@
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "预览生成失败": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "Shot {0} previs layout": [
+    "packages/nodes/director3dNode/src/index.vue"
+  ],
+  "Every shot of the previs is confirmed; Build shot nodes connects each layout to its keyframe": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
   "Agent 未修改方案，原方案未修改，请重试。": [
@@ -8142,11 +9033,62 @@
   "模型动画与运镜同步生成": [
     "packages/nodes/director3dNode/src/directorPanel.vue"
   ],
+  "Blocking shot {0} of {1}; the first request also starts Colab and loads the model, about 1–2 minutes": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Shot {0} failed: {1}": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Shot {0} of {1} is ready: check it, then confirm": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Previs shot {0} of {1}": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Retry shot {0}": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Block shot {0}": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Confirm shot {0}": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Confirm shot {0} and block the next": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Let the AI use jointed mannequins for people; otherwise every person is one cylinder, as previs only blocks positions": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "Allow mannequins": [
+    "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
   "生成动画": [
     "packages/nodes/director3dNode/src/directorPanel.vue"
   ],
   "生成方案": [
     "packages/nodes/director3dNode/src/directorPanel.vue"
+  ],
+  "{0}: out of frame": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0}: left of the frame, about {1} m from the camera": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0}: right of the frame, about {1} m from the camera": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0}: centre of the frame, about {1} m from the camera": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "camera about {0} m high, looking down": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "camera about {0} m high, looking up": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "camera about {0} m high, level": [
+    "packages/nodes/director3dNode/src/blocking.ts"
   ],
   "运镜时间无效": [
     "packages/nodes/director3dNode/src/motion.ts"
@@ -8244,6 +9186,12 @@
   "添加人偶": [
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
+  "Replace the mannequins with four turnaround figures (front, left, back, right three-quarter) and add a keyframe framing each one centred in a 1 x 4 grid split at the current aspect ratio": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
+  "Turnaround": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
   "暂停影片": [
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
@@ -8320,6 +9268,12 @@
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
   "导出关键帧 {0} 到画布": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
+  "Export depth map (near white, far black) as an image control for image generation": [
+    "packages/nodes/director3dNode/src/sceneEditor.vue"
+  ],
+  "Export depth map of keyframe {0} to canvas": [
     "packages/nodes/director3dNode/src/sceneEditor.vue"
   ],
   "场景载入失败": [
@@ -8433,7 +9387,16 @@
   "下": [
     "packages/nodes/director3dNode/src/lightDirection.vue"
   ],
+  "Image generation": [
+    "packages/nodes/imageGenerationNode/vite.config.ts"
+  ],
   "选择替换图片": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Make this keyframe the master shot: every other shot keyframe references it for lighting, colour, clothing and props": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Set as master shot": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片预览失败": [
@@ -8499,6 +9462,34 @@
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "没有可用于角色“{0}”的图片模型": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Lighting, colour, clothing and props match {0}, but the composition, camera angle and poses follow the description below.": [
+    "packages/nodes/imageGenerationNode/src/index.vue",
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Already following this master: shots {0}.": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Shots {0} follow another master shot and are left unchanged.": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "No other shot keyframe needs this master shot.": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Connect this keyframe to {0} shot keyframes (shots {1}) and add a line asking them to match its lighting, colour, clothing and props?": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Shots {0} already have images; regenerate them to apply the master shot.": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Connect": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Master shot connected": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "Connected the master shot to {0} keyframes": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片处理中，请完成后再刷新节点": [
@@ -8960,6 +9951,47 @@
   "Maximum body characters": [
     "packages/tools/webFetch/build.ts"
   ],
+  "The prompt asks the model to render on-screen text ({0}). Remove it, or generate this node on its own to send it anyway.": [
+    "packages/nodeShared/src/confirmOnScreenText.ts"
+  ],
+  "The prompt asks the model to render on-screen text ({0}). Models garble text, so captions, title cards and signs belong in post-production. Send it anyway?": [
+    "packages/nodeShared/src/confirmOnScreenText.ts"
+  ],
+  "On-screen text": [
+    "packages/nodeShared/src/confirmOnScreenText.ts"
+  ],
+  "Send anyway": [
+    "packages/nodeShared/src/confirmOnScreenText.ts",
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Edit prompt": [
+    "packages/nodeShared/src/confirmOnScreenText.ts",
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Generation cancelled: remove the on-screen text from the prompt and add it in post-production": [
+    "packages/nodeShared/src/confirmOnScreenText.ts"
+  ],
+  "No shot list found: write shots as Markdown table rows with a time range cell (0–3.5, 0s–4s or 0:00–0:04) or as Shot_001 | scene | shot size | 3s | action lines": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Line {0}: the shot has no length": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Line {0}: shot runs {1} s, over {2} s; split it into shorter shots": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Line {0}: {1} s gap after the previous shot": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Line {0}: overlaps the previous shot by {1} s": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Median shot length is {0} s; most shots of a well-paced short run 3–4 s": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Total length is {0} s, but the target is {1} s": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
   "文件路径必须位于工作区内": [
     "packages/nodeShared/src/markdownContent.ts"
   ],
@@ -8971,6 +10003,39 @@
   ],
   "当前宿主无法读取文档图片": [
     "packages/nodeShared/src/markdownContent.ts"
+  ],
+  "{0} is the script. Read the whole script first, then turn it into a shot list for AI video production, splitting it into time ranges by the pacing of the story. Output only one Markdown table with the columns Shot, Time, Shot size, Camera, Action, Dialogue, Cast and State.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Time is the range of the shot in seconds, such as 0–3.5; each shot starts where the previous one ends, with no gaps or overlaps.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Keep every shot at most 8 s and most shots at 3–4 s.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Cast lists the characters in frame by the names the script uses, separated by commas, including anyone only partly visible such as a hand or their back; leave it empty when nobody is in frame.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "State gives each cast member's posture, what they wear (or that they are unclothed) and what they hold at the start of the shot.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "The characters on the canvas are named {0}. In Cast and State, call each person by exactly one of these names, matching the people of the script to them even when the script calls them differently; use another name only for someone who is none of them.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Cover the whole script and write the cells in the language of the script.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "After the table, write one line naming the master shot, the shot the other shots should match for lighting, colour, clothing and props (usually the widest shot that shows the whole set and every main character), with a short reason of your own, for example \"Master shot: 4 - full shot showing the whole room and both characters\".": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "LoRA": [
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Strength of {0}": [
+    "packages/nodeShared/src/components/loraPicker.vue"
   ],
   "历史记录": [
     "packages/nodeShared/src/components/mediaHistory.vue"
@@ -9062,11 +10127,206 @@
   "引用 {0}：{1}{2}": [
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
+  "（{0}）": [
+    "packages/nodeShared/src/components/referenceCard.vue"
+  ],
   "读取引用文件失败": [
     "packages/nodeShared/src/components/referenceCard.vue"
   ],
-  "（{0}）": [
-    "packages/nodeShared/src/components/referenceCard.vue"
+  "Set role": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Node role": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "What this node is for; the shot flow only uses nodes with a role": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Plain": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Shot number": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Outfit": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "The same person in another outfit keeps the same name; the outfit, such as kimono or nude, tells their views apart": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Scene name": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Every image of the same place keeps the same name; a scene LoRA with this name loads with its keyframes": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Keyframe": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Previs layout": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Shot prompt": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Finish LoRA": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Retrain LoRA": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Teach the AI this person's face and body, so every keyframe and video keeps them the same. Uses every image with the Character role and the same name.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Teach the AI this place, so every keyframe keeps its look. Uses every image with the Scene role and the same name.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Who is this? Give the character name used in the script.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Which place is this? Give the scene name used in the script.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Next": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Generate or upload this image first": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "videos and keyframes": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "videos": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "keyframes": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Only {0} of the 12 images it needs exist, so about {1} more in other clothes, places and light are generated from this image first (roughly 0.5–1 more units). Use the clearest image; giving more real views the name {2} makes it better.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Train {0} for {1}? It runs on Colab for about 30–60 minutes and uses roughly {2}–{3} compute units. You can close this page; the LoRA is used automatically by \"Build shot nodes\" when it finishes.": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "{0} is trained; \"Build shot nodes\" uses it automatically": [
+    "packages/nodeShared/src/components/assetLora.vue"
+  ],
+  "Quality grade of this output": [
+    "packages/nodeShared/src/components/gradeControl.vue"
+  ],
+  "Quality grade": [
+    "packages/nodeShared/src/components/gradeControl.vue"
+  ],
+  "Tick every check to allow L3 or L4.": [
+    "packages/nodeShared/src/components/gradeControl.vue"
+  ],
+  "Under 30% of this node's graded outputs reached L3: fix the prompt and references before generating more.": [
+    "packages/nodeShared/src/components/gradeControl.vue"
+  ],
+  "L1 Discard": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Broken face, deformed limbs or heavy flicker; regenerate": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "L2 Material": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Usable with flaws; keep for B-roll or transitions": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "L3 Main": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "No visible faults; ready for the main cut": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "L4 Hero": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Composition, light and expression all hold up as a still; cover or poster": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Faces are clear and recognisable": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "At most two visible hands, with whole fingers": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Same character and design as the references": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Furniture, ships and buildings keep their structure": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "No conflicting strong light directions": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "No glossy AI look, garbled text or skin blotches": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "No flicker or colour blotches between frames": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Motion has no tearing or melting": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "Length within 1 s of the planned shot": [
+    "packages/nodeShared/src/grading.ts"
+  ],
+  "The set is {0} and must match it exactly.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "{0} is the person shown in {1}.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Draw only the people named in the shot description.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "One single full-frame photograph, not a grid, collage or character sheet.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Faces, hair and clothing match the references exactly; natural skin, sharp focus, no on-screen text.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Character state at the start of this shot: {0}.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "Write a still-frame description of shot {0} ({1}) of the attached shot list as one paragraph of 80 to 200 words, based on that row''s description and action columns: the shot size; the camera position, height and angle from the shot list; and for each person in frame their place in the picture (left, centre or right, foreground or background), posture, action, expression and gaze. Describe only the opening moment. Do not write reference markers, the setting, lighting, style words or anyone''s appearance.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "The people in this shot are exactly: {0}. Describe only them and call them by these names. When only part of someone is in frame, such as a hand, their back or a silhouette, say which part and how it is framed, so the rest of them is not drawn.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "No one is in this shot; describe only the place.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
+  "{0} has no content yet; generate or fill it before using it as a reference.": [
+    "packages/nodeShared/src/useNodeReferences.ts"
+  ],
+  "Unnamed node": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "The prompt names no reference with {{ref N}}, so the model does not know which connected image is which.": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Reference {0} is not connected: this node has {1} references.": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Connected but not named in the prompt, so the model may draw them as extra subjects: {0}. Disconnect the ones this shot does not use.": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "{0} are cells of the same split image ({1}), usually angles of one character; name one per character or the model may draw several people.": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Fix the prompt, or generate this node on its own to send it anyway.": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Reference check": [
+    "packages/nodeShared/src/confirmReferences.ts"
+  ],
+  "Generation cancelled: fix the reference numbers in the prompt first": [
+    "packages/nodeShared/src/confirmReferences.ts"
   ],
   "节点正在生成，请等待完成": [
     "packages/nodeShared/src/useNodeGeneration.ts"
@@ -9140,6 +10400,9 @@
   ],
   "节点 {0} 的输出端口 {1} 值不符合类型声明": [
     "packages/nodeScaffold/src/nodeInputs.ts"
+  ],
+  "The server did not respond, it may have restarted. This generation was stopped; please generate again.": [
+    "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "AI 请求失败（HTTP {0}）": [
     "packages/nodeScaffold/src/nodeAi.ts"

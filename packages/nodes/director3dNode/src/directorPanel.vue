@@ -29,6 +29,15 @@
       </template>
     </div>
     <p class="instructionHint">{{ referenceCount ? `使用 ${referenceCount} 个关键帧生成运镜` : result ? `参考：${result.name}` : '模型动画与运镜同步生成' }}</p>
+    <div v-if="previsStep" class="previsStep">
+      <span v-if="previsStep.running" class="previsStatus"><icon-loader-2 :size="14" class="loadingIcon" />{{ t`Blocking shot ${previsStep.shot} of ${previsStep.total}; the first request also starts Colab and loads the model, about 1–2 minutes` }}</span>
+      <span v-else-if="previsStep.error" class="previsStatus failed"><icon-alert-circle :size="14" />{{ t`Shot ${previsStep.shot} failed: ${previsStep.error}` }}</span>
+      <span v-else-if="previsStep.confirm" class="previsStatus">{{ t`Shot ${previsStep.shot} of ${previsStep.total} is ready: check it, then confirm` }}</span>
+      <span v-else class="previsStatus">{{ t`Previs shot ${previsStep.shot} of ${previsStep.total}` }}</span>
+      <el-button v-if="!previsStep.running" size="small" type="primary" plain :disabled="initializing || tasks.some(task => !task.error) || !model" @click="emit('previsStep')">
+        {{ !previsStep.confirm ? (previsStep.error ? t`Retry shot ${previsStep.shot}` : t`Block shot ${previsStep.shot}`) : previsStep.last ? t`Confirm shot ${previsStep.shot}` : t`Confirm shot ${previsStep.shot} and block the next` }}
+      </el-button>
+    </div>
     <footer class="chatFooter">
       <div class="inputContent"><slot name="input" /></div>
       <div class="inputActions">
@@ -37,6 +46,7 @@
             <el-option v-for="item in provider.models" :key="item.modelId" :label="item.label" :value="JSON.stringify([item.providerId, item.modelId])" />
           </el-option-group>
         </el-select>
+        <el-checkbox v-model="allowMannequins" size="small" :title="translate('Let the AI use jointed mannequins for people; otherwise every person is one cylinder, as previs only blocks positions')">{{ translate("Allow mannequins") }}</el-checkbox>
         <el-button class="sendButton" type="primary" round :disabled="initializing || !prompt.trim() || !model" aria-label="生成动画" @click="sendInstruction">
           <icon-sparkles :size="14" /><span>生成方案</span>
         </el-button>
@@ -47,17 +57,19 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ElButton, ElOption, ElOptionGroup, ElSelect } from "element-plus";
+import { t, translate } from "@toonflow/i18n/vue";
+import { ElButton, ElCheckbox, ElOption, ElOptionGroup, ElSelect } from "element-plus";
 import { IconLoader2, IconSparkles, IconMovie, IconCheck, IconAlertCircle, IconArrowBackUp } from "@tabler/icons-vue";
 import type { NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 
-import type { DirectorPlan, DirectorPlanItem, DirectorGeneration } from "./sceneAnimation";
+import type { DirectorPlan, DirectorPlanItem, DirectorGeneration, PrevisStep } from "./sceneAnimation";
 
-const props = defineProps<{ result?: DirectorPlan; referenceCount: number; initializing: boolean; plans: DirectorPlanItem[]; selectedPlanId: string; tasks: DirectorGeneration[]; models: NodeAiModel[]; modelsLoading: boolean }>();
-const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; send: []; loadModels: [] }>();
+const props = defineProps<{ previsStep?: PrevisStep; result?: DirectorPlan; referenceCount: number; initializing: boolean; plans: DirectorPlanItem[]; selectedPlanId: string; tasks: DirectorGeneration[]; models: NodeAiModel[]; modelsLoading: boolean }>();
+const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; send: []; loadModels: []; previsStep: [] }>();
 const prompt = defineModel<string>("prompt", { default: "" });
 const model = defineModel<string>("model", { default: "" });
+const allowMannequins = defineModel<boolean>("allowMannequins", { default: false });
 const modelGroups = computed(() => groupNodeModels(props.models));
 function sendInstruction() {
   if (props.initializing || !prompt.value.trim() || !model.value) return;
@@ -121,6 +133,26 @@ function sendInstruction() {
 
   .instructionHint { flex-shrink: 0; margin: 12px; font-size: 11px; line-height: 1.5; color: var(--el-text-color-secondary); overflow-wrap: anywhere; }
 
+  .previsStep {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 12px 8px;
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+
+    .previsStatus {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+
+      &.failed { color: var(--el-color-danger); }
+      .loadingIcon { flex-shrink: 0; animation: directorLoading 1.2s linear infinite; }
+    }
+  }
+
   .chatFooter {
     flex-shrink: 0;
     margin: 0 8px 4px;
@@ -173,6 +205,6 @@ function sendInstruction() {
 
 @keyframes directorLoading { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .directorPanel .planContent .loadingIcon { animation: none; }
+  .directorPanel .planContent .loadingIcon, .directorPanel .previsStep .loadingIcon { animation: none; }
 }
 </style>

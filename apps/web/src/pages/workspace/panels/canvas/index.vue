@@ -170,6 +170,7 @@ import { generalSettings } from "@/stores/settings";
 import { getShortcutBindings, shortcutLabel, shortcutMatches, shortcutPressed } from "@/lib/canvasShortcuts";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { dropCanvasFiles, getClipboardMediaFiles, importCanvasFiles, isCanvasFileDrag } from "./canvasDrop";
+import { beginGeneration } from "@/lib/generationGuard";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/minimap/dist/style.css";
@@ -1009,10 +1010,10 @@ onBeforeUnmount(() => {
 });
 
 const nodeWindow = window as typeof window & {
-  toonflowNodeHost?: { vue: typeof vueRuntime; vueFlow: typeof vueFlowRuntime; elementPlus: typeof elementPlusRuntime; three: typeof threeRuntime; i18n: typeof i18nRuntime; ai: { runAgentLoop: typeof runAgentLoop; createAssistantMessageEventStream: typeof createAssistantMessageEventStream; createInitialSystemMessage: typeof createInitialSystemMessage; getCurrentSystemPrompt: typeof getCurrentSystemPrompt; getCurrentTools: typeof getCurrentTools } };
+  toonflowNodeHost?: { vue: typeof vueRuntime; vueFlow: typeof vueFlowRuntime; elementPlus: typeof elementPlusRuntime; three: typeof threeRuntime; i18n: typeof i18nRuntime; ai: { runAgentLoop: typeof runAgentLoop; createAssistantMessageEventStream: typeof createAssistantMessageEventStream; createInitialSystemMessage: typeof createInitialSystemMessage; getCurrentSystemPrompt: typeof getCurrentSystemPrompt; getCurrentTools: typeof getCurrentTools }; generations: { begin: typeof beginGeneration } };
   toonflowNodes?: NodeTypesObject;
 };
-nodeWindow.toonflowNodeHost = { vue: vueRuntime, vueFlow: vueFlowRuntime, elementPlus: elementPlusRuntime, three: threeRuntime, i18n: i18nRuntime, ai: { runAgentLoop, createAssistantMessageEventStream, createInitialSystemMessage, getCurrentSystemPrompt, getCurrentTools } };
+nodeWindow.toonflowNodeHost = { vue: vueRuntime, vueFlow: vueFlowRuntime, elementPlus: elementPlusRuntime, three: threeRuntime, i18n: i18nRuntime, ai: { runAgentLoop, createAssistantMessageEventStream, createInitialSystemMessage, getCurrentSystemPrompt, getCurrentTools }, generations: { begin: beginGeneration } };
 provide("nodeConfig", (nodeType: string) => nodeConfigs.value[nodeType] ?? {});
 provide("workspaceFiles", () => {
   const directory = project.value?.directory;

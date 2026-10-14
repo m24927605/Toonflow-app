@@ -21,7 +21,7 @@ Current stage, authorized continuous production scope, pending items:
 |---|---|---|---|---|---|---|---|
 
 ## Generation attempts
-| Local attempt ID | Asset/segment, node | Prompt snapshot | Model and full effective parameters | Reference files, versions, order, and purposes | Output before the call | Authorized scope and remaining runs | Return and actual file |
+| Local attempt ID | Asset/segment, node | Prompt snapshot | Model and full effective parameters, including attached LoRAs (name, trigger, strength) | Reference files, versions, order, and purposes | Output before the call | Authorized scope and remaining runs | Return and actual file |
 |---|---|---|---|---|---|---|---|
 
 ## Segment adoption

@@ -3,7 +3,8 @@ import { nodeTools, z } from "@toonflow/nodes-scaffold/nodeTools";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
 import type { NodeOutputs } from "@toonflow/nodes-scaffold/values";
 
-export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: () => void, start: () => void) {
+/** `start(batch)` is true for a canvas batch run, where checks fail the node instead of asking, so dialogs do not pile up. */
+export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: () => void, start: (batch: boolean) => void) {
   const status = ref<"idle" | "running" | "succeeded" | "failed">("idle");
   const error = ref("");
   const generating = computed(() => status.value === "running");
@@ -27,7 +28,7 @@ export function useNodeGeneration(outputs: Readonly<Ref<NodeOutputs>>, cancel: (
   });
 
   // Batch generation from the canvas selection; a node that is already generating keeps its current run.
-  useNodeEvent().on("generate", () => { if (!generating.value) start(); });
+  useNodeEvent().on("generate", () => { if (!generating.value) start(true); });
 
   async function run<T>(task: () => Promise<T>): Promise<T> {
     if (generating.value) throw new Error("节点正在生成，请等待完成");

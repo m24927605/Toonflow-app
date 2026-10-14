@@ -82,6 +82,21 @@ export async function readReference(cwd: string, reference: MediaReference, medi
   return { type: "base64", data: bytes.toString("base64"), mimeType, name: reference.path };
 }
 
+// LoRA files are a few hundred MB at most; a safetensors file starts with its header length and a JSON object.
+const maxLoraSize = 1024 * 1024 * 1024;
+
+async function readLora(cwd: string, reference: { path: string; strength?: number }, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  if (!reference.path.toLowerCase().endsWith(".safetensors")) invalid("A LoRA must be a .safetensors file");
+  const { path } = await resolveWorkspacePath(cwd, reference.path);
+  const info = await stat(path);
+  if (!info.isFile() || info.size > maxLoraSize) invalid("A LoRA must be a file no larger than 1 GB");
+  const bytes = await readFile(path, { signal });
+  if (bytes.length < 9 || bytes[8] !== 0x7b) invalid("The LoRA file is not a valid safetensors file");
+  const file: Extract<MediaInput, { type: "binary" }> = { type: "binary", data: bytes, mimeType: "application/octet-stream", name: reference.path };
+  return { file, strength: reference.strength ?? 1 };
+}
+
 async function downloadAsset(url: string, signal?: AbortSignal) {
   if (!/^https?:\/\//i.test(url)) invalid("Generated results must use HTTP or HTTPS URLs");
   const response = await fetch(url, { signal });
@@ -161,6 +176,7 @@ export async function generateMedia(
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("Please configure the provider API Key in the media model settings first");
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
+  const loras = request.loras ? await Promise.all(request.loras.map(item => readLora(directory, item, signal))) : undefined;
   signal?.throwIfAborted();
   const assets = mediaType === "audio"
     ? await provider.generateAudio!({
@@ -168,12 +184,13 @@ export async function generateMedia(
       voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate, duration: request.duration,
     })
     : mediaType === "image"
-    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId })
+    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras })
     : await provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,
       videos: await references(request.videos, "video"), audios: await references(request.audios, "audio"),
       firstFrame: request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined,
       lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
+      loras,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode,
     });
