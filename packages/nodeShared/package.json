@@ -21,6 +21,7 @@
     "./keyframePrompt": "./src/keyframePrompt.ts",
     "./loraTriggers": "./src/loraTriggers.ts",
     "./videoPrompt": "./src/videoPrompt.ts",
+    "./previsInstructions": "./src/previsInstructions.ts",
     "./gradeControl": "./src/components/gradeControl.vue",
     "./grading": "./src/grading.ts",
     "./confirmReferences": "./src/confirmReferences.ts",

@@ -5182,6 +5182,9 @@
   "Not a Toonflow production file": [
     "apps/server/src/utils/production/state.ts"
   ],
+  "The server address is not known yet; try again in a moment": [
+    "apps/server/src/utils/production/previs.ts"
+  ],
   "The model did not list the cast as JSON": [
     "apps/server/src/utils/production/assets.ts"
   ],
@@ -6444,6 +6447,21 @@
   "Drawing the keyframes, the master shot first…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Recording the dialogue…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Blocking every shot in the previs…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Writing the video prompts…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Rendering the clips ({0}/{1})…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Joining the rough cut…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Stopped by an error; Continue tries again": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6462,7 +6480,7 @@
   "Waiting for your review of the keyframes": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "The keyframes are approved. Dubbing and video come in phase 2.": [
+  "The 480p rough cut is ready on the canvas. The final quality, music and subtitles come in the next updates.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Request failed": [
@@ -6498,6 +6516,9 @@
   "Shot {0} keyframe ({1})": [
     "packages/nodes/productionNode/src/index.vue",
     "packages/nodes/textNode/src/index.vue"
+  ],
+  "Rough cut (480p)": [
+    "packages/nodes/productionNode/src/index.vue"
   ],
   "Character photos": [
     "packages/nodes/productionNode/src/index.vue"
@@ -7518,18 +7539,6 @@
     "packages/nodes/textNode/src/index.vue"
   ],
   "This shot list already has a previs node; continue the shots there": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "{0} is the original script and {1} is the shot list.": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "{0} is the shot list.": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "Block shot {0} ({1}) for previs. First build the set at real-world scale from the shot list and the script: the room, the furniture, and every person who appears in any shot as one cylinder named as in the shot list. Then block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "Block shot {0} ({1}) for previs. Keep the set and the people; each person starts where the previous shot left them unless the row says otherwise. Block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Previs": [
@@ -8982,9 +8991,6 @@
   "Every shot of the previs is confirmed; Build shot nodes connects each layout to its keyframe": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
-  "Agent 未修改方案，原方案未修改，请重试。": [
-    "packages/nodes/director3dNode/src/index.vue"
-  ],
   "基础模型已被另一条指令更新，请基于当前模型重试。": [
     "packages/nodes/director3dNode/src/index.vue"
   ],
@@ -9350,6 +9356,9 @@
   ],
   "planId 仅用于只读 history": [
     "packages/nodes/director3dNode/src/agentTools.ts"
+  ],
+  "The director agent left the plan unchanged; try again": [
+    "packages/nodes/director3dNode/src/previsRunner.ts"
   ],
   "拖动调整水平方位": [
     "packages/nodes/director3dNode/src/lightDirection.vue"
@@ -10222,6 +10231,18 @@
   ],
   "Under 30% of this node's graded outputs reached L3: fix the prompt and references before generating more.": [
     "packages/nodeShared/src/components/gradeControl.vue"
+  ],
+  "{0} is the original script and {1} is the shot list.": [
+    "packages/nodeShared/src/previsInstructions.ts"
+  ],
+  "{0} is the shot list.": [
+    "packages/nodeShared/src/previsInstructions.ts"
+  ],
+  "Block shot {0} ({1}) for previs. First build the set at real-world scale from the shot list and the script: the room, the furniture, and every person who appears in any shot as one cylinder named as in the shot list. Then block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
+    "packages/nodeShared/src/previsInstructions.ts"
+  ],
+  "Block shot {0} ({1}) for previs. Keep the set and the people; each person starts where the previous shot left them unless the row says otherwise. Block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts {2} s.": [
+    "packages/nodeShared/src/previsInstructions.ts"
   ],
   "L1 Discard": [
     "packages/nodeShared/src/grading.ts"

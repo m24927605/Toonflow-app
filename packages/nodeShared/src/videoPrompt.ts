@@ -58,7 +58,7 @@ export function fillDialogue(prompt: string, lines: DialogueLine[]) {
  * references and the shot list last, so `scripts` is their count; dialogue is written as [[LINE n]] markers that
  * fillDialogue replaces with the exact words.
  */
-export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; loras?: { name: string; trigger: string }[] }, ids: Map<string, string>) {
+export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; dubbed?: boolean; loras?: { name: string; trigger: string }[] }, ids: Map<string, string>) {
   const shotList = `{{ref ${scripts + 1}}}`;
   const time = `${Number(span.start.toFixed(2))}–${Number(span.end.toFixed(2))} s`;
   const lines = parseDialogue(span.dialogue);
@@ -68,6 +68,7 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
       : `${shotList} is the shot list. Read it completely before writing.`,
     `Write the MiniMax H3 video prompt for shot ${span.shot} (${time}) of the shot list: one continuous ${video.duration}-second shot that starts from that shot's keyframe image, called <Picture 1>.`,
     ...video.previs ? ["The video is also given <Video 1>, this shot's grey-box previs: plain boxes and cylinders that show where each person stands and moves, their positions relative to each other, the timing and the camera move. It is a blocking guide only."] : [],
+    ...video.dubbed && lines.length ? ["The lines are already recorded as <Audio 1>, the shot's complete soundtrack: the speakers lip-sync to it."] : [],
     ...span.row ? [`This is shot ${span.shot}'s row of the shot list${span.header ? ", under its header" : ""}; everything in this shot comes from it:`, ...span.header ? [span.header] : [], span.row] : [],
     "Output exactly this structure and nothing else:",
     "",
@@ -94,6 +95,9 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
       : "- Nobody speaks in this shot: write no dialogue and no speech.",
     "- overall_soundscape: one to three sentences of only the sounds of the scene (ambience, footsteps, objects, fabric, breathing), without dialogue or music; describe the ambience the same way in every shot of the same scene.",
     "- non_diegetic_music is always N/A: no background music, it is added to the finished film later.",
+    ...video.dubbed && lines.length ? [
+      "- Right after the first-frame line, add this sentence exactly: \"<Audio 1>: fully_copy - <Audio 1> is reused 1:1 as the complete final audio track; each speaker says their words in time with <Audio 1>.\"",
+    ] : [],
     ...video.previs ? [
       "- Right after the first-frame line, add this sentence exactly: \"<Video 1> is a grey-box previs used only for blocking: follow where each person stands and moves, their relative positions, the timing and the camera move, but take no shapes, materials, colours, set dressing or markings from it; every person and the set look exactly like <Picture 1>.\"",
       "- Describe the movements and the camera in the same order and timing as <Video 1>.",

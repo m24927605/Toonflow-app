@@ -88,6 +88,7 @@ import { t, translate } from "@toonflow/i18n/vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
+import { previsInstructions } from "@toonflow/node-shared/previsInstructions";
 import { keyframeDescriptionInstructions, masterLine, stateLine, withoutFullStop } from "@toonflow/node-shared/keyframePrompt";
 import { useVueFlow } from "@vue-flow/core";
 import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
@@ -376,17 +377,7 @@ async function createPrevis() {
   const spans = shotSpans(shots, text);
   const scripts = planShotNodes(node.id, text, spans, flow.getNodes.value, flow.getEdges.value, new Set()).scripts.map(item => item.nodeId);
   const sources = [...scripts, node.id];
-  const listRef = `{{ref ${sources.length}}}`;
-  const intro = scripts.length ? t`${scripts.map((_, index) => `{{ref ${index + 1}}}`).join(", ")} is the original script and ${listRef} is the shot list.` : t`${listRef} is the shot list.`;
-  const seconds = (value: number) => Number(value.toFixed(2));
-  const queue = spans.map((span, index) => {
-    const time = `${seconds(span.start)}–${seconds(span.end)}s`;
-    const duration = seconds(span.end - span.start);
-    const task = index === 0
-      ? t`Block shot ${span.shot} (${time}) for previs. First build the set at real-world scale from the shot list and the script: the room, the furniture, and every person who appears in any shot as one cylinder named as in the shot list. Then block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts ${duration} s.`
-      : t`Block shot ${span.shot} (${time}) for previs. Keep the set and the people; each person starts where the previous shot left them unless the row says otherwise. Block only this shot from its row: where each person starts, how they move, and the camera, following its shot size and camera cells. The plan lasts ${duration} s.`;
-    return { shot: span.shot, instruction: [intro, task, ...span.row ? [span.header ?? "", span.row] : []].filter(Boolean).join("\n") };
-  });
+  const queue = previsInstructions(spans, scripts.length).map(item => ({ shot: item.shot, instruction: item.lines.map(line => typeof line === "string" ? line : translate(line)).join("\n") }));
   const id = crypto.randomUUID();
   const first = queue[0]!.instruction;
   flow.addNodes([{ id, type: "remote-director3dNode", position: {

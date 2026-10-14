@@ -5,6 +5,8 @@ import { getConfiguredModel, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { assetDrawn, castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
+import { renderPrevis } from "./previs";
+import { joinRoughCut, renderClips, writeClipPrompts } from "./video";
 import { estimateProduction } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, parseDescriptions, planKeyframes } from "./keyframes";
 import {
@@ -19,9 +21,14 @@ const textModelId = "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive";
 const runners = new Map<string, { controller: AbortController; finished: Promise<void> }>();
 const runnerKey = (cwd: string, id: string) => JSON.stringify([cwd, id]);
 
-async function complete(systemPrompt: string, prompt: string, signal: AbortSignal) {
+function textModel() {
   const model = listAiModels().find(item => item.modelId === textModelId);
   if (!model) throw new Error(`Add the Colab CLI provider with ${textModelId} in Settings first`);
+  return model;
+}
+
+async function complete(systemPrompt: string, prompt: string, signal: AbortSignal) {
+  const model = textModel();
   const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content: prompt, timestamp: Date.now() }] }, signal);
   const message = await stream.result();
   if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
@@ -214,8 +221,38 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     return true;
   }
 
-  // ACT: The production currently ends with the dubbing; the previs, video and rough cut follow.
-  Object.assign(production, { status: "done", message: "dubDone", review: undefined });
+  // Every video needs its shot's previs: the director agent blocks the shots with cylinders in a headless Chrome.
+  if (!production.previs) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
+    const model = textModel();
+    production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+
+  const videoWriter = "You write prompts for the MiniMax H3 video model.";
+  if (!production.videos) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
+    production.videos = await writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, signal));
+    await saveProduction(cwd, production);
+    return true;
+  }
+  // The rough cut is always 480p: cheap to watch through; the chosen final quality is rendered only for approved shots.
+  if (production.videos.some(item => !item.video)) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "roughCut")!.units, signal)) return false;
+    await renderClips(cwd, production, "480p", signal, () => saveProduction(cwd, production));
+    return true;
+  }
+  if (!production.roughCut) {
+    production.roughCut = await joinRoughCut(cwd, production, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+
+  // ACT: The production currently ends with the 480p rough cut; the final quality, music and subtitles follow in phase 3.
+  Object.assign(production, { status: "done", message: "roughCutDone", review: undefined });
   await saveProduction(cwd, production);
   return false;
 }

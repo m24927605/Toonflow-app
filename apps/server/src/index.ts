@@ -30,6 +30,8 @@ stopOrphanedColabSessions().then(
 ).then(resumeRunningProductions).catch(error => console.error("[production] Resuming productions failed:", error));
 const { initializeMcpRuntime } = await import("./utils/mcp/runtime");
 app.listen(realPort, async () => {
+  // Auto production opens its headless previs page here.
+  process.env.TOONFLOW_APP_ORIGIN = `http://localhost:${realPort}`;
   await initializeMcpRuntime(app, `http://127.0.0.1:${realPort}`, resolve(appDirectory, fromSource ? "packages/mcp/src/stdio.ts" : "build/mcp/stdio.js"));
   console.log(`[Server started]: http://localhost:${realPort}`);
   console.log(`[Startup time]: ${(Date.now() - startTime).toFixed(2)}ms`);

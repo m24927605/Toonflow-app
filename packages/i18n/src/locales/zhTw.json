@@ -2524,7 +2524,6 @@
   "返回修改": "返回修改",
   "模型加载失败": "模型載入失敗",
   "预览生成失败": "預覽生成失敗",
-  "Agent 未修改方案，原方案未修改，请重试。": "Agent 未修改方案，原方案未變更，請重試。",
   "基础模型已被另一条指令更新，请基于当前模型重试。": "基礎模型已被另一條指令更新，請基於目前模型重試。",
   "生成失败，请重试": "生成失敗，請重試",
   "文本、图片、视频输入": "文字、圖片、影片輸入",
@@ -3302,8 +3301,16 @@
   "The model did not list the cast as JSON": "模型沒有以 JSON 列出角色與場景",
   "Training LoRAs so faces and places stay the same (about an hour)…": "正在訓練 LoRA，讓臉和場景保持一致（約一小時）…",
   "Drawing the keyframes, the master shot first…": "正在畫關鍵影格，先畫主鏡頭…",
-  "The keyframes are approved. Dubbing and video come in phase 2.": "關鍵影格已通過。配音與影片將在第二階段加入。",
   "The keyframes are on the canvas. Regenerate any you do not like in its own node, then approve.": "關鍵影格已放在畫布上。不滿意的請在該節點重新生成，然後按通過。",
   "Waiting for your review of the keyframes": "等待你審核關鍵影格",
-  "Characters already on the canvas keep their look: {0}": "畫布上已有的角色會沿用原本的樣子：{0}"
+  "Characters already on the canvas keep their look: {0}": "畫布上已有的角色會沿用原本的樣子：{0}",
+  "The director agent left the plan unchanged; try again": "導演 Agent 沒有修改方案，原方案未變，請重試。",
+  "Recording the dialogue…": "正在錄製台詞…",
+  "Blocking every shot in the previs…": "正在為每一鏡做預演走位…",
+  "Writing the video prompts…": "正在寫影片提示詞…",
+  "Rendering the clips ({0}/{1})…": "正在生成影片片段（{0}/{1}）…",
+  "Joining the rough cut…": "正在剪接粗剪…",
+  "The 480p rough cut is ready on the canvas. The final quality, music and subtitles come in the next updates.": "480p 粗剪已放在畫布上。成片畫質、配樂與字幕將在後續更新中加入。",
+  "Rough cut (480p)": "粗剪（480p）",
+  "The server address is not known yet; try again in a moment": "伺服器位址還未就緒，請稍後再試"
 }

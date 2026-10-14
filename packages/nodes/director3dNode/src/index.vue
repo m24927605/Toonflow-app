@@ -34,8 +34,7 @@ import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
 import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, createTurnaround, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
-import { createDirectorDraft } from "./agentTools";
-import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
+import { planShot, runPrevis } from "./previsRunner";
 import { anchorSchema, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
 import { directorPlanSchema, prepareSceneAnimation, type DirectorPlan, type DirectorGeneration } from "./sceneAnimation";
 import { renderImage, renderVideo, type RenderPass } from "./renderMedia";
@@ -51,6 +50,8 @@ type ModelDocument = z.infer<typeof modelDocumentSchema>;
 defineOptions({
   inheritAttrs: false,
   icon: IconCube3dSphere,
+  // The headless previs runner of auto production loads this plugin and calls it, without a canvas.
+  runPrevis,
   handles: [{ id: "in", type: "target", dataType: ["STRING", "IMAGE", "VIDEO"], label: "文本、图片、视频输入" }] satisfies NodeHandle[],
 });
 const { node, nodeProps, previewReady, ai, files, nodeEvent } = useNode({ label: "3D导演台" });
@@ -456,32 +457,16 @@ async function generate(previsShot?: number) {
     const mediaReferences = refList.value
       .filter(item => item.value !== undefined && (item.dataType === "STRING" || item.dataType === "IMAGE" || item.dataType === "VIDEO"))
       .map(item => item.dataType === "STRING" ? { dataType: item.dataType, value: item.value } : { dataType: item.dataType, value: { ...item.value } });
-    const references = anchors.value.map((value, index) => {
-      const { camera, controls } = anchorSchema.parse(value);
-      return { order: index + 1, camera, controls };
-    });
-    const basePlan = selectedPlan.value;
-    const draft = createDirectorDraft(
-      JSON.parse(JSON.stringify(baseScene)),
-      basePlan ? directorPlanSchema.parse({ name: basePlan.name, duration: basePlan.duration, tracks: basePlan.tracks, cameraFrames: basePlan.cameraFrames }) : undefined,
-      JSON.parse(JSON.stringify(plans.value)),
-      allowMannequins.value,
-    );
     const directory = mediaReferences.some(item => item.dataType !== "STRING") ? (await workspaceFiles.list()).directory : undefined;
     if (disposed) return;
-    await ai.generate({
-      references: mediaReferences,
-      providerId: choice.providerId,
-      modelId: choice.modelId,
-      systemPrompt: `${directorPrompt}\n${allowMannequins.value ? mannequinsAllowed : mannequinsForbidden}`,
-      prompt: JSON.stringify({ instruction: requirement, references, selectedPlanId: basePlanId, document: draft.summary() }),
-      directory,
-      tools: draft.tools,
+    const result = await planShot({
+      generate: request => ai.generate(request), providerId: choice.providerId, modelId: choice.modelId, instruction: requirement,
+      scene: baseScene, basePlan: selectedPlan.value, plans: plans.value, allowMannequins: allowMannequins.value,
+      anchors: anchors.value, selectedPlanId: basePlanId, references: mediaReferences, directory,
     });
     if (disposed) return;
-    if (!draft.edited) throw new Error("Agent 未修改方案，原方案未修改，请重试。");
-    const result = draft.read();
-    const nextScene = draft.sceneChanged ? result.scene : baseScene;
+    const nextScene = result.scene;
+    const draft = { sceneChanged: result.sceneChanged };
     const plan = { ...result.plan, id: task.id, instruction: requirement };
     // Tools only edit the draft; when done, verify the actual render, and replace the current plan only once persisted.
     const previewLighting = { ...getSceneLighting(nextScene), ...data.value.lighting };

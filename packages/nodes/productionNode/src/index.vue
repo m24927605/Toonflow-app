@@ -103,6 +103,7 @@ type Production = {
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
   keyframes?: { master: number; shots: Keyframe[] };
+  dub?: unknown; clips?: unknown; previs?: unknown; videos?: { shot: number; video?: string }[]; roughCut?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
@@ -116,6 +117,7 @@ type Data = {
   // rows of images start, below everything that was on the canvas when the first of them was placed.
   images?: Record<string, string>;
   top?: number;
+  roughCut?: string;
   keyframes?: Record<number, string>;
   // The budget follows the estimate until someone sets it (`budgetSet`).
   form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; reviewKeyframes: boolean; names: Record<string, string> };
@@ -166,7 +168,12 @@ const headline = computed(() => {
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
     if (!production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views))) return translate("Designing the characters and places…");
     if (assets.some(item => !item.loras)) return translate("Training LoRAs so faces and places stay the same (about an hour)…");
-    return translate("Drawing the keyframes, the master shot first…");
+    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
+    if (!production.clips) return translate("Recording the dialogue…");
+    if (!production.previs) return translate("Blocking every shot in the previs…");
+    if (!production.videos) return translate("Writing the video prompts…");
+    if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
+    return translate("Joining the rough cut…");
   }
   if (production.status === "failed") return translate("Stopped by an error; Continue tries again");
   return ({
@@ -175,7 +182,7 @@ const headline = computed(() => {
     balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
     stopped: translate("Stopped"),
     reviewKeyframes: translate("Waiting for your review of the keyframes"),
-    keyframesDone: translate("The keyframes are approved. Dubbing and video come in phase 2."),
+    roughCutDone: translate("The 480p rough cut is ready on the canvas. The final quality, music and subtitles come in the next updates."),
   } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
 });
 
@@ -315,6 +322,16 @@ async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
   }
 }
 
+/** Puts the rough cut on the canvas as a video node to the right of this node, once. */
+function syncRoughCut(path: string) {
+  if (data.value.roughCut) return;
+  const nodeId = crypto.randomUUID();
+  flow.addNodes([{ id: nodeId, type: "remote-videoNode", position: { x: node.computedPosition.x - 520, y: node.computedPosition.y }, data: {
+    label: translate("Rough cut (480p)"), outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType: "video/mp4" } } },
+  } }]);
+  data.value.roughCut = nodeId;
+}
+
 async function refresh() {
   if (!data.value.started) return;
   try {
@@ -323,6 +340,7 @@ async function refresh() {
     if (state.value.shotList) syncText("shotList", state.value.shotList);
     if (state.value.production.assets) syncAssets(state.value.production.assets);
     if (state.value.production.keyframes) await syncKeyframes(state.value.production.keyframes);
+    if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut);
     newBudget.value ??= state.value.production.input.budget;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));

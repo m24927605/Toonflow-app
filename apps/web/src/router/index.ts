@@ -24,6 +24,11 @@ const router = createRouter({
       path: "/workspace",
       component: () => import("@/pages/workspace/index.vue"),
     },
+    {
+      // Opened only by the server's headless browser during auto production.
+      path: "/previs-runner",
+      component: () => import("@/pages/previsRunner/index.vue"),
+    },
   ],
 });
 export default router;
