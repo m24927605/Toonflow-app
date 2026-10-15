@@ -1,7 +1,7 @@
 import { translate } from "@toonflow/i18n";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
-import { getConfiguredModel, listAiModels, streamAi } from "@/utils/ai";
+import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { assetDrawn, castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
@@ -226,7 +226,15 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
     const model = textModel();
-    production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+    // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's render
+    // can outlast the session's idle stop: the model is loaded here first and its session held until previs ends.
+    const release = holdColab();
+    try {
+      await complete("Reply with OK.", "OK?", signal);
+      production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+    } finally {
+      release();
+    }
     await saveProduction(cwd, production);
     return true;
   }

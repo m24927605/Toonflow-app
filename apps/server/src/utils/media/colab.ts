@@ -114,6 +114,9 @@ export async function stopOrphanedColabSessions() {
 
 const tail = (text: string, length = 3000) => stripVTControlCharacters(text).trim().slice(-length);
 
+const idempotent = new Set(["upload", "download", "sessions", "usage"]);
+const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost/;
+
 async function colab(command: string, args: string[], signal?: AbortSignal) {
   for (let attempt = 1; ; attempt++) {
     const child = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal });
@@ -124,6 +127,12 @@ async function colab(command: string, args: string[], signal?: AbortSignal) {
     // Parallel jobs share the CLI's local session database, which another CLI process can hold for a moment.
     if (stderr.includes("unable to open database") && attempt < 5) {
       await scheduler.wait(attempt * 3_000, { signal });
+      continue;
+    }
+    // A dropped connection to the VM fails a whole job for a moment's network trouble; transfers and reads can simply
+    // run again, while an exec may already have run and is left to its own recovery.
+    if (idempotent.has(args[0]!) && transient.test(stderr) && attempt < 4) {
+      await scheduler.wait(attempt * 10_000, { signal });
       continue;
     }
     throw new Error(tail(`${stdout}\n${stderr}`, 2000) || `Colab CLI exited with code ${child.exitCode}`);
@@ -555,6 +564,21 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     });
   }
 
+  /**
+   * Keeps an open session from its idle stop, as a running job does, until the returned release is called; for a
+   * caller whose jobs come with gaps longer than `idleMs` in between. The caller must release in a finally block.
+   */
+  function hold() {
+    clearTimeout(idleTimer);
+    pending++;
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      if (--pending === 0 && session) scheduleIdleStop();
+    };
+  }
+
   /** Stops the session now, cancelling the running job and every queued one. */
   function stop() {
     clearTimeout(idleTimer);
@@ -563,7 +587,7 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     return enqueue(() => close());
   }
 
-  return { run, stop };
+  return { run, hold, stop };
 }
 
 /** A random seed with 53 bits, so it stays exact as a JavaScript number. */
