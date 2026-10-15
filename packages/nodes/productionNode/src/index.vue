@@ -34,6 +34,10 @@
             <el-checkbox v-model="form.reviewScript">{{ translate("Let me review the script") }}</el-checkbox>
             <el-checkbox v-model="form.reviewKeyframes">{{ translate("Let me review the keyframes") }}</el-checkbox>
           </div>
+          <div class="formRow">
+            <el-checkbox v-model="form.subtitles">{{ translate("Subtitles from the dialogue") }}</el-checkbox>
+            <el-checkbox v-model="form.music" :title="translate('Suno composes the score; it bills your sunoapi.org account, not Colab compute units')">{{ translate("Music by Suno (billed by sunoapi.org)") }}</el-checkbox>
+          </div>
           <div v-if="quote" class="quote">
             <span>{{ t`Estimated cost: about ${quote.total} Colab compute units for ${quote.shots} shots.` }}</span>
             <label>{{ translate("Spend at most (units)") }} <el-input-number :modelValue="form.budget" size="small" :min="1" :max="1000" :step="1" controlsPosition="right" @update:modelValue="setBudget" /></label>
@@ -94,7 +98,7 @@ type Ratio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
 type Estimate = { shots: number; total: number; steps: { step: string; units: number }[] };
 type Production = {
   id: string;
-  input: { budget: number; seconds: number; ratio: Ratio };
+  input: { budget: number; seconds: number; ratio: Ratio; quality: Quality };
   status: "running" | "waiting" | "failed" | "done";
   message?: string;
   detail?: string;
@@ -103,12 +107,13 @@ type Production = {
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
   keyframes?: { master: number; shots: Keyframe[] };
-  dub?: unknown; clips?: unknown; previs?: unknown; videos?: { shot: number; video?: string }[]; roughCut?: string;
+  dub?: unknown; clips?: unknown; previs?: { shot: number; depth: string }[]; videos?: { shot: number; video?: string }[]; roughCut?: string;
+  finals?: { shot: number; video?: string }[]; music?: string; film?: string; report?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
-type State = { production: Production; script?: string; shotList?: string; estimate: Estimate };
-type TextKind = "script" | "shotList";
+type State = { production: Production; script?: string; shotList?: string; report?: string; estimate: Estimate };
+type TextKind = "script" | "shotList" | "report";
 // `texts` are the text nodes this production made, each with the text last put into it, so a revision by the AI
 // replaces it only while nobody has edited it.
 type Data = {
@@ -118,9 +123,10 @@ type Data = {
   images?: Record<string, string>;
   top?: number;
   roughCut?: string;
+  film?: string;
   keyframes?: Record<number, string>;
   // The budget follows the estimate until someone sets it (`budgetSet`).
-  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; reviewKeyframes: boolean; names: Record<string, string> };
+  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; reviewKeyframes: boolean; subtitles: boolean; music: boolean; names: Record<string, string> };
   started?: boolean;
 };
 
@@ -130,7 +136,7 @@ const { id, node, nodeProps, files } = useNode({ label: "Auto production" });
 const flow = useVueFlow();
 const { refList } = useNodeReferences();
 const data = computed(() => node.data as typeof node.data & Data);
-data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, reviewKeyframes: true, names: {} };
+data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, reviewKeyframes: true, subtitles: true, music: false, names: {} };
 const form = reactive(data.value.form);
 const state = ref<State>();
 const quote = ref<Estimate>();
@@ -173,7 +179,11 @@ const headline = computed(() => {
     if (!production.clips) return translate("Recording the dialogue…");
     if (!production.videos) return translate("Writing the video prompts…");
     if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
-    return translate("Joining the rough cut…");
+    if (!production.roughCut) return translate("Joining the rough cut…");
+    const finals = production.finals ?? [];
+    if (production.input.quality !== "480p" && (!production.finals || finals.some(item => !item.video))) return t`Rendering the clips at ${production.input.quality} (${finals.filter(item => item.video).length}/${production.videos.length})…`;
+    if (!production.film) return translate("Finishing the film: music, sound levels and subtitles…");
+    return translate("Writing the delivery report…");
   }
   if (production.status === "failed") return translate("Stopped by an error; Continue tries again");
   return ({
@@ -182,7 +192,7 @@ const headline = computed(() => {
     balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
     stopped: translate("Stopped"),
     reviewKeyframes: translate("Waiting for your review of the keyframes"),
-    roughCutDone: translate("The 480p rough cut is ready on the canvas. The final quality, music and subtitles come in the next updates."),
+    filmDone: translate("The film and its delivery report are ready on the canvas."),
   } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
 });
 
@@ -225,7 +235,7 @@ async function start() {
   try {
     await api("create", {
       directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality, budget: form.budget,
-      gates: [...form.reviewScript ? ["script"] : [], ...form.reviewKeyframes ? ["keyframes"] : []],
+      gates: [...form.reviewScript ? ["script"] : [], ...form.reviewKeyframes ? ["keyframes"] : []], subtitles: form.subtitles, music: form.music,
       photos: [...photos.value.map(photo => ({ name: form.names[photo.key]!.trim(), path: photo.url })), ...canvasCast.value.map(item => ({ name: item.name, path: item.url }))],
     });
     data.value.started = true;
@@ -258,8 +268,10 @@ function syncText(kind: TextKind, text: string) {
   const source = kind === "shotList" && texts.script ? flow.findNode(texts.script.node) : undefined;
   const anchor = source ?? node;
   const nodeId = crypto.randomUUID();
-  flow.addNodes([{ id: nodeId, type: "remote-textNode", position: { x: anchor.computedPosition.x + (anchor.dimensions.width || 360) + 120, y: anchor.computedPosition.y }, data: {
-    label: kind === "script" ? translate("Script") : translate("Shot list"), outputs: {}, textSnapshot: text, role: kind,
+  // The report goes below the script, which sits right of this node too.
+  flow.addNodes([{ id: nodeId, type: "remote-textNode", position: { x: anchor.computedPosition.x + (anchor.dimensions.width || 360) + 120, y: anchor.computedPosition.y + (kind === "report" ? 720 : 0) }, data: {
+    label: { script: translate("Script"), shotList: translate("Shot list"), report: translate("Delivery report") }[kind], outputs: {}, textSnapshot: text,
+    ...kind === "report" ? {} : { role: kind },
   } }]);
   if (source) flow.addEdges([{ id: crypto.randomUUID(), source: source.id, sourceHandle: "text", target: nodeId, targetHandle: "in" }]);
   texts[kind] = { node: nodeId, synced: text };
@@ -294,9 +306,10 @@ function syncAssets(assets: NonNullable<Production["assets"]>) {
 
 /**
  * Puts the keyframes on the canvas as image generation nodes with their shot number, prompt, LoRAs and references
- * connected in prompt order, so any of them can be adjusted and regenerated by hand.
+ * connected in prompt order, so any of them can be adjusted and regenerated by hand: the depth model's first
+ * reference is the shot's previs depth map, placed below its keyframe.
  */
-async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
+async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>, previs: NonNullable<Production["previs"]>) {
   const placed = data.value.keyframes ??= {};
   const ready = keyframes.shots.filter(item => item.image && item.prompt && !placed[item.shot]);
   if (!ready.length) return;
@@ -306,6 +319,14 @@ async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
   const top = (data.value.top ??= Math.max(...flow.getNodes.value.map(entry => entry.computedPosition.y + (entry.dimensions.height || 240))) + 160) + rows * 320;
   // The master keyframe is placed first, so the others can connect to it.
   for (const item of [...ready].sort((a, b) => Number(b.shot === keyframes.master) - Number(a.shot === keyframes.master))) {
+    const depth = previs.find(shot => shot.shot === item.shot)?.depth;
+    if (depth && !data.value.images?.[depth]) {
+      const depthId = crypto.randomUUID();
+      flow.addNodes([{ id: depthId, type: "remote-imageNode", position: { x: node.computedPosition.x + (item.shot - 1) * 400, y: top + 360 }, data: {
+        label: t`Shot ${item.shot} previs depth`, role: "layout", shot: item.shot, outputs: { image: { dataType: "IMAGE", value: { url: depth, mimeType: mimeOf(depth) } } },
+      } }]);
+      (data.value.images ??= {})[depth] = depthId;
+    }
     const sources = item.references!.map(path => data.value.images?.[path] ?? keyframes.shots.flatMap(other => other.image === path && placed[other.shot] ? [placed[other.shot]!] : [])[0]);
     if (sources.some(source => !source)) continue;
     const nodeId = crypto.randomUUID();
@@ -315,13 +336,23 @@ async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>) {
     });
     flow.addNodes([{ id: nodeId, type: "remote-imageGenerationNode", position: { x: node.computedPosition.x + (item.shot - 1) * 400, y: top }, data: {
       label: t`Shot ${item.shot} keyframe (${item.time})`, role: "keyframe", shot: item.shot, prompt: item.prompt, promptModel: item.prompt!.split("\n").map(text => [{ type: "Write", text }]),
-      model: JSON.stringify(["qwenImage", "qwen_image_2_1_turbo"]), ratio: state.value?.production.input.ratio ?? "16:9", size: "1K", loras,
+      model: JSON.stringify(["qwenImage", "qwen_image_2_1_turbo_depth"]), ratio: state.value?.production.input.ratio ?? "16:9", size: "1K", loras,
       outputs: { image: { dataType: "IMAGE", value: { url: item.image, mimeType: mimeOf(item.image!) } } },
       referenceOrder: { in: sources.map(source => encodeURIComponent(JSON.stringify([source, "image"]))) },
     } }]);
     flow.addEdges(sources.map(source => ({ id: crypto.randomUUID(), source: source!, sourceHandle: "image", target: nodeId, targetHandle: "in" })));
     placed[item.shot] = nodeId;
   }
+}
+
+/** Puts the finished film on the canvas as a video node below the rough cut, once. */
+function syncFilm(path: string, quality: Quality) {
+  if (data.value.film) return;
+  const nodeId = crypto.randomUUID();
+  flow.addNodes([{ id: nodeId, type: "remote-videoNode", position: { x: node.computedPosition.x - 520, y: node.computedPosition.y + 360 }, data: {
+    label: t`Film (${quality})`, outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType: "video/mp4" } } },
+  } }]);
+  data.value.film = nodeId;
 }
 
 /** Puts the rough cut on the canvas as a video node to the right of this node, once. */
@@ -341,8 +372,10 @@ async function refresh() {
     if (state.value.script) syncText("script", state.value.script);
     if (state.value.shotList) syncText("shotList", state.value.shotList);
     if (state.value.production.assets) syncAssets(state.value.production.assets);
-    if (state.value.production.keyframes) await syncKeyframes(state.value.production.keyframes);
+    if (state.value.production.keyframes && state.value.production.previs) await syncKeyframes(state.value.production.keyframes, state.value.production.previs);
     if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut);
+    if (state.value.production.film) syncFilm(state.value.production.film, state.value.production.input.quality);
+    if (state.value.report) syncText("report", state.value.report);
     newBudget.value ??= state.value.production.input.budget;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));

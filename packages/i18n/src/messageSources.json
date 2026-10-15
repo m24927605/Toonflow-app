@@ -5188,6 +5188,74 @@
   "The model did not list the cast as JSON": [
     "apps/server/src/utils/production/assets.ts"
   ],
+  "Production report": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Film: {0}, {1}, {2} shots.": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Colab compute units: {0} spent of a {1} budget (estimate {2}); the balance shows spending a few minutes late.": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Dialogue: Gemini TTS, billed by the Google account.": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Music: Suno V6, billed by the sunoapi.org account.": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Shots": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Shot": [
+    "apps/server/src/utils/production/engine.ts",
+    "packages/nodes/textNode/src/shotNodesDialog.vue",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Keyframe": [
+    "apps/server/src/utils/production/engine.ts",
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Clip": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Keyframe seed": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Clip seed": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "LoRAs": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Name": [
+    "apps/server/src/utils/production/engine.ts",
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Model": [
+    "apps/server/src/utils/production/engine.ts",
+    "packages/nodes/loraTrainingNode/src/index.vue"
+  ],
+  "Trigger word": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "File": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "None.": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Models": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Script, shot list, descriptions and prompts: {0} on Colab": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Keyframes and designs: Qwen-Image 2.1 Turbo on Colab, keyframes with previs depth control": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Video: MiniMax H3 on Colab, lip-synced to the dubbed lines": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "This production is not waiting for a review": [
     "apps/server/src/utils/production/engine.ts"
   ],
@@ -6402,6 +6470,15 @@
   "Let me review the keyframes": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Subtitles from the dialogue": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Suno composes the score; it bills your sunoapi.org account, not Colab compute units": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Music by Suno (billed by sunoapi.org)": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Estimated cost: about {0} Colab compute units for {1} shots.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6468,6 +6545,15 @@
   "Joining the rough cut…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Rendering the clips at {0} ({1}/{2})…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Finishing the film: music, sound levels and subtitles…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Writing the delivery report…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Stopped by an error; Continue tries again": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6486,7 +6572,7 @@
   "Waiting for your review of the keyframes": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "The 480p rough cut is ready on the canvas. The final quality, music and subtitles come in the next updates.": [
+  "The film and its delivery report are ready on the canvas.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Request failed": [
@@ -6519,9 +6605,18 @@
     "packages/nodes/textNode/src/shotNodesDialog.vue",
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
+  "Delivery report": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Shot {0} previs depth": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Shot {0} keyframe ({1})": [
     "packages/nodes/productionNode/src/index.vue",
     "packages/nodes/textNode/src/index.vue"
+  ],
+  "Film ({0})": [
+    "packages/nodes/productionNode/src/index.vue"
   ],
   "Rough cut (480p)": [
     "packages/nodes/productionNode/src/index.vue"
@@ -7824,10 +7919,6 @@
   "Tick a person even when only part of them is in frame, such as a hand, their back or a silhouette, so their skin, hair and clothing stay consistent.": [
     "packages/nodes/textNode/src/shotNodesDialog.vue"
   ],
-  "Shot": [
-    "packages/nodes/textNode/src/shotNodesDialog.vue",
-    "packages/nodeShared/src/components/roleSelect.vue"
-  ],
   "Character state": [
     "packages/nodes/textNode/src/shotNodesDialog.vue"
   ],
@@ -8821,13 +8912,7 @@
   "What the LoRA learns": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
-  "Model": [
-    "packages/nodes/loraTrainingNode/src/index.vue"
-  ],
   "Video and image (recommended)": [
-    "packages/nodes/loraTrainingNode/src/index.vue"
-  ],
-  "Name": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
   "What the picture is, e.g. a close-up photo of a person who is": [
@@ -10191,9 +10276,6 @@
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
   "Every image of the same place keeps the same name; a scene LoRA with this name loads with its keyframes": [
-    "packages/nodeShared/src/components/roleSelect.vue"
-  ],
-  "Keyframe": [
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
   "Previs layout": [

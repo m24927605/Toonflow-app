@@ -17,6 +17,8 @@ export default Router().post("/", validateFields({
   budget: z.number().positive().max(1000),
   gates: z.array(z.enum(u.production.productionGates)).max(2),
   photos: z.array(z.strictObject({ name: z.string().trim().min(1).max(64), path: z.string().min(1).max(4096) })).max(20),
+  subtitles: z.boolean(),
+  music: z.boolean(),
 }), async (req, res) => {
   // Only Toonflow pages may spend the Colab plan.
   u.mcpControl.assertAppRequest(req);
@@ -28,7 +30,7 @@ export default Router().post("/", validateFields({
     res.status(409).json(error("This node already has a production"));
     return;
   }
-  const { outline, seconds, ratio, quality, budget, gates, photos } = input;
-  await u.production.createProduction(cwd, id, { outline: outline.trim(), seconds, ratio, quality, budget, gates, photos });
+  const { outline, seconds, ratio, quality, budget, gates, photos, subtitles, music } = input;
+  await u.production.createProduction(cwd, id, { outline: outline.trim(), seconds, ratio, quality, budget, gates, photos, subtitles, music });
   res.json(success({ id }));
 });

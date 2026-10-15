@@ -1,4 +1,4 @@
-import { translate } from "@toonflow/i18n";
+import { t, translate } from "@toonflow/i18n";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
@@ -7,7 +7,7 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
-import { joinRoughCut, renderClips, writeClipPrompts } from "./video";
+import { finishFilm, joinRoughCut, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { estimateProduction } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes } from "./keyframes";
 import {
@@ -275,7 +275,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   // The rough cut is always 480p: cheap to watch through; the chosen final quality is rendered only for approved shots.
   if (production.videos.some(item => !item.video)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "roughCut")!.units, signal)) return false;
-    await renderClips(cwd, production, "480p", signal, () => saveProduction(cwd, production));
+    await renderClips(cwd, production, production.videos, "480p", "clips", signal, () => saveProduction(cwd, production));
     return true;
   }
   if (!production.roughCut) {
@@ -284,10 +284,90 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     return true;
   }
 
-  // ACT: The production currently ends with the 480p rough cut; the final quality, music and subtitles follow in phase 3.
-  Object.assign(production, { status: "done", message: "roughCutDone", review: undefined });
+  // The film: the clips render again at the chosen quality with the rough cut's prompts and seeds, so the shots keep
+  // what the rough cut showed; a 480p film uses the rough cut's clips.
+  if (production.input.quality !== "480p" && !production.finals) {
+    production.finals = production.videos.map(({ shot, prompt, seed }) => ({ shot, prompt, seed }));
+    await saveProduction(cwd, production);
+    return true;
+  }
+  if (production.finals?.some(item => !item.video)) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "final")!.units, signal)) return false;
+    await renderClips(cwd, production, production.finals, production.input.quality, "final", signal, () => saveProduction(cwd, production));
+    return true;
+  }
+  if (production.input.music && !production.music) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const seconds = production.clips.reduce((sum, item) => sum + item.clip, 0);
+    const style = await complete(composer, musicPrompt(await readProductionText(cwd, production.script), seconds), signal);
+    production.music = await scoreFilm(cwd, production, style, seconds, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+  if (!production.film) {
+    production.film = await finishFilm(cwd, production, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+  if (!production.report) {
+    production.report = await deliveryReport(cwd, production, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+  Object.assign(production, { status: "done", message: "filmDone", review: undefined });
   await saveProduction(cwd, production);
   return false;
+}
+
+const composer = "You describe film scores for a music generation model.";
+
+/** Asks for the Suno style prompt of an instrumental score that follows the story under its dialogue. */
+function musicPrompt(script: string, seconds: number) {
+  return [
+    `Describe the instrumental score of the short film below as a style prompt for a music model, in English: genre, instruments, tempo, and how the mood moves over its ${seconds} seconds with the story. It plays under the dialogue, so keep it sparse and soft.`,
+    "No vocals, no lyrics, no names of artists or songs. At most 600 characters. Output only the description.",
+    "",
+    "Screenplay:",
+    script,
+  ].join("\n");
+}
+
+/** The delivery report in the interface language: the film, what it cost, each shot's files and seeds, the LoRAs and models used. */
+async function deliveryReport(cwd: string, production: Production, signal: AbortSignal) {
+  const balance = await readColabBalance(signal).catch(() => undefined);
+  const spent = balance !== undefined && production.balanceAtStart !== undefined ? (production.balanceAtStart - balance).toFixed(2) : "?";
+  const clips = production.finals ?? production.videos!;
+  const loras = [...production.assets!.characters, ...production.assets!.places].flatMap(asset => (asset.loras ?? []).map(lora => `| ${asset.name} | ${lora.family} | ${lora.trigger} | ${lora.path} |`));
+  const lines = [
+    `# ${t`Production report`}`,
+    "",
+    t`Film: ${production.film}, ${production.input.quality}, ${clips.length} shots.`,
+    t`Colab compute units: ${spent} spent of a ${production.input.budget} budget (estimate ${production.estimate}); the balance shows spending a few minutes late.`,
+    t`Dialogue: Gemini TTS, billed by the Google account.`,
+    ...production.music ? [t`Music: Suno V6, billed by the sunoapi.org account.`] : [],
+    "",
+    `## ${t`Shots`}`,
+    "",
+    `| ${t`Shot`} | ${t`Keyframe`} | ${t`Clip`} | ${t`Keyframe seed`} | ${t`Clip seed`} |`,
+    "| --- | --- | --- | --- | --- |",
+    ...production.keyframes!.shots.map(item => {
+      const clip = clips.find(other => other.shot === item.shot);
+      return `| ${item.shot} | ${item.image ?? ""} | ${clip?.video ?? ""} | ${item.seed ?? ""} | ${clip?.seed ?? ""} |`;
+    }),
+    "",
+    `## ${t`LoRAs`}`,
+    "",
+    ...loras.length ? [`| ${t`Name`} | ${t`Model`} | ${t`Trigger word`} | ${t`File`} |`, "| --- | --- | --- | --- |", ...loras] : [t`None.`],
+    "",
+    `## ${t`Models`}`,
+    "",
+    `- ${t`Script, shot list, descriptions and prompts: ${textModel().modelId} on Colab`}`,
+    `- ${t`Keyframes and designs: Qwen-Image 2.1 Turbo on Colab, keyframes with previs depth control`}`,
+    `- ${t`Video: MiniMax H3 on Colab, lip-synced to the dubbed lines`}`,
+  ];
+  const path = `${productionDirectory(production.id)}/report.md`;
+  await writeProductionText(cwd, path, `${lines.join("\n")}\n`);
+  return path;
 }
 
 /** Runs a production in the background until it waits, fails or finishes; a second call while it runs does nothing. */

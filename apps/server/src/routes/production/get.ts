@@ -15,6 +15,6 @@ export default Router().get("/", validateFields({ directory: z.string().min(1).m
   // A production left running by a stopped runner, such as after a server restart, continues when its page looks.
   if (production.status === "running" && !u.production.isProductionRunning(cwd, id)) u.production.runProduction(cwd, id);
   const read = (text?: { path: string }) => text ? u.production.readProductionText(cwd, text) : undefined;
-  const [script, shotList] = await Promise.all([read(production.script), read(production.shotList)]);
-  res.json(success({ production, script, shotList, estimate: await u.production.quoteProduction(cwd, production.input) }));
+  const [script, shotList, report] = await Promise.all([read(production.script), read(production.shotList), read(production.report ? { path: production.report } : undefined)]);
+  res.json(success({ production, script, shotList, report, estimate: await u.production.quoteProduction(cwd, production.input) }));
 });

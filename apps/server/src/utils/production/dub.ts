@@ -22,7 +22,8 @@ const clipSeconds = (seconds: number) => Math.min(15, Math.max(4, Math.ceil(seco
 export type ProductionDub = {
   /** Each speaking person's Gemini voice and the delivery the cast description gives them. */
   voices: Record<string, { voice: string; style: string }>;
-  shots: { shot: number; seconds: number; lines: { speaker: string; words: string; path?: string; seconds?: number }[]; track?: string }[];
+  /** `start` is when a line begins in its shot's track, which the film's subtitles follow. */
+  shots: { shot: number; seconds: number; lines: { speaker: string; words: string; path?: string; seconds?: number; start?: number }[]; track?: string }[];
 };
 
 /** Plans the lines of every shot and gives each speaker a voice: female or male by their look, distinct per person. */
@@ -66,7 +67,11 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
     const inputs = shot.lines.map(line => line.path!);
     // Each line is delayed to its place after the lead and the lines before it, then all are mixed into one track.
     let at = lead;
-    const delays = shot.lines.map(line => { const start = at; at += line.seconds! + gap; return start; });
+    const delays = shot.lines.map(line => {
+      line.start = at;
+      at += line.seconds! + gap;
+      return line.start;
+    });
     shot.seconds = Math.max(shot.seconds, at + lead);
     // The track runs the whole clip, silence after the last line, since H3 takes it as the clip's complete soundtrack.
     const filters = [

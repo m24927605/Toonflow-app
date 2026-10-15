@@ -24,6 +24,10 @@ export type ProductionInput = {
   gates: ProductionGate[];
   /** Photos of characters the user already has, by the name the outline uses. */
   photos: { name: string; path: string }[];
+  /** Burns the dialogue into the film as subtitles. */
+  subtitles: boolean;
+  /** Scores the film with Suno music, which bills the sunoapi.org account rather than Colab units. */
+  music: boolean;
 };
 
 /** A text the production writes, which a person can rewrite; `manual` texts are never rewritten by the engine. */
@@ -64,6 +68,13 @@ export type Production = {
   roughCut?: string;
   /** Each shot's clip length in whole seconds, set by its dubbed lines. */
   clips?: { shot: number; clip: number }[];
+  /** The clips rendered again at the final quality, with the rough cut's prompts and seeds; absent at 480p. */
+  finals?: ProductionClip[];
+  /** The Suno score under the whole film, when the production asked for music. */
+  music?: string;
+  /** The finished film and its delivery report. */
+  film?: string;
+  report?: string;
   updatedAt: string;
 };
 
