@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n/vue";
 import type { NodeAiRequest } from "@toonflow/nodes-scaffold/runtime";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
-import { describeBlocking } from "./blocking";
+import { describeBlocking, framingIssues, reframeShot } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { renderImage, renderVideo } from "./renderMedia";
 import { createEmptyScene, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
@@ -53,20 +53,62 @@ export async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspec
   return { layout, video, blocking };
 }
 
+// Times the director agent may fix a shot whose framing check fails before the camera is framed by computation.
+const framingRetries = 1;
+
+/** A shot where everyone holds the pose the previous shot ended on, for when the agent cannot block it. */
+function heldPlan(previous: DirectorPlan, shot: number, seconds: number): DirectorPlan {
+  return {
+    name: `Shot ${shot}`, duration: seconds,
+    tracks: previous.tracks.map(track => {
+      const last = track.frames.at(-1)!;
+      return { ...track, frames: [{ ...last, time: 0 }, { ...last, time: seconds }] };
+    }),
+    cameraFrames: [{ ...previous.cameraFrames.at(-1)!, time: 0 }],
+  };
+}
+
 /**
  * Blocks and exports every shot in order without a person: the first instruction builds the set, each later shot
- * starts from the previous shot's plan. People are cylinders; mannequins are never used here.
+ * starts from the previous shot's plan, or from `start`, the set and plans a stopped run had reached. People are
+ * cylinders; mannequins are never used here. Since no one looks at the blocking, each shot's framing is checked and
+ * handed back to the agent to fix, then framed by computation from the shot size; a shot the agent cannot block at
+ * all (a stuck or looping model) holds the previous shot's positions and is framed by computation. A shot that still
+ * fails, or a first shot the agent cannot block, stops.
  */
 export async function runPrevis(options: {
-  generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string }[]; aspect: number; signal: AbortSignal;
+  generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number }[]; aspect: number; signal: AbortSignal;
+  start?: { scene: SceneDocument; plans: SavedPlan[] };
   onShot: (result: { shot: number; layout: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[] }) => Promise<void>;
 }) {
-  let scene = createEmptyScene();
-  const plans: SavedPlan[] = [];
-  for (const { shot, instruction } of options.shots) {
+  let scene = options.start?.scene ?? createEmptyScene();
+  const plans: SavedPlan[] = [...options.start?.plans ?? []];
+  for (const { shot, instruction, cast, size, seconds } of options.shots) {
     options.signal.throwIfAborted();
     const basePlan = plans.at(-1);
-    const result = await planShot({ ...options, instruction, scene, basePlan, plans, allowMannequins: false, selectedPlanId: basePlan?.id });
+    const attempt = (instruction: string, from: { scene: SceneDocument; plan?: DirectorPlan }) =>
+      planShot({ ...options, instruction, scene: from.scene, basePlan: from.plan, plans, allowMannequins: false, selectedPlanId: basePlan?.id })
+        .catch((error: unknown) => {
+          if (options.signal.aborted || !basePlan) throw error;
+          console.warn(`Shot ${shot}: the director agent failed`, error);
+          return undefined;
+        });
+    const planned = await attempt(instruction, { scene, plan: basePlan });
+    let result = planned ?? { scene, plan: heldPlan(basePlan!, shot, seconds) };
+    let issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
+    for (let retry = 0; planned && issues.length && retry < framingRetries; retry++) {
+      options.signal.throwIfAborted();
+      const fix = `${instruction}\n\nYour blocking of this shot fails the framing check. Fix it, moving the camera or the objects in the way, and keep the rest:\n${issues.join("\n")}`;
+      const fixed = await attempt(fix, result);
+      if (!fixed) break;
+      result = fixed;
+      issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
+    }
+    if (issues.length) {
+      result = { ...result, plan: await reframeShot(result.scene, result.plan, options.aspect, cast, size) };
+      issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
+    }
+    if (issues.length) throw new Error(`Shot ${shot}: ${issues.join(" ")}`);
     scene = result.scene;
     const plan: SavedPlan = { ...result.plan, id: crypto.randomUUID(), instruction };
     plans.push(plan);
