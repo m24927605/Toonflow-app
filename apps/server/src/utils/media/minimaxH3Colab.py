@@ -259,12 +259,16 @@ graph.update({
     "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": "toonflow/h3", **videoFormat}},
 })
 
-# LoRAs ride after the Turbo LoRA at their strength; every node that used the Turbo model takes the last one.
+# LoRAs ride after the Turbo LoRA at their strength; every node that used the Turbo model takes the last one. Each is
+# named by its content and stays on the machine, so the session's later clips use it without another upload.
 characterModel = ["2", 0]
-loraStrengths = json.loads((inputs / f"{prefix}loras.json").read_text()) if (inputs / f"{prefix}loras.json").exists() else []
-for index, source in enumerate(sorted(inputs.glob(f"{prefix}lora_*.safetensors"))):
-    shutil.copy(source, comfy / "models" / "loras" / f"character_{job}_{index}.safetensors")
-    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": f"character_{job}_{index}.safetensors", "strength_model": float(loraStrengths[index]) if index < len(loraStrengths) else 1.0}}
+characterLoras = json.loads((inputs / f"{prefix}loras.json").read_text()) if (inputs / f"{prefix}loras.json").exists() else []
+for index, entry in enumerate(characterLoras):
+    assert "/" not in entry["name"] and entry["name"].startswith("h3lora_")
+    target = comfy / "models" / "loras" / entry["name"]
+    if not target.exists():
+        shutil.copy(inputs / entry["name"], target)
+    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": entry["name"], "strength_model": float(entry["strength"])}}
     characterModel = [f"lora{index}", 0]
 if characterModel != ["2", 0]:
     for key, node in graph.items():
@@ -290,6 +294,6 @@ subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), "-t", str(du
                 *(["-c:a", "aac", "-b:a", "192k"] if audio else ["-an"]),
                 "-movflags", "+faststart", str(outputs / "final.mp4")], check=True)
 # The job's inputs are deleted so a long session does not fill the disk.
-for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*"), *(comfy / "models" / "loras").glob(f"character_{job}_*")]:
+for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*")]:
     leftover.unlink(missing_ok=True)
 print("COLAB_DONE", resolution, f"{outputWidth}x{outputHeight}")

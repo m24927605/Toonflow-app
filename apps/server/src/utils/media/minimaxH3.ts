@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import type { ProviderTools } from "@toonflow/providers";
-import { createColabWorker, inputBytes, inputExtension, randomSeed } from "@/utils/media/colab";
+import { createColabWorker, inputBytes, inputExtension, randomSeed, type ColabSession } from "@/utils/media/colab";
 import pipeline from "./minimaxH3Colab.py" with { type: "text" };
 
 export type MinimaxH3Request = Parameters<ProviderTools["minimaxH3"]>[0];
@@ -11,6 +12,8 @@ const worker = createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 
 // Of the four Turbo sampling steps, the reference videos condition only the first: Code Video Model found a previs
 // used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
 const videoSteps = 1;
+// LoRA files already on a session's machine.
+const sentLoras = new WeakMap<ColabSession, Set<string>>();
 
 /** Stops the A100 as soon as the clips already requested are done, for a caller that has no more to send. */
 export const stopMinimaxH3WhenIdle = () => worker.stopWhenIdle();
@@ -28,7 +31,13 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
   if (!Number.isSafeInteger(seed) || seed < 0) throw new Error("Invalid MiniMax H3 seed");
   const job = crypto.randomUUID().slice(0, 8);
   const name = (rest: string) => `h3in_${job}_${rest}`;
-  const [video] = await worker.run((session, sessionSignal) => session.job({
+  // A LoRA is named by its content and kept on the machine, so a session's later clips never upload it again.
+  const characterLoras = loras.map(lora => ({ data: inputBytes(lora.file), strength: lora.strength }))
+    .map(lora => ({ ...lora, name: `h3lora_${createHash("sha256").update(lora.data).digest("hex").slice(0, 32)}.safetensors` }));
+  const video = await worker.run(async (session, sessionSignal) => {
+    const sent = sentLoras.get(session) ?? new Set<string>();
+    const loraUploads = [...new Map(characterLoras.filter(lora => !sent.has(lora.name)).map(lora => [lora.name, { name: lora.name, data: lora.data }])).values()];
+    const [output] = await session.job({
     script: pipeline,
     uploads: [
       { name: name("prompt.txt"), data: prompt },
@@ -38,11 +47,15 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
       ...controlVideo ? [{ name: name(`control.${inputExtension(controlVideo)}`), data: inputBytes(controlVideo) }] : [],
       ...firstFrame ? [{ name: name(`first.${inputExtension(firstFrame)}`), data: inputBytes(firstFrame) }] : [],
       ...lastFrame ? [{ name: name(`last.${inputExtension(lastFrame)}`), data: inputBytes(lastFrame) }] : [],
-      ...loras.map((lora, index) => ({ name: name(`lora_${index}.safetensors`), data: inputBytes(lora.file) })),
-      ...loras.length ? [{ name: name("loras.json"), data: JSON.stringify(loras.map(lora => lora.strength)) }] : [],
+      ...loraUploads,
+      ...characterLoras.length ? [{ name: name("loras.json"), data: JSON.stringify(characterLoras.map(({ name, strength }) => ({ name, strength }))) }] : [],
     ],
     env: { H3_JOB: job, H3_SEED: seed, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps },
     outputs: ["/content/h3out/final.mp4"],
-  }, sessionSignal), signal);
-  return { data: video!, mimeType: "video/mp4" as const, seed };
+    }, sessionSignal);
+    for (const { name } of loraUploads) sent.add(name);
+    sentLoras.set(session, sent);
+    return output!;
+  }, signal);
+  return { data: video, mimeType: "video/mp4" as const, seed };
 }
