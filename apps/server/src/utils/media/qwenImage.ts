@@ -52,15 +52,19 @@ async function drawBatch() {
   try {
     // A LoRA is named by its content: a batch sends each one once, and a later batch on the same machine never
     // picks up a different file under the same name.
-    const loraName = (file: Uint8Array) => `qwin_lora_${createHash("sha256").update(file).digest("hex").slice(0, 32)}.safetensors`;
+    const digest = (data: Uint8Array) => createHash("sha256").update(data).digest("hex").slice(0, 32);
+    const loraName = (file: Uint8Array) => `qwin_lora_${digest(file)}.safetensors`;
+    // Images are named by their content too, so a batch sends a place or person shared by its keyframes once: each
+    // upload is a CLI call on the paid machine.
+    const imageName = (image: NonNullable<QwenImageRequest["controlImage"]>) => `qwin_image_${digest(inputBytes(image))}.${inputExtension(image)}`;
     const loras = batch.map(({ request }) => (request.loras ?? []).map(lora => ({ data: inputBytes(lora.file), strength: lora.strength })).map(lora => ({ ...lora, name: loraName(lora.data) })));
     const items = batch.map(({ request }, index) => ({
       prompt: request.prompt,
       ratio: request.ratio,
       size: request.size,
       seed: request.seed ?? randomSeed(),
-      refs: (request.images ?? []).map((image, refIndex) => `qwin_${index}_${refIndex}.${inputExtension(image)}`),
-      control: request.controlImage ? `qwin_${index}_control.${inputExtension(request.controlImage)}` : null,
+      refs: (request.images ?? []).map(imageName),
+      control: request.controlImage ? imageName(request.controlImage) : null,
       loras: loras[index]!.map(({ name, strength }) => ({ name, strength })),
     }));
     const results = await worker.run(async (session, signal) => {
@@ -70,8 +74,8 @@ async function drawBatch() {
         script: pipeline,
         uploads: [
           { name: "qwin_job.json", data: JSON.stringify(items) },
-          ...batch.flatMap(({ request }, index) => (request.images ?? []).map((image, refIndex) => ({ name: items[index]!.refs[refIndex]!, data: inputBytes(image) }))),
-          ...batch.flatMap(({ request }, index) => request.controlImage ? [{ name: items[index]!.control!, data: inputBytes(request.controlImage) }] : []),
+          ...new Map(batch.flatMap(({ request }) => [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []])
+            .map(image => [imageName(image), { name: imageName(image), data: inputBytes(image) }])).values(),
           ...loraUploads,
         ],
         env: {},
