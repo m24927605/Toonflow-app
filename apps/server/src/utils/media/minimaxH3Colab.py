@@ -130,7 +130,12 @@ for index, source in enumerate(sorted(inputs.glob(f"{prefix}vid_*"))):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True)
     seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(target)], capture_output=True, text=True, check=True).stdout)
     if seconds < 2:
-        raise ValueError(f"reference video {index + 1} is shorter than 2 seconds")
+        # H3 takes at least two seconds of reference; a shorter one, such as the previs of a brief shot, holds its last
+        # frame for the rest.
+        padded = target.with_name(f"h3vidpad{job}_{index}.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(target), "-vf", f"tpad=stop_mode=clone:stop_duration={2.1 - seconds:.2f}",
+                        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(padded)], check=True)
+        target = padded
     videos.append(target.name)
 # Standalone reference audio (<Audio N>), resampled to the audio VAE's 32 kHz stereo; a clip marked fully_copy in the
 # prompt becomes the soundtrack and the speaker lip-syncs to it.
