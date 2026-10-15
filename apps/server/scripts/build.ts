@@ -5,14 +5,20 @@ import { dirname, resolve } from "node:path";
 const projectDir = resolve(import.meta.dirname, "../../..");
 const agentDirectory = dirname(await realpath(Bun.resolveSync("@earendil-works/pi-coding-agent", resolve(projectDir, "apps/server"))));
 const photonDirectory = dirname(Bun.resolveSync("@silvia-odwyer/photon-node", agentDirectory));
+const playwrightDirectory = dirname(Bun.resolveSync("playwright-core/package.json", resolve(projectDir, "apps/server")));
 // ACT: Teams are not bundled for now; uncomment to restore.
 // await $`${process.execPath} run build:teams`.cwd(projectDir);
 await $`${process.execPath} run build`.cwd(resolve(projectDir, "packages/mcp"));
 // ACT: Ship Photon's JS together with its WASM so the runtime does not depend on the source directory or launch location.
-await $`${process.execPath} build src/index.ts --target=bun --minify --external @silvia-odwyer/photon-node --outdir ../../build/server`.cwd(resolve(projectDir, "apps/server"));
+// Playwright ships as its own package beside the bundle: minifying it renames the error classes it tells apart by
+// name, and it requires optional packages (chromium-bidi, electron) on paths previs never takes. It has no dependencies.
+await $`${process.execPath} build src/index.ts --target=bun --minify --external @silvia-odwyer/photon-node --external playwright-core --outdir ../../build/server`.cwd(resolve(projectDir, "apps/server"));
 const photonOutput = resolve(projectDir, "build/server/node_modules/@silvia-odwyer/photon-node");
 await rm(photonOutput, { recursive: true, force: true });
 await cp(photonDirectory, photonOutput, { recursive: true });
+const playwrightOutput = resolve(projectDir, "build/server/node_modules/playwright-core");
+await rm(playwrightOutput, { recursive: true, force: true });
+await cp(playwrightDirectory, playwrightOutput, { recursive: true });
 const skillsOutput = resolve(projectDir, "build/skills");
 await rm(skillsOutput, { recursive: true, force: true });
 await cp(resolve(projectDir, "packages/skills"), skillsOutput, { recursive: true });
