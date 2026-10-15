@@ -287,12 +287,22 @@ export function useNodeAi() {
       },
     }));
     let turns = 0;
+    // A model that sends the same tool calls turn after turn is stuck: the loop stops after the third identical turn
+    // rather than running to the 40-turn cap.
+    let lastCalls = "";
+    let repeats = 0;
+    const repeated = (message: AssistantMessage) => {
+      const calls = JSON.stringify(message.content.flatMap(part => part.type === "toolCall" ? [[part.name, part.arguments]] : []));
+      repeats = calls !== "[]" && calls === lastCalls ? repeats + 1 : 0;
+      lastCalls = calls;
+      return repeats >= 2;
+    };
     const system = createInitialSystemMessage(systemPrompt, undefined);
     const messages = await runAgentLoop([{ role: "user", content: prompt, timestamp: Date.now() }], {
       messages: system ? [system] : [], tools,
     }, {
       model, convertToLlm: messages => messages as Message[], toolExecution: "sequential",
-      finishTurn: ({ message }) => ++turns >= 40 || message.stopReason === "length" ? { action: "end" } : undefined,
+      finishTurn: ({ message }) => ++turns >= 40 || message.stopReason === "length" || repeated(message) ? { action: "end" } : undefined,
     }, event => {
       signal.throwIfAborted();
       if (event.type === "tool_execution_start") onEvent?.({ type: "toolStart", id: event.toolCallId, name: event.toolName, args: event.args });
@@ -306,6 +316,7 @@ export function useNodeAi() {
     if (!message) throw new Error("AI 未返回结果");
     if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "AI 请求失败");
     if (definitions.length && message.stopReason === "length") throw new Error("模型输出达到上限，请精简任务后重试");
+    if (repeats >= 2) throw new Error(translate("The model repeated the same tool calls three times and was stopped; try again"));
     if (message.content.some(part => part.type === "toolCall")) throw new Error("AI 已达到 40 轮调用上限，请缩小任务后重试");
     const text = message.content.filter(part => part.type === "text").map(part => part.text).join("");
     const reasoning = message.content.filter(part => part.type === "thinking").map(part => part.thinking).join("");

@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n/vue";
 import type { NodeAiRequest } from "@toonflow/nodes-scaffold/runtime";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
-import { describeBlocking, framingIssues, reframeShot } from "./blocking";
+import { describeBlocking, framingIssues, reframeShot, type Posture } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { renderImage, renderVideo } from "./renderMedia";
 import { createEmptyScene, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
@@ -77,13 +77,14 @@ function heldPlan(previous: DirectorPlan, shot: number, seconds: number): Direct
  * fails, or a first shot the agent cannot block, stops.
  */
 export async function runPrevis(options: {
-  generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number }[]; aspect: number; signal: AbortSignal;
+  generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number; angled: boolean; postures: Record<string, Posture> }[];
+  aspect: number; signal: AbortSignal;
   start?: { scene: SceneDocument; plans: SavedPlan[] };
   onShot: (result: { shot: number; layout: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[] }) => Promise<void>;
 }) {
   let scene = options.start?.scene ?? createEmptyScene();
   const plans: SavedPlan[] = [...options.start?.plans ?? []];
-  for (const { shot, instruction, cast, size, seconds } of options.shots) {
+  for (const { shot, instruction, cast, size, seconds, angled, postures } of options.shots) {
     options.signal.throwIfAborted();
     const basePlan = plans.at(-1);
     const attempt = (instruction: string, from: { scene: SceneDocument; plan?: DirectorPlan }) =>
@@ -95,20 +96,22 @@ export async function runPrevis(options: {
         });
     const planned = await attempt(instruction, { scene, plan: basePlan });
     let result = planned ?? { scene, plan: heldPlan(basePlan!, shot, seconds) };
-    let issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
-    for (let retry = 0; planned && issues.length && retry < framingRetries; retry++) {
+    const check = (from: typeof result) => framingIssues(from.scene, from.plan, options.aspect, cast, angled, postures);
+    let issues = await check(result);
+    for (let retry = 0; planned && issues.hard.length + issues.soft.length && retry < framingRetries; retry++) {
       options.signal.throwIfAborted();
-      const fix = `${instruction}\n\nYour blocking of this shot fails the framing check. Fix it, moving the camera or the objects in the way, and keep the rest:\n${issues.join("\n")}`;
+      const fix = `${instruction}\n\nYour blocking of this shot fails the framing check. Fix it, moving the camera or the objects in the way, and keep the rest:\n${[...issues.hard, ...issues.soft].join("\n")}`;
       const fixed = await attempt(fix, result);
       if (!fixed) break;
       result = fixed;
-      issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
+      issues = await check(result);
     }
-    if (issues.length) {
+    // A held plan still has the previous shot's camera, so it is always framed for this shot's people and size.
+    if (!planned || issues.hard.length) {
       result = { ...result, plan: await reframeShot(result.scene, result.plan, options.aspect, cast, size) };
-      issues = await framingIssues(result.scene, result.plan, options.aspect, cast);
+      issues = await check(result);
     }
-    if (issues.length) throw new Error(`Shot ${shot}: ${issues.join(" ")}`);
+    if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
     scene = result.scene;
     const plan: SavedPlan = { ...result.plan, id: crypto.randomUUID(), instruction };
     plans.push(plan);

@@ -1,5 +1,5 @@
 import { translate, type MessageDescriptor } from "@toonflow/i18n";
-import { keyframeDescriptionInstructions, keyframeTemplate, masterLine, stateLine, type PromptLine } from "@toonflow/node-shared/keyframePrompt";
+import { keyframeDescriptionInstructions, keyframeTemplate, layoutLine, masterLine, stateLine, type PromptLine } from "@toonflow/node-shared/keyframePrompt";
 import { withTriggers } from "@toonflow/node-shared/loraTriggers";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { castNames, shotSpans, suggestMasterShot } from "@toonflow/node-shared/shotList";
@@ -44,11 +44,11 @@ export function planKeyframes(shotList: string, assets: NonNullable<Production["
   return { master: suggestMasterShot(shotList, spans)?.shot ?? 1, shots };
 }
 
-/** Asks for every shot's still-frame description in one request, as "### Shot N" sections. */
-export function descriptionsPrompt(script: string, shotList: string, shots: ProductionKeyframe[]) {
+/** Asks for every shot's still-frame description in one request, as "### Shot N" sections, each placing people as the shot's previs does. */
+export function descriptionsPrompt(script: string, shotList: string, shots: ProductionKeyframe[], previs: NonNullable<Production["previs"]>) {
   return [
     "The screenplay and its shot list are below. For every shot, follow that shot's instructions; write the sections one after another.",
-    ...shots.flatMap(item => ["", ...keyframeDescriptionInstructions(item.shot, item.time, item.cast, item.state).map(english)]),
+    ...shots.flatMap(item => ["", ...keyframeDescriptionInstructions(item.shot, item.time, item.cast, item.state, previs.find(shot => shot.shot === item.shot)?.blocking).map(english)]),
     "",
     "Screenplay:",
     script,
@@ -69,16 +69,17 @@ export function parseDescriptions(text: string) {
 const byName = (list: ProductionAsset[], name?: string) => list.find(item => item.name === name);
 
 /** The part of a state or row cell about one person: from "Name:" to the next semicolon, or all of it for one person. */
-function segmentOf(text: string, name: string, castSize: number) {
+export function segmentOf(text: string, name: string, castSize: number) {
   const part = text.split(/[；;]/).find(item => item.trimStart().startsWith(name));
   return part ?? (castSize === 1 ? text : "");
 }
 
 /**
- * The prompt, references and LoRAs of one keyframe: the place's base image, each person's front view, and the master
- * keyframe for every other shot; Qwen-Image LoRAs of the cast and place, at most 4, people first.
+ * The prompt, references and LoRAs of one keyframe: the place's base image, each person's front view, the master
+ * keyframe for every other shot, and the shot's previs layout, which fixes the composition; Qwen-Image LoRAs of the
+ * cast and place, at most 4, people first.
  */
-export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, masterImage?: string) {
+export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, masterImage?: string, layout?: string) {
   const place = byName(assets.places, item.place);
   const people = item.cast.flatMap(name => byName(assets.characters, name) ?? []);
   // A person's reference is the front view of the outfit they wear in this shot, so the keyframe draws those clothes.
@@ -90,11 +91,12 @@ export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Pr
   const fixed = [
     ...item.state ? [english(stateLine(item.state))] : [],
     ...masterImage ? [english(masterLine(`{{ref ${references.length + 1}}}`))] : [],
+    ...layout ? [english(layoutLine(`{{ref ${references.length + (masterImage ? 2 : 1)}}}`))] : [],
   ];
   const prompt = template.map(english).join("\n").replace("{{shot}}", [...fixed, item.description ?? ""].join("\n"));
   const loras = [...people, ...place ? [place] : []].flatMap(asset => (asset.loras ?? []).filter(lora => lora.family === "qwen").map(lora => ({ ...lora, name: asset.name }))).slice(0, 4);
   return {
-    prompt: withTriggers(prompt, loras), references: [...references, ...masterImage ? [masterImage] : []],
+    prompt: withTriggers(prompt, loras), references: [...references, ...masterImage ? [masterImage] : [], ...layout ? [layout] : []],
     loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
   };
 }

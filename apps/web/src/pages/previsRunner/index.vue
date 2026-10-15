@@ -16,7 +16,7 @@ import { loadNodeComponent } from "@/pages/workspace/panels/canvas/loadNodeCompo
  */
 type PrevisJob = {
   directory: string; folder: string; providerId: string; modelId: string; aspect: number; script: string; shotList: string;
-  shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number }[];
+  shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number; angled: boolean; postures: Record<string, "seated" | "standing"> }[];
   start?: { scene: unknown; plans: unknown[] };
 };
 type RunPrevis = (options: {

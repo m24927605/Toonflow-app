@@ -179,6 +179,26 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     return true;
   }
 
+  // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the reference
+  // image: the director agent blocks the shots with cylinders in a headless Chrome, and each keyframe keeps its shot's
+  // previs composition, so the first frame and the previs a clip is given never disagree.
+  if (!production.previs) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
+    const model = textModel();
+    // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's render
+    // can outlast the session's idle stop: the model is loaded here first and its session held until previs ends.
+    const release = holdColab();
+    try {
+      await complete("Reply with OK.", "OK?", signal);
+      production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+    } finally {
+      release();
+    }
+    await saveProduction(cwd, production);
+    return true;
+  }
+
   if (!production.keyframes) {
     production.keyframes = planKeyframes(await readProductionText(cwd, production.shotList), production.assets);
     await saveProduction(cwd, production);
@@ -188,7 +208,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   if (keyframes.shots.some(item => item.description === undefined)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
-    const sections = parseDescriptions(await complete(shotListWriter, descriptionsPrompt(script, shotList, keyframes.shots), signal));
+    const sections = parseDescriptions(await complete(shotListWriter, descriptionsPrompt(script, shotList, keyframes.shots, production.previs), signal));
     for (const item of keyframes.shots) item.description = sections.get(item.shot) ?? item.row ?? "";
     await saveProduction(cwd, production);
     return true;
@@ -200,7 +220,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   if (pending.length) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
     await Promise.all(pending.map(async item => {
-      Object.assign(item, composeKeyframe(item, production.assets!, item === master ? undefined : master.image));
+      Object.assign(item, composeKeyframe(item, production.assets!, item === master ? undefined : master.image, production.previs!.find(shot => shot.shot === item.shot)?.layout));
       item.image = await drawKeyframe(cwd, production, item, signal);
       await saveProduction(cwd, production);
     }));
@@ -217,24 +237,6 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   if (!production.clips) {
     production.clips = await recordDub(cwd, production, signal, () => saveProduction(cwd, production));
-    await saveProduction(cwd, production);
-    return true;
-  }
-
-  // Every video needs its shot's previs: the director agent blocks the shots with cylinders in a headless Chrome.
-  if (!production.previs) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
-    const model = textModel();
-    // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's render
-    // can outlast the session's idle stop: the model is loaded here first and its session held until previs ends.
-    const release = holdColab();
-    try {
-      await complete("Reply with OK.", "OK?", signal);
-      production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
-    } finally {
-      release();
-    }
     await saveProduction(cwd, production);
     return true;
   }

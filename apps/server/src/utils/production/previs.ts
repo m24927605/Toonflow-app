@@ -5,6 +5,7 @@ import { previsInstructions } from "@toonflow/node-shared/previsInstructions";
 import { readFile } from "@toonflow/file";
 import { chromium } from "playwright-core";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
+import { segmentOf } from "./keyframes";
 import { productionDirectory, type Production } from "./state";
 
 export type ProductionPrevis = { shot: number; layout: string; video: string; blocking: string }[];
@@ -13,6 +14,24 @@ export type ProductionPrevis = { shot: number; layout: string; video: string; bl
 const previsTimeout = 60 * 60_000;
 
 type SavedShot = { blocking: string; scene: unknown; plans: unknown[] };
+
+// A row asking for a low or high camera, which lifts the previs's usual camera height limits: the Chinese words for
+// low and high angle shots, overhead and bird's-eye views, or their English names.
+const angledCamera = /\u4ef0\u62cd|\u4fef\u62cd|\u4fef\u77b0|\u9ce5\u77b0|\u9e1f\u77b0|\u4ef0\u89d2|\u4fef\u89d2|low[- ]angle|high[- ]angle|bird'?s[- ]eye|worm'?s[- ]eye|top[- ]down|overhead/i;
+// Posture words: the Chinese "\u5750" (sit) and "\u8dea" (kneel), then "\u7ad9" (stand), or English.
+const seated = /\u5750|\u8dea|seated|sitting|kneel/i;
+const standing = /\u7ad9|standing|stands/i;
+
+/** Each person's posture at the start of a shot, from the first posture word in their part of the state cell. */
+function posturesOf(state: string, cast: string[]) {
+  return Object.fromEntries(cast.flatMap(name => {
+    const part = segmentOf(state, name, cast.length);
+    const at = (pattern: RegExp) => part.search(pattern);
+    const [sit, stand] = [at(seated), at(standing)];
+    if (sit < 0 && stand < 0) return [];
+    return [[name, sit >= 0 && (stand < 0 || sit < stand) ? "seated" : "standing"]];
+  }));
+}
 
 /**
  * Blocks and renders every shot's previs in a headless Chrome on the server: the page /previs-runner loads the
@@ -24,7 +43,8 @@ export async function renderPrevis(cwd: string, production: Production, script: 
   const spans = shotSpans(checkScript(shotList).shots, shotList);
   const shots = previsInstructions(spans, 1).map((item, index) => ({
     shot: item.shot, instruction: item.lines.map(line => typeof line === "string" ? line : translate(line, undefined, "en")).join("\n"), cast: castNames(spans[index]!), size: spans[index]!.size ?? "",
-    seconds: Number((spans[index]!.end - spans[index]!.start).toFixed(2)),
+    seconds: Number((spans[index]!.end - spans[index]!.start).toFixed(2)), angled: angledCamera.test(spans[index]!.row ?? ""),
+    postures: posturesOf(spans[index]!.state ?? "", castNames(spans[index]!)),
   }));
   const folder = `${productionDirectory(production.id)}/previs`;
   const done: ProductionPrevis = [];

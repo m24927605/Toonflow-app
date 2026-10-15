@@ -24,6 +24,12 @@ export function keyframeTemplate(sceneRefs: number, characters: { name: string; 
 /** The shot list's character state, fixed next to the shot description so a text model cannot change it. */
 export const stateLine = (state: string) => msg`Character state at the start of this shot: ${withoutFullStop(state)}.`;
 
+/**
+ * A shot's previs layout fixes its keyframe's composition and leaves only the look to the image model, as Code Video
+ * Model restyles its proxy frame (https://code-video-model.github.io).
+ */
+export const layoutLine = (ref: string) => msg`${ref} is this shot's previs layout and fixes its composition: keep its camera position, angle and crop, where each person stands, how large they are in the frame and who hides whom, and add or remove no one and nothing; take no shape, material or colour from its plain blocks.`;
+
 /** Every keyframe but the master shot's follows the master's look while keeping its own composition. */
 export const masterLine = (ref: string) => msg`Lighting, colour, clothing and props match ${ref}, but the composition, camera angle and poses follow the description below.`;
 

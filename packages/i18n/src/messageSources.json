@@ -7629,9 +7629,6 @@
   "Failed to prepare the videos": [
     "packages/nodes/textNode/src/index.vue"
   ],
-  "{0} is this shot''s previs layout: follow its composition, camera angle and where each person stands, but take no appearance, material or colour from it.": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
   "Previs blocking at the start of this shot: {0}.": [
     "packages/nodes/textNode/src/index.vue"
   ],
@@ -10313,6 +10310,9 @@
   "Character state at the start of this shot: {0}.": [
     "packages/nodeShared/src/keyframePrompt.ts"
   ],
+  "{0} is this shot''s previs layout and fixes its composition: keep its camera position, angle and crop, where each person stands, how large they are in the frame and who hides whom, and add or remove no one and nothing; take no shape, material or colour from its plain blocks.": [
+    "packages/nodeShared/src/keyframePrompt.ts"
+  ],
   "Write a still-frame description of shot {0} ({1}) of the attached shot list as one paragraph of 80 to 200 words, based on that row''s description and action columns: the shot size; the camera position, height and angle from the shot list; and for each person in frame their place in the picture (left, centre or right, foreground or background), posture, action, expression and gaze. Describe only the opening moment. Do not write reference markers, the setting, lighting, style words or anyone''s appearance.": [
     "packages/nodeShared/src/keyframePrompt.ts"
   ],
@@ -10462,6 +10462,9 @@
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "模型输出达到上限，请精简任务后重试": [
+    "packages/nodeScaffold/src/nodeAi.ts"
+  ],
+  "The model repeated the same tool calls three times and was stopped; try again": [
     "packages/nodeScaffold/src/nodeAi.ts"
   ],
   "AI 已达到 40 轮调用上限，请缩小任务后重试": [

@@ -89,7 +89,7 @@ import { computed, inject, onMounted, ref, watch } from "vue";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { previsInstructions } from "@toonflow/node-shared/previsInstructions";
-import { keyframeDescriptionInstructions, masterLine, stateLine, withoutFullStop } from "@toonflow/node-shared/keyframePrompt";
+import { keyframeDescriptionInstructions, layoutLine, masterLine, stateLine, withoutFullStop } from "@toonflow/node-shared/keyframePrompt";
 import { useVueFlow } from "@vue-flow/core";
 import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
 import { planPromptDistribution } from "./distributePrompts";
@@ -694,7 +694,7 @@ function buildShotNodes(choice: ShotNodesChoice) {
     // The previs layout and the master shot come after the template's references, so its numbering stays as written.
     const layout = video ? undefined : plan.layouts.get(span.shot);
     if (layout) sources.push(layout);
-    const layoutLine = layout ? t`${`{{ref ${sources.length}}}`} is this shot's previs layout: follow its composition, camera angle and where each person stands, but take no appearance, material or colour from it.` : "";
+    const layoutText = layout ? translate(layoutLine(`{{ref ${sources.length}}}`)) : "";
     // Where people stand, measured in the previs scene when the shot was confirmed, is fixed text like the state line.
     const blocking = String(plan.layouts.has(span.shot) ? flow.findNode(plan.layouts.get(span.shot)!)?.data?.blocking ?? "" : "");
     const blockingLine = blocking && !video ? t`Previs blocking at the start of this shot: ${blocking}.` : "";
@@ -704,7 +704,7 @@ function buildShotNodes(choice: ShotNodesChoice) {
     // A video node also takes the shot's previs video, after its keyframe, for blocking only.
     const previsVideo = video ? plan.previsVideos.get(span.shot) : undefined;
     const previsLine = previsVideo ? t`${`{{ref ${sources.length + 1}}}`} is this shot's grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like ${"{{ref 1}}"}.` : "";
-    const fixedLines = [stateText, blockingLine, layoutLine, masterText, previsLine].filter(Boolean).join("\n");
+    const fixedLines = [stateText, blockingLine, layoutText, masterText, previsLine].filter(Boolean).join("\n");
     const prompt = fixedLines && castTemplate.includes("{{shot}}") ? castTemplate.replace("{{shot}}", `${fixedLines}\n{{shot}}`) : castTemplate;
     newNodes.push({ id, type, position: { x: choice.textNodes ? x + 460 : x, y }, data: {
       label: video ? t`Shot ${span.shot} video (${time})` : t`Shot ${span.shot} keyframe (${time})`, outputs: {}, shot: span.shot,
