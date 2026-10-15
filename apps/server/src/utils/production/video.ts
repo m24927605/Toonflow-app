@@ -15,7 +15,7 @@ import { productionDirectory, writeProductionText, type Production } from "./sta
  */
 export type ProductionClip = {
   shot: number; prompt?: string; video?: string; seed?: number;
-  check?: { composition: number; quality: number; issues: string[]; passed: boolean }; retried?: boolean;
+  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean;
 };
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
@@ -189,8 +189,6 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
 
 // Frames a clip check reads, as shares of the clip's length.
 const checkTimes = [0.1, 0.4, 0.7, 0.95];
-// A clip passes with at least these scores, as Code Video Model's review set them.
-const passing = { composition: 60, quality: 70 };
 
 /** The keyframe and four frames of a clip as base64 PNGs, the frames saved beside the clips for a person to see. */
 export async function clipFrames(cwd: string, production: Production, clip: ProductionClip, keyframe: string, signal: AbortSignal) {
@@ -209,28 +207,31 @@ export async function clipFrames(cwd: string, production: Production, clip: Prod
   return Promise.all(frames.map(async path => Buffer.from(await readFile((await resolveWorkspacePath(cwd, path)).path)).toString("base64")));
 }
 
-/** Asks for a clip's composition and quality scores from its keyframe and frames, as JSON. */
+/**
+ * Asks for every problem in a clip, each marked major or minor, as JSON. ACT: The model names problems well but scored
+ * clips 85/92 whatever it found, a changed set and clothes included, so the verdict follows the problems it marks major.
+ */
 export function clipCheckPrompt(description: string, prompt: string) {
   return [
     "The first image is a shot's keyframe, the first frame its video clip had to start from; the next four are frames from the clip at 10%, 40%, 70% and 95% of its length.",
     `The keyframe shows: ${description}`,
     `The clip was asked for: ${prompt}`,
-    "Score the clip from 0 to 100 on two things. composition: it keeps the keyframe's framing, people, clothes and set, and plays the asked action without anyone appearing, vanishing or jumping. quality: no melted or deformed faces, hands or bodies, nobody passing through furniture or each other, no flicker or morphing.",
-    "Reply with JSON only: {\"composition\": 0-100, \"quality\": 0-100, \"issues\": [\"each problem you saw, with the frame\"]}.",
+    "List every problem you see. A problem is major when the set, the light or someone's clothes differ from the keyframe; the clip does not start from the keyframe's moment (a different pose, place or framing); someone who should be seen has their head or face out of frame; someone appears, vanishes or jumps; a face, hand or body melts or deforms; someone passes through furniture or another person; or the picture flickers or morphs. Anything smaller is minor, such as a slight change of expression or a small drift of the framing. A camera move the clip was asked for, such as a push in, pull back, pan or follow, is no problem.",
+    "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }
 
-/** Reads the check's JSON; a reply that cannot be read fails, so the clip is rendered again rather than trusted. */
+/** Reads the check's JSON: a clip passes without major problems; a reply that cannot be read fails rather than trusted. */
 export function readClipCheck(reply: string): NonNullable<ProductionClip["check"]> {
+  const unreadable = { issues: [{ problem: "The check's reply could not be read.", major: true }], passed: false };
   try {
-    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { composition?: unknown; quality?: unknown; issues?: unknown };
-    const score = (field: unknown) => typeof field === "number" && Number.isFinite(field) ? Math.max(0, Math.min(100, field)) : 0;
-    const composition = score(value.composition);
-    const quality = score(value.quality);
-    const issues = Array.isArray(value.issues) ? value.issues.filter((item): item is string => typeof item === "string").slice(0, 8) : [];
-    return { composition, quality, issues, passed: composition >= passing.composition && quality >= passing.quality };
+    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { issues?: unknown };
+    if (!Array.isArray(value.issues)) return unreadable;
+    const issues = value.issues.flatMap(item => item && typeof item === "object" && typeof (item as { problem?: unknown }).problem === "string"
+      ? [{ problem: (item as { problem: string }).problem, major: (item as { major?: unknown }).major === true }] : []).slice(0, 10);
+    return { issues, passed: !issues.some(item => item.major) };
   } catch {
-    return { composition: 0, quality: 0, issues: ["The check's reply could not be read."], passed: false };
+    return unreadable;
   }
 }
 

@@ -2907,7 +2907,7 @@
   "Shot {0} failed: {1}": "第 {0} 镜失败：{1}",
   "Shot {0} has an empty section.": "第 {0} 镜的段落是空的。",
   "Shot {0} keyframe ({1})": "第 {0} 镜 关键帧（{1}）",
-  "Shot {0} needs a look (composition {1}, quality {2}): {3}": "第 {0} 镜需要人工查看（构图 {1}，画质 {2}）：{3}",
+  "Shot {0} needs a look: {1}": "第 {0} 镜需要人工查看：{1}",
   "Shot {0} of {1} is ready: check it, then confirm": "第 {0} 镜／共 {1} 镜已完成：请检查后再确认",
   "Shot {0} previs": "第 {0} 镜 粗模试演",
   "Shot {0} previs depth": "第 {0} 镜预演深度图",

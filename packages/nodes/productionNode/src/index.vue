@@ -8,7 +8,7 @@
         <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
         <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
         <!-- Clips that failed the frame check twice; the film keeps them, so a person decides whether to redo them. -->
-        <span v-for="clip in flaggedClips" :key="clip.shot" class="warning">{{ t`Shot ${clip.shot} needs a look (composition ${clip.check.composition}, quality ${clip.check.quality}): ${clip.check.issues.join("; ")}` }}</span>
+        <span v-for="clip in flaggedClips" :key="clip.shot" class="warning">{{ t`Shot ${clip.shot} needs a look: ${clip.check.issues.filter(issue => issue.major).map(issue => issue.problem).join("; ")}` }}</span>
         <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
       </template>
       <span v-else>{{ translate("Give an outline and a length; the AI writes the script and makes the film, stopping for your review.") }}</span>
@@ -110,7 +110,7 @@ type Production = {
   assets?: { characters: Asset[]; places: Asset[] };
   keyframes?: { master: number; shots: Keyframe[] };
   dub?: unknown; clips?: unknown; previs?: { shot: number; depth: string }[]; roughCut?: string;
-  videos?: { shot: number; video?: string; check?: { composition: number; quality: number; issues: string[]; passed: boolean }; retried?: boolean }[];
+  videos?: { shot: number; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
   finals?: { shot: number; video?: string }[]; music?: string; film?: string; report?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };

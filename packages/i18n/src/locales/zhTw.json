@@ -3326,7 +3326,7 @@
   "Rendering the clips ({0}/{1})…": "正在生成影片片段（{0}/{1}）…",
   "Joining the rough cut…": "正在剪接粗剪…",
   "Checking the clips frame by frame ({0}/{1})…": "正在逐格檢查片段（{0}/{1}）…",
-  "Shot {0} needs a look (composition {1}, quality {2}): {3}": "第 {0} 鏡需要人工查看（構圖 {1}，畫質 {2}）：{3}",
+  "Shot {0} needs a look: {1}": "第 {0} 鏡需要人工查看：{1}",
   "Clip": "片段",
   "Clip seed": "片段種子",
   "Colab compute units: {0} spent of a {1} budget (estimate {2}); the balance shows spending a few minutes late.": "Colab 運算單元：預算 {1}，已用 {0}（預估 {2}）；餘額會延遲幾分鐘才反映用量。",

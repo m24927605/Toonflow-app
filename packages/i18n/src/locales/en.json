@@ -3326,7 +3326,7 @@
   "Rendering the clips ({0}/{1})…": "Rendering the clips ({0}/{1})…",
   "Joining the rough cut…": "Joining the rough cut…",
   "Checking the clips frame by frame ({0}/{1})…": "Checking the clips frame by frame ({0}/{1})…",
-  "Shot {0} needs a look (composition {1}, quality {2}): {3}": "Shot {0} needs a look (composition {1}, quality {2}): {3}",
+  "Shot {0} needs a look: {1}": "Shot {0} needs a look: {1}",
   "Clip": "Clip",
   "Clip seed": "Clip seed",
   "Colab compute units: {0} spent of a {1} budget (estimate {2}); the balance shows spending a few minutes late.": "Colab compute units: {0} spent of a {1} budget (estimate {2}); the balance shows spending a few minutes late.",
