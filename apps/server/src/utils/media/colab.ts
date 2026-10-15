@@ -64,17 +64,29 @@ async function guardColabLog() {
 
 // Sessions this process opened and has not stopped yet, with the CLI path that opened them.
 const activeSessions = new Map<string, string>();
+// Sessions whose `colab new` is still running. That CLI process outlives this one and records the session only once the
+// machine is assigned, about a minute later, so until then a stop finds nothing and the machine would bill unseen.
+const startingSessions = new Set<string>();
+// How long an exit keeps retrying the stop of a starting session: a `new` has taken up to about two minutes.
+const startingStopWait = 180_000;
 let exitGuarded = false;
 
 /**
  * A killed or restarted server never reaches the `finally` that stops its session, and an orphaned GPU keeps billing,
- * so every open session is stopped synchronously when the process is told to end.
+ * so every open session is stopped synchronously when the process is told to end, waiting for one still starting.
  */
 function guardProcessExit() {
   if (exitGuarded) return;
   exitGuarded = true;
   const stopAll = () => {
-    for (const [session, command] of activeSessions) Bun.spawnSync([command, "stop", "--session", session], { stdin: "ignore", stdout: "ignore", stderr: "ignore" });
+    for (const [session, command] of activeSessions) {
+      const deadline = Date.now() + (startingSessions.has(session) ? startingStopWait : 0);
+      for (;;) {
+        const { stdout, stderr } = Bun.spawnSync([command, "stop", "--session", session], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+        if (!`${stdout}${stderr}`.includes("not found") || Date.now() > deadline) break;
+        Bun.sleepSync(3_000);
+      }
+    }
     activeSessions.clear();
   };
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
@@ -119,7 +131,8 @@ const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted
 
 async function colab(command: string, args: string[], signal?: AbortSignal) {
   for (let attempt = 1; ; attempt++) {
-    const child = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal });
+    // `new` runs in its own process group, so a Ctrl-C in the terminal cannot kill it midway (see openColabSession).
+    const child = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal, detached: args[0] === "new" });
     const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
     await child.exited;
     signal?.throwIfAborted();
@@ -309,7 +322,10 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
     return stdout;
   }
 
-  /** Starts the heartbeat; the first execs of a new session may hang before reaching the kernel, so it is retried. */
+  /**
+   * Starts the heartbeat. The first execs of a new session may hang before reaching the kernel or time out while the
+   * machine's proxy comes up, so it is retried; the script starts nothing twice.
+   */
   async function startHeartbeat(signal?: AbortSignal) {
     const path = join(directory, "heartbeat.py");
     await writeFile(path, heartbeatScript);
@@ -317,8 +333,9 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
       const timeout = AbortSignal.timeout(90_000);
       const result = await spawnExec(path, {}, signal ? AbortSignal.any([signal, timeout]) : timeout);
       signal?.throwIfAborted();
-      if (!timeout.aborted) return checkOutput(result);
+      if (!timeout.aborted && !(result.exitCode !== 0 && transient.test(result.stderr))) return checkOutput(result);
       if (attempt === 3) throw new Error(`Colab session ${name} did not run code after three attempts: ${tail(result.stderr, 1000)}`);
+      await scheduler.wait(attempt * 10_000, { signal });
     }
   }
 
@@ -454,7 +471,10 @@ for _name, _count in ${JSON.stringify(split)}:
     // follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
     for (const waitStart = Date.now(); ; ) {
       try {
-        await colab(command, ["new", "--session", name, "--gpu", gpu, ...highMem ? ["--high-mem"] : []], signal);
+        startingSessions.add(name);
+        // Never cancelled midway: a killed `new` can leave an assigned machine the CLI never recorded, which nothing can
+        // stop; a cancelled start is stopped once `new` returns.
+        await colab(command, ["new", "--session", name, "--gpu", gpu, ...highMem ? ["--high-mem"] : []]).finally(() => startingSessions.delete(name));
         break;
       } catch (error) {
         if (!/Allocation refused|Service Unavailable/.test(String(error)) || Date.now() - waitStart > allocationWait) throw error;
@@ -463,6 +483,7 @@ for _name, _count in ${JSON.stringify(split)}:
       }
     }
     startedAt = Date.now();
+    signal?.throwIfAborted();
     // ACT: The account-wide rate right after start stands for this session; with parallel sessions it over-counts.
     hourlyRate = Number(/Usage rate:\s*([\d.]+)/.exec(await colab(command, ["usage"]).catch(() => ""))?.[1]) || fallbackHourlyRate;
     await startHeartbeat(signal);
