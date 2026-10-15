@@ -7,7 +7,7 @@ import { readFile, readdir } from "@toonflow/file";
 import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { errorFromCause } from "@/lib/responseFormat";
-import initializePlugins from "@/utils/plugins/initialize";
+import initializePlugins, { syncEditablePlugins } from "@/utils/plugins/initialize";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 
@@ -75,8 +75,8 @@ export async function createApp({
     const providerRevision = await contentRevision(autoInstallProviders.map(name => resolve(sourceDirectory, name)));
     await initializePlugins(resolve(dataDirectory, "providers"), sourceDirectory, autoInstallProviders, providerRevision);
   }
-  // ACT: Skills and teams are only installed on first run, preserving user edits.
-  if (dataDirectory && skillsRoot) await initializePlugins(resolve(dataDirectory, "skills"), skillsRoot);
+  // Built-in skills follow the build unless they were edited; teams are only installed on first run, preserving edits.
+  if (dataDirectory && skillsRoot) await syncEditablePlugins(resolve(dataDirectory, "skills"), skillsRoot);
   if (dataDirectory && agentsRoot) await initializePlugins(resolve(dataDirectory, "agents"), agentsRoot);
   const app = express();
   app.locals.appVersion = appVersion;
