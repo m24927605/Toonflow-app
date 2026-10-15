@@ -5,6 +5,7 @@
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
 # 480p samples just above the target size; 720p samples at the model's native ~768p and downscales;
 # 1080p upscales the 768p video latent with the LBH 3D latent upscaler and resamples it.
+import json
 import math
 import os
 import shutil
@@ -34,9 +35,14 @@ seed = int(os.environ["H3_SEED"])
 resolution = os.environ["H3_RESOLUTION"]
 duration = int(os.environ["H3_DURATION"])
 audio = os.environ["H3_AUDIO"] == "1"
+# Sampling steps that attend to the reference videos. A previs is flat Three.js footage: attended to throughout, H3
+# copies its look, so it is dropped once the early steps have set the layout, motion and camera (Code Video Model's
+# early-step conditioning, https://code-video-model.github.io).
+steps = 4
+videoSteps = int(os.environ["H3_VIDEO_STEPS"])
 ratioWidth, ratioHeight = (int(part) for part in os.environ["H3_RATIO"].split(":"))
 shortSides = {"480p": 480, "720p": 720, "1080p": 1080}
-assert resolution in shortSides and 4 <= duration <= 15 and ratioWidth > 0 and ratioHeight > 0
+assert resolution in shortSides and 4 <= duration <= 15 and 1 <= videoSteps <= steps and ratioWidth > 0 and ratioHeight > 0
 
 
 def ceil32(value):
@@ -174,10 +180,25 @@ graph = {
         **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
     "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
     "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
-    "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": 4, "denoise": 1.0}},
+    "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
     "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
-    "14": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["12", 0], "vae": ["5", 0]}},
 }
+sampled = ["12", 0]
+early = bool(videos) and videoSteps < steps
+if early:
+    # The same request without the reference videos conditions the remaining steps, continuing the first sampler's
+    # latent without new noise.
+    withoutVideos = json.loads(json.dumps(graph["7"]))
+    withoutVideos["inputs"] = {name: value for name, value in withoutVideos["inputs"].items() if not name.startswith("ref_videos.")}
+    graph.update({
+        "7b": withoutVideos,
+        "17": {"class_type": "SplitSigmas", "inputs": {"sigmas": ["11", 0], "step": videoSteps}},
+        "18": {"class_type": "DisableNoise", "inputs": {}},
+        "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": ["12", 0]}},
+    })
+    graph["12"]["inputs"]["sigmas"] = ["17", 0]
+    sampled = ["19", 0]
+graph["14"] = {"class_type": "VAEDecodeAudio", "inputs": {"samples": sampled, "vae": ["5", 0]}}
 for index, ref in enumerate(refs):
     graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
 for index, name in enumerate(audios):
@@ -189,7 +210,7 @@ for index, name in enumerate(videos):
 model = ["2", 0]
 if controlSource:
     graph.update({
-        "cvFile": {"class_type": "LoadVideo", "inputs": {"file": "h3control.mp4"}},
+        "cvFile": {"class_type": "LoadVideo", "inputs": {"file": f"h3control{job}.mp4"}},
         "cv": {"class_type": "GetVideoComponents", "inputs": {"video": ["cvFile", 0]}},
         "30": {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}},
         "31": {"class_type": "MiniMaxH3FunControlNetApply", "inputs": {
@@ -202,10 +223,10 @@ for name, image in (("first", firstFrame), ("last", lastFrame)):
         graph[f"{name}Frame"] = {"class_type": "LoadImage", "inputs": {"image": image.name}}
 
 
-def guided(prefix, latent):
+def guided(prefix, latent, source="7"):
     # Pins the first frame at frame 0 and the last frame at the last frame that survives the final trim.
     # Guides are encoded at the latent's own size, so the 1080p refine pass gets its own chain.
-    conditioning = ["7", 0]
+    conditioning = [source, 0]
     for name, image, frameIndex in (("first", firstFrame, 0), ("last", lastFrame, frames - 1)):
         if image:
             graph[f"{prefix}{name}"] = {"class_type": "MiniMaxH3AddGuide", "inputs": {
@@ -215,17 +236,19 @@ def guided(prefix, latent):
 
 
 graph["8"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": guided("guide", ["7", 1])}}
-videoLatent = ["12", 0]
+if early:
+    graph["8b"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": guided("baseGuide", ["7", 1], "7b")}}
+videoLatent = sampled
 if refine:
     # Second-pass schedule from the LBH r2v example; the soundtrack stays from the first pass.
     graph.update({
-        "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["12", 0]}},
+        "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": sampled}},
         "21": {"class_type": "MinimaxH3LatentUpscaler3D", "inputs": {
             "latent": ["20", 0], "model_name": upscaler, "mode": "target dimensions", "mode.width": upscaleWidth, "mode.height": upscaleHeight,
             "align": 32, "enable_temporal_chunking": True, "force_unload": True, "device": "cuda", "precision": "fp16"}},
         "22": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["21", 0], "audio_latent": ["20", 1]}},
         "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
-        "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0])}},
+        "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0], "7b" if early else "7")}},
         "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
         "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": ["22", 0]}},
     })

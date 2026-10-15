@@ -8,6 +8,9 @@ const resolutions = new Set(["480p", "720p", "1080p"]);
 // Clips share one high-RAM A100 kept for five idle minutes, so a batch of shots pays the ComfyUI install and the
 // 30+ GB model download once; the high-RAM shape is needed for those weights to pass through host memory.
 const worker = createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000);
+// Of the four Turbo sampling steps, the reference videos condition only the first: Code Video Model found a previs
+// used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
+const videoSteps = 1;
 
 /** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
 export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio }: MinimaxH3Request, signal?: AbortSignal) {
@@ -34,7 +37,7 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
       ...loras.map((lora, index) => ({ name: name(`lora_${index}.safetensors`), data: inputBytes(lora.file) })),
       ...loras.length ? [{ name: name("loras.json"), data: JSON.stringify(loras.map(lora => lora.strength)) }] : [],
     ],
-    env: { H3_JOB: job, H3_SEED: randomSeed(), H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0 },
+    env: { H3_JOB: job, H3_SEED: randomSeed(), H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps },
     outputs: ["/content/h3out/final.mp4"],
   }, sessionSignal), signal);
   return { data: video!, mimeType: "video/mp4" as const };
