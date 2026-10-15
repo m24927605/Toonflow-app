@@ -11,11 +11,12 @@ import { productionDirectory, writeProductionText, type Production } from "./sta
 
 /**
  * `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest; `check` is the model's
- * verdict on its frames, and `retried` marks a clip rendered again with a new seed after it failed.
+ * verdict on its frames, `retried` marks a clip rendered again with a new seed after it failed, and `rejected` keeps the
+ * verdict that sent it back.
  */
 export type ProductionClip = {
   shot: number; prompt?: string; video?: string; seed?: number;
-  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean;
+  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean; rejected?: ProductionClip["check"];
 };
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };

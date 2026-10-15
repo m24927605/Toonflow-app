@@ -297,7 +297,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const keyframe = production.keyframes.shots.find(shot => shot.shot === item.shot)!;
       const frames = await clipFrames(cwd, production, item, keyframe.image!, signal);
       item.check = readClipCheck(await complete(checker, clipCheckPrompt(keyframe.description ?? "", item.prompt ?? ""), signal, frames));
-      if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, video: undefined, seed: undefined, check: undefined });
+      if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
       await saveProduction(cwd, production);
     }
     return true;
