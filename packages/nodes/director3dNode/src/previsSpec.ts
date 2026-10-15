@@ -77,12 +77,12 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "",
     "set: the one place where the shots happen.",
     "- \"interior\": true for a room, false for outdoors; \"width\" and \"depth\": the floor in metres at real scale (a six-mat Japanese room is about 3.6 by 2.7, a living room about 5 by 4).",
-    "- \"props\": every piece of furniture, door and window the shots use or the script names, each {\"name\": a unique name, \"kind\": a kind below, \"at\": a place}. Leave out things held in the hand.",
+    "- \"props\": every piece of furniture, door and window the shots use or the script names, each {\"name\": a unique name, \"kind\": a kind below, \"at\": a place}. Leave out things held in the hand, and floor coverings such as tatami or rugs: the floor is built already.",
     `- Kinds: ${Object.keys(propKinds).filter(kind => kind !== "other").join(", ")}, or "other" with "size": {"width", "depth", "height"} in metres. Doors, sliding doors, windows, desks, sofas, beds, cabinets and counters stand against the wall nearest their place.`,
     "",
-    "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side; or on a chair, sofa, bed, cushion or bench: {\"prop\": its name, \"side\": \"on\"}.",
+    "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side and nothing is behind a prop that stands against a wall; or on a chair, sofa, bed, cushion or bench: {\"prop\": its name, \"side\": \"on\"}.",
     "",
-    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\"}. Someone who comes in through a door enters at the door. Once in, people stay in the place.",
+    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\"}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
     "",
     "shots: one per shot, in order: {\"shot\": its number, \"moves\": [...], \"camera\": {...}}.",
     "- \"moves\": each person who moves or changes posture during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end}; leave out \"to\" for someone who only sits down or stands up where they are. Everyone starts where the previous shot left them, so leave out anyone who stays as they are.",
@@ -93,10 +93,12 @@ export function previsSpecPrompt(shots: SpecShot[]) {
 }
 
 const isSeat = (kind: PropKind) => "seat" in propKinds[kind];
+const onWall = (kind: PropKind) => "wall" in propKinds[kind];
 
 /**
  * Reads the model's reply into a plan and lists what is wrong with it for the model to fix: the JSON and its shape,
- * then names that point nowhere, people missing from the shots they are in frame in, and seats that are not seats.
+ * then names that point nowhere, people missing from the shots they are in frame in, seats that are not seats, and
+ * places behind a prop against a wall of a room, which are inside the wall.
  * A shot the plan leaves out keeps everyone still under a front camera.
  */
 export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: PrevisSpec; problems: string[] } {
@@ -116,6 +118,7 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
     const kind = props.get(place.prop);
     if (!kind) problems.push(`${where} names the prop "${place.prop}", which the set does not have (or has only later in its list).`);
     else if (place.side === "on" && !isSeat(kind)) problems.push(`${where} puts someone on "${place.prop}", a ${kind}; only a chair, sofa, bed, cushion or bench can be sat on.`);
+    else if (place.side === "back" && onWall(kind) && spec.set.interior) problems.push(`${where} is behind "${place.prop}", which stands against a wall, so behind it is inside the wall; use its front, the room side.`);
     else if (seat && place.side === "on") problems.push(`${where} puts a prop on "${place.prop}"; put it beside it instead.`);
   };
   for (const prop of spec.set.props) {

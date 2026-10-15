@@ -248,7 +248,7 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
       const away = new Vector3(nearCentre.x - farCentre.x, 0, nearCentre.z - farCentre.z).normalize();
       const across = new Vector3(-away.z, 0, away.x);
       if (across.x * shot.direction.x + across.z * shot.direction.z < 0) across.negate();
-      const from = new Vector3(nearCentre.x, 0, nearCentre.z).addScaledVector(away, 0.75).addScaledVector(across, 0.3);
+      const from = new Vector3(nearCentre.x, 0, nearCentre.z).addScaledVector(away, 0.75).addScaledVector(across, 0.4);
       from.y = below(Math.max(cameraHeights.framed, near.max.y - 0.1));
       const heads = far.map(box => box.max.y - 0.15);
       const target = new Vector3(farCentre.x, (Math.min(...heads) + Math.max(...heads)) / 2, farCentre.z);

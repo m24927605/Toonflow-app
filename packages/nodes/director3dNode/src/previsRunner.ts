@@ -5,7 +5,7 @@ import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentP
 import { describeBlocking, frameShot, framingIssues } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot } from "./previsSpec";
-import { buildSet, ceilingOf, emptyShotView, stageShots } from "./previsStage";
+import { buildSet, ceilingOf, emptyShotView, renderSettings, stageShots } from "./previsStage";
 import { renderImage, renderVideo } from "./renderMedia";
 import { getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { directorPlanSchema, type DirectorPlan } from "./sceneAnimation";
@@ -107,7 +107,7 @@ export async function runPrevis(options: {
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
     if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
     plans.push({ ...plan, id: crypto.randomUUID() });
-    const exported = await exportShot(scene, plan, options.aspect, options.signal);
+    const exported = await exportShot(scene, plan, options.aspect, options.signal, getSceneLighting(scene), renderSettings(spec));
     await options.onShot({ shot, ...exported, scene, plans, spec });
   }
 }

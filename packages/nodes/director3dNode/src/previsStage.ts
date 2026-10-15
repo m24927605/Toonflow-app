@@ -31,8 +31,8 @@ const actionShare = 0.9;
 const clearance = 0.15;
 const personGap = 0.55;
 const wallHeight = 2.4;
-// How far the walls, floor and ceiling run on past the room, where only a camera outside it sees them.
-const wallRunOn = 4;
+// How far the floor runs on past the room, under a camera that steps out of it.
+const floorRunOn = 4;
 // How far off the other person's eyeline the camera of a single stands, so the face is seen in three-quarter view.
 const eyelineAngle = 35 * Math.PI / 180;
 
@@ -40,7 +40,7 @@ const sideDirections: Record<string, Point> = {
   front: { x: 0, z: 1 }, frontLeft: { x: -Math.SQRT1_2, z: Math.SQRT1_2 }, frontRight: { x: Math.SQRT1_2, z: Math.SQRT1_2 },
   left: { x: -1, z: 0 }, right: { x: 1, z: 0 }, back: { x: 0, z: -1 },
 };
-const colours = { floor: "#8c8273", walls: ["#b9b3a7", "#aaa498", "#c3bdb1"], ceiling: "#d2cec6", prop: "#6e5c49", opening: "#c9c1ad", people: ["#d9714e", "#4e8ad9", "#8bc34a", "#e0b84a", "#a46bd9", "#4ec2c2"] };
+const colours = { floor: "#8c8273", walls: ["#b9b3a7", "#aaa498", "#c3bdb1"], ceiling: "#d2cec6", prop: "#6e5c49", flat: "#a69a84", opening: "#c9c1ad", people: ["#d9714e", "#4e8ad9", "#8bc34a", "#e0b84a", "#a46bd9", "#4ec2c2"] };
 
 const add = (a: Point, b: Point, scale = 1) => ({ x: a.x + b.x * scale, z: a.z + b.z * scale });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -58,6 +58,11 @@ const roomPoint = (width: number, depth: number, place: string): Point => ({
   x: /left/i.test(place) ? -width / 3 : /right/i.test(place) ? width / 3 : 0,
   z: /back/i.test(place) ? -depth / 3 : /front/i.test(place) ? depth / 3 : 0,
 });
+// Rugs, mats and cushions are walked and stood on, and doors and windows are panels in the walls: neither is in anyone's
+// way, and a flat one is no place another prop has to keep clear of.
+const flat = (prop: Footprint) => prop.height <= 0.1;
+const opening = (prop: Footprint) => prop.depth < 0.1;
+const obstacle = (prop: Footprint) => !flat(prop) && !opening(prop);
 const inside = (point: Point, rect: Rect) => point.x > rect.minX && point.x < rect.maxX && point.z > rect.minZ && point.z < rect.maxZ;
 const overlaps = (a: Rect, b: Rect) => a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
 
@@ -118,7 +123,7 @@ function layOut(spec: PrevisSpec) {
     const within = (centre: Point) => interior
       ? { x: Math.max(-width / 2 + spanX / 2, Math.min(width / 2 - spanX / 2, centre.x)), z: Math.max(-depth / 2 + spanZ / 2, Math.min(depth / 2 - spanZ / 2, centre.z)) }
       : centre;
-    const clear = (centre: Point) => !props.some(other => overlaps(rectOf({ ...prop, centre }, 0), rectOf(other, 0)));
+    const clear = (centre: Point) => flat(prop) || !props.some(other => !flat(other) && overlaps(rectOf({ ...prop, centre }, 0), rectOf(other, 0)));
     prop.centre = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 8, -8, 10, -10].map(step => within(add(point, tangent, step * 0.3))).find(clear) ?? within(point);
     props.push(prop);
   }
@@ -139,30 +144,32 @@ export function buildSet(spec: PrevisSpec): SceneDocument {
   const set = layOut(spec);
   const { width, depth, height } = set;
   const view = roomView(set);
-  const plane = (id: string, size: { width: number; height: number }, position: { x: number; y: number; z: number }, rotation: { rotationX: number; rotationY: number }, color: string): SceneDocument["objectList"][number] => ({
-    threeJsonId: id, name: id, objType: "plane", geometry: size, position, rotation: { ...rotation, rotationZ: 0 }, material: { type: "standard", color },
+  const plane = (id: string, size: { width: number; height: number }, position: { x: number; y: number; z: number }, rotation: { rotationX: number; rotationY: number }, color: string, name = id): SceneDocument["objectList"][number] => ({
+    threeJsonId: id, name, objType: "plane", geometry: size, position, rotation: { ...rotation, rotationZ: 0 }, material: { type: "standard", color },
   });
   // Planes show only their front, so the walls, facing in, are seen from inside and seen through from outside, as on a
   // film set with a wall taken out: a camera that steps back for a wide shot is never blocked by the wall behind it.
-  // They run on past the room, hidden from inside by the walls across them, so that camera sees walls and not the sky
-  // past a corner.
-  const [across, deep] = [width + 2 * wallRunOn, depth + 2 * wallRunOn];
+  // The floor runs on under that camera; past the walls there is nothing, rendered as the far background.
   const room = set.interior ? [
-    plane("floor", { width: across, height: deep }, { x: 0, y: 0.002, z: 0 }, { rotationX: -Math.PI / 2, rotationY: 0 }, colours.floor),
-    plane("backWall", { width: across, height }, { x: 0, y: height / 2, z: -depth / 2 }, { rotationX: 0, rotationY: 0 }, colours.walls[0]!),
-    plane("frontWall", { width: across, height }, { x: 0, y: height / 2, z: depth / 2 }, { rotationX: 0, rotationY: Math.PI }, colours.walls[0]!),
-    plane("leftWall", { width: deep, height }, { x: -width / 2, y: height / 2, z: 0 }, { rotationX: 0, rotationY: Math.PI / 2 }, colours.walls[1]!),
-    plane("rightWall", { width: deep, height }, { x: width / 2, y: height / 2, z: 0 }, { rotationX: 0, rotationY: -Math.PI / 2 }, colours.walls[2]!),
-    plane("ceiling", { width: across, height: deep }, { x: 0, y: height, z: 0 }, { rotationX: Math.PI / 2, rotationY: 0 }, colours.ceiling),
-  ] : [plane("ground", { width: Math.max(width, depth) * 4, height: Math.max(width, depth) * 4 }, { x: 0, y: 0.002, z: 0 }, { rotationX: -Math.PI / 2, rotationY: 0 }, colours.floor)];
-  // Props are boxes, never cylinders, which the checks take for people.
-  const props = set.props.map((prop, index): SceneDocument["objectList"][number] => ({
-    threeJsonId: `prop${index + 1}`, name: prop.name, objType: "box",
-    geometry: { width: prop.width, height: prop.height, depth: prop.depth },
-    position: { x: prop.centre.x, y: prop.bottom + prop.height / 2, z: prop.centre.z },
-    rotation: { rotationX: 0, rotationY: Math.atan2(prop.facing.x, prop.facing.z), rotationZ: 0 },
-    material: { type: "standard", color: prop.depth < 0.1 ? colours.opening : colours.prop, roughness: 0.9 },
-  }));
+    plane("floor", { width: width + 2 * floorRunOn, height: depth + 2 * floorRunOn }, { x: 0, y: 0.002, z: 0 }, { rotationX: -Math.PI / 2, rotationY: 0 }, colours.floor),
+    plane("backWall", { width, height }, { x: 0, y: height / 2, z: -depth / 2 }, { rotationX: 0, rotationY: 0 }, colours.walls[0]!),
+    plane("frontWall", { width, height }, { x: 0, y: height / 2, z: depth / 2 }, { rotationX: 0, rotationY: Math.PI }, colours.walls[0]!),
+    plane("leftWall", { width: depth, height }, { x: -width / 2, y: height / 2, z: 0 }, { rotationX: 0, rotationY: Math.PI / 2 }, colours.walls[1]!),
+    plane("rightWall", { width: depth, height }, { x: width / 2, y: height / 2, z: 0 }, { rotationX: 0, rotationY: -Math.PI / 2 }, colours.walls[2]!),
+    plane("ceiling", { width, height: depth }, { x: 0, y: height, z: 0 }, { rotationX: Math.PI / 2, rotationY: 0 }, colours.ceiling),
+  ] : [plane("ground", { width: 200, height: 200 }, { x: 0, y: 0.002, z: 0 }, { rotationX: -Math.PI / 2, rotationY: 0 }, colours.floor)];
+  // Props are boxes, never cylinders, which the checks take for people; doors and windows are planes facing into the
+  // room like the walls they are in, so a camera outside sees through them too.
+  const props = set.props.map((prop, index): SceneDocument["objectList"][number] => {
+    const position = { x: prop.centre.x, y: prop.bottom + prop.height / 2, z: prop.centre.z };
+    const turn = Math.atan2(prop.facing.x, prop.facing.z);
+    return opening(prop)
+      ? plane(`prop${index + 1}`, { width: prop.width, height: prop.height }, position, { rotationX: 0, rotationY: turn }, colours.opening, prop.name)
+      : {
+          threeJsonId: `prop${index + 1}`, name: prop.name, objType: "box", geometry: { width: prop.width, height: prop.height, depth: prop.depth },
+          position, rotation: { rotationX: 0, rotationY: turn, rotationZ: 0 }, material: { type: "standard", color: flat(prop) ? colours.flat : colours.prop, roughness: 0.9 },
+        };
+  });
   const people = spec.people.map((person, index): SceneDocument["objectList"][number] => ({
     threeJsonId: `person${index + 1}`, name: person.name, objType: "cylinder",
     geometry: { radiusTop: radius, radiusBottom: radius, height: standingHeight, radialSegments: 24 },
@@ -193,6 +200,9 @@ export function emptyShotView(spec: PrevisSpec) {
 
 /** The height a camera must stay under: the ceiling of a room, none outdoors. */
 export const ceilingOf = (spec: PrevisSpec) => spec.set.interior ? spec.set.height ?? wallHeight : Infinity;
+
+/** What the renders show besides the set: no grid, and the sky only outdoors, so a room is seen against nothing. */
+export const renderSettings = (spec: PrevisSpec) => ({ gridVisible: false, skyVisible: !spec.set.interior });
 
 /** A person's cylinder for a body: its height from the posture, or laid along the longer side of what they lie on. */
 function transformOf(body: Body) {
@@ -303,7 +313,7 @@ function place(set: SetLayout, at: Place, posture: Posture, others: Body[]): Bod
     }
   }
   if (!seat) {
-    const blocking = set.props.find(prop => inside(point, rectOf(prop, radius + clearance)));
+    const blocking = set.props.find(prop => obstacle(prop) && inside(point, rectOf(prop, radius + clearance)));
     if (blocking) {
       const direction = sideOf(blocking, "front");
       point = add(blocking.centre, direction, halfAlong(blocking, direction) + radius + clearance + 0.05);
@@ -324,7 +334,7 @@ function walkFrames(set: SetLayout, start: Body, end: Body, seconds: number) {
   const moving = distance(start, end) > 0.05;
   if (moving) {
     // The props they leave and the seat they go to are not in their way.
-    const blocking = set.props.filter(prop => prop.name !== start.seat?.prop && prop.name !== end.seat?.prop)
+    const blocking = set.props.filter(prop => obstacle(prop) && prop.name !== start.seat?.prop && prop.name !== end.seat?.prop)
       .map(prop => rectOf(prop, radius + 0.05)).find(rect => crosses(start, end, rect));
     if (blocking) {
       const corners = [{ x: blocking.minX, z: blocking.minZ }, { x: blocking.minX, z: blocking.maxZ }, { x: blocking.maxX, z: blocking.minZ }, { x: blocking.maxX, z: blocking.maxZ }]
