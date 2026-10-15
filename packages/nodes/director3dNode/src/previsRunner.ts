@@ -58,6 +58,43 @@ export async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspec
 // Times the director agent may fix a shot whose framing check fails before the camera is framed by computation.
 const framingRetries = 1;
 
+/** The opening, middle and end frames of a plan, the camera at its last keyframe before each moment. */
+async function reviewFrames(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal) {
+  const frames: Blob[] = [];
+  for (const time of [0, plan.duration / 2, Math.max(0, plan.duration - 0.05)]) {
+    const view = plan.cameraFrames.findLast(frame => frame.time <= time) ?? plan.cameraFrames[0]!;
+    frames.push(await renderImage(scene, anchorSchema.parse({ ...view.view, time }), aspect, time, signal, plan, getSceneLighting(scene), { gridVisible: true, skyVisible: true }, "color"));
+  }
+  return frames;
+}
+
+/**
+ * Has the director model look at a blocked shot's frames, which the geometric checks cannot judge against the story:
+ * the shot size and angle, who stands where and how people relate and move. Returns what to change, or nothing; a
+ * reply that cannot be read counts as nothing, since the geometry already passed.
+ */
+async function lookAtShot(options: { generate: Generate; providerId: string; modelId: string; signal: AbortSignal }, instruction: string, blocking: string, frames: string[]) {
+  const prompt = [
+    "A previs director was given the task below for one shot of a short film.",
+    "",
+    instruction,
+    "",
+    `The last three images are the opening, middle and end frames of the shot they blocked: people are grey cylinders and the set is plain blocks. Measured at the opening frame: ${blocking}.`,
+    "Check only the staging against the shot list: the shot size and camera angle, who is in frame and where, how the people relate to each other and to the set, and how they move over the three frames. Ignore the plain look.",
+    "Reply with JSON only: {\"ok\": true} when it matches, or {\"ok\": false, \"issues\": [\"what to change\"]}.",
+  ].join("\n");
+  const reply = await options.generate({
+    providerId: options.providerId, modelId: options.modelId, prompt, signal: options.signal,
+    references: frames.map(url => ({ dataType: "IMAGE" as const, value: { url, mimeType: "image/png" } })),
+  }) as { text?: string };
+  try {
+    const verdict = JSON.parse(/\{[\s\S]*\}/.exec(reply.text ?? "")?.[0] ?? "{}") as { ok?: boolean; issues?: unknown };
+    return verdict.ok === false && Array.isArray(verdict.issues) ? verdict.issues.filter((item): item is string => typeof item === "string").slice(0, 5) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** A shot where everyone holds the pose the previous shot ended on, for when the agent cannot block it. */
 function heldPlan(previous: DirectorPlan, shot: number, seconds: number): DirectorPlan {
   return {
@@ -82,6 +119,8 @@ export async function runPrevis(options: {
   generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number; angled: boolean; postures: Record<string, Posture> }[];
   aspect: number; signal: AbortSignal;
   start?: { scene: SceneDocument; plans: SavedPlan[] };
+  /** Saves an image the director model looks at and returns its workspace path. */
+  saveImage: (name: string, image: Blob) => Promise<string>;
   onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[] }) => Promise<void>;
 }) {
   let scene = options.start?.scene ?? createEmptyScene();
@@ -114,6 +153,15 @@ export async function runPrevis(options: {
       issues = await check(result);
     }
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
+    // The director model then looks at the agent's blocking and hands it back once with what it saw; a fix that breaks
+    // the geometry is dropped and the shot keeps the blocking that passed.
+    if (planned) {
+      const frames = await reviewFrames(result.scene, result.plan, options.aspect, options.signal);
+      const paths = await Promise.all(frames.map((frame, index) => options.saveImage(`shot${shot}Review${index + 1}.png`, frame)));
+      const seen = await lookAtShot(options, instruction, await describeBlocking(result.scene, result.plan, options.aspect), paths);
+      const fixed = seen.length ? await attempt(`${instruction}\n\nA look at the rendered frames found problems with the staging. Fix them, moving the camera or the people, and keep the rest:\n${seen.join("\n")}`, result) : undefined;
+      if (fixed && !(await check(fixed)).hard.length) result = fixed;
+    }
     scene = result.scene;
     const plan: SavedPlan = { ...result.plan, id: crypto.randomUUID(), instruction };
     plans.push(plan);

@@ -22,6 +22,7 @@ type PrevisJob = {
 type RunPrevis = (options: {
   generate: (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>; providerId: string; modelId: string; aspect: number; signal: AbortSignal;
   shots: PrevisJob["shots"]; start?: PrevisJob["start"];
+  saveImage: (name: string, image: Blob) => Promise<string>;
   onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: unknown; plans: unknown[] }) => Promise<void>;
 }) => Promise<void>;
 type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { done?: { shot: number; layout: string; depth: string; video: string; blocking: string }[]; error?: string } };
@@ -43,9 +44,16 @@ onMounted(async () => {
     const director = await loadNodeComponent("director3dNode", "/api/nodes/files?name=director3dNode") as unknown as { runPrevis?: RunPrevis };
     if (!director.runPrevis) throw new Error("The Director's Studio plugin cannot run previs; update it");
     const references: NodeAiRequest["references"] = [{ dataType: "STRING", value: job.script }, { dataType: "STRING", value: job.shotList }];
+    // The frames the director model looks at are kept with the previs, so its verdicts can be checked later.
+    await files.mkdir(`${job.folder}/review`).catch(() => undefined);
     await director.runPrevis({
-      generate: request => ai.generate({ ...request, references }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
+      generate: request => ai.generate({ ...request, references: [...references, ...request.references ?? []] }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
       signal: new AbortController().signal, shots: job.shots, start: job.start,
+      async saveImage(name, image) {
+        const path = `${job.folder}/review/${name}`;
+        await files.write(path, image);
+        return path;
+      },
       async onShot({ shot, layout, depth, video, blocking, scene, plans }) {
         status.value = `shot ${shot}`;
         const paths = { layout: `${job.folder}/shot${shot}.png`, depth: `${job.folder}/shot${shot}Depth.png`, video: `${job.folder}/shot${shot}.mp4` };

@@ -7,7 +7,7 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
-import { finishFilm, joinRoughCut, renderClips, scoreFilm, writeClipPrompts } from "./video";
+import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { estimateProduction } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes } from "./keyframes";
 import {
@@ -28,9 +28,11 @@ function textModel() {
   return model;
 }
 
-async function complete(systemPrompt: string, prompt: string, signal: AbortSignal) {
+/** Asks the text model, which also reads `images` after the prompt (PNG bytes as base64). */
+async function complete(systemPrompt: string, prompt: string, signal: AbortSignal, images: string[] = []) {
   const model = textModel();
-  const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content: prompt, timestamp: Date.now() }] }, signal);
+  const content = images.length ? [{ type: "text" as const, text: prompt }, ...images.map(data => ({ type: "image" as const, data, mimeType: "image/png" }))] : prompt;
+  const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content, timestamp: Date.now() }] }, signal);
   const message = await stream.result();
   if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
   return message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
@@ -278,6 +280,20 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await renderClips(cwd, production, production.videos, "480p", "clips", signal, () => saveProduction(cwd, production));
     return true;
   }
+  // Each clip is checked against its keyframe by the model reading frames of it: a clip that fails is rendered once more
+  // with a new seed, and one that fails again stays, flagged for a person to look at.
+  const unchecked = production.videos.filter(item => !item.check);
+  if (unchecked.length) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    for (const item of unchecked) {
+      const keyframe = production.keyframes.shots.find(shot => shot.shot === item.shot)!;
+      const frames = await clipFrames(cwd, production, item, keyframe.image!, signal);
+      item.check = readClipCheck(await complete(checker, clipCheckPrompt(keyframe.description ?? "", item.prompt ?? ""), signal, frames));
+      if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, video: undefined, seed: undefined, check: undefined });
+      await saveProduction(cwd, production);
+    }
+    return true;
+  }
   if (!production.roughCut) {
     production.roughCut = await joinRoughCut(cwd, production, signal);
     await saveProduction(cwd, production);
@@ -320,6 +336,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
 }
 
 const composer = "You describe film scores for a music generation model.";
+const checker = "You check AI-generated video clips for a film editor.";
 
 /** Asks for the Suno style prompt of an instrumental score that follows the story under its dialogue. */
 function musicPrompt(script: string, seconds: number) {

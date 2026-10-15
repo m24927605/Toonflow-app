@@ -7,6 +7,8 @@
         <span v-if="state.production.detail" class="failure">{{ state.production.detail }}</span>
         <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
         <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
+        <!-- Clips that failed the frame check twice; the film keeps them, so a person decides whether to redo them. -->
+        <span v-for="clip in flaggedClips" :key="clip.shot" class="warning">{{ t`Shot ${clip.shot} needs a look (composition ${clip.check.composition}, quality ${clip.check.quality}): ${clip.check.issues.join("; ")}` }}</span>
         <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
       </template>
       <span v-else>{{ translate("Give an outline and a length; the AI writes the script and makes the film, stopping for your review.") }}</span>
@@ -107,7 +109,8 @@ type Production = {
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
   keyframes?: { master: number; shots: Keyframe[] };
-  dub?: unknown; clips?: unknown; previs?: { shot: number; depth: string }[]; videos?: { shot: number; video?: string }[]; roughCut?: string;
+  dub?: unknown; clips?: unknown; previs?: { shot: number; depth: string }[]; roughCut?: string;
+  videos?: { shot: number; video?: string; check?: { composition: number; quality: number; issues: string[]; passed: boolean }; retried?: boolean }[];
   finals?: { shot: number; video?: string }[]; music?: string; film?: string; report?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
@@ -166,6 +169,7 @@ watch(photos, list => {
 }, { immediate: true });
 
 const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
+const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed && clip.retried ? [{ shot: clip.shot, check: clip.check }] : []));
 const headline = computed(() => {
   const production = state.value!.production;
   if (production.status === "running") {
@@ -179,6 +183,7 @@ const headline = computed(() => {
     if (!production.clips) return translate("Recording the dialogue…");
     if (!production.videos) return translate("Writing the video prompts…");
     if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
+    if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");
     const finals = production.finals ?? [];
     if (production.input.quality !== "480p" && (!production.finals || finals.some(item => !item.video))) return t`Rendering the clips at ${production.input.quality} (${finals.filter(item => item.video).length}/${production.videos.length})…`;

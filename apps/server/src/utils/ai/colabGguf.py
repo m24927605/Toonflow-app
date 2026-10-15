@@ -15,11 +15,21 @@ modelId = request["modelId"]
 revision = request["revision"]
 weightFile = request["file"]
 thinking = request["thinking"]
+# The vision projector of a multimodal model; without one the model reads text only.
+mmproj = request.get("mmproj")
 messages = request["messages"]
 tools = request.get("tools") or []
 contextWindow = request["contextWindow"]
 maxOutputTokens = request["maxOutputTokens"]
+def validPart(part):
+    if part.get("type") == "text":
+        return isinstance(part.get("text"), str)
+    return bool(mmproj) and part.get("type") == "image_url" and str((part.get("image_url") or {}).get("url", "")).startswith("data:image/")
+
+
 def validMessage(item):
+    if item["role"] == "user" and isinstance(item.get("content"), list):
+        return all(isinstance(part, dict) and validPart(part) for part in item["content"])
     if not isinstance(item.get("content"), str):
         return False
     if item["role"] == "tool":
@@ -51,18 +61,21 @@ if not (llamaRoot / "ready").exists():
 
 loadSeconds = 0.0
 server = globals().get("llamaServer")
-if globals().get("loadedModel") != (modelId, revision, weightFile) or server is None or server.poll() is not None:
+if globals().get("loadedModel") != (modelId, revision, weightFile, mmproj) or server is None or server.poll() is not None:
     # One model at a time: release whatever the previous request loaded, in either runtime.
     globals().get("releaseLoadedModel", lambda: None)()
     loadedModel = None
     started = time.monotonic()
     from huggingface_hub import hf_hub_download
     weightPath = hf_hub_download(modelId, weightFile, revision=revision, local_dir="/content/gguf")
+    # ACT: The projector runs on the CPU: the quantized weights and the 32K context nearly fill the L4, so text work
+    # never risks running out of GPU memory; drop --no-mmproj-offload once a run shows the headroom, for faster images.
+    vision = ["--mmproj", hf_hub_download(modelId, mmproj, revision=revision, local_dir="/content/gguf"), "--no-mmproj-offload"] if mmproj else []
     binary = next(llamaRoot.rglob("llama-server"))
     libraries = sorted({str(path.parent) for path in llamaRoot.rglob("*.so*")})
     serverLog = open("/content/llamaServer.log", "w")
     llamaServer = subprocess.Popen([
-        str(binary), "-m", weightPath, "-ngl", "999", "-c", str(contextWindow), "-fa", "on", "--jinja",
+        str(binary), "-m", weightPath, *vision, "-ngl", "999", "-c", str(contextWindow), "-fa", "on", "--jinja",
         "--host", "127.0.0.1", "--port", "18080",
     ], stdout=serverLog, stderr=subprocess.STDOUT, env={**os.environ, "LD_LIBRARY_PATH": ":".join([*libraries, os.environ.get("LD_LIBRARY_PATH", "")])})
     while True:
@@ -79,7 +92,7 @@ if globals().get("loadedModel") != (modelId, revision, weightFile) or server is 
         llamaServer.terminate()
         llamaServer.wait(60)
 
-    loadedModel = (modelId, revision, weightFile)
+    loadedModel = (modelId, revision, weightFile, mmproj)
     loadSeconds = time.monotonic() - started
 
 started = time.monotonic()

@@ -5058,6 +5058,9 @@
   "Colab CLI text generation does not support tool calls.": [
     "apps/server/src/utils/ai/colab.ts"
   ],
+  "This Colab CLI model reads text and images in user messages only.": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
   "Colab CLI text generation only supports text inputs and text references.": [
     "apps/server/src/utils/ai/colab.ts"
   ],
@@ -6429,6 +6432,9 @@
   "Shot list: {0} shots": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Shot {0} needs a look (composition {1}, quality {2}): {3}": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Budget {0} units · estimate {1} units": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6540,6 +6546,9 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Rendering the clips ({0}/{1})…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Checking the clips frame by frame ({0}/{1})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Joining the rough cut…": [

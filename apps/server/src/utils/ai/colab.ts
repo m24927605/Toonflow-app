@@ -11,13 +11,14 @@ const provider = languageProviders.find(item => item.protocol === "colab-cli")!;
 // Safetensors models are quantized to 4-bit with Transformers on load; GGUF models run on llama.cpp with the listed
 // file, the largest quant measured to fit the L4 together with the 32K context.
 // `tools` marks the models whose tool calls were checked to work through llama-server, such as the Director's Studio
-// tool loop; every other model still rejects tools.
-const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean }; tools?: boolean }> = {
+// tool loop; every other model still rejects tools. `mmproj` is a GGUF model's vision projector, which lets it read
+// images in user messages and image references; models without one read text only.
+const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean; mmproj?: string }; tools?: boolean }> = {
   "dphn/Dolphin-Mistral-24B-Venice-Edition": { revision: "b23ff40b4a25e4f93de432bd896d4464479a9f79" },
   "huihui-ai/Huihui-Qwen3.8-27B-abliterated": { revision: "739e3c5b89849f6c238ce1e5b70008612ae42cdd" },
   "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive": {
     revision: "f12a584fecbeb5f20001130d8ecd66c9327ae685",
-    gguf: { file: "Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", thinking: false },
+    gguf: { file: "Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", thinking: false, mmproj: "mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf" },
     tools: true,
   },
   "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive": {
@@ -52,14 +53,22 @@ export function streamColab(providerId: string, modelId: string, context: Contex
   if (!weight.tools && (context.tools?.length || context.messages.some(message => message.role === "toolResult" || (Array.isArray(message.content) && message.content.some(part => part.type === "toolCall"))))) {
     throw Object.assign(new Error("Colab CLI text generation does not support tool calls."), { status: 400 });
   }
-  if (references.some(item => item.dataType !== "STRING") || context.messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === "image"))) {
+  const vision = !!weight.gguf?.mmproj;
+  const hasImages = (message: Context["messages"][number]) => Array.isArray(message.content) && message.content.some(part => part.type === "image");
+  if (references.some(item => item.dataType !== "STRING" && !(vision && item.dataType === "IMAGE"))
+    || context.messages.some(message => hasImages(message) && (!vision || message.role !== "user"))) {
+    if (vision) throw Object.assign(new Error("This Colab CLI model reads text and images in user messages only."), { status: 400 });
     throw Object.assign(new Error("Colab CLI text generation only supports text inputs and text references."), { status: 400 });
   }
   const text = (content: string | { type: string; text?: string }[]) => typeof content === "string" ? content : content.flatMap(part => part.type === "text" ? [part.text!] : []).join("\n");
+  type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+  // A user message with images keeps its parts in order, images as data URLs; any other message is plain text.
+  const userContent = (content: Context["messages"][number]["content"]): string | Part[] => typeof content === "string" || !content.some(part => part.type === "image") ? text(content as { type: string; text?: string }[] | string)
+    : content.flatMap((part): Part[] => part.type === "text" ? [{ type: "text", text: part.text }] : part.type === "image" ? [{ type: "image_url", image_url: { url: `data:${part.mimeType};base64,${part.data}` } }] : []);
   // llama-server takes the OpenAI chat format: tool calls ride on assistant messages and results come back as tool messages.
-  const messages: { role: string; content: string; tool_call_id?: string; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[] }[] = context.messages.map(message => {
+  const messages: { role: string; content: string | Part[]; tool_call_id?: string; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[] }[] = context.messages.map(message => {
     if (message.role === "toolResult") return { role: "tool", tool_call_id: message.toolCallId, content: text(message.content) };
-    if (message.role !== "assistant") return { role: message.role, content: text(message.content) };
+    if (message.role !== "assistant") return { role: message.role, content: userContent(message.content) };
     const calls = message.content.flatMap(part => part.type === "toolCall" ? [part] : []);
     return {
       role: "assistant", content: text(message.content),
@@ -67,9 +76,15 @@ export function streamColab(providerId: string, modelId: string, context: Contex
     };
   });
   const firstUser = messages.find(message => message.role === "user");
-  if (!firstUser?.content.trim()) throw Object.assign(new Error("Colab CLI requires a non-empty text prompt."), { status: 400 });
+  const plain = (content: string | Part[]) => typeof content === "string" ? content : content.flatMap(part => part.type === "text" ? [part.text] : []).join("");
+  if (!firstUser || !plain(firstUser.content).trim()) throw Object.assign(new Error("Colab CLI requires a non-empty text prompt."), { status: 400 });
   const tools = context.tools?.map(tool => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }));
-  if (references.length) firstUser.content += references.map((item, index) => `\n{{ref ${index + 1}}}\n${item.value}`).join("");
+  if (references.length) {
+    const parts = references.flatMap((item, index): Part[] => item.dataType === "STRING" ? [{ type: "text", text: `\n{{ref ${index + 1}}}\n${item.value}` }]
+      : [{ type: "text", text: `\n{{ref ${index + 1}}}` }, { type: "image_url", image_url: { url: item.value } }]);
+    const merged = [...typeof firstUser.content === "string" ? [{ type: "text" as const, text: firstUser.content }] : firstUser.content, ...parts];
+    firstUser.content = merged.every(part => part.type === "text") ? plain(merged) : merged;
+  }
   // Given a long task, the model otherwise writes its plan and the tool arguments as text, which its chat template
   // allows before a call, so the reply ends without one; tool_choice "required" does not stop that text.
   const toolFormat = tools?.length ? "\n\nReply with exactly one tool call in the <tool_call> format and no other text until the task is done; only then reply with a short summary." : "";

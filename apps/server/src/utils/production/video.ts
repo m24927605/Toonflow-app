@@ -2,13 +2,21 @@ import type { FfmpegCommand } from "@toonflow/ffmpeg";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
 import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
+import { mkdir, readFile } from "@toonflow/file";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 
-/** `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest. */
-export type ProductionClip = { shot: number; prompt?: string; video?: string; seed?: number };
+/**
+ * `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest; `check` is the model's
+ * verdict on its frames, and `retried` marks a clip rendered again with a new seed after it failed.
+ */
+export type ProductionClip = {
+  shot: number; prompt?: string; video?: string; seed?: number;
+  check?: { composition: number; quality: number; issues: string[]; passed: boolean }; retried?: boolean;
+};
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
@@ -177,5 +185,52 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     .outputOptions(["-c:v libx264", "-crf 18", "-pix_fmt yuv420p", "-c:a aac", "-b:a 192k", "-movflags +faststart"]).output(output);
   await finished(command);
   return output;
+}
+
+// Frames a clip check reads, as shares of the clip's length.
+const checkTimes = [0.1, 0.4, 0.7, 0.95];
+// A clip passes with at least these scores, as Code Video Model's review set them.
+const passing = { composition: 60, quality: 70 };
+
+/** The keyframe and four frames of a clip as base64 PNGs, the frames saved beside the clips for a person to see. */
+export async function clipFrames(cwd: string, production: Production, clip: ProductionClip, keyframe: string, signal: AbortSignal) {
+  const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+  const length = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(clip.video!, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
+  const folder = `${productionDirectory(production.id)}/checks`;
+  await mkdir((await resolveWorkspacePath(cwd, folder, true)).path, { recursive: true });
+  // Everything is scaled to 640 px wide, which keeps the model's image reading short.
+  const frames = [`${folder}/shot${clip.shot}Keyframe.png`];
+  await finished(ffmpeg(keyframe).frames(1).outputOptions(["-vf scale=640:-2"]).output(frames[0]!));
+  for (const [index, share] of checkTimes.entries()) {
+    const frame = `${folder}/shot${clip.shot}Frame${index + 1}.png`;
+    await finished(ffmpeg(clip.video!).seekInput(length * share).frames(1).outputOptions(["-vf scale=640:-2"]).output(frame));
+    frames.push(frame);
+  }
+  return Promise.all(frames.map(async path => Buffer.from(await readFile((await resolveWorkspacePath(cwd, path)).path)).toString("base64")));
+}
+
+/** Asks for a clip's composition and quality scores from its keyframe and frames, as JSON. */
+export function clipCheckPrompt(description: string, prompt: string) {
+  return [
+    "The first image is a shot's keyframe, the first frame its video clip had to start from; the next four are frames from the clip at 10%, 40%, 70% and 95% of its length.",
+    `The keyframe shows: ${description}`,
+    `The clip was asked for: ${prompt}`,
+    "Score the clip from 0 to 100 on two things. composition: it keeps the keyframe's framing, people, clothes and set, and plays the asked action without anyone appearing, vanishing or jumping. quality: no melted or deformed faces, hands or bodies, nobody passing through furniture or each other, no flicker or morphing.",
+    "Reply with JSON only: {\"composition\": 0-100, \"quality\": 0-100, \"issues\": [\"each problem you saw, with the frame\"]}.",
+  ].join("\n");
+}
+
+/** Reads the check's JSON; a reply that cannot be read fails, so the clip is rendered again rather than trusted. */
+export function readClipCheck(reply: string): NonNullable<ProductionClip["check"]> {
+  try {
+    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { composition?: unknown; quality?: unknown; issues?: unknown };
+    const score = (field: unknown) => typeof field === "number" && Number.isFinite(field) ? Math.max(0, Math.min(100, field)) : 0;
+    const composition = score(value.composition);
+    const quality = score(value.quality);
+    const issues = Array.isArray(value.issues) ? value.issues.filter((item): item is string => typeof item === "string").slice(0, 8) : [];
+    return { composition, quality, issues, passed: composition >= passing.composition && quality >= passing.quality };
+  } catch {
+    return { composition: 0, quality: 0, issues: ["The check's reply could not be read."], passed: false };
+  }
 }
 
