@@ -64,6 +64,41 @@ async function guardColabLog() {
 
 // Sessions this process opened and has not stopped yet, with the CLI path that opened them.
 const activeSessions = new Map<string, string>();
+
+// Colab gives an account about three GPU sessions at once, at most two of them L4s; a start beyond that waits here for
+// one of this process's sessions to stop rather than being refused. ACT: Only this process's sessions count; another
+// app on the same account still meets the refusal, which the start retries.
+const machineLimits = { total: 3, L4: 2 };
+const runningMachines: { gpu: ColabMachine["gpu"] }[] = [];
+const machineWaiters = new Set<() => void>();
+
+/** Waits for a free machine of this kind and returns its release. */
+async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
+  const free = () => runningMachines.length < machineLimits.total && (gpu !== "L4" || runningMachines.filter(item => item.gpu === "L4").length < machineLimits.L4);
+  while (!free()) {
+    await new Promise<void>((resolve, reject) => {
+      const wake = () => {
+        machineWaiters.delete(wake);
+        signal?.removeEventListener("abort", abort);
+        resolve();
+      };
+      const abort = () => {
+        machineWaiters.delete(wake);
+        reject(signal!.reason);
+      };
+      machineWaiters.add(wake);
+      signal?.addEventListener("abort", abort, { once: true });
+    });
+  }
+  const slot = { gpu };
+  runningMachines.push(slot);
+  return () => {
+    const index = runningMachines.indexOf(slot);
+    if (index < 0) return;
+    runningMachines.splice(index, 1);
+    for (const wake of [...machineWaiters]) wake();
+  };
+}
 // Sessions whose `colab new` is still running. That CLI process outlives this one and records the session only once the
 // machine is assigned, about a minute later, so until then a stop finds nothing and the machine would bill unseen.
 const startingSessions = new Set<string>();
@@ -458,10 +493,13 @@ for _name, _count in ${JSON.stringify(split)}:
     }
     stopped = true;
     activeSessions.delete(name);
+    releaseMachine();
     if (startedAt) await recordColabUnits(provider, (Date.now() - startedAt) / 3_600_000 * hourlyRate);
     await rm(directory, { recursive: true, force: true });
   }
 
+  // Taken last before the try, whose failure path stops the session and so frees the machine again.
+  const releaseMachine = await acquireMachine(gpu, signal);
   guardProcessExit();
   // Tracked before `new` returns, because an interrupted `new` can still leave the session running.
   activeSessions.set(name, command);

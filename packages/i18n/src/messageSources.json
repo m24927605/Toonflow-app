@@ -6530,7 +6530,13 @@
   "Designing the characters and places…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Designing the characters and places while blocking every shot in the previs…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Training LoRAs so faces and places stay the same (about an hour)…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Blocking every shot in the previs…": [

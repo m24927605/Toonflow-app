@@ -8,7 +8,7 @@ import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAss
 import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
-import { estimateProduction } from "./estimate";
+import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes } from "./keyframes";
 import {
   productionDirectory, readProduction, readProductionText, readRegistry, saveProduction, setRegistered, writeProductionText,
@@ -124,7 +124,7 @@ async function withinBudget(cwd: string, production: Production, nextUnits: numb
 async function step(cwd: string, id: string, signal: AbortSignal): Promise<boolean> {
   const production = await readProduction(cwd, id);
   if (production.status !== "running") return false;
-  const estimate = estimateProduction(production.input);
+  const estimate = estimateProduction(production.input, 0, await costRatio());
   const needs = (gate: ProductionGate) => production.input.gates.includes(gate) && !production.approved.includes(gate);
 
   if (!production.script) {
@@ -168,37 +168,45 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
-  if ([...production.assets.characters, ...production.assets.places].some(item => !assetDrawn(item))) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "assets")!.units, signal)) return false;
-    await drawAssets(cwd, production, production.input.ratio, signal, () => saveProduction(cwd, production));
-    return true;
-  }
-
-  if ([...production.assets.characters, ...production.assets.places].some(item => !item.loras)) {
-    // Only the LoRAs actually trained count against the budget; reused and skipped ones cost nothing.
-    const plan = await planAssetLoras(cwd, production, await readProductionText(cwd, production.shotList));
-    if (plan.units && !await withinBudget(cwd, production, plan.units, signal)) return false;
-    await trainAssetLoras(cwd, plan, signal, () => saveProduction(cwd, production));
-    return true;
-  }
-
-  // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the reference
-  // image: the director agent blocks the shots with cylinders in a headless Chrome, and each keyframe keeps its shot's
-  // previs composition, so the first frame and the previs a clip is given never disagree.
-  if (!production.previs) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
-    const model = textModel();
-    // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's render
-    // can outlast the session's idle stop: the model is loaded here first and its session held until previs ends.
-    const release = holdColab();
-    try {
-      await complete("Reply with OK.", "OK?", signal);
-      production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
-    } finally {
-      release();
-    }
-    await saveProduction(cwd, production);
+  // Designs and their LoRAs need the cast while previs needs only the shot list, so the two run side by side on
+  // separate machines, the budget checked once for both; the keyframes start when both are done. Only the LoRAs
+  // actually trained count against the budget; reused and skipped ones cost nothing.
+  const everyAsset = [...production.assets.characters, ...production.assets.places];
+  const drawn = everyAsset.every(assetDrawn);
+  const trained = everyAsset.every(item => item.loras);
+  if (!drawn || !trained || !production.previs) {
+    const plan = trained ? undefined : await planAssetLoras(cwd, production, await readProductionText(cwd, production.shotList));
+    const units = (drawn ? 0 : estimate.steps.find(item => item.step === "assets")!.units) + (plan?.units ?? 0)
+      + (production.previs ? 0 : estimate.steps.find(item => item.step === "text")!.units);
+    if (units && !await withinBudget(cwd, production, units, signal)) return false;
+    const save = () => saveProduction(cwd, production);
+    const results = await Promise.allSettled([
+      (async () => {
+        if (!drawn) await drawAssets(cwd, production, production.input.ratio, signal, save);
+        if (plan) await trainAssetLoras(cwd, plan, signal, save);
+      })(),
+      // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the
+      // reference image: the director agent blocks the shots with cylinders in a headless Chrome, and each keyframe
+      // keeps its shot's previs composition, so the first frame and the previs a clip is given never disagree.
+      (async () => {
+        if (production.previs) return;
+        const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
+        const model = textModel();
+        // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's
+        // render can outlast the session's idle stop: the model is loaded here first and held until previs ends.
+        const release = holdColab();
+        try {
+          await complete("Reply with OK.", "OK?", signal);
+          production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+        } finally {
+          release();
+        }
+        await save();
+      })(),
+    ]);
+    // Both are awaited before an error is passed on, so nothing keeps running unwatched.
+    const failure = results.find(result => result.status === "rejected");
+    if (failure) throw failure.reason;
     return true;
   }
 
@@ -353,6 +361,7 @@ function musicPrompt(script: string, seconds: number) {
 async function deliveryReport(cwd: string, production: Production, signal: AbortSignal) {
   const balance = await readColabBalance(signal).catch(() => undefined);
   const spent = balance !== undefined && production.balanceAtStart !== undefined ? (production.balanceAtStart - balance).toFixed(2) : "?";
+  if (spent !== "?") await recordProductionCost(production.estimate, Number(spent));
   const clips = production.finals ?? production.videos!;
   const loras = [...production.assets!.characters, ...production.assets!.places].flatMap(asset => (asset.loras ?? []).map(lora => `| ${asset.name} | ${lora.family} | ${lora.trigger} | ${lora.path} |`));
   const lines = [
@@ -412,7 +421,7 @@ export function runProduction(cwd: string, id: string) {
 
 /** The estimate of a production in this workspace, without the LoRAs it will reuse from earlier work. */
 export async function quoteProduction(cwd: string, input: Pick<ProductionInput, "seconds" | "quality" | "photos">) {
-  return estimateProduction(input, await peopleWithLoras(cwd, input.photos.map(photo => photo.name)));
+  return estimateProduction(input, await peopleWithLoras(cwd, input.photos.map(photo => photo.name)), await costRatio());
 }
 
 export async function createProduction(cwd: string, id: string, input: ProductionInput) {

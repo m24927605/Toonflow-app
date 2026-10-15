@@ -3320,6 +3320,8 @@
   "The director agent left the plan unchanged; try again": "The director agent left the plan unchanged; try again",
   "Recording the dialogue…": "Recording the dialogue…",
   "Blocking every shot in the previs…": "Blocking every shot in the previs…",
+  "Designing the characters and places while blocking every shot in the previs…": "Designing the characters and places while blocking every shot in the previs…",
+  "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…": "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…",
   "Writing the video prompts…": "Writing the video prompts…",
   "Rendering the clips ({0}/{1})…": "Rendering the clips ({0}/{1})…",
   "Joining the rough cut…": "Joining the rough cut…",

@@ -176,8 +176,11 @@ const headline = computed(() => {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
-    if (!production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views))) return translate("Designing the characters and places…");
-    if (assets.some(item => !item.loras)) return translate("Training LoRAs so faces and places stay the same (about an hour)…");
+    // Designs and LoRAs run side by side with previs.
+    const designing = !production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views));
+    const training = assets.some(item => !item.loras);
+    if (designing) return production.previs ? translate("Designing the characters and places…") : translate("Designing the characters and places while blocking every shot in the previs…");
+    if (training) return production.previs ? translate("Training LoRAs so faces and places stay the same (about an hour)…") : translate("Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…");
     if (!production.previs) return translate("Blocking every shot in the previs…");
     if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
     if (!production.clips) return translate("Recording the dialogue…");
