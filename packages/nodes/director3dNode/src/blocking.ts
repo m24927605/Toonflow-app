@@ -149,18 +149,21 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
  * Checks a shot's framing at each camera keyframe, so a director agent that cannot see the render can fix it: every
  * person the shot names has their head in frame, is not too close, is not hidden behind anything (rays from the camera
  * to points up their cylinder) and does not cover another; the camera stands at a usual height unless the shot list
- * asks for a low or high angle (`angled`). `hard` problems fail the shot. `soft` ones are only handed back to the agent:
- * a cylinder whose height does not fit the posture the shot list gives (`postures`).
+ * asks for a low or high angle (`angled`). `hard` problems fail the shot. `overlap` (people covering each other) is
+ * fixed by the agent or by computed framing when it can be, and kept otherwise, as people placed close together may
+ * overlap from every side. `soft` ones are only handed back to the agent: a cylinder whose height does not fit the
+ * posture the shot list gives (`postures`).
  */
 export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], angled = false, postures: Record<string, Posture> = {}) {
   const people = scene.objectList.filter(object => personTypes.has(object.objType));
   const missing = cast.filter(name => !people.some(object => object.name === name));
-  if (missing.length) return { hard: [`The scene has no person cylinder named ${missing.join(", ")}; name each person's cylinder exactly as the shot list does.`], soft: [] };
+  if (missing.length) return { hard: [`The scene has no person cylinder named ${missing.join(", ")}; name each person's cylinder exactly as the shot list does.`], overlap: [], soft: [] };
   const stage = await framingStage(scene, plan, aspect);
   try {
     const { camera } = stage;
     const motion = prepareMotion(plan.cameraFrames);
     const hard: string[] = [];
+    const overlap: string[] = [];
     const soft: string[] = [];
     const named = cast.flatMap(name => stage.roots.filter(({ object }) => object.name === name));
     stage.pose(0, motion);
@@ -196,11 +199,11 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
       }
       for (const [index, a] of rects.entries()) {
         for (const b of rects.slice(index + 1)) {
-          if (overlapShare(a.rect, b.rect) > overlapLimit) hard.push(`At ${time} s ${a.name} and ${b.name} overlap in frame; place them or the camera so both are seen apart.`);
+          if (overlapShare(a.rect, b.rect) > overlapLimit) overlap.push(`At ${time} s ${a.name} and ${b.name} overlap in frame; place them or the camera so both are seen apart.`);
         }
       }
     }
-    return { hard, soft };
+    return { hard, overlap, soft };
   } finally {
     stage.dispose();
   }
@@ -263,15 +266,17 @@ export async function reframeShot(scene: SceneDocument, plan: DirectorPlan, aspe
         while (distance < 60 && !fits(at(direction, distance))) distance *= 1.05;
         return at(direction, distance);
       });
-      const apart = (from: Vector3) => {
+      // The largest share any two people cover of each other from a camera position.
+      const overlapFrom = (from: Vector3) => {
         camera.position.copy(from);
         camera.lookAt(target);
         camera.updateMatrixWorld();
         const rects = boxes.map(box => screenRect(box, camera));
-        return rects.every((a, index) => rects.slice(index + 1).every(b => overlapShare(a, b) <= overlapLimit));
+        return Math.max(0, ...rects.flatMap((a, index) => rects.slice(index + 1).map(b => overlapShare(a, b))));
       };
       const clear = (from: Vector3) => people.every(person => !stage.blockerOf(from, person));
-      const position = candidates.find(from => clear(from) && apart(from)) ?? candidates.find(clear) ?? candidates[0]!;
+      // Among the sides with nothing in the way, the one where people cover each other least.
+      const position = candidates.filter(clear).map(from => ({ from, overlap: overlapFrom(from) })).sort((a, b) => a.overlap - b.overlap)[0]?.from ?? candidates[0]!;
       return {
         ...frame,
         view: {

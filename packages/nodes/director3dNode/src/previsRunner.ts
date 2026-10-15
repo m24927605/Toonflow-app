@@ -142,20 +142,21 @@ export async function runPrevis(options: {
     let result = planned ?? { scene, plan: heldPlan(basePlan!, shot, seconds) };
     const check = (from: typeof result) => framingIssues(from.scene, from.plan, options.aspect, cast, angled, postures);
     let issues = await check(result);
-    for (let retry = 0; planned && issues.hard.length + issues.soft.length && retry < framingRetries; retry++) {
+    for (let retry = 0; planned && issues.hard.length + issues.overlap.length + issues.soft.length && retry < framingRetries; retry++) {
       options.signal.throwIfAborted();
-      const fix = `${instruction}\n\nYour blocking of this shot fails the framing check. Fix it, moving the camera or the objects in the way, and keep the rest:\n${[...issues.hard, ...issues.soft].join("\n")}`;
+      const fix = `${instruction}\n\nYour blocking of this shot fails the framing check. Fix it, moving the camera or the objects in the way, and keep the rest:\n${[...issues.hard, ...issues.overlap, ...issues.soft].join("\n")}`;
       const fixed = await attempt(fix, result);
       if (!fixed) break;
       result = fixed;
       issues = await check(result);
     }
     // A held plan still has the previous shot's camera, so it is always framed for this shot's people and size.
-    if (!planned || issues.hard.length) {
+    if (!planned || issues.hard.length || issues.overlap.length) {
       result = { ...result, plan: await reframeShot(result.scene, result.plan, options.aspect, cast, size) };
       issues = await check(result);
     }
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
+    if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
     // The director model then looks at the agent's blocking and hands it back once with what it saw; a fix that breaks
     // the geometry is dropped and the shot keeps the blocking that passed.
     if (planned) {
