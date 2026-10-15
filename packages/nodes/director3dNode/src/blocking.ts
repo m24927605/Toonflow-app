@@ -29,6 +29,8 @@ export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan,
       if (!root) return [];
       root.updateMatrixWorld(true);
       const box = new Box3().setFromObject(root);
+      // People who have not come in yet wait below the floor.
+      if (box.max.y < 0) return [];
       const centre = box.getCenter(new Vector3());
       // The head decides whether and where a person is in frame: a close-up leaves the middle of the body out.
       const point = new Vector3(centre.x, box.min.y + (box.max.y - box.min.y) * 0.9, centre.z).project(camera);
@@ -85,10 +87,6 @@ const safeArea = 0.9;
 const cameraHeights = { lowest: 0.5, highest: 2.5, framed: 0.6 };
 // Two people sharing more than this part of the smaller one's screen area read as one shape.
 const overlapLimit = 0.5;
-// Cylinder heights in metres that a seated or standing person's opening pose takes.
-const postureHeights = { seated: 1.3, standing: 1.4 };
-
-export type Posture = "seated" | "standing";
 
 /** The rectangle a box covers on screen, in normalised device coordinates clipped to the frame; empty when off screen. */
 function screenRect(box: Box3, camera: PerspectiveCamera) {
@@ -146,34 +144,23 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
 }
 
 /**
- * Checks a shot's framing at each camera keyframe, so a director agent that cannot see the render can fix it: every
- * person the shot names has their head in frame, is not too close, is not hidden behind anything (rays from the camera
- * to points up their cylinder) and does not cover another; the camera stands at a usual height unless the shot list
- * asks for a low or high angle (`angled`). `hard` problems fail the shot. `overlap` (people covering each other) is
- * fixed by the agent or by computed framing when it can be, and kept otherwise, as people placed close together may
- * overlap from every side. `soft` ones are only handed back to the agent: a cylinder whose height does not fit the
- * posture the shot list gives (`postures`).
+ * Checks a shot's framing at each camera keyframe, the floor every computed camera must keep: every person the shot
+ * names has their head in frame, is not too close, is not hidden behind anything (rays from the camera to points up
+ * their cylinder) and does not cover another; the camera stands at a usual height unless the shot asks for a low or
+ * high angle (`angled`). `hard` problems fail the shot. `overlap` (people covering each other) is kept, as people
+ * placed close together may overlap from every side.
  */
-export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], angled = false, postures: Record<string, Posture> = {}) {
+export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], angled = false) {
   const people = scene.objectList.filter(object => personTypes.has(object.objType));
   const missing = cast.filter(name => !people.some(object => object.name === name));
-  if (missing.length) return { hard: [`The scene has no person cylinder named ${missing.join(", ")}; name each person's cylinder exactly as the shot list does.`], overlap: [], soft: [] };
+  if (missing.length) return { hard: [`The scene has no person cylinder named ${missing.join(", ")}; name each person's cylinder exactly as the shot list does.`], overlap: [] };
   const stage = await framingStage(scene, plan, aspect);
   try {
     const { camera } = stage;
     const motion = prepareMotion(plan.cameraFrames);
     const hard: string[] = [];
     const overlap: string[] = [];
-    const soft: string[] = [];
     const named = cast.flatMap(name => stage.roots.filter(({ object }) => object.name === name));
-    stage.pose(0, motion);
-    for (const person of named) {
-      const posture = postures[person.object.name!];
-      const box = new Box3().setFromObject(person.root);
-      const height = box.max.y - box.min.y;
-      if (posture === "seated" && height > postureHeights.seated) soft.push(`${person.object.name} is seated at the start of this shot, but their cylinder is ${height.toFixed(1)} m tall; make it about 1.0 m.`);
-      if (posture === "standing" && height < postureHeights.standing) soft.push(`${person.object.name} is standing at the start of this shot, but their cylinder is ${height.toFixed(1)} m tall; make it about 1.7 m.`);
-    }
     for (const time of new Set(plan.cameraFrames.map(frame => frame.time))) {
       stage.pose(time, motion);
       if (!angled && (camera.position.y < cameraHeights.lowest || camera.position.y > cameraHeights.highest)) {
@@ -203,31 +190,76 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
         }
       }
     }
-    return { hard, overlap, soft };
+    return { hard, overlap };
   } finally {
     stage.dispose();
   }
 }
 
+// Vertical fields of view by the share of a person a shot size leaves out: longer lenses for closer shots.
+const lensOf = (lowest: number) => lowest >= 0.6 ? 30 : lowest >= 0.4 ? 36 : 45;
+// How much further back a push in starts or a pull out ends.
+const moveRatio = 1.3;
+
+export type ShotCamera = { direction: { x: number; z: number }; angle: "eye" | "low" | "high"; move: "static" | "pushIn" | "pullOut" | "follow"; over?: string };
+
 /**
- * Frames a shot's people by computation when the agent cannot: at every camera keyframe the camera keeps the side it
- * looks from, aims level at the people, and steps back until the part of each person the shot size shows (with their
- * width) projects inside the safe area; it swings round them in 30° steps until nothing is in the way. Lens and timing
- * are kept.
- * ACT: Every keyframe is framed on its own, so a push-in or pull-out is flattened to one distance; scale the distances
- * by the agent's original ratios if moves need to survive.
+ * Frames a shot by computation: the camera stands on the asked side of the people, level with the part of them the
+ * shot size shows (or low, or a metre above it), aims at it, and steps back until all of it is inside the safe area:
+ * wherever they move while the camera holds, or for a close shot at its opening, as people may well leave a close-up.
+ * When something is in the way it swings round in 30° steps, at most 60° either way so it keeps to its side of the
+ * action. A move adds a keyframe at the end: a push in starts further back, a pull out ends there, and a follow frames
+ * the people again where they end. Over a shoulder it stands just behind that person at their eye height, looking past
+ * them at the others' heads over the shot, on the side `direction` gives. The camera stays below `ceiling`.
  */
-export async function reframeShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string): Promise<DirectorPlan> {
+export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string, shot: ShotCamera, ceiling = Infinity): Promise<DirectorPlan> {
   const stage = await framingStage(scene, plan, aspect);
   try {
     const people = cast.flatMap(name => stage.roots.filter(({ object }) => object.name === name && personTypes.has(object.objType)));
     if (!people.length) return plan;
-    const motion = prepareMotion(plan.cameraFrames);
-    const lowest = shotSizes.find(rule => rule.pattern.test(size))?.lowest ?? 0;
     const { camera } = stage;
-    const cameraFrames = plan.cameraFrames.map(frame => {
-      stage.pose(frame.time, motion);
-      const boxes = people.map(person => new Box3().setFromObject(person.root));
+    const end = plan.duration;
+    const lowest = shotSizes.find(rule => rule.pattern.test(size))?.lowest ?? 0;
+    const fov = lensOf(lowest);
+    // Posing a moment also moves the camera to the plan's own, so the lens is set again after every pose.
+    const poseAt = (time: number) => {
+      stage.pose(time);
+      camera.fov = fov;
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+    };
+    const boxesAt = (time: number, of = people) => {
+      poseAt(time);
+      return of.map(person => new Box3().setFromObject(person.root));
+    };
+    const below = (y: number) => Math.min(y, ceiling - 0.15);
+    const view = (from: Vector3, target: Vector3) => ({
+      camera: { position: { x: from.x, y: from.y, z: from.z }, fov, near: 0.1, far: 1000 },
+      controls: { target: { x: target.x, y: target.y, z: target.z } },
+    });
+
+    const over = shot.over ? stage.roots.find(({ object }) => object.name === shot.over && personTypes.has(object.objType)) : undefined;
+    const others = people.filter(person => person !== over);
+    if (over && others.length) {
+      const near = boxesAt(0, [over])[0]!;
+      const far = [0, end / 2, end].flatMap(time => boxesAt(time, others));
+      const nearCentre = near.getCenter(new Vector3());
+      const farCentre = far.reduce((sum, box) => sum.add(box.getCenter(new Vector3())), new Vector3()).divideScalar(far.length);
+      const away = new Vector3(nearCentre.x - farCentre.x, 0, nearCentre.z - farCentre.z).normalize();
+      const across = new Vector3(-away.z, 0, away.x);
+      if (across.x * shot.direction.x + across.z * shot.direction.z < 0) across.negate();
+      const from = new Vector3(nearCentre.x, 0, nearCentre.z).addScaledVector(away, 0.75).addScaledVector(across, 0.3);
+      from.y = below(Math.max(cameraHeights.framed, near.max.y - 0.1));
+      const heads = far.map(box => box.max.y - 0.15);
+      const target = new Vector3(farCentre.x, (Math.min(...heads) + Math.max(...heads)) / 2, farCentre.z);
+      return { ...plan, cameraFrames: [{ time: 0, easing: "smooth", view: view(from, target) }] };
+    }
+
+    const up = new Vector3(0, 1, 0);
+    const side = new Vector3(shot.direction.x, 0, shot.direction.z).normalize();
+    /** The camera that frames the people at all of `times`, from the first of `turns` that sees them clearly. */
+    const fit = (times: number[], turns = [0, 1, -1, 2, -2]) => {
+      const boxes = times.flatMap(time => boxesAt(time));
       // The top of each person and the lowest point the shot size shows, on their axis.
       const marks = boxes.flatMap(box => {
         const centre = box.getCenter(new Vector3());
@@ -235,10 +267,8 @@ export async function reframeShot(scene: SceneDocument, plan: DirectorPlan, aspe
         return [box.max.y, box.min.y + height * lowest].map(y => ({ point: new Vector3(centre.x, y, centre.z), radius: Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 }));
       });
       const target = marks.reduce((sum, mark) => sum.add(mark.point), new Vector3()).divideScalar(marks.length);
+      const height = below(shot.angle === "low" ? 0.4 : shot.angle === "high" ? target.y + 1 : Math.max(cameraHeights.framed, target.y));
       const nearest = Math.max(...marks.map(mark => mark.radius + mark.point.clone().setY(target.y).distanceTo(target))) + minimumGap;
-      camera.fov = frame.view.camera.fov;
-      camera.aspect = aspect;
-      camera.updateProjectionMatrix();
       // Whether every mark, widened by its person's radius across the view, projects inside the safe area.
       const fits = (from: Vector3) => {
         camera.position.copy(from);
@@ -250,42 +280,42 @@ export async function reframeShot(scene: SceneDocument, plan: DirectorPlan, aspe
           return projected.z < 1 && Math.abs(projected.x) <= safeArea && Math.abs(projected.y) <= safeArea;
         }));
       };
-      const side = new Vector3(frame.view.camera.position.x - target.x, 0, frame.view.camera.position.z - target.z);
-      if (side.lengthSq() < 1e-6) side.set(0, 0, 1);
-      side.normalize();
-      const turns = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6];
-      // The camera stays level with the people, raised to a usual height when they are low, such as seated on the floor.
-      const at = (direction: Vector3, distance: number) => {
-        const from = target.clone().addScaledVector(direction, distance);
-        from.y = Math.max(from.y, cameraHeights.framed);
-        return from;
-      };
+      const at = (direction: Vector3, distance: number) => target.clone().addScaledVector(direction, distance).setY(height);
+      poseAt(times[0]!);
       const candidates = turns.map(turn => {
-        const direction = side.clone().applyAxisAngle(new Vector3(0, 1, 0), turn * Math.PI / 6);
+        const direction = side.clone().applyAxisAngle(up, turn * Math.PI / 6);
         let distance = nearest;
         while (distance < 60 && !fits(at(direction, distance))) distance *= 1.05;
-        return at(direction, distance);
+        return { turn, from: at(direction, distance), target };
       });
       // The largest share any two people cover of each other from a camera position.
       const overlapFrom = (from: Vector3) => {
         camera.position.copy(from);
         camera.lookAt(target);
         camera.updateMatrixWorld();
-        const rects = boxes.map(box => screenRect(box, camera));
+        const rects = people.map(person => screenRect(new Box3().setFromObject(person.root), camera));
         return Math.max(0, ...rects.flatMap((a, index) => rects.slice(index + 1).map(b => overlapShare(a, b))));
       };
-      const clear = (from: Vector3) => people.every(person => !stage.blockerOf(from, person));
-      // Among the sides with nothing in the way, the one where people cover each other least.
-      const position = candidates.filter(clear).map(from => ({ from, overlap: overlapFrom(from) })).sort((a, b) => a.overlap - b.overlap)[0]?.from ?? candidates[0]!;
-      return {
-        ...frame,
-        view: {
-          ...frame.view,
-          camera: { ...frame.view.camera, position: { x: position.x, y: position.y, z: position.z } },
-          controls: { ...frame.view.controls, target: { x: target.x, y: target.y, z: target.z } },
-        },
-      };
-    });
+      // The asked side unless something hides someone or people cover each other there; then the nearest side that
+      // is clear, or the clear side where they cover each other least.
+      const clear = candidates.filter(({ from }) => people.every(person => !stage.blockerOf(from, person))).map(item => ({ ...item, overlap: overlapFrom(item.from) }));
+      return clear.find(item => item.overlap <= overlapLimit) ?? clear.sort((a, b) => a.overlap - b.overlap)[0] ?? candidates[0]!;
+    };
+    const backed = (framing: ReturnType<typeof fit>) => {
+      const offset = framing.from.clone().sub(framing.target).setY(0).multiplyScalar(moveRatio);
+      return { ...framing, from: framing.target.clone().add(offset).setY(framing.from.y) };
+    };
+    const key = (time: number, framing: ReturnType<typeof fit>) => ({ time, easing: "smooth" as const, view: view(framing.from, framing.target) });
+    let cameraFrames: DirectorPlan["cameraFrames"];
+    if (shot.move === "follow") {
+      const first = fit([0]);
+      cameraFrames = [key(0, first), key(end, fit([end], [first.turn]))];
+    } else {
+      const held = fit(lowest >= 0.6 ? [0] : [0, end / 2, end]);
+      cameraFrames = shot.move === "pushIn" ? [key(0, backed(held)), key(end, held)]
+        : shot.move === "pullOut" ? [key(0, held), key(end, backed(held))]
+          : [key(0, held)];
+    }
     return { ...plan, cameraFrames };
   } finally {
     stage.dispose();

@@ -187,21 +187,25 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
         if (plan) await trainAssetLoras(cwd, plan, signal, save);
       })(),
       // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the
-      // reference image: the director agent blocks the shots with cylinders in a headless Chrome, and each keyframe
-      // keeps its shot's previs composition, so the first frame and the previs a clip is given never disagree.
+      // reference image: the text model plans the film's staging in one reply, the Director's Studio code builds and
+      // frames every shot with cylinders in a headless Chrome, and each keyframe keeps its shot's previs composition,
+      // so the first frame and the previs a clip is given never disagree.
       (async () => {
         if (production.previs) return;
         const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
         const model = textModel();
-        // The page gives each director turn 10 minutes, which a cold Colab start can take by itself, and a shot's
-        // render can outlast the session's idle stop: the model is loaded here first and held until previs ends.
-        const release = holdColab();
-        try {
-          await complete("Reply with OK.", "OK?", signal);
-          production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
-        } finally {
-          release();
-        }
+        // The model is loaded here first, so a failed Colab start stops the step before Chrome opens, and held while
+        // the page writes the plan, so the session's idle stop never falls between the plan and its fix.
+        production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal, async () => {
+          const release = holdColab();
+          try {
+            await complete("Reply with OK.", "OK?", signal);
+            return release;
+          } catch (error) {
+            release();
+            throw error;
+          }
+        });
         await save();
       })(),
     ]);

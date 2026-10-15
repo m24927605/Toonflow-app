@@ -71,7 +71,7 @@ export function parseDescriptions(text: string) {
 const byName = (list: ProductionAsset[], name?: string) => list.find(item => item.name === name);
 
 /** The part of a state or row cell about one person: from "Name:" to the next semicolon, or all of it for one person. */
-export function segmentOf(text: string, name: string, castSize: number) {
+function segmentOf(text: string, name: string, castSize: number) {
   const part = text.split(/[；;]/).find(item => item.trimStart().startsWith(name));
   return part ?? (castSize === 1 ? text : "");
 }
