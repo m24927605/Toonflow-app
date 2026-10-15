@@ -1,28 +1,43 @@
+import { Euler, Matrix4, Vector3 } from "three";
 import type { SceneDocument } from "./scene";
 import type { DirectorPlan } from "./sceneAnimation";
-import { propKinds, type Place, type Posture, type PrevisSpec, type PropKind, type SpecShot } from "./previsSpec";
+import { propKinds, type Place as SpecPlace, type Posture, type PrevisSpec, type PropKind, type SpecShot } from "./previsSpec";
 
 /**
  * Builds the set of a previs plan and stages its shots, by computation only: the room and props at real scale, every
- * person as a cylinder at the height of their posture, walks between named places, and which side of the people each
- * shot's camera stands on. Each shot starts from where the previous one left everyone, so nobody jumps between shots.
+ * person as a flattened column at the height of their posture turned the way they look, walks between named places,
+ * and which side of the people each shot's camera stands on. Each shot starts from where the previous one left
+ * everyone, so nobody jumps between shots. The opening frame can also be posed with jointed figures for the depth map.
  */
 
 type Point = { x: number; z: number };
 type Footprint = { name: string; kind: PropKind; centre: Point; facing: Point; width: number; depth: number; height: number; bottom: number; seat?: number };
-type Body = Point & { posture: Posture; seat?: { prop: string; height: number; alongX: boolean } };
+type Place = Point & { posture: Posture; seat?: { prop: string; height: number; alongX: boolean } };
+/** A person at a moment: where, in what posture, turned to `yaw` (radians from +Z), looking at `faces` or the nearest. */
+export type StagedBody = Place & { yaw: number; faces?: string };
 export type StagedShot = {
-  shot: number; seconds: number; tracks: DirectorPlan["tracks"]; subjects: string[];
+  shot: number; seconds: number; tracks: DirectorPlan["tracks"]; subjects: string[]; opening: Map<string, StagedBody>;
   camera: { direction: Point; angle: "eye" | "low" | "high"; move: "static" | "pushIn" | "pullOut" | "follow"; over?: string };
 };
 
-// Cylinder people: a standing height, their radius, the top of a seated or kneeling body above what they sit on, and
-// how far below the floor people wait before they enter.
+// People are columns as wide as shoulders and about half as deep, so the way they face shows; how far below the floor
+// people wait before they enter.
 const standingHeight = 1.7;
 const radius = 0.22;
-const seatedTop = 0.85;
-const kneelingTop = 0.9;
+const depthRatio = 0.55;
 const hiddenDepth = -10;
+// The jointed figure's proportions, which the columns follow so both stand equally tall: its height, its hip joint
+// above the feet, a 1.7 m person's hip joint above a chair seat and above the floor or a cushion when kneeling (floor
+// sitting is taken as kneeling, seiza), the hip joint to the top of the head, and a lying body's middle above its bed.
+const figureHeight = 1.8;
+const figureHip = 0.91;
+const figureScale = standingHeight / figureHeight;
+const chairHip = 0.06;
+const kneelHip = 0.22;
+const upperBody = (figureHeight - figureHip) * figureScale;
+const lyingMiddle = 0.12;
+// A seat at least this high is sat on like a chair; lower ones are knelt or sat on like the floor.
+const chairSeat = 0.3;
 // Walking speed in metres a second, the time to sit down or stand up, and the share of a shot the action may take.
 const walkSpeed = 1.1;
 const postureTime = 1;
@@ -104,7 +119,7 @@ function layOut(spec: PrevisSpec) {
     let tangent: Point = { x: 1, z: 0 };
     if (typeof item.at === "string") point = roomPoint(width, depth, item.at);
     else {
-      const other = props.find(prop => prop.name === (item.at as Exclude<Place, string>).prop)!;
+      const other = props.find(prop => prop.name === (item.at as Exclude<SpecPlace, string>).prop)!;
       const direction = sideOf(other, item.at.side ?? "front");
       prop.facing = other.facing;
       point = add(other.centre, direction, halfAlong(other, direction) + halfAlong(prop, direction) + 0.05);
@@ -204,18 +219,68 @@ export const ceilingOf = (spec: PrevisSpec) => spec.set.interior ? spec.set.heig
 /** What the renders show besides the set: no grid, and the sky only outdoors, so a room is seen against nothing. */
 export const renderSettings = (spec: PrevisSpec) => ({ gridVisible: false, skyVisible: !spec.set.interior });
 
-/** A person's cylinder for a body: its height from the posture, or laid along the longer side of what they lie on. */
-function transformOf(body: Body) {
-  const rotation = { x: 0, y: 0, z: 0 };
+/** The height of a person's hip joint in a sitting or kneeling posture: on a chair, or kneeling on the floor or a seat. */
+function hipOf(body: Place) {
+  const seat = body.seat?.height ?? 0;
+  return body.posture === "seated" && seat >= chairSeat ? seat + chairHip : seat + kneelHip;
+}
+
+/** A person's column for a body: as tall as the figure in that posture and turned their way, or laid along their bed. */
+function transformOf(body: StagedBody) {
+  const scale = { x: 1, y: 1, z: depthRatio };
   if (body.posture === "lying") {
-    return { position: { x: body.x, y: (body.seat?.height ?? 0) + radius, z: body.z }, rotation: body.seat?.alongX === false ? { ...rotation, x: Math.PI / 2 } : { ...rotation, z: Math.PI / 2 }, scale: { x: 1, y: 1, z: 1 } };
+    return { position: { x: body.x, y: (body.seat?.height ?? 0) + lyingMiddle, z: body.z }, rotation: body.seat?.alongX === false ? { x: Math.PI / 2, y: 0, z: 0 } : { x: 0, y: 0, z: Math.PI / 2 }, scale };
   }
-  const top = body.posture === "standing" ? standingHeight : (body.seat?.height ?? 0) + (body.posture === "kneeling" ? kneelingTop : seatedTop);
-  return { position: { x: body.x, y: top / 2, z: body.z }, rotation, scale: { x: 1, y: top / standingHeight, z: 1 } };
+  const top = body.posture === "standing" ? standingHeight : hipOf(body) + upperBody;
+  return { position: { x: body.x, y: top / 2, z: body.z }, rotation: { x: 0, y: body.yaw, z: 0 }, scale: { ...scale, y: top / standingHeight } };
+}
+
+// Joint rotations of the figure on a chair and kneeling (seiza): thighs forward, shins down or folded back under them,
+// hands resting on the thighs. Zero is the figure's relaxed standing pose.
+const both = (side: "Hip" | "Knee" | "Ankle" | "Shoulder" | "Elbow", x: number) => ({ [`left${side}`]: { x, y: 0, z: 0 }, [`right${side}`]: { x, y: 0, z: 0 } });
+const chairPose = { ...both("Hip", -1.5), ...both("Knee", 1.5), ...both("Shoulder", -0.4), ...both("Elbow", -0.8) };
+const kneelPose = { ...both("Hip", -1.4), ...both("Knee", 2.85), ...both("Ankle", 0.9), ...both("Shoulder", -0.35), ...both("Elbow", -0.9) };
+
+/** The jointed figure of a body: posed for its posture, its hips on the seat, and turned or laid the way the column is. */
+function figureOf(body: StagedBody) {
+  const seat = body.seat?.height ?? 0;
+  if (body.posture === "lying") {
+    // On the back with the head along the bed, toward the wall it stands against or to the left.
+    const head = body.seat?.alongX === false ? new Vector3(0, 0, -1) : new Vector3(-1, 0, 0);
+    const up = new Vector3(0, 1, 0);
+    const rotation = new Euler().setFromRotationMatrix(new Matrix4().makeBasis(head.clone().cross(up), head, up));
+    const feet = new Vector3(body.x, seat + lyingMiddle, body.z).addScaledVector(head, -figureHeight * figureScale / 2);
+    return { position: { x: feet.x, y: feet.y, z: feet.z }, rotation: { rotationX: rotation.x, rotationY: rotation.y, rotationZ: rotation.z }, pose: {} };
+  }
+  const y = body.posture === "standing" ? 0 : hipOf(body) - figureHip * figureScale;
+  const pose = body.posture === "standing" ? {} : body.posture === "seated" && seat >= chairSeat ? chairPose : kneelPose;
+  return { position: { x: body.x, y, z: body.z }, rotation: { rotationX: 0, rotationY: body.yaw, rotationZ: 0 }, pose };
 }
 
 /**
- * Stages every shot: who enters, each person's walk and change of posture, and the side of the camera. In a two-person
+ * The scene of a shot's opening frame with every person on set as a jointed figure in their posture and facing, for
+ * the still images: a depth map of human shapes is what depth-controlled image models know, while the previs video
+ * keeps the columns so a video model takes only the blocking from it.
+ */
+export function figureScene(scene: SceneDocument, shot: StagedShot): SceneDocument {
+  return {
+    ...scene,
+    objectList: scene.objectList.map(object => {
+      const body = object.objType === "cylinder" ? shot.opening.get(object.name ?? "") : undefined;
+      if (!body) return object;
+      const { position, rotation, pose } = figureOf(body);
+      return {
+        threeJsonId: object.threeJsonId, name: object.name, objType: "mannequin" as const, geometry: {}, position, rotation, pose,
+        scale: { scaleX: figureScale, scaleY: figureScale, scaleZ: figureScale }, material: object.material,
+      };
+    }),
+  };
+}
+
+/**
+ * Stages every shot: who enters, each person's walk, change of posture and turn toward what they look at (the person
+ * or prop the plan names, kept until it names another, or the nearest other person; someone alone keeps their way),
+ * and the side of the camera. In a two-person
  * scene the camera keeps to one side of the line between them (the 180-degree rule), the side of its first view off
  * the line: a side across the line is mirrored back, a single of one person is shot from near the other's eyeline so
  * their face is seen, and an over-the-shoulder view looks past the near shoulder on that side.
@@ -224,17 +289,23 @@ function transformOf(body: Body) {
  */
 export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
   const set = layOut(spec);
-  const bodies = new Map<string, Body>();
+  const bodies = new Map<string, StagedBody>();
   let lineSide: number | undefined;
   const staged: StagedShot[] = [];
+  /** The way a body turns to look at what it faces among `others`, or the nearest of them; alone, it keeps its way. */
+  const turn = (body: StagedBody, name: string, others: Map<string, StagedBody>) => {
+    const target = body.faces ? others.get(body.faces) ?? set.props.find(prop => prop.name === body.faces)?.centre
+      : [...others].filter(([other]) => other !== name).map(([, other]) => other).sort((a, b) => distance(body, a) - distance(body, b))[0];
+    return { ...body, yaw: target && distance(body, target) > 0.05 ? Math.atan2(target.x - body.x, target.z - body.z) : body.yaw };
+  };
   for (const { shot, seconds, cast } of shots) {
     const plan = spec.shots.find(item => item.shot === shot);
     const starts = new Map(bodies);
-    for (const person of spec.people.filter(item => item.enters === shot || (item.enters < shot && !bodies.has(item.name)))) {
-      const body = place(set, person.at, person.posture, [...starts.values()]);
-      starts.set(person.name, body);
-    }
-    // Everyone who does not move keeps their place; the movers then end at free spots one by one.
+    const entering = spec.people.filter(item => item.enters === shot || (item.enters < shot && !bodies.has(item.name)));
+    for (const person of entering) starts.set(person.name, { ...place(set, person.at, person.posture, [...starts.values()]), yaw: 0, faces: person.faces });
+    for (const person of entering) starts.set(person.name, turn(starts.get(person.name)!, person.name, starts));
+    // Everyone who does not move keeps their place; the movers then end at free spots one by one, and everyone ends
+    // turned to what they look at.
     const ends = new Map(starts);
     const moves = (plan?.moves ?? []).filter(move => starts.has(move.name));
     for (const move of moves) ends.delete(move.name);
@@ -243,8 +314,10 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
       const posture = move.posture ?? start.posture;
       // Someone who gets up from a seat steps out in front of it; someone who stays on it takes the new posture there.
       const target = move.to ?? (start.seat ? { prop: start.seat.prop, side: posture === "standing" ? "front" as const : "on" as const } : undefined);
-      ends.set(move.name, target ? place(set, target, posture, [...ends.values()]) : { ...start, posture });
+      const end = target ? place(set, target, posture, [...ends.values()]) : { ...start, posture };
+      ends.set(move.name, { ...end, yaw: start.yaw, faces: move.faces ?? start.faces });
     }
+    for (const [name, body] of ends) ends.set(name, turn(body, name, ends));
     const tracks = spec.people.map((person, index) => {
       const objectId = `person${index + 1}`;
       const start = starts.get(person.name);
@@ -262,7 +335,7 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
     const over = camera.side === "overShoulder" && camera.over && starts.has(camera.over) ? camera.over : undefined;
     let direction = sideDirections[camera.side] ?? sideDirections.front!;
     if (present.length === 2) {
-      const [a, b] = [...present].sort().map(name => starts.get(name)!) as [Body, Body];
+      const [a, b] = [...present].sort().map(name => starts.get(name)!) as [StagedBody, StagedBody];
       const length = distance(a, b);
       if (length > 0.1) {
         const line = { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
@@ -283,7 +356,7 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
       }
     }
     staged.push({
-      shot, seconds, tracks, subjects: subjects.length ? subjects : present,
+      shot, seconds, tracks, subjects: subjects.length ? subjects : present, opening: starts,
       camera: { direction, angle: camera.angle ?? "eye", move: camera.move ?? "static", over },
     });
   }
@@ -294,10 +367,10 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
  * Where a place puts a person in a posture: on a seat, beside a prop, or on part of the floor, moved aside from the
  * people already there and out of any prop it falls in. Someone standing on a seat stands in front of it instead.
  */
-function place(set: SetLayout, at: Place, posture: Posture, others: Body[]): Body {
+function place(set: SetLayout, at: SpecPlace, posture: Posture, others: Point[]): Place {
   let point: Point;
   let tangent: Point = { x: 1, z: 0 };
-  let seat: Body["seat"];
+  let seat: Place["seat"];
   if (typeof at === "string") point = roomPoint(set.width, set.depth, at);
   else {
     const prop = set.props.find(item => item.name === at.prop)!;
@@ -327,9 +400,10 @@ function place(set: SetLayout, at: Place, posture: Posture, others: Body[]): Bod
 
 /**
  * The keyframes of one person over a shot: standing up when they have to walk, the walk (round the first prop in the
- * way), then settling into the end posture, sped up to fit the shot when they would run over.
+ * way) facing where they go, then settling into the end posture and turning to what they look at, sped up to fit the
+ * shot when they would run over.
  */
-function walkFrames(set: SetLayout, start: Body, end: Body, seconds: number) {
+function walkFrames(set: SetLayout, start: StagedBody, end: StagedBody, seconds: number) {
   const path = [start as Point];
   const moving = distance(start, end) > 0.05;
   if (moving) {
@@ -345,15 +419,18 @@ function walkFrames(set: SetLayout, start: Body, end: Body, seconds: number) {
     }
     path.push(end);
   }
-  const standing = (point: Point): Body => ({ x: point.x, z: point.z, posture: "standing" });
+  const standing = (point: Point, yaw: number): StagedBody => ({ x: point.x, z: point.z, posture: "standing", yaw });
   const rise = moving && start.posture !== "standing" ? postureTime : 0;
   const walk = path.slice(1).reduce((sum, point, index) => sum + distance(path[index]!, point), 0) / walkSpeed;
   const settle = end.posture !== (moving ? "standing" : start.posture) ? postureTime : 0;
   const scale = Math.min(1, seconds * actionShare / Math.max(1e-6, rise + walk + settle));
-  const keys: { time: number; body: Body }[] = [{ time: 0, body: start }];
+  const keys: { time: number; body: StagedBody }[] = [{ time: 0, body: start }];
   let time = 0;
-  if (rise) keys.push({ time: time += rise * scale, body: standing(start) });
-  for (const [index, point] of path.slice(1).entries()) keys.push({ time: time += distance(path[index]!, point) / walkSpeed * scale, body: standing(point) });
+  if (rise) keys.push({ time: time += rise * scale, body: standing(start, start.yaw) });
+  for (const [index, point] of path.slice(1).entries()) {
+    const from = path[index]!;
+    keys.push({ time: time += distance(from, point) / walkSpeed * scale, body: standing(point, Math.atan2(point.x - from.x, point.z - from.z)) });
+  }
   if (settle) keys.push({ time: time += settle * scale, body: end });
   keys.push({ time: seconds, body: end });
   // Keyframe times must rise strictly; the action ends by actionShare of the shot, so the hold at its end always stays.

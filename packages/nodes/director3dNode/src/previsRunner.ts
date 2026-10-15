@@ -5,9 +5,9 @@ import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentP
 import { describeBlocking, frameShot, framingIssues } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot } from "./previsSpec";
-import { buildSet, ceilingOf, emptyShotView, renderSettings, stageShots } from "./previsStage";
+import { buildSet, ceilingOf, emptyShotView, figureScene, renderSettings, stageShots } from "./previsStage";
 import { renderImage, renderVideo } from "./renderMedia";
-import { getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
+import { getSceneLighting, type SceneDocument, type SceneSettings } from "./scene";
 import { directorPlanSchema, type DirectorPlan } from "./sceneAnimation";
 
 type Generate = (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>;
@@ -45,15 +45,16 @@ export async function planShot(options: {
 
 /**
  * The previs of one blocked shot: the opening frame as the colour layout image and as a depth map for depth-controlled
- * keyframes, the colour animation as the previs video, and the measured blocking of the opening frame as text for
- * keyframe prompts.
+ * keyframes, both from `still` (the opening with jointed figures), the colour animation as the previs video, and the
+ * measured blocking of the opening frame as text for keyframe prompts.
  */
-export async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, lighting: LightingSettings = getSceneLighting(scene), settings: SceneSettings = { gridVisible: true, skyVisible: true }, onProgress: (value: number) => void = () => {}) {
+async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, settings: SceneSettings, still: { scene: SceneDocument; plan: DirectorPlan }) {
+  const lighting = getSceneLighting(scene);
   const anchor = anchorSchema.parse({ ...plan.cameraFrames[0]!.view, time: 0 });
-  const blocking = await describeBlocking(scene, plan, aspect);
-  const layout = await renderImage(scene, anchor, aspect, 0, signal, plan, lighting, settings, "color");
-  const depth = await renderImage(scene, anchor, aspect, 0, signal, plan, lighting, settings, "depth");
-  const video = await renderVideo(scene, plan, aspect, signal, onProgress, lighting, settings, "color");
+  const blocking = await describeBlocking(scene, plan, aspect, true);
+  const layout = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "color");
+  const depth = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "depth");
+  const video = await renderVideo(scene, plan, aspect, signal, () => {}, lighting, settings, "color");
   return { layout, depth, video, blocking };
 }
 
@@ -77,8 +78,8 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
  * Blocks and exports every shot in order without a person: the director model writes one plan for the whole film (the
  * set, where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from
  * where the previous one ended, frames the camera from the shot size and checks the framing. A stopped run passes the
- * plan and the shots it finished as `start` and carries on after them. People are cylinders; mannequins are never
- * used here.
+ * plan and the shots it finished as `start` and carries on after them. People are columns in the previs video and
+ * jointed figures in the opening's still images, both posed by code.
  */
 export async function runPrevis(options: {
   generate: Generate; providerId: string; modelId: string; shots: (SpecShot & { size: string })[];
@@ -90,7 +91,8 @@ export async function runPrevis(options: {
   const scene = buildSet(spec);
   const ceiling = ceilingOf(spec);
   const plans: SavedPlan[] = [...options.start?.plans ?? []];
-  for (const [index, { shot, seconds, tracks, subjects, camera }] of stageShots(spec, options.shots).entries()) {
+  for (const [index, staged] of stageShots(spec, options.shots).entries()) {
+    const { shot, seconds, tracks, subjects, camera } = staged;
     if (index < plans.length) continue;
     options.signal.throwIfAborted();
     const size = options.shots[index]!.size;
@@ -107,7 +109,8 @@ export async function runPrevis(options: {
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
     if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
     plans.push({ ...plan, id: crypto.randomUUID() });
-    const exported = await exportShot(scene, plan, options.aspect, options.signal, getSceneLighting(scene), renderSettings(spec));
+    // The stills show the opening with jointed figures and no motion, which the people's tracks would move.
+    const exported = await exportShot(scene, plan, options.aspect, options.signal, renderSettings(spec), { scene: figureScene(scene, staged), plan: { ...plan, tracks: [] } });
     await options.onShot({ shot, ...exported, scene, plans, spec });
   }
 }

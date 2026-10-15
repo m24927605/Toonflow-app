@@ -54,10 +54,10 @@ export const previsSpecSchema = z.strictObject({
       size: z.strictObject({ width: metres, depth: metres, height: metres }).optional(),
     })).max(40),
   }),
-  people: z.array(z.strictObject({ name, enters: z.number().int().min(1), at: place, posture: z.enum(postures) })).min(1).max(12),
+  people: z.array(z.strictObject({ name, enters: z.number().int().min(1), at: place, posture: z.enum(postures), faces: name.optional() })).min(1).max(12),
   shots: z.array(z.strictObject({
     shot: z.number().int().min(1),
-    moves: z.array(z.strictObject({ name, to: place.optional(), posture: z.enum(postures).optional() })).max(12).optional(),
+    moves: z.array(z.strictObject({ name, to: place.optional(), posture: z.enum(postures).optional(), faces: name.optional() })).max(12).optional(),
     camera: z.strictObject({
       side: z.enum(cameraSides), over: name.optional(),
       angle: z.enum(["eye", "low", "high"]).optional(), move: z.enum(["static", "pushIn", "pullOut", "follow"]).optional(),
@@ -82,10 +82,11 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "",
     "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side; or on a chair, sofa, bed, cushion or bench: {\"prop\": its name, \"side\": \"on\"}.",
     "",
-    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\"}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
+    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\", \"faces\": the person or prop they look at}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
     "",
     "shots: one per shot, in order: {\"shot\": its number, \"moves\": [...], \"camera\": {...}}.",
-    "- \"moves\": each person who moves or changes posture during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end}; leave out \"to\" for someone who only sits down or stands up where they are. Everyone starts where the previous shot left them, so leave out anyone who stays as they are.",
+    "- \"moves\": each person who moves, changes posture or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end, \"faces\": the person or prop they look at by the end}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
+    "- \"faces\" names a person or a prop exactly as the plan does; leave it out to have someone look at the nearest other person.",
     "- \"camera\": {\"side\": where the camera stands, seen from the front: \"front\", \"frontLeft\", \"frontRight\", \"left\", \"right\" or \"back\"; or \"overShoulder\" with \"over\": the person whose shoulder it looks past at another person; \"angle\": \"eye\", \"low\" or \"high\"; \"move\": \"static\", \"pushIn\", \"pullOut\" or \"follow\"}. The shot size and who is in frame come from the shot list.",
     "",
     "Follow each row's action, camera and state cells and the script. Keep the staging continuous: when a row's state disagrees with what the previous shots showed, keep the earlier staging unless the row's action changes it.",
@@ -97,7 +98,8 @@ const onWall = (kind: PropKind) => "wall" in propKinds[kind];
 
 /**
  * Reads the model's reply into a plan and lists what is wrong with it for the model to fix: the JSON and its shape,
- * then names that point nowhere, people missing from the shots they are in frame in, and seats that are not seats.
+ * then names that point nowhere, people missing from the shots they are in frame in, seats that are not seats, and
+ * looks at nothing in the plan.
  * Behind a prop against a room's wall is inside the wall, and the model writes it for someone at a door, so it is
  * read as the prop's room side rather than sent back.
  * A shot the plan leaves out keeps everyone still under a front camera.
@@ -129,7 +131,13 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
     props.set(prop.name, prop.kind);
   }
   const people = new Map(spec.people.map(person => [person.name, person]));
-  for (const person of spec.people) checkPlace(person.at, `${person.name}'s entrance`);
+  const checkFaces = (faces: string | undefined, who: string) => {
+    if (faces && !people.has(faces) && !props.has(faces)) problems.push(`${who} looks at "${faces}", which is neither a person nor a prop of the plan.`);
+  };
+  for (const person of spec.people) {
+    checkPlace(person.at, `${person.name}'s entrance`);
+    checkFaces(person.faces, person.name);
+  }
   for (const { shot, cast } of shots) {
     for (const name of cast) {
       const person = people.get(name);
@@ -143,6 +151,7 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
       if (!person) problems.push(`Shot ${item.shot} moves ${move.name}, who is not in "people".`);
       else if (person.enters > item.shot) problems.push(`Shot ${item.shot} moves ${move.name}, who enters only in shot ${person.enters}.`);
       if (move.to) checkPlace(move.to, `Shot ${item.shot}'s move of ${move.name}`);
+      checkFaces(move.faces, `In shot ${item.shot}, ${move.name}`);
     }
     const { over } = item.camera;
     if (item.camera.side === "overShoulder" && (!over || !people.has(over))) problems.push(`Shot ${item.shot} looks over a shoulder, but "over" does not name a person in "people".`);
