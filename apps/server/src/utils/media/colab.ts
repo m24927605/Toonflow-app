@@ -495,28 +495,6 @@ for _name, _count in ${JSON.stringify(split)}:
 }
 
 /**
- * Runs one script on a fresh high-RAM Colab A100 session and returns the downloaded outputs. The session is always
- * stopped.
- */
-export async function runColabJob({ provider, ...job }: ColabJob, signal?: AbortSignal) {
-  checkJob(job);
-  // ACT: The high-RAM shape is required: the Qwen-Image and H3 weights (30+ GB) passed through host memory crashed the
-  // standard shape's kernel. It needs Colab Pro or Pro+, which A100 access already implies.
-  const session = await openColabSession(provider, { gpu: "A100", highMem: true }, signal);
-  let results: Uint8Array[];
-  try {
-    results = await session.job(job, signal);
-  } catch (error) {
-    await session.close(error);
-    throw error;
-  }
-  // The outputs are paid for, so a stop that keeps failing (host offline) is logged instead of discarding them; by the
-  // time it gives up (stopRetry), the VM watchdog has released the idle session (releaseAfter).
-  await session.close().catch((error: unknown) => console.error("[colab] Session stop failed after the job finished; check with `colab sessions`:", error));
-  return results;
-}
-
-/**
  * Keeps one Colab session open across jobs so state a job loads into the kernel, such as model weights, serves the
  * next one. Jobs run one at a time in arrival order. The session stops after `idleMs` without jobs (never while one
  * runs or waits), on stop(), and when a job fails for any reason other than its own Python error, because a

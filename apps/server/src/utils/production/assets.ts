@@ -5,6 +5,7 @@ import { readdir, readFile } from "@toonflow/file";
 import { trainLora, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
+import { holdQwenImage } from "@/utils/media/qwenImage";
 import { productionDirectory, type Production, type ProductionAsset } from "./state";
 
 const castSchema = z.object({
@@ -74,34 +75,40 @@ async function draw(cwd: string, id: string, prompt: string, ratio: string, refe
 
 /**
  * Draws the base image of every character without a photo and of every place in one batch, then every view in a
- * second batch: Qwen-Image draws requests that arrive together in one Colab session, so each batch starts one machine.
+ * second batch: Qwen-Image draws requests that arrive together in one Colab session, and the session is held between
+ * the two batches so they share one machine.
  */
 export async function drawAssets(cwd: string, production: Production, ratio: string, signal: AbortSignal, save: () => Promise<void>) {
   const assets = production.assets!;
-  await Promise.all([
-    ...assets.characters.filter(item => !item.base).map(async item => {
-      item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${item.outfits![0]!.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal);
-    }),
-    ...assets.places.filter(item => !item.base).map(async item => {
-      item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, empty, no people. ${finish}`, ratio, [], signal);
-    }),
-  ]);
-  await save();
-  await Promise.all([
-    ...assets.characters.filter(item => !item.views).map(async item => {
-      const rule = "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body.";
-      item.views = await Promise.all(faceViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
-    }),
-    ...assets.characters.flatMap(item => (item.outfits ?? []).filter(outfit => !outfit.views).map(async outfit => {
-      const rule = `The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body, now wearing ${outfit.look}.`;
-      outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
-    })),
-    ...assets.places.filter(item => !item.views).map(async item => {
-      const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, layout and light.";
-      item.views = [item.base!, ...await Promise.all(placeViews.map(view => draw(cwd, production.id, `${view} ${rule} ${finish}`, ratio, [item.base!], signal)))];
-    }),
-  ]);
-  await save();
+  const release = holdQwenImage();
+  try {
+    await Promise.all([
+      ...assets.characters.filter(item => !item.base).map(async item => {
+        item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${item.outfits![0]!.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal);
+      }),
+      ...assets.places.filter(item => !item.base).map(async item => {
+        item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, empty, no people. ${finish}`, ratio, [], signal);
+      }),
+    ]);
+    await save();
+    await Promise.all([
+      ...assets.characters.filter(item => !item.views).map(async item => {
+        const rule = "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body.";
+        item.views = await Promise.all(faceViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
+      }),
+      ...assets.characters.flatMap(item => (item.outfits ?? []).filter(outfit => !outfit.views).map(async outfit => {
+        const rule = `The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body, now wearing ${outfit.look}.`;
+        outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
+      })),
+      ...assets.places.filter(item => !item.views).map(async item => {
+        const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, layout and light.";
+        item.views = [item.base!, ...await Promise.all(placeViews.map(view => draw(cwd, production.id, `${view} ${rule} ${finish}`, ratio, [item.base!], signal)))];
+      }),
+    ]);
+    await save();
+  } finally {
+    release();
+  }
 }
 
 // ACT: A LoRA (about 1–2 units each) only pays off for a person or place seen in this many shots; fewer get by on
@@ -148,6 +155,13 @@ export async function trainAssetLoras(cwd: string, plan: Awaited<ReturnType<type
     item.loras = [...kept, ...trained].map(record => ({ family: record.family, path: record.path, trigger: record.trigger }));
     await save();
   }));
+}
+
+/** How many of these people already have both their H3 and Qwen-Image character LoRAs, which a production reuses. */
+export async function peopleWithLoras(cwd: string, names: string[]) {
+  const records = await workspaceLoras(cwd);
+  const ready = (name: string) => (["h3", "qwen"] as const).every(family => records.some(record => record.kind === "character" && record.family === family && record.name === name));
+  return [...new Set(names.filter(Boolean))].filter(ready).length;
 }
 
 /** The workspace's LoRA records, newest first. */

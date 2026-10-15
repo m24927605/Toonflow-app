@@ -168,9 +168,9 @@ const headline = computed(() => {
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
     if (!production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views))) return translate("Designing the characters and places…");
     if (assets.some(item => !item.loras)) return translate("Training LoRAs so faces and places stay the same (about an hour)…");
+    if (!production.previs) return translate("Blocking every shot in the previs…");
     if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
     if (!production.clips) return translate("Recording the dialogue…");
-    if (!production.previs) return translate("Blocking every shot in the previs…");
     if (!production.videos) return translate("Writing the video prompts…");
     if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
     return translate("Joining the rough cut…");
@@ -197,11 +197,13 @@ const directory = async () => (await files.getWorkspaceFiles().list()).directory
 
 // The quote follows the form, so the budget starts at the estimate rounded up.
 let quoteTimer: ReturnType<typeof setTimeout> | undefined;
-watch(() => [form.seconds, form.quality, photos.value.length, canvasCast.value.length] as const, () => {
+// People whose LoRAs the workspace already has are quoted without training, so the names count too.
+const castNames = computed(() => [...photos.value.map(photo => form.names[photo.key]?.trim() ?? ""), ...canvasCast.value.map(item => item.name)]);
+watch(() => [form.seconds, form.quality, castNames.value.join("\n")] as const, () => {
   if (data.value.started) return;
   clearTimeout(quoteTimer);
   quoteTimer = setTimeout(async () => {
-    quote.value = await api<Estimate>("estimate", { seconds: form.seconds, quality: form.quality, people: photos.value.length + canvasCast.value.length }).catch(() => undefined);
+    quote.value = await api<Estimate>("estimate", { directory: await directory(), seconds: form.seconds, quality: form.quality, names: castNames.value }).catch(() => undefined);
     if (quote.value && !form.budgetSet) form.budget = Math.ceil(quote.value.total);
   }, 400);
 }, { immediate: true });

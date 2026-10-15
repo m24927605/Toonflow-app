@@ -155,6 +155,7 @@ for index, item in enumerate(items):
         time.sleep(2)
     if history["status"].get("status_str") != "success":
         raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
-    produced = next((comfy / "output" / "toonflow").glob(f"qwen{index}_*.png"))
-    shutil.copy(produced, outputs / f"image_{index}.png")
+    # The file this prompt saved, as ComfyUI reports it: a session that draws several batches keeps the earlier ones.
+    saved = history["outputs"]["13"]["images"][0]
+    shutil.copy(comfy / "output" / saved["subfolder"] / saved["filename"], outputs / f"image_{index}.png")
 print("COLAB_DONE", len(items))

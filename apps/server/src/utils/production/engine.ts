@@ -3,7 +3,8 @@ import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
-import { assetDrawn, castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLoras } from "./assets";
+import { holdQwenImage } from "@/utils/media/qwenImage";
+import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
 import { joinRoughCut, renderClips, writeClipPrompts } from "./video";
@@ -214,16 +215,23 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     return true;
   }
   // The master shot is drawn first; every other keyframe then takes it as the reference for light, colour and clothing,
-  // and they are drawn together so Qwen-Image draws them in one Colab session.
+  // and they are drawn together so Qwen-Image draws them in one batch. The session is held between the two batches, so
+  // both run on one machine.
   const master = keyframes.shots.find(item => item.shot === keyframes.master) ?? keyframes.shots[0]!;
-  const pending = master.image ? keyframes.shots.filter(item => !item.image) : [master];
-  if (pending.length) {
+  if (keyframes.shots.some(item => !item.image)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
-    await Promise.all(pending.map(async item => {
-      Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
-      item.image = await drawKeyframe(cwd, production, item, signal);
-      await saveProduction(cwd, production);
-    }));
+    const release = holdQwenImage();
+    try {
+      for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
+        await Promise.all(batch.filter(item => !item.image).map(async item => {
+          Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
+          item.image = await drawKeyframe(cwd, production, item, signal);
+          await saveProduction(cwd, production);
+        }));
+      }
+    } finally {
+      release();
+    }
     return true;
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
@@ -290,11 +298,16 @@ export function runProduction(cwd: string, id: string) {
   runners.set(key, { controller, finished });
 }
 
+/** The estimate of a production in this workspace, without the LoRAs it will reuse from earlier work. */
+export async function quoteProduction(cwd: string, input: Pick<ProductionInput, "seconds" | "quality" | "photos">) {
+  return estimateProduction(input, await peopleWithLoras(cwd, input.photos.map(photo => photo.name)));
+}
+
 export async function createProduction(cwd: string, id: string, input: ProductionInput) {
   const now = new Date().toISOString();
   await saveProduction(cwd, {
     toonflowProduction: 1, id, createdAt: now, updatedAt: now, input, status: "running", approved: [],
-    estimate: estimateProduction(input).total,
+    estimate: (await quoteProduction(cwd, input)).total,
   });
   runProduction(cwd, id);
 }

@@ -16,5 +16,5 @@ export default Router().get("/", validateFields({ directory: z.string().min(1).m
   if (production.status === "running" && !u.production.isProductionRunning(cwd, id)) u.production.runProduction(cwd, id);
   const read = (text?: { path: string }) => text ? u.production.readProductionText(cwd, text) : undefined;
   const [script, shotList] = await Promise.all([read(production.script), read(production.shotList)]);
-  res.json(success({ production, script, shotList, estimate: u.production.estimateProduction(production.input) }));
+  res.json(success({ production, script, shotList, estimate: await u.production.quoteProduction(cwd, production.input) }));
 });
