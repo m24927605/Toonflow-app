@@ -47,7 +47,8 @@ onMounted(async () => {
     // The frames the director model looks at are kept with the previs, so its verdicts can be checked later.
     await files.mkdir(`${job.folder}/review`).catch(() => undefined);
     await director.runPrevis({
-      generate: request => ai.generate({ ...request, references: [...references, ...request.references ?? []] }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
+      // The job's directory resolves the review frames the director model is shown, which are workspace paths.
+      generate: request => ai.generate({ ...request, directory: job.directory, references: [...references, ...request.references ?? []] }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
       signal: new AbortController().signal, shots: job.shots, start: job.start,
       async saveImage(name, image) {
         const path = `${job.folder}/review/${name}`;

@@ -103,6 +103,8 @@ try:
             "messages": messages, "max_tokens": maxOutputTokens, "temperature": 0.15, "top_p": 0.9,
             "chat_template_kwargs": {"enable_thinking": thinking},
             **({"tools": tools} if tools else {}),
+            # Set only when a reply wrote its tool call as text and is asked again.
+            **({"tool_choice": "required"} if tools and request.get("toolChoice") == "required" else {}),
         }).encode(),
         {"Content-Type": "application/json"},
     ), timeout=7200).read())

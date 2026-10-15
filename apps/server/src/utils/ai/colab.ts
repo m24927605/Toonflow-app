@@ -99,15 +99,32 @@ export function streamColab(providerId: string, modelId: string, context: Contex
   stream.push({ type: "start", partial: output });
   // ACT: The CLI job downloads the complete reply; token streaming needs an incremental CLI transport.
   void (async () => {
-    const [data] = await worker.run((session, jobSignal) => session.job({
-      script: weight.gguf ? ggufPipeline : pipeline,
-      uploads: [{ name: "colabInput.json", data: JSON.stringify({
-        modelId, revision: weight.revision, ...weight.gguf, messages, ...tools?.length ? { tools } : {}, contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens,
-      }) }],
-      env: {}, outputs: ["/content/colabOutput.json"],
-    }, jobSignal), signal);
-    const result = resultSchema.parse(JSON.parse(new TextDecoder().decode(data)));
-    console.log(`[colab] ${modelId}: load ${result.loadSeconds} s, ${result.outputTokens} tokens in ${result.generateSeconds} s`);
+    const ask = async (extra: typeof messages, toolChoice?: "required") => {
+      const [data] = await worker.run((session, jobSignal) => session.job({
+        script: weight.gguf ? ggufPipeline : pipeline,
+        uploads: [{ name: "colabInput.json", data: JSON.stringify({
+          modelId, revision: weight.revision, ...weight.gguf, messages: [...messages, ...extra], ...tools?.length ? { tools } : {}, ...toolChoice ? { toolChoice } : {},
+          contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens,
+        }) }],
+        env: {}, outputs: ["/content/colabOutput.json"],
+      }, jobSignal), signal);
+      const reply = resultSchema.parse(JSON.parse(new TextDecoder().decode(data)));
+      console.log(`[colab] ${modelId}: load ${reply.loadSeconds} s, ${reply.outputTokens} tokens in ${reply.generateSeconds} s`);
+      return reply;
+    };
+    // ACT: Given a long task the model now and then writes the tool arguments out as a JSON document instead of calling
+    // a tool, which ends the tool loop with nothing done. Such a reply goes back once with a correction and the call
+    // required; one that is still text ends the loop as before. A leading "{" or code fence marks the document.
+    const writtenOut = (reply: z.infer<typeof resultSchema>) => !!tools?.length && !reply.toolCalls?.length && /^\s*(\{|```)/.test(reply.text);
+    let result = await ask([]);
+    if (writtenOut(result)) {
+      console.warn(`[colab] ${modelId} wrote its tool call as text; asking again`);
+      result = await ask([
+        { role: "assistant", content: result.text },
+        { role: "user", content: "That reply was text, so nothing was done. Do the work with the tools: reply with one tool call now." },
+      ], "required");
+      if (writtenOut(result)) console.warn(`[colab] ${modelId} wrote its tool call as text again: ${result.text.slice(0, 1500)}`);
+    }
     const toolCalls = (result.toolCalls ?? []).map(call => {
       let parsed: unknown;
       try {
