@@ -111,8 +111,8 @@ function heldPlan(previous: DirectorPlan, shot: number, seconds: number): Direct
  * Blocks and exports every shot in order without a person: the first instruction builds the set, each later shot
  * starts from the previous shot's plan, or from `start`, the set and plans a stopped run had reached. People are
  * cylinders; mannequins are never used here. Since no one looks at the blocking, each shot's framing is checked and
- * handed back to the agent to fix, then framed by computation from the shot size; a shot the agent cannot block at
- * all (a stuck or looping model) holds the previous shot's positions and is framed by computation. A shot that still
+ * handed back to the agent to fix, then framed by computation from the shot size; a shot the agent cannot block in two
+ * tries (a stuck or looping model) holds the previous shot's positions and is framed by computation. A shot that still
  * fails, or a first shot the agent cannot block, stops.
  */
 export async function runPrevis(options: {
@@ -128,14 +128,17 @@ export async function runPrevis(options: {
   for (const { shot, instruction, cast, size, seconds, angled, postures } of options.shots) {
     options.signal.throwIfAborted();
     const basePlan = plans.at(-1);
-    const attempt = (instruction: string, from: { scene: SceneDocument; plan?: DirectorPlan }) =>
+    // A failed fix only drops that fix; `required` marks the one attempt whose failure stops the run.
+    const attempt = (instruction: string, from: { scene: SceneDocument; plan?: DirectorPlan }, required = false) =>
       planShot({ ...options, instruction, scene: from.scene, basePlan: from.plan, plans, allowMannequins: false, selectedPlanId: basePlan?.id })
         .catch((error: unknown) => {
-          if (options.signal.aborted || !basePlan) throw error;
+          if (options.signal.aborted || required) throw error;
           console.warn(`Shot ${shot}: the director agent failed`, error);
           return undefined;
         });
-    const planned = await attempt(instruction, { scene, plan: basePlan });
+    // The model now and then answers with text instead of a tool call, so a shot gets a second try; only the first
+    // shot, which has no previous shot to hold, stops the run when both fail.
+    const planned = await attempt(instruction, { scene, plan: basePlan }) ?? await attempt(instruction, { scene, plan: basePlan }, !basePlan);
     let result = planned ?? { scene, plan: heldPlan(basePlan!, shot, seconds) };
     const check = (from: typeof result) => framingIssues(from.scene, from.plan, options.aspect, cast, angled, postures);
     let issues = await check(result);
