@@ -7,7 +7,8 @@ import { generateMedia } from "@/utils/media/generation";
 import { stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
 import { productionDirectory, type Production } from "./state";
 
-export type ProductionClip = { shot: number; prompt?: string; video?: string };
+/** `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest. */
+export type ProductionClip = { shot: number; prompt?: string; video?: string; seed?: number };
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
@@ -80,9 +81,10 @@ export async function renderClips(cwd: string, production: Production, resolutio
         skipPrevis: true,
         videos: previs ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
         audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
-        loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
+        loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed,
       }, signal);
       item.video = video!.path;
+      item.seed = video!.seed;
       await save();
     }));
   } finally {

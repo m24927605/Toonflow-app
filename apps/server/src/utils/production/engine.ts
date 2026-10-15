@@ -9,7 +9,7 @@ import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
 import { joinRoughCut, renderClips, writeClipPrompts } from "./video";
 import { estimateProduction } from "./estimate";
-import { composeKeyframe, descriptionsPrompt, drawKeyframe, parseDescriptions, planKeyframes } from "./keyframes";
+import { composeKeyframe, descriptionsPrompt, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes } from "./keyframes";
 import {
   productionDirectory, readProduction, readProductionText, readRegistry, saveProduction, setRegistered, writeProductionText,
   type Production, type ProductionGate, type ProductionInput,
@@ -214,6 +214,21 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
+  // A reviewer's change requests rewrite the descriptions of the shots they concern; those shots are drawn again with
+  // their own seeds, so only what was asked changes, and the review comes round again.
+  if (production.review?.gate === "keyframes" && production.review.notes) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(keyframes.shots, production.review.notes), signal));
+    for (const item of keyframes.shots) {
+      const description = sections.get(item.shot);
+      if (description === undefined) continue;
+      item.description = description;
+      delete item.image;
+    }
+    production.review = undefined;
+    await saveProduction(cwd, production);
+    return true;
+  }
   // The master shot is drawn first; every other keyframe then takes it as the reference for light, colour and clothing,
   // and they are drawn together so Qwen-Image draws them in one batch. The session is held between the two batches, so
   // both run on one machine.
@@ -225,7 +240,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
         await Promise.all(batch.filter(item => !item.image).map(async item => {
           Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
-          item.image = await drawKeyframe(cwd, production, item, signal);
+          Object.assign(item, await drawKeyframe(cwd, production, item, signal));
           await saveProduction(cwd, production);
         }));
       }

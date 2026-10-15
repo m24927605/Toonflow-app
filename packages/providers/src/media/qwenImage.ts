@@ -1,6 +1,6 @@
 const rules = [] as const;
 
-const version = "1.3.0";
+const version = "1.4.0";
 
 export default {
   id: "qwenImage" as const,
@@ -34,10 +34,10 @@ export default {
     if (depth && !first) throw new Error("Connect a depth map as the first reference image for depth control");
     // The depth map leaves the reference list, so {{ref 1}} names it and later markers shift down to the images sent.
     const prompt = depth ? request.prompt.replace(/\{\{ref (\d+)\}\}/g, (_, index) => index === "1" ? "the depth map" : `{{ref ${Number(index) - 1}}}`) : request.prompt;
-    const { data, mimeType } = await this.tool.qwenImage({
-      prompt, ratio: request.ratio ?? "1:1", size, loras: request.loras,
+    const { data, mimeType, seed } = await this.tool.qwenImage({
+      prompt, ratio: request.ratio ?? "1:1", size, loras: request.loras, seed: request.seed,
       ...(depth ? { images: rest, controlImage: first } : { images: request.images ?? [] }),
     });
-    return [{ mediaType: "image", type: "binary", data, mimeType }];
+    return [{ mediaType: "image", type: "binary", data, mimeType, seed }];
   },
 } satisfies ProviderDefinition<typeof rules>;

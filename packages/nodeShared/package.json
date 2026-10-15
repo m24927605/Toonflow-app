@@ -29,6 +29,7 @@
     "./masterShot": "./src/masterShot.ts",
     "./nodeRole": "./src/nodeRole.ts",
     "./roleSelect": "./src/components/roleSelect.vue",
+    "./seedLock": "./src/components/seedLock.vue",
     "./assetLora": "./src/components/assetLora.vue",
     "./loraPicker": "./src/components/loraPicker.vue",
     "./loraRegistry": "./src/loraRegistry.ts"

@@ -64,7 +64,8 @@ type MediaInput =
   | { type: "base64"; data: string; mimeType: string; name?: string }
   | { type: "binary"; data: Uint8Array; mimeType: string; name?: string };
 
-type MediaAsset = MediaInput & { mediaType: "image" | "video" | "audio" };
+/** A generated result; `seed` is the seed the model drew with, for models that report one. */
+type MediaAsset = MediaInput & { mediaType: "image" | "video" | "audio"; seed?: number };
 
 type MediaImageInfo = { width: number; height: number; format: string };
 type MediaImageResizeOptions = { width?: number; height?: number; format?: "jpeg" | "png" | "webp"; quality?: number };
@@ -172,7 +173,9 @@ interface ProviderTools {
     ratio: string;
     /** Keeps the generated soundtrack; false returns a silent video. */
     audio: boolean;
-  }): Promise<{ data: Uint8Array; mimeType: "video/mp4" }>;
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+  }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
   /**
    * Draws one Qwen-Image 2.1 Turbo image on a Google Colab A100 through the Colab CLI installed and signed in on the
    * host, using the compute units of that Google account. The host gathers the requests made around the same time
@@ -191,7 +194,9 @@ interface ProviderTools {
     controlImage?: MediaInput;
     /** LoRAs (.safetensors) applied to the model at their strength. */
     loras?: LoraInput[];
-  }): Promise<{ data: Uint8Array; mimeType: "image/png" }>;
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+  }): Promise<{ data: Uint8Array; mimeType: "image/png"; seed: number }>;
 }
 
 /** A LoRA file and the strength to apply it at. */
@@ -219,6 +224,8 @@ interface ImageRequest extends MediaRequest {
   outputFormat?: string;
   /** Trained character identity to keep consistent; only sent to models that declare `character`. */
   characterId?: string;
+  /** Seed to draw with, so a rerun that changes one thing keeps the rest; providers without seeds ignore it. */
+  seed?: number;
 }
 
 interface VideoRequest extends MediaRequest {
@@ -241,6 +248,8 @@ interface VideoRequest extends MediaRequest {
   resolution?: string;
   generateAudio?: boolean;
   watermark?: boolean;
+  /** Seed to draw with, so a rerun that changes one thing keeps the rest; providers without seeds ignore it. */
+  seed?: number;
 }
 
 /**

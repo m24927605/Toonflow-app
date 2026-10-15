@@ -58,7 +58,7 @@ async function drawBatch() {
       prompt: request.prompt,
       ratio: request.ratio,
       size: request.size,
-      seed: randomSeed(),
+      seed: request.seed ?? randomSeed(),
       refs: (request.images ?? []).map((image, refIndex) => `qwin_${index}_${refIndex}.${inputExtension(image)}`),
       control: request.controlImage ? `qwin_${index}_control.${inputExtension(request.controlImage)}` : null,
       loras: loras[index]!.map(({ name, strength }) => ({ name, strength })),
@@ -81,7 +81,7 @@ async function drawBatch() {
       sentLoras.set(session, sent);
       return outputs;
     }, controller.signal);
-    batch.forEach((item, index) => item.resolve({ data: results[index]!, mimeType: "image/png" }));
+    batch.forEach((item, index) => item.resolve({ data: results[index]!, mimeType: "image/png", seed: items[index]!.seed }));
   } catch (error) {
     for (const item of batch) item.reject(error);
   } finally {
@@ -103,6 +103,7 @@ export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (!/^[1-9]\d?:[1-9]\d?$/.test(request.ratio)) throw new Error("Invalid Qwen-Image aspect ratio");
   if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
   if ((request.loras?.length ?? 0) > 4) throw new Error("Qwen-Image loads at most 4 LoRAs");
+  if (request.seed !== undefined && (!Number.isSafeInteger(request.seed) || request.seed < 0)) throw new Error("Invalid Qwen-Image seed");
   for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []]) inputBytes(image);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {

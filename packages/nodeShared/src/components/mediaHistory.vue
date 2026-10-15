@@ -20,10 +20,21 @@
               <span v-if="item.url === current?.url.replaceAll('\\', '/')" class="currentLabel">当前结果</span>
             </button>
           </div>
-          <div class="historyPreview" v-loading="!!selected && !previewReady && !previewError">
+          <div class="historyPreview" :class="{ compare: !!currentUrl }" v-loading="!!selected && !previewReady && !previewError">
             <el-alert v-if="previewError" :title="previewError" type="error" :closable="false" />
-            <img v-else-if="previewUrl && mediaType === 'image'" :src="previewUrl" alt="历史图片预览" @load="previewReady = true" @error="previewError = translate('无法预览该图片')" />
-            <video v-else-if="previewUrl" :src="previewUrl" controls playsinline preload="auto" aria-label="历史视频预览" @loadeddata="previewReady = true" @error="previewError = translate('无法预览该视频')" />
+            <template v-else>
+              <!-- An earlier result sits next to the current one, so a rerun that changed one thing can be compared. -->
+              <figure v-if="currentUrl">
+                <img v-if="mediaType === 'image'" :src="currentUrl" alt="当前结果" />
+                <video v-else :src="currentUrl" controls playsinline preload="auto" aria-label="当前结果" />
+                <figcaption>当前结果</figcaption>
+              </figure>
+              <figure>
+                <img v-if="previewUrl && mediaType === 'image'" :src="previewUrl" alt="历史图片预览" @load="previewReady = true" @error="previewError = translate('无法预览该图片')" />
+                <video v-else-if="previewUrl" :src="previewUrl" controls playsinline preload="auto" aria-label="历史视频预览" @loadeddata="previewReady = true" @error="previewError = translate('无法预览该视频')" />
+                <figcaption v-if="currentUrl">所选版本</figcaption>
+              </figure>
+            </template>
           </div>
         </div>
         <el-pagination v-model:currentPage="page" :pageSize="pageSize" :total="items.length" layout="prev, pager, next" hideOnSinglePage />
@@ -70,6 +81,9 @@ watch(previewFile, () => { previewError.value = ""; }, { flush: "sync" });
 // ACT: The directory listing keeps only paths, shows 20 per page and reads only the selected file;
 // extend list once huge directories need server-side paging.
 const previewUrl = files.useFileUrl(previewFile, () => { previewError.value = "历史文件读取失败，文件可能已被移动或删除"; });
+// The current result, shown beside a selected earlier one.
+const currentFile = computed(() => previewFile.value && props.current && previewFile.value.url !== props.current.url.replaceAll("\\", "/") ? props.current : undefined);
+const currentUrl = files.useFileUrl(currentFile, () => {});
 watch([previewFile, previewUrl], () => { previewReady.value = false; }, { flush: "sync" });
 
 watch(() => props.disabled, disabled => { if (disabled) visible.value = false; });
@@ -161,7 +175,19 @@ function selectOutput() {
       background: var(--el-fill-color-light);
       border-radius: var(--el-border-radius-base);
 
-      img, video { width: 100%; max-height: 360px; object-fit: contain; }
+      &.compare { grid-template-columns: 1fr 1fr; gap: 8px; }
+
+      figure {
+        display: grid;
+        place-items: center;
+        gap: 4px;
+        min-width: 0;
+        margin: 0;
+
+        figcaption { font-size: 12px; color: var(--el-text-color-secondary); }
+      }
+
+      img, video { width: 100%; max-height: 330px; object-fit: contain; }
     }
   }
 

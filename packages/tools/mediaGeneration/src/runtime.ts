@@ -29,6 +29,7 @@ export const imageGenerationSchema = z.strictObject({
   characterId: z.string().regex(/^[\w-]{1,128}$/, "Invalid character identity ID.").optional(),
   loras: z.array(z.strictObject({ path: relativePath, strength: z.number().min(-4).max(4).optional() })).max(4).describe("LoRA files (.safetensors) in the workspace with an optional strength (1 by default; sliders take -4 to 4); the prompt names each by its trigger word").optional(),
   skipTextCheck,
+  seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe("The seed of an earlier result, reported with it, to change one thing and keep the rest; omit for a new random seed").optional(),
 });
 export const videoGenerationSchema = z.strictObject({
   ...sharedFields,
@@ -41,6 +42,7 @@ export const videoGenerationSchema = z.strictObject({
   duration: z.number().finite().positive().max(3600).optional(),
   generateAudio: z.boolean().optional(),
   skipTextCheck,
+  seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe("The seed of an earlier result, reported with it, to change one thing and keep the rest; omit for a new random seed").optional(),
   skipPrevis: z.boolean().describe("Set to true only when the user explicitly agrees not to use previs; otherwise you must connect the depth video exported from Director's Studio in videoControl mode").optional(),
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text", "videoExtension", "videoControl"]),

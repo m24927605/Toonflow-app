@@ -29,10 +29,13 @@ export type NodeImageRequest = {
   size?: string;
   characterId?: string;
   skipTextCheck?: boolean;
+  /** Draws with this seed, for models that take one. */
+  seed?: number;
 };
-export type NodeImageResult = { path: string; mimeType: string; mediaType: "image" };
+/** `seed` is the seed the model drew with, for models that report one. */
+export type NodeImageResult = { path: string; mimeType: string; mediaType: "image"; seed?: number };
 export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
-export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
+export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video"; seed?: number };
 export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate" | "duration"> & { directory: string; outputDirectory: string };
 export type NodeAudioResult = { path: string; mimeType: string; mediaType: "audio" };
 export type NodeLoraKind = "character" | "scene" | "costume" | "style" | "motion" | "voice" | "slider";
@@ -200,7 +203,7 @@ export function useNodeAi() {
   }
 
   async function generateMedia<T extends "image" | "video" | "audio">(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal) {
-    return guarded(() => runJob<{ path: string; mimeType: string; mediaType: T }[]>("/api/ai/media/generate", { ...input, mediaType }, input.directory, signal));
+    return guarded(() => runJob<{ path: string; mimeType: string; mediaType: T; seed?: number }[]>("/api/ai/media/generate", { ...input, mediaType }, input.directory, signal));
   }
 
   /**

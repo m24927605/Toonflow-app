@@ -124,6 +124,8 @@ export interface MediaGenerationRequest {
   skipPrevis?: boolean;
   /** Image and video only: send although the prompt asks for on-screen text; set only after the user confirmed it. */
   skipTextCheck?: boolean;
+  /** Image and video only: the seed to draw with, so a rerun that changes one thing keeps the rest; models without seeds ignore it. */
+  seed?: number;
   mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension" | "videoControl"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }
@@ -132,6 +134,8 @@ export interface GeneratedMedia {
   path: string;
   mimeType: string;
   mediaType: "image" | "video" | "audio";
+  /** The seed the model drew with, for models that report one. */
+  seed?: number;
 }
 
 export interface MediaContext {

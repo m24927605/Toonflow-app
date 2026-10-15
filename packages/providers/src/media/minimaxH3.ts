@@ -1,6 +1,6 @@
 const rules = [] as const;
 
-const version = "1.3.1";
+const version = "1.4.0";
 
 export default {
   id: "minimaxH3" as const,
@@ -21,7 +21,7 @@ export default {
     },
   ] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
-    const { data, mimeType } = await this.tool.minimaxH3({
+    const { data, mimeType, seed } = await this.tool.minimaxH3({
       prompt: request.prompt,
       // In the frame modes the node still labels its images <Picture N> in connection order, so the pinned frames are
       // also sent as those references; without them the labels point at nothing and the first frame does not hold.
@@ -36,7 +36,8 @@ export default {
       resolution: (request.resolution ?? "720p") as "480p" | "720p" | "1080p",
       ratio: request.ratio ?? "16:9",
       audio: request.generateAudio !== false,
+      seed: request.seed,
     });
-    return [{ mediaType: "video", type: "binary", data, mimeType }];
+    return [{ mediaType: "video", type: "binary", data, mimeType, seed }];
   },
 } satisfies ProviderDefinition<typeof rules>;

@@ -5284,6 +5284,9 @@
   "MiniMax H3 loads at most 4 LoRAs": [
     "apps/server/src/utils/media/minimaxH3.ts"
   ],
+  "Invalid MiniMax H3 seed": [
+    "apps/server/src/utils/media/minimaxH3.ts"
+  ],
   "Audio input must be a Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
   ],
@@ -5414,6 +5417,9 @@
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Qwen-Image loads at most 4 LoRAs": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Invalid Qwen-Image seed": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Failed to read image: HTTP {0}": [
@@ -10082,6 +10088,9 @@
   "历史视频预览": [
     "packages/nodeShared/src/components/mediaHistory.vue"
   ],
+  "所选版本": [
+    "packages/nodeShared/src/components/mediaHistory.vue"
+  ],
   "设为当前结果": [
     "packages/nodeShared/src/components/mediaHistory.vue"
   ],
@@ -10192,6 +10201,12 @@
   ],
   "Shot prompt": [
     "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Seed {0} of the current result: keep it to change only what you edit and compare with the history": [
+    "packages/nodeShared/src/components/seedLock.vue"
+  ],
+  "Keep seed": [
+    "packages/nodeShared/src/components/seedLock.vue"
   ],
   "Finish LoRA": [
     "packages/nodeShared/src/components/assetLora.vue"

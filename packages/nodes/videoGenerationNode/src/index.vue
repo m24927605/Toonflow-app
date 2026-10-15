@@ -92,6 +92,7 @@
             :ratios="ratioOptions"
             :model="selectedModel"
             :disabled="generating || deleting || !selectedModel" />
+          <seedLock v-model:keep="data.keepSeed" :seed="currentSeed" :disabled="generating || deleting" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -108,6 +109,7 @@
 
 <script setup lang="ts">
 import loraPicker from "@toonflow/node-shared/loraPicker";
+import seedLock from "@toonflow/node-shared/seedLock";
 import { activeLoras, listLoras, loraFamilyOf, pickLoras, type AttachedLora } from "@toonflow/node-shared/loraRegistry";
 import { withTriggers } from "@toonflow/node-shared/loraTriggers";
 import { roleOf } from "@toonflow/node-shared/nodeRole";
@@ -145,7 +147,9 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
 // `preflight` is written by the text node's "Prepare videos" and covers the prompt it holds.
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean; preflight?: { prompt: string; score: number; issues: string[]; passed: boolean }; loras?: AttachedLora[] });
+// `seeds` holds the seed of each result this node drew, by file, so the current one can be drawn again with one change.
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean; preflight?: { prompt: string; score: number; issues: string[]; passed: boolean }; loras?: AttachedLora[]; seeds?: Record<string, number>; keepSeed?: boolean });
+const currentSeed = computed(() => data.value.seeds?.[outputFile.value?.url ?? ""]);
 const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
@@ -371,6 +375,7 @@ async function startGeneration() {
     // LoRAs picked here or set for the shot's cast by Prepare videos.
     ...attached.length ? { loras: attached.map(lora => ({ path: lora.path, strength: lora.strength })) } : {},
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
+    ...data.value.keepSeed && currentSeed.value !== undefined ? { seed: currentSeed.value } : {},
   };
   generationController = controller;
   // ACT: The tool returns immediately; the node owns the task and cancels it on stop or unmount.
@@ -384,6 +389,7 @@ async function startGeneration() {
       controller.signal.throwIfAborted();
       if (!result) throw new Error("供应商未返回视频");
       outputs.value.video = { dataType: "VIDEO", value: { url: result.path, mimeType: result.mimeType } };
+      if (result.seed !== undefined) data.value.seeds = { ...data.value.seeds, [result.path]: result.seed };
     }))
     .catch((error) => showNodeError(error, "视频生成失败"))
     .finally(() => {
@@ -425,6 +431,8 @@ function getConfig() {
       ratio: data.value.ratio,
       mode: selectedMode.value,
       generateAudio: data.value.generateAudio,
+      keepSeed: data.value.keepSeed === true,
+      seed: currentSeed.value,
     },
     models: models.value,
     ratios: ratioOptions,
@@ -446,7 +454,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setConfig",
-  description: "Modify this video generation node's model, duration, resolution, aspect ratio, mode or audio; first use getConfig to query the capabilities, and providerId and modelId must be provided together; mode uses the original string or array returned and must match the current references; does not modify the prompt or start generation",
+  description: "Modify this video generation node's model, duration, resolution, aspect ratio, mode or audio, or keepSeed: render the next video with the current result's seed (getConfig's seed, for models that report one) so only what you change differs; first use getConfig to query the capabilities, and providerId and modelId must be provided together; mode uses the original string or array returned and must match the current references; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -455,6 +463,7 @@ nodeTools.register({
     ratio: z.enum(ratioOptions).optional(),
     mode: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     generateAudio: z.boolean().optional(),
+    keepSeed: z.boolean().optional(),
   }).refine((args) => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -479,6 +488,7 @@ nodeTools.register({
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
     if (args.mode !== undefined) data.value.mode = JSON.stringify(args.mode);
     if (args.generateAudio !== undefined) data.value.generateAudio = args.generateAudio;
+    if (args.keepSeed !== undefined) data.value.keepSeed = args.keepSeed;
     return getConfig();
   },
 });

@@ -16,7 +16,7 @@ const videoSteps = 1;
 export const stopMinimaxH3WhenIdle = () => worker.stopWhenIdle();
 
 /** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
-export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio }: MinimaxH3Request, signal?: AbortSignal) {
+export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio, seed = randomSeed() }: MinimaxH3Request, signal?: AbortSignal) {
   if (!prompt.trim()) throw new Error("MiniMax H3 prompt cannot be empty");
   if (!Number.isInteger(duration) || duration < 4 || duration > 15) throw new Error("MiniMax H3 duration must be a whole number of seconds from 4 to 15");
   if (!resolutions.has(resolution)) throw new Error("MiniMax H3 only supports 480p, 720p and 1080p");
@@ -25,6 +25,7 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
   if (videos.length > 3) throw new Error("MiniMax H3 supports at most 3 reference videos");
   if (audios.length > 3) throw new Error("MiniMax H3 supports at most 3 reference audio clips");
   if (loras.length > 4) throw new Error("MiniMax H3 loads at most 4 LoRAs");
+  if (!Number.isSafeInteger(seed) || seed < 0) throw new Error("Invalid MiniMax H3 seed");
   const job = crypto.randomUUID().slice(0, 8);
   const name = (rest: string) => `h3in_${job}_${rest}`;
   const [video] = await worker.run((session, sessionSignal) => session.job({
@@ -40,8 +41,8 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
       ...loras.map((lora, index) => ({ name: name(`lora_${index}.safetensors`), data: inputBytes(lora.file) })),
       ...loras.length ? [{ name: name("loras.json"), data: JSON.stringify(loras.map(lora => lora.strength)) }] : [],
     ],
-    env: { H3_JOB: job, H3_SEED: randomSeed(), H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps },
+    env: { H3_JOB: job, H3_SEED: seed, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps },
     outputs: ["/content/h3out/final.mp4"],
   }, sessionSignal), signal);
-  return { data: video!, mimeType: "video/mp4" as const };
+  return { data: video!, mimeType: "video/mp4" as const, seed };
 }

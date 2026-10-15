@@ -88,6 +88,7 @@
             :sizes="sizeOptions"
             :ratios="ratioOptions"
             :disabled="generating || deleting || !selectedModel" />
+          <seedLock v-if="editor?.mode !== 'inpaint'" v-model:keep="data.keepSeed" :seed="currentSeed" :disabled="generating || deleting" />
           <el-button v-if="editor?.mode === 'inpaint'" class="confirmButton" type="primary" :icon="IconCheck" :loading="editor.busy" :disabled="deleting || uploading || !generationPrompt" @click="confirmInpaint().catch(error => showNodeError(error, translate('重绘节点创建失败')))">确认</el-button>
           <el-button
             v-else
@@ -124,6 +125,7 @@ import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImage
 import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown, IconStar } from "@tabler/icons-vue";
 import { planMasterShot } from "@toonflow/node-shared/masterShot";
 import roleSelect from "@toonflow/node-shared/roleSelect";
+import seedLock from "@toonflow/node-shared/seedLock";
 import assetLora from "@toonflow/node-shared/assetLora";
 import { roleOf, registerRoleTool, type NodeRole } from "@toonflow/node-shared/nodeRole";
 import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
@@ -161,7 +163,9 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
 const roles: NodeRole[] = ["keyframe", "character", "scene", "layout"];
 registerRoleTool(roles);
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; inpaintPrompt: string; inpaintPromptModel: PromptModel; model: string; size: string; ratio: string; inpaint?: ImageInpaint; loras?: AttachedLora[] });
+// `seeds` holds the seed of each result this node drew, by file, so the current one can be drawn again with one change.
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; inpaintPrompt: string; inpaintPromptModel: PromptModel; model: string; size: string; ratio: string; inpaint?: ImageInpaint; loras?: AttachedLora[]; seeds?: Record<string, number>; keepSeed?: boolean });
+const currentSeed = computed(() => data.value.seeds?.[outputFile.value?.url ?? ""]);
 const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
@@ -334,6 +338,7 @@ async function startGeneration(batch = false) {
     images: references.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     characterId: character?.id,
     ...attached.length ? { loras: attached.map(lora => ({ path: lora.path, strength: lora.strength })) } : {},
+    ...data.value.keepSeed && currentSeed.value !== undefined ? { seed: currentSeed.value } : {},
   };
   if (inpaintData) {
     let imageIndex = 3 + (inpaintData.images?.length ?? 0);
@@ -354,6 +359,7 @@ async function startGeneration(batch = false) {
       controller.signal.throwIfAborted();
       if (!result) throw new Error("供应商未返回图片");
       outputs.value.image = { dataType: "IMAGE", value: { url: result.path, mimeType: result.mimeType } };
+      if (result.seed !== undefined) data.value.seeds = { ...data.value.seeds, [result.path]: result.seed };
     }))
     .catch((error) => showNodeError(error, "图片生成失败"))
     .finally(() => {
@@ -454,6 +460,8 @@ function getConfig() {
       modelId: selectedModel.value?.modelId ?? "",
       size: data.value.size,
       ratio: data.value.ratio,
+      keepSeed: data.value.keepSeed === true,
+      seed: currentSeed.value,
     },
     models: models.value,
   };
@@ -473,12 +481,13 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setConfig",
-  description: "Modify this image generation node's model, resolution or aspect ratio; first use getConfig to query the available capabilities, and providerId and modelId must be provided together; does not modify the prompt or start generation",
+  description: "Modify this image generation node's model, resolution or aspect ratio, or keepSeed: draw the next image with the current result's seed (getConfig's seed, for models that report one) so only what you change differs; first use getConfig to query the available capabilities, and providerId and modelId must be provided together; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     size: z.string().min(1).optional(),
     ratio: z.string().min(1).optional(),
+    keepSeed: z.boolean().optional(),
   }).refine((args) => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -496,6 +505,7 @@ nodeTools.register({
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     if (args.size !== undefined) data.value.size = args.size;
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
+    if (args.keepSeed !== undefined) data.value.keepSeed = args.keepSeed;
     return getConfig();
   },
 });

@@ -184,7 +184,7 @@ export async function generateMedia(
       voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate, duration: request.duration,
     })
     : mediaType === "image"
-    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras })
+    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras, seed: request.seed })
     : await provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,
       videos: await references(request.videos, "video"), audios: await references(request.audios, "audio"),
@@ -192,7 +192,7 @@ export async function generateMedia(
       lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
       loras,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
-      generateAudio: request.generateAudio, mode: request.mode,
+      generateAudio: request.generateAudio, mode: request.mode, seed: request.seed,
     });
   if (!Array.isArray(assets) || !assets.length) invalid("The provider did not return any generation results");
   // The provider has been paid once it returns results, so the run counts even if writing them fails.
@@ -215,7 +215,7 @@ export async function generateMedia(
         signal?.throwIfAborted();
         await writeWorkspaceFile(path, bytes, true);
         written.push(path);
-        result.push({ path: relative(directory, path).replace(/\\/g, "/"), mimeType, mediaType });
+        result.push({ path: relative(directory, path).replace(/\\/g, "/"), mimeType, mediaType, ...typeof asset.seed === "number" ? { seed: asset.seed } : {} });
       } finally { release(); }
     }
     signal?.throwIfAborted();

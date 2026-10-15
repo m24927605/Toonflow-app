@@ -12,6 +12,8 @@ export type ProductionKeyframe = {
   /** The outfit each person in the shot wears, by name. */
   outfits?: Record<string, string>;
   description?: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string;
+  /** The seed the keyframe was drawn with, kept so a redraw after a change request changes only what was asked. */
+  seed?: number;
 };
 
 const english = (line: PromptLine | MessageDescriptor) => typeof line === "string" ? line : translate(line, undefined, "en");
@@ -102,11 +104,26 @@ export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Pr
   };
 }
 
+/** Draws a keyframe with its own seed when it has one, and returns the image with the seed it was drawn with. */
 export async function drawKeyframe(cwd: string, production: Production, item: ProductionKeyframe, signal: AbortSignal) {
   const [image] = await generateMedia(cwd, "image", {
     providerId: "qwenImage", modelId: "qwen_image_2_1_turbo_depth", prompt: item.prompt!, ratio: production.input.ratio, size: "1K",
-    outputDirectory: `${productionDirectory(production.id)}/keyframes`, loras: item.loras,
+    outputDirectory: `${productionDirectory(production.id)}/keyframes`, loras: item.loras, seed: item.seed,
     images: item.references!.map(path => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : "image/png" })),
   }, signal);
-  return image!.path;
+  return { image: image!.path, seed: image!.seed };
+}
+
+/** Asks for new descriptions of only the shots a reviewer's change requests concern, as "### Shot N" sections. */
+export function keyframeRevisionPrompt(shots: ProductionKeyframe[], notes: string) {
+  return [
+    "A reviewer asked for changes to the keyframes of a short film. The change requests and every shot's current still-frame description are below.",
+    "Rewrite the description of each shot the requests concern, changing only what they ask and keeping the rest word for word; when a request concerns something every shot shares, such as the light or someone's clothes, rewrite every shot it affects.",
+    "Output only the rewritten shots, each as the heading line \"### Shot N\" followed by its paragraph, and nothing for a shot that stays as it is.",
+    "",
+    "Change requests:",
+    notes,
+    "",
+    ...shots.flatMap(item => [`### Shot ${item.shot}`, item.description ?? "", ""]),
+  ].join("\n");
 }
