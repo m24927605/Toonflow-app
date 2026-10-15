@@ -58,7 +58,7 @@ export function fillDialogue(prompt: string, lines: DialogueLine[]) {
  * references and the shot list last, so `scripts` is their count; dialogue is written as [[LINE n]] markers that
  * fillDialogue replaces with the exact words.
  */
-export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; dubbed?: boolean; loras?: { name: string; trigger: string }[] }, ids: Map<string, string>) {
+export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; dubbed?: boolean; loras?: { name: string; trigger: string }[]; keyframe?: string }, ids: Map<string, string>) {
   const shotList = `{{ref ${scripts + 1}}}`;
   const time = `${Number(span.start.toFixed(2))}–${Number(span.end.toFixed(2))} s`;
   const lines = parseDialogue(span.dialogue);
@@ -67,6 +67,7 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
       ? `${Array.from({ length: scripts }, (_, index) => `{{ref ${index + 1}}}`).join(", ")} is the original script and ${shotList} is its shot list. Read both completely before writing.`
       : `${shotList} is the shot list. Read it completely before writing.`,
     `Write the MiniMax H3 video prompt for shot ${span.shot} (${time}) of the shot list: one continuous ${video.duration}-second shot that starts from that shot's keyframe image, called <Picture 1>.`,
+    ...video.keyframe ? [`<Picture 1> shows: ${video.keyframe}`] : [],
     ...video.previs ? ["The video is also given <Video 1>, this shot's grey-box previs: plain boxes and cylinders that show where each person stands and moves, their positions relative to each other, the timing and the camera move. It is a blocking guide only."] : [],
     ...video.dubbed && lines.length ? ["The lines are already recorded as <Audio 1>, the shot's complete soundtrack: the speakers lip-sync to it."] : [],
     ...span.row ? [`This is shot ${span.shot}'s row of the shot list${span.header ? ", under its header" : ""}; everything in this shot comes from it:`, ...span.header ? [span.header] : [], span.row] : [],
@@ -82,14 +83,15 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
     "",
     "Rules:",
     "- integrated_multimodal_description starts with exactly \"[Shot 1] \" followed by the style (live-action, cinematic, unless the script says otherwise) and the first frame: the setting, the light, where each person is and what they wear and hold, as shown in <Picture 1>; say that their appearance, clothing, positions and the set stay unchanged.",
+    "- <Picture 1> is the first frame and wins over the shot list: describe the clothes, the set, the light and the time of day only as <Picture 1> shows them, and add no window view, fire, prop or set piece it does not show. When the row's action is already done in <Picture 1> (a jacket already off, a person already seated), start from <Picture 1> and describe only what still happens.",
     `- Then describe in time order what happens over the ${video.duration} seconds, from the row's action, camera and character-state cells and the story around it in the script: each person's movements, expressions and gaze, and the camera, written as natural phrases such as "the camera holds a static shot" or "the camera pushes in with small amplitude at slow speed". Use no cuts or timestamps.`,
-    `- The people in frame are exactly those in the row's cast cell${span.cast ? ` (${span.cast})` : ""}. Refer to each by a short visual description that fits the script, such as "the young woman in the pale kimono", never by a name label. If nobody is in frame, describe only the place.`,
-    ...(video.loras ?? []).map(lora => `- ${lora.name} has a trained identity: every time ${lora.name} is mentioned, write the word "${lora.trigger}" followed by woman or man as fits, such as "${lora.trigger} woman in the pale kimono", never a pronoun alone; this word makes the video model draw that exact person.`),
+    `- The people in frame are exactly those in the row's cast cell${span.cast ? ` (${span.cast})` : ""}. Refer to each by a short visual description of their age, sex and the clothes <Picture 1> shows, never by a name label. If nobody is in frame, describe only the place.`,
+    ...(video.loras ?? []).map(lora => `- ${lora.name} has a trained identity: every time ${lora.name} is mentioned, write the word "${lora.trigger}" followed by woman or man as fits, then their clothes as <Picture 1> shows them, never a pronoun alone; this word makes the video model draw that exact person.`),
     lines.length
       ? [
           "- The shot has these spoken lines, in this order:",
           ...lines.map((line, index) => `  [[LINE ${index + 1}]] spoken by ${line.speaker ? `${line.speaker} (${ids.get(line.speaker)})` : "the person speaking in this shot"}`),
-          "  Where each line is spoken, write the speaker's visual description, the speaker ID in brackets and the voice, then \"says:\" and the marker itself, for example: the young woman with a soft, low voice (S1) says: [[LINE 1]]",
+          "  Where each line is spoken, write that speaker's own visual description (with their trigger word when they have one), their voice, the speaker ID in brackets, then \"says:\" and the marker itself: <the speaker> with <their voice> (S1) says: [[LINE 1]]. The speaker is the person the line is spoken by, never someone else in the scene.",
           "  Write each marker exactly once and never write the words of a line yourself; they are filled in later. No one says anything else.",
         ].join("\n")
       : "- Nobody speaks in this shot: write no dialogue and no speech.",

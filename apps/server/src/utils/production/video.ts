@@ -13,8 +13,9 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
 
 /**
  * Writes every shot's MiniMax H3 prompt with the text model: the shared instructions, here with the script and shot
- * list inline, the previs as <Video 1> and the dubbed track as <Audio 1>; the lines go in by fillDialogue. A prompt whose
- * line markers are wrong is rewritten once with the error.
+ * list inline, the keyframe's description for <Picture 1>, the previs as <Video 1> and the dubbed track as <Audio 1>; the
+ * lines go in by fillDialogue. A prompt whose line markers are wrong, or that never names a person by their LoRA's
+ * trigger word, is rewritten once with the error.
  */
 export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
@@ -23,19 +24,35 @@ export async function writeClipPrompts(production: Production, script: string, s
   for (const span of spans) {
     const clip = production.clips!.find(item => item.shot === span.shot)!.clip;
     const dubbed = !!production.dub!.shots.find(item => item.shot === span.shot)?.track;
-    const people = production.keyframes!.shots.find(item => item.shot === span.shot)?.cast ?? [];
+    const keyframe = production.keyframes!.shots.find(item => item.shot === span.shot);
+    const people = keyframe?.cast ?? [];
     const loras = people.flatMap(name => {
       const lora = production.assets!.characters.find(item => item.name === name)?.loras?.find(item => item.family === "h3");
       return lora ? [{ name, trigger: lora.trigger }] : [];
     });
-    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras }, ids)}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description }, ids)}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    // A person the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in
+    // the mouth of someone described otherwise is spoken by the wrong person.
+    const finish = (draft: string) => {
+      const missing = loras.filter(lora => !draft.includes(lora.trigger));
+      if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man"`).join(" and ")} every time they are mentioned`);
+      for (const { speaker } of parseDialogue(span.dialogue)) {
+        const lora = loras.find(item => item.name === speaker);
+        const at = draft.indexOf(`(${ids.get(speaker ?? "")}) says`);
+        // ACT: The speaker's description is taken as the 200 characters before their ID; a longer one fails this check.
+        if (lora && at >= 0 && !draft.slice(Math.max(0, at - 200), at).includes(lora.trigger)) {
+          throw new Error(`The line of ${speaker} must be said by "${lora.trigger} woman" or "${lora.trigger} man", described right before (${ids.get(speaker!)}) says`);
+        }
+      }
+      return fillDialogue(draft, parseDialogue(span.dialogue));
+    };
     let draft = await complete(instructions);
     let prompt: string;
     try {
-      prompt = fillDialogue(draft, parseDialogue(span.dialogue));
+      prompt = finish(draft);
     } catch (error) {
       draft = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`);
-      prompt = fillDialogue(draft, parseDialogue(span.dialogue));
+      prompt = finish(draft);
     }
     clips.push({ shot: span.shot, prompt });
   }
