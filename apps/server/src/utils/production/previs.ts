@@ -3,6 +3,7 @@ import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { castNames, shotSpans } from "@toonflow/node-shared/shotList";
 import { previsInstructions } from "@toonflow/node-shared/previsInstructions";
 import { readFile } from "@toonflow/file";
+import { scheduler } from "node:timers/promises";
 import { chromium } from "playwright-core";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { segmentOf } from "./keyframes";
@@ -10,8 +11,10 @@ import { productionDirectory, type Production } from "./state";
 
 export type ProductionPrevis = { shot: number; layout: string; depth: string; video: string; blocking: string }[];
 
-// A previs of a few shots takes minutes; this bounds a runner that hangs.
-const previsTimeout = 60 * 60_000;
+// A director agent on a Colab model takes about a quarter of an hour per shot, so a whole previs may run for hours;
+// the runner only counts as hung when it saves no shot for this long. Progress is checked every progressPoll.
+const stallTimeout = 45 * 60_000;
+const progressPoll = 15_000;
 
 type SavedShot = { blocking: string; scene: unknown; plans: unknown[] };
 
@@ -73,8 +76,17 @@ export async function renderPrevis(cwd: string, production: Production, script: 
     const page = await browser.newPage();
     await page.addInitScript(value => { (globalThis as { previsJob?: unknown }).previsJob = value; }, job);
     await page.goto(`${origin}/#/previs-runner`);
-    const handle = await page.waitForFunction(() => (globalThis as { previsResult?: unknown }).previsResult, undefined, { timeout: previsTimeout, polling: 2000 });
-    const result = await handle.jsonValue() as { done?: ProductionPrevis; error?: string };
+    const savedShots = async () => (await Promise.all(job.shots.map(async ({ shot }) =>
+      readFile((await resolveWorkspacePath(cwd, `${folder}/shot${shot}.json`, true)).path, "utf8").then(() => true, () => false)))).filter(Boolean).length;
+    let saved = 0;
+    let progressAt = Date.now();
+    let result: { done?: ProductionPrevis; error?: string } | undefined;
+    while (!(result = await page.evaluate(() => (globalThis as { previsResult?: { done?: ProductionPrevis; error?: string } }).previsResult))) {
+      await scheduler.wait(progressPoll, { signal });
+      const now = await savedShots();
+      if (now > saved) [saved, progressAt] = [now, Date.now()];
+      else if (Date.now() - progressAt > stallTimeout) throw new Error(`Previs saved no shot for ${stallTimeout / 60_000} minutes; the runner seems stuck`);
+    }
     if (result.error) throw new Error(`Previs failed: ${result.error}`);
     return [...done, ...result.done ?? []];
   } finally {
