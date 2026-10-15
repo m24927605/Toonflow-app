@@ -18,6 +18,9 @@ const lead = 0.3;
 const gap = 0.3;
 // MiniMax H3 renders whole seconds from 4 to 15.
 const clipSeconds = (seconds: number) => Math.min(15, Math.max(4, Math.ceil(seconds)));
+// Gemini pads each line with about a third of a second of near silence at both ends; it is cut off, so the pauses above
+// and the subtitles follow the spoken words. -50 dB keeps the soft start of a word and a trailing breath.
+const trimSilence = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse";
 
 export type ProductionDub = {
   /** Each speaking person's Gemini voice and the delivery the cast description gives them. */
@@ -58,7 +61,9 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
   await Promise.all(dub.shots.flatMap(shot => shot.lines.filter(line => !line.path).map(async line => {
     const { voice, style } = dub.voices[line.speaker]!;
     const [audio] = await generateMedia(cwd, "audio", { ...tts, prompt: line.words, voice, emotion: style, format: "wav", outputDirectory: folder }, signal);
-    line.path = audio!.path;
+    const spoken = `${audio!.path.replace(/\.[^./]+$/, "")}Spoken.wav`;
+    await finished(ffmpeg(audio!.path).audioFilters(trimSilence).output(spoken));
+    line.path = spoken;
     line.seconds = await duration(line.path);
   })));
   await save();

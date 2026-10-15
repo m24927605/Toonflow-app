@@ -20,6 +20,11 @@ export type ProductionClip = {
 };
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
+/**
+ * How long a shot plays in the film: its time in the shot list, or longer when its lines need it. H3 renders whole
+ * seconds of at least four, so the film cuts each clip to this.
+ */
+const shotSeconds = (production: Production, shot: number) => production.dub!.shots.find(item => item.shot === shot)!.seconds;
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 
 /**
@@ -41,7 +46,9 @@ export async function writeClipPrompts(production: Production, script: string, s
       const lora = production.assets!.characters.find(item => item.name === name)?.loras?.find(item => item.family === "h3");
       return lora ? [{ name, trigger: lora.trigger }] : [];
     });
-    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description }, ids)}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const kept = shotSeconds(production, span.shot);
+    const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
+    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // A person the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in
     // the mouth of someone described otherwise is spoken by the wrong person.
     const finish = (draft: string) => {
@@ -105,13 +112,20 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
 
 const finished = (command: FfmpegCommand) => new Promise<void>((resolve, reject) => command.on("end", () => resolve()).on("error", reject).run());
 
-/** Joins the clips in shot order into the rough cut, re-encoded to one format so clips of any source join cleanly. */
+/** Each clip as an input cut to its shot's length. */
+const cutClips = (command: FfmpegCommand, production: Production, clips: ProductionClip[]) =>
+  clips.reduce((current, clip) => current.input(clip.video!).inputOptions("-t", shotSeconds(production, clip.shot).toFixed(3)), command);
+
+/**
+ * Joins the clips in shot order, each cut to its shot's length, into the rough cut, re-encoded to one format so clips of
+ * any source join cleanly.
+ */
 export async function joinRoughCut(cwd: string, production: Production, signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
-  const clips = [...production.videos!].sort((a, b) => a.shot - b.shot).map(item => item.video!);
+  const clips = [...production.videos!].sort((a, b) => a.shot - b.shot);
   const output = `${productionDirectory(production.id)}/roughCut.mp4`;
   const filters = [`${clips.map((_, index) => `[${index}:v][${index}:a]`).join("")}concat=n=${clips.length}:v=1:a=1[v][a]`];
-  const command = clips.reduce((current, clip) => current.input(clip), ffmpeg()).complexFilter(filters, ["v", "a"])
+  const command = cutClips(ffmpeg(), production, clips).complexFilter(filters, ["v", "a"])
     .outputOptions(["-c:v libx264", "-crf 18", "-pix_fmt yuv420p", "-c:a aac", "-b:a 192k", "-movflags +faststart"]).output(output);
   await finished(command);
   return output;
@@ -139,15 +153,15 @@ function srtTime(seconds: number) {
 }
 
 /**
- * Finishes the film from the final clips, or the rough cut's at 480p: joins them in shot order with each clip's sound
- * at one loudness, lays the music under the dialogue and ducks it while people speak, as the soundtrack mix node does,
- * and burns in each dubbed line as a subtitle for as long as it is spoken.
+ * Finishes the film from the final clips, or the rough cut's at 480p: joins them in shot order, each cut to its shot's
+ * length, with each clip's sound at one loudness, lays the music under the dialogue and ducks it while people speak, as
+ * the soundtrack mix node does, and burns in each dubbed line as a subtitle for as long as it is spoken.
  */
 export async function finishFilm(cwd: string, production: Production, signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   const duration = (path: string) => new Promise<number>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
   const clips = [...production.finals ?? production.videos!].sort((a, b) => a.shot - b.shot);
-  const lengths = await Promise.all(clips.map(clip => duration(clip.video!)));
+  const lengths = await Promise.all(clips.map(async clip => Math.min(await duration(clip.video!), shotSeconds(production, clip.shot))));
   const total = lengths.reduce((sum, length) => sum + length, 0);
   const folder = productionDirectory(production.id);
   let subtitles: string | undefined;
@@ -172,14 +186,14 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     }),
     `${clips.map((_, index) => `[${index}:v][a${index}]`).join("")}concat=n=${clips.length}:v=1:a=1[v][dialogue]`,
     // The subtitle file sits in the production folder, a path of plain characters relative to the workspace FFmpeg runs in.
-    subtitles ? `[v]subtitles=filename=${subtitles}:force_style='FontSize=18,Outline=1,Shadow=0,MarginV=20'[picture]` : "[v]null[picture]",
+    subtitles ? `[v]subtitles=filename=${subtitles}:force_style='FontSize=24,Outline=2,Shadow=1,MarginV=24'[picture]` : "[v]null[picture]",
     production.music
       ? `[${clips.length}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=duration=${total},asetpts=PTS-STARTPTS,volume=${musicVolume},afade=t=in:d=2,afade=t=out:st=${Math.max(0, total - 3)}:d=3[bed];`
         + "[dialogue]asplit=2[voice][key];[bed][key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=500[ducked];[voice][ducked]amix=inputs=2:normalize=0,alimiter=limit=0.95[sound]"
       : "[dialogue]alimiter=limit=0.95[sound]",
   ];
   const output = `${folder}/film.mp4`;
-  const command = clips.reduce((current, clip) => current.input(clip.video!), ffmpeg());
+  const command = cutClips(ffmpeg(), production, clips);
   // The score repeats if it is shorter than the film; atrim cuts it to the film's length.
   if (production.music) command.input(production.music).inputOptions("-stream_loop", "-1");
   command.complexFilter(filters, ["picture", "sound"])
@@ -188,13 +202,17 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
   return output;
 }
 
-// Frames a clip check reads, as shares of the clip's length.
+// Frames a clip check reads, as shares of the part of the clip the film keeps.
 const checkTimes = [0.1, 0.4, 0.7, 0.95];
 
-/** The keyframe and four frames of a clip as base64 PNGs, the frames saved beside the clips for a person to see. */
+/**
+ * The keyframe and four frames of the part of a clip the film keeps as base64 PNGs, the frames saved beside the clips for
+ * a person to see.
+ */
 export async function clipFrames(cwd: string, production: Production, clip: ProductionClip, keyframe: string, signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
-  const length = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(clip.video!, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
+  const probed = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(clip.video!, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
+  const length = Math.min(probed, shotSeconds(production, clip.shot));
   const folder = `${productionDirectory(production.id)}/checks`;
   await mkdir((await resolveWorkspacePath(cwd, folder, true)).path, { recursive: true });
   // Everything is scaled to 640 px wide, which keeps the model's image reading short.
@@ -211,13 +229,16 @@ export async function clipFrames(cwd: string, production: Production, clip: Prod
 /**
  * Asks for every problem in a clip, each marked major or minor, as JSON. ACT: The model names problems well but scored
  * clips 85/92 whatever it found, a changed set and clothes included, so the verdict follows the problems it marks major.
+ * The clip is judged against the keyframe image only: given the keyframe's written description as well, the model took
+ * the words for the picture and failed every clip of the first production, natural movement included.
  */
-export function clipCheckPrompt(description: string, prompt: string) {
+export function clipCheckPrompt(prompt: string) {
   return [
     "The first image is a shot's keyframe, the first frame its video clip had to start from; the next four are frames from the clip at 10%, 40%, 70% and 95% of its length.",
-    `The keyframe shows: ${description}`,
     `The clip was asked for: ${prompt}`,
-    "List every problem you see. A problem is major when the set, the light or someone's clothes differ from the keyframe; the clip does not start from the keyframe's moment (a different pose, place or framing); someone who should be seen has their head or face out of frame; someone appears, vanishes or jumps; a face, hand or body melts or deforms; someone passes through furniture or another person; or the picture flickers or morphs. Anything smaller is minor, such as a slight change of expression or a small drift of the framing. A camera move the clip was asked for, such as a push in, pull back, pan or follow, is no problem.",
+    "Compare the frames with the keyframe image, never with the words: they only tell you which movements and camera move were asked for, and where they describe the picture differently, the keyframe image is right.",
+    "List every problem you see. A problem is major when the set, the light or someone's clothes, hair or face differ from the keyframe; the clip does not open on the keyframe's place, framing and people; someone who should be seen has their head or face out of frame; someone or something appears from nowhere, vanishes or jumps to another place; a face, hand or body melts or deforms; someone passes through furniture or another person; or the picture flickers or morphs. Anything smaller is minor, such as a small drift of the framing.",
+    "Movement is what a clip is for: people turning, looking around, speaking, changing expression, gesturing, standing up, sitting down or walking, and a camera move such as a push in, pull back, pan or follow, are no problem as long as they carry on naturally from the keyframe's moment.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }

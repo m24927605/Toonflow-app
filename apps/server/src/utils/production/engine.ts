@@ -1,6 +1,7 @@
-import { t, translate } from "@toonflow/i18n";
+import { translate } from "@toonflow/i18n";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
+import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { holdQwenImage } from "@/utils/media/qwenImage";
@@ -296,7 +297,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     for (const item of unchecked) {
       const keyframe = production.keyframes.shots.find(shot => shot.shot === item.shot)!;
       const frames = await clipFrames(cwd, production, item, keyframe.image!, signal);
-      item.check = readClipCheck(await complete(checker, clipCheckPrompt(keyframe.description ?? "", item.prompt ?? ""), signal, frames));
+      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? ""), signal, frames));
       if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
       await saveProduction(cwd, production);
     }
