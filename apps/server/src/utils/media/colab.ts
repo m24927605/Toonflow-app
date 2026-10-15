@@ -159,10 +159,12 @@ export async function stopOrphanedColabSessions() {
   return orphans;
 }
 
-const tail = (text: string, length = 3000) => stripVTControlCharacters(text).trim().slice(-length);
+// CLI errors quote the VM's proxy URLs, whose token opens the running VM; messages are shown and saved, so it is cut.
+const tail = (text: string, length = 3000) => stripVTControlCharacters(text).replace(/(colab-runtime-proxy-token=)[^&\s]+/g, "$1\u2026").trim().slice(-length);
 
 const idempotent = new Set(["upload", "download", "sessions", "usage"]);
-const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost/;
+// Includes the proxy's 502, 503 and 504, which it answers for a moment while the VM is busy or briefly unreachable.
+const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|50[234] Server Error/;
 
 async function colab(command: string, args: string[], signal?: AbortSignal) {
   for (let attempt = 1; ; attempt++) {
