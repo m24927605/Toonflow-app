@@ -220,7 +220,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   if (pending.length) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
     await Promise.all(pending.map(async item => {
-      Object.assign(item, composeKeyframe(item, production.assets!, item === master ? undefined : master.image, production.previs!.find(shot => shot.shot === item.shot)?.layout));
+      Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
       item.image = await drawKeyframe(cwd, production, item, signal);
       await saveProduction(cwd, production);
     }));

@@ -180,7 +180,7 @@ watch([order, () => ({ ...characterViews }), () => ({ ...characterNames })], () 
     next += item.cells.length;
     return { name: item.name, ref };
   });
-  template.value = keyframeTemplate(scenes.length, named).map(line => typeof line === "string" ? line : translate(line)).join("\n");
+  template.value = keyframeTemplate(scenes.map((_, index) => index + 1), named).map(line => typeof line === "string" ? line : translate(line)).join("\n");
 }, { immediate: true, deep: true });
 
 function build() {

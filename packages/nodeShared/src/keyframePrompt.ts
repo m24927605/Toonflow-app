@@ -8,11 +8,11 @@ export const withoutFullStop = (text: string) => text.replace(/[。.]+$/, "");
 
 /**
  * The keyframe template "Build shot nodes" fills per shot: the set references first, then the reference naming each
- * person, and `{{shot}}` where the shot description goes.
+ * person, and `{{shot}}` where the shot description goes. `sceneRefs` and each person's `ref` are reference numbers.
  */
-export function keyframeTemplate(sceneRefs: number, characters: { name: string; ref: number }[]): PromptLine[] {
+export function keyframeTemplate(sceneRefs: number[], characters: { name: string; ref: number }[]): PromptLine[] {
   return [
-    ...sceneRefs ? [msg`The set is ${Array.from({ length: sceneRefs }, (_, index) => `{{ref ${index + 1}}}`).join(", ")} and must match it exactly.`] : [],
+    ...sceneRefs.length ? [msg`The set is ${sceneRefs.map(ref => `{{ref ${ref}}}`).join(", ")} and must match it exactly.`] : [],
     ...characters.map(item => msg`${item.name} is the person shown in ${`{{ref ${item.ref}}}`}.`),
     ...characters.length ? [msg`Draw only the people named in the shot description.`] : [],
     msg`One single full-frame photograph, not a grid, collage or character sheet.`,

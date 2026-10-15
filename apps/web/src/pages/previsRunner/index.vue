@@ -22,9 +22,9 @@ type PrevisJob = {
 type RunPrevis = (options: {
   generate: (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>; providerId: string; modelId: string; aspect: number; signal: AbortSignal;
   shots: PrevisJob["shots"]; start?: PrevisJob["start"];
-  onShot: (result: { shot: number; layout: Blob; video: Blob; blocking: string; scene: unknown; plans: unknown[] }) => Promise<void>;
+  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: unknown; plans: unknown[] }) => Promise<void>;
 }) => Promise<void>;
-type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { done?: { shot: number; layout: string; video: string; blocking: string }[]; error?: string } };
+type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { done?: { shot: number; layout: string; depth: string; video: string; blocking: string }[]; error?: string } };
 
 // A page without the workspace UI that the server opens in a headless browser for auto production's previs. It works
 // on the directory the job names and never opens a project, so the people's own pages keep their current project.
@@ -46,10 +46,11 @@ onMounted(async () => {
     await director.runPrevis({
       generate: request => ai.generate({ ...request, references }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
       signal: new AbortController().signal, shots: job.shots, start: job.start,
-      async onShot({ shot, layout, video, blocking, scene, plans }) {
+      async onShot({ shot, layout, depth, video, blocking, scene, plans }) {
         status.value = `shot ${shot}`;
-        const paths = { layout: `${job.folder}/shot${shot}.png`, video: `${job.folder}/shot${shot}.mp4` };
+        const paths = { layout: `${job.folder}/shot${shot}.png`, depth: `${job.folder}/shot${shot}Depth.png`, video: `${job.folder}/shot${shot}.mp4` };
         await files.write(paths.layout, layout);
+        await files.write(paths.depth, depth);
         await files.write(paths.video, video);
         // Written last, so a shot counts as done only once its media are saved; a stopped run resumes after it.
         await files.writeJson(`${job.folder}/shot${shot}.json`, { blocking, scene, plans });

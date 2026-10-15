@@ -8,7 +8,7 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { segmentOf } from "./keyframes";
 import { productionDirectory, type Production } from "./state";
 
-export type ProductionPrevis = { shot: number; layout: string; video: string; blocking: string }[];
+export type ProductionPrevis = { shot: number; layout: string; depth: string; video: string; blocking: string }[];
 
 // A previs of a few shots takes minutes; this bounds a runner that hangs.
 const previsTimeout = 60 * 60_000;
@@ -53,7 +53,7 @@ export async function renderPrevis(cwd: string, production: Production, script: 
     const path = (await resolveWorkspacePath(cwd, `${folder}/shot${shot}.json`, true)).path;
     const saved = await readFile(path, "utf8").then(text => JSON.parse(text) as SavedShot).catch(() => undefined);
     if (!saved) break;
-    done.push({ shot, layout: `${folder}/shot${shot}.png`, video: `${folder}/shot${shot}.mp4`, blocking: saved.blocking });
+    done.push({ shot, layout: `${folder}/shot${shot}.png`, depth: `${folder}/shot${shot}Depth.png`, video: `${folder}/shot${shot}.mp4`, blocking: saved.blocking });
     start = { scene: saved.scene, plans: saved.plans };
   }
   if (done.length === shots.length) return done;

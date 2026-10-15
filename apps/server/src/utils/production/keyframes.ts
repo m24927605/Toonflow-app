@@ -1,5 +1,5 @@
 import { translate, type MessageDescriptor } from "@toonflow/i18n";
-import { keyframeDescriptionInstructions, keyframeTemplate, layoutLine, masterLine, stateLine, type PromptLine } from "@toonflow/node-shared/keyframePrompt";
+import { keyframeDescriptionInstructions, keyframeTemplate, masterLine, stateLine, type PromptLine } from "@toonflow/node-shared/keyframePrompt";
 import { withTriggers } from "@toonflow/node-shared/loraTriggers";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { castNames, shotSpans, suggestMasterShot } from "@toonflow/node-shared/shotList";
@@ -75,35 +75,36 @@ export function segmentOf(text: string, name: string, castSize: number) {
 }
 
 /**
- * The prompt, references and LoRAs of one keyframe: the place's base image, each person's front view, the master
- * keyframe for every other shot, and the shot's previs layout, which fixes the composition; Qwen-Image LoRAs of the
- * cast and place, at most 4, people first.
+ * The prompt, references and LoRAs of one keyframe: the shot's previs depth map first, which fixes the composition
+ * through the depth model, then the place's base image, each person's front view and, for every other shot, the master
+ * keyframe, which set the look; Qwen-Image LoRAs of the cast and place, at most 4, people first.
  */
-export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, masterImage?: string, layout?: string) {
-  const place = byName(assets.places, item.place);
+export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, depth: string, masterImage?: string) {
+  const set = byName(assets.places, item.place);
+  const setView = set?.views?.[0];
   const people = item.cast.flatMap(name => byName(assets.characters, name) ?? []);
   // A person's reference is the front view of the outfit they wear in this shot, so the keyframe draws those clothes.
   const outfitView = (person: ProductionAsset) => (person.outfits?.find(outfit => outfit.name === item.outfits?.[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base!;
-  const references = [...place?.views?.[0] ? [place.views[0]] : [], ...people.map(outfitView)];
+  // {{ref 1}} is the depth map, which the depth model takes as its control image, so the look references start at 2.
+  const references = [depth, ...setView ? [setView] : [], ...people.map(outfitView)];
   // A person's trigger word stands next to their name, so the LoRA binds to that person rather than the whole picture.
   const trigger = (asset: ProductionAsset) => asset.loras?.find(lora => lora.family === "qwen")?.trigger;
-  const template = keyframeTemplate(place ? 1 : 0, people.map((person, index) => ({ name: trigger(person) ? `${person.name} (${trigger(person)})` : person.name, ref: (place ? 2 : 1) + index })));
+  const template = keyframeTemplate(setView ? [2] : [], people.map((person, index) => ({ name: trigger(person) ? `${person.name} (${trigger(person)})` : person.name, ref: (setView ? 3 : 2) + index })));
   const fixed = [
     ...item.state ? [english(stateLine(item.state))] : [],
     ...masterImage ? [english(masterLine(`{{ref ${references.length + 1}}}`))] : [],
-    ...layout ? [english(layoutLine(`{{ref ${references.length + (masterImage ? 2 : 1)}}}`))] : [],
   ];
   const prompt = template.map(english).join("\n").replace("{{shot}}", [...fixed, item.description ?? ""].join("\n"));
-  const loras = [...people, ...place ? [place] : []].flatMap(asset => (asset.loras ?? []).filter(lora => lora.family === "qwen").map(lora => ({ ...lora, name: asset.name }))).slice(0, 4);
+  const loras = [...people, ...set ? [set] : []].flatMap(asset => (asset.loras ?? []).filter(lora => lora.family === "qwen").map(lora => ({ ...lora, name: asset.name }))).slice(0, 4);
   return {
-    prompt: withTriggers(prompt, loras), references: [...references, ...masterImage ? [masterImage] : [], ...layout ? [layout] : []],
+    prompt: withTriggers(prompt, loras), references: [...references, ...masterImage ? [masterImage] : []],
     loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
   };
 }
 
 export async function drawKeyframe(cwd: string, production: Production, item: ProductionKeyframe, signal: AbortSignal) {
   const [image] = await generateMedia(cwd, "image", {
-    providerId: "qwenImage", modelId: "qwen_image_2_1_turbo", prompt: item.prompt!, ratio: production.input.ratio, size: "1K",
+    providerId: "qwenImage", modelId: "qwen_image_2_1_turbo_depth", prompt: item.prompt!, ratio: production.input.ratio, size: "1K",
     outputDirectory: `${productionDirectory(production.id)}/keyframes`, loras: item.loras,
     images: item.references!.map(path => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : "image/png" })),
   }, signal);

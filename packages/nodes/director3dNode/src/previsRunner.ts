@@ -42,15 +42,17 @@ export async function planShot(options: {
 }
 
 /**
- * The previs of one blocked shot: the opening frame as the colour layout image, the colour animation as the previs
- * video, and the measured blocking of the opening frame as text for keyframe prompts.
+ * The previs of one blocked shot: the opening frame as the colour layout image and as a depth map for depth-controlled
+ * keyframes, the colour animation as the previs video, and the measured blocking of the opening frame as text for
+ * keyframe prompts.
  */
 export async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, lighting: LightingSettings = getSceneLighting(scene), settings: SceneSettings = { gridVisible: true, skyVisible: true }, onProgress: (value: number) => void = () => {}) {
   const anchor = anchorSchema.parse({ ...plan.cameraFrames[0]!.view, time: 0 });
   const blocking = await describeBlocking(scene, plan, aspect);
   const layout = await renderImage(scene, anchor, aspect, 0, signal, plan, lighting, settings, "color");
+  const depth = await renderImage(scene, anchor, aspect, 0, signal, plan, lighting, settings, "depth");
   const video = await renderVideo(scene, plan, aspect, signal, onProgress, lighting, settings, "color");
-  return { layout, video, blocking };
+  return { layout, depth, video, blocking };
 }
 
 // Times the director agent may fix a shot whose framing check fails before the camera is framed by computation.
@@ -80,7 +82,7 @@ export async function runPrevis(options: {
   generate: Generate; providerId: string; modelId: string; shots: { shot: number; instruction: string; cast: string[]; size: string; seconds: number; angled: boolean; postures: Record<string, Posture> }[];
   aspect: number; signal: AbortSignal;
   start?: { scene: SceneDocument; plans: SavedPlan[] };
-  onShot: (result: { shot: number; layout: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[] }) => Promise<void>;
+  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[] }) => Promise<void>;
 }) {
   let scene = options.start?.scene ?? createEmptyScene();
   const plans: SavedPlan[] = [...options.start?.plans ?? []];
