@@ -11,7 +11,7 @@
     :style="{ width: previewUrl && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
-      <roleSelect :roles="['keyframe', 'character', 'scene', 'layout']" />
+      <roleSelect :roles="roles" />
       <assetLora />
       <el-button :icon="IconPanoramaHorizontal" :disabled="uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || inpaintPrompt?.creating || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down :size="14" /></el-button>
       <el-button :icon="IconBrush" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
@@ -79,6 +79,7 @@ import { IconPhoto, IconUpload, IconTransfer, IconLayoutGrid, IconBrush, IconPen
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";
 import gradeControl from "@toonflow/node-shared/gradeControl";
 import roleSelect from "@toonflow/node-shared/roleSelect";
+import { registerRoleTool, type NodeRole } from "@toonflow/node-shared/nodeRole";
 import assetLora from "@toonflow/node-shared/assetLora";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import imageGridSplit from "./components/imageGridSplit.vue";
@@ -100,6 +101,8 @@ defineOptions({
 const { node, nodeProps, outputs, nodeEvent, files, updateNodeInternals } = useNode({
   label: "图片",
 });
+const roles: NodeRole[] = ["keyframe", "character", "scene", "layout"];
+registerRoleTool(roles);
 const fileInput = ref<HTMLInputElement>();
 const gridSplit = ref<InstanceType<typeof imageGridSplit>>();
 const editor = ref<InstanceType<typeof imageEditor>>();

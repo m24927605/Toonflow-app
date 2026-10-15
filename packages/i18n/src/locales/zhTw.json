@@ -3182,6 +3182,8 @@
   "Shot {0} previs layout": "第 {0} 鏡 構圖參考",
   "The previs fixes the opening frame: {0}. Place each person and the camera to match it.": "粗模試演已定好開場畫面：{0}。每個人的位置和鏡頭都要與此一致。",
   "This shot list already has a previs node; continue the shots there": "這張分鏡表已經有粗模試演節點，請在那裡繼續逐鏡試演",
+  "The script is empty": "劇本是空的",
+  "This node is busy; try again when it is done": "這個節點正在忙，完成後再試一次",
   "Blocking shot {0} of {1}; the first request also starts Colab and loads the model, about 1–2 minutes": "正在做第 {0} 鏡／共 {1} 鏡；首次請求還要啟動 Colab 並載入模型，約 1～2 分鐘",
   "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": "每一格都寫在同一行：同一格有多段內容（例如兩個人的台詞或狀態）時，用全形分號（；）分隔，不要用 <br> 或換行。",
   "Retry shot {0}": "重試第 {0} 鏡",

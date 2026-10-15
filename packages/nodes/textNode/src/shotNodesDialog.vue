@@ -97,16 +97,10 @@
 import { computed, reactive, ref, watch } from "vue";
 import { ElButton, ElCheckbox, ElDialog, ElInput, ElOption, ElSelect } from "element-plus";
 import { t, translate } from "@toonflow/i18n/vue";
-import type { ShotNodesPlan } from "./shotNodes";
-import { keyframeTemplate } from "@toonflow/node-shared/keyframePrompt";
+import { defaultCast, defaultVideoTemplate, shotNodesTemplate, type ShotNodesChoice, type ShotNodesPlan } from "./shotNodes";
 
 /** A person (with `video`) or a place of the shot list and whether its LoRAs are trained; `unnamed` scenes cannot have one yet. */
 export type LoraRow = { label: string; video?: boolean; keyframe: boolean; unnamed?: boolean };
-/** `cast` lists, per shot, the indexes into `characters` of the people in that shot; `masterShot` is 0 for none. */
-export type ShotNodesChoice = {
-  scenes: string[]; characters: { name: string; person: string; cells: string[] }[]; cast: Record<number, number[]>; masterShot: number;
-  template: string; videoTemplate: string; textNodes: boolean;
-};
 
 const props = defineProps<{ plan: ShotNodesPlan; loraRows: LoraRow[] }>();
 const emit = defineEmits<{ build: [choice: ShotNodesChoice]; closed: [] }>();
@@ -132,24 +126,12 @@ const masterOptions = computed(() => [...new Set([...props.plan.keyframesToBuild
 // Each person is one column; with several outfits the cell picks which one this shot uses.
 const castPeople = computed(() => [...new Set(props.plan.characters.filter(item => characterChecks[item.name]).map(item => item.person))]);
 const outfitsOf = (person: string) => props.plan.characters.filter(item => item.person === person && characterChecks[item.name]);
-// Who is in each shot comes from the shot list's cast column (a person counts when their name is in the cell) or, without
-// one, everyone. The outfit is the one whose name the shot's row mentions (its state cell first), else the first one;
-// the user has the last word here, never the text model.
-const castChoice = reactive(Object.fromEntries(props.plan.keyframesToBuild.map(span => [span.shot, Object.fromEntries(
-  [...new Set(props.plan.characters.map(item => item.person))].map(person => {
-    const outfits = props.plan.characters.filter(item => item.person === person);
-    if (span.cast !== undefined && !span.cast.includes(person) && !outfits.some(item => span.cast!.includes(item.name))) return [person, ""];
-    const text = `${span.state ?? ""} ${span.row ?? ""}`;
-    return [person, (outfits.find(item => item.outfit && text.includes(item.outfit)) ?? outfits[0]!).name];
-  }))])));
+// Who is in each shot and in which outfit starts from the shot list (see defaultCast); the user has the last word here,
+// never the text model.
+const castChoice = reactive(defaultCast(props.plan));
 const hasState = props.plan.keyframesToBuild.some(span => span.state);
 const template = ref("");
-// Music is laid over the joined film afterwards, so every shot keeps only the sound of the scene and cuts stay seamless.
-const videoTemplate = ref([
-  translate("Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged."),
-  "{{shot}}",
-  translate("No background music: only dialogue and the sounds of the scene."),
-].join("\n"));
+const videoTemplate = ref(defaultVideoTemplate());
 // Kept out of the template: the marker's braces would end a template interpolation.
 const shotHint = computed(() => translate("{{shot}} marks where Distribute prompts puts each shot's text."));
 
@@ -174,13 +156,7 @@ const order = computed(() => {
 // Changing the reference choices rebuilds the template; edits made after the last change are kept until then.
 watch([order, () => ({ ...characterViews }), () => ({ ...characterNames })], () => {
   const { scenes, characters } = order.value;
-  let next = scenes.length + 1;
-  const named = characters.map(item => {
-    const ref = next + item.cells.indexOf(characterViews[item.key]!);
-    next += item.cells.length;
-    return { name: item.name, ref };
-  });
-  template.value = keyframeTemplate(scenes.map((_, index) => index + 1), named).map(line => typeof line === "string" ? line : translate(line)).join("\n");
+  template.value = shotNodesTemplate(scenes.length, characters.map(item => ({ ...item, view: characterViews[item.key]! })));
 }, { immediate: true, deep: true });
 
 function build() {

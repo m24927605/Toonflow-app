@@ -6444,13 +6444,13 @@
   "Training LoRAs so faces and places stay the same (about an hour)…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
+  "Blocking every shot in the previs…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
   "Drawing the keyframes, the master shot first…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Recording the dialogue…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Blocking every shot in the previs…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Writing the video prompts…": [
@@ -7535,6 +7535,9 @@
   "文本尚未加载": [
     "packages/nodes/textNode/src/index.vue"
   ],
+  "The script is empty": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
   "Add the Colab CLI provider with {0} in Settings first": [
     "packages/nodes/textNode/src/index.vue"
   ],
@@ -7579,6 +7582,9 @@
     "packages/nodes/textNode/src/index.vue"
   ],
   "Filled {0} nodes": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "This node is busy; try again when it is done": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Add the MiniMax H3 (Colab) media provider in Settings first": [
@@ -7719,6 +7725,12 @@
   "复制失败，请在原文中选择并复制": [
     "packages/nodes/textNode/src/markdownEditor.vue"
   ],
+  "Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged.": [
+    "packages/nodes/textNode/src/shotNodes.ts"
+  ],
+  "No background music: only dialogue and the sounds of the scene.": [
+    "packages/nodes/textNode/src/shotNodes.ts"
+  ],
   "Markdown 预览失败": [
     "packages/nodes/textNode/src/markdownPreview.vue"
   ],
@@ -7848,12 +7860,6 @@
     "packages/nodes/textNode/src/shotNodesDialog.vue"
   ],
   "Suggested: shot {0}, the widest shot{1}.": [
-    "packages/nodes/textNode/src/shotNodesDialog.vue"
-  ],
-  "Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged.": [
-    "packages/nodes/textNode/src/shotNodesDialog.vue"
-  ],
-  "No background music: only dialogue and the sounds of the scene.": [
     "packages/nodes/textNode/src/shotNodesDialog.vue"
   ],
   "{{shot}} marks where Distribute prompts puts each shot's text.": [

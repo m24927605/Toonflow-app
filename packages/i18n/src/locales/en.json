@@ -3166,6 +3166,8 @@
   "Block shot {0}": "Block shot {0}",
   "The previs fixes the opening frame: {0}. Place each person and the camera to match it.": "The previs fixes the opening frame: {0}. Place each person and the camera to match it.",
   "This shot list already has a previs node; continue the shots there": "This shot list already has a previs node; continue the shots there",
+  "The script is empty": "The script is empty",
+  "This node is busy; try again when it is done": "This node is busy; try again when it is done",
   "Confirm shot {0}": "Confirm shot {0}",
   "{0}: left of the frame, about {1} m from the camera": "{0}: left of the frame, about {1} m from the camera",
   "camera about {0} m high, level": "camera about {0} m high, level",

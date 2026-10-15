@@ -1,4 +1,6 @@
 import type { Edge, GraphNode } from "@vue-flow/core";
+import { translate } from "@toonflow/i18n/vue";
+import { keyframeTemplate } from "@toonflow/node-shared/keyframePrompt";
 import { roleOf, shotNumberOf } from "@toonflow/node-shared/nodeRole";
 import { suggestMasterShot, type MasterShotSuggestion, type ShotSpan } from "@toonflow/node-shared/shotList";
 
@@ -31,6 +33,58 @@ export type ShotNodesPlan = {
   /** The master shot preselected in the dialog. */
   masterSuggestion?: MasterShotSuggestion;
 };
+
+/** `cast` lists, per shot, the indexes into `characters` of the people in that shot; `masterShot` is 0 for none. */
+export type ShotNodesChoice = {
+  scenes: string[]; characters: { name: string; person: string; cells: string[] }[]; cast: Record<number, number[]>; masterShot: number;
+  template: string; videoTemplate: string; textNodes: boolean;
+};
+
+/**
+ * Who is in each shot to build, as each person's outfit name ("" for someone absent): a person counts when their name
+ * is in the shot's cast cell, or everyone without a cast column; the outfit is the one the shot's row mentions (its
+ * state cell first), else the first one.
+ */
+export function defaultCast(plan: ShotNodesPlan) {
+  return Object.fromEntries(plan.keyframesToBuild.map(span => [span.shot, Object.fromEntries(
+    [...new Set(plan.characters.map(item => item.person))].map(person => {
+      const outfits = plan.characters.filter(item => item.person === person);
+      if (span.cast !== undefined && !span.cast.includes(person) && !outfits.some(item => span.cast!.includes(item.name))) return [person, ""];
+      const text = `${span.state ?? ""} ${span.row ?? ""}`;
+      return [person, (outfits.find(item => item.outfit && text.includes(item.outfit)) ?? outfits[0]!).name];
+    }))]));
+}
+
+/** The keyframe template for these references: the scenes, then every view of each person, each named by the chosen view. */
+export function shotNodesTemplate(sceneCount: number, characters: { name: string; cells: string[]; view: string }[]) {
+  let next = sceneCount + 1;
+  const named = characters.map(item => {
+    const ref = next + item.cells.indexOf(item.view);
+    next += item.cells.length;
+    return { name: item.name, ref };
+  });
+  return keyframeTemplate(Array.from({ length: sceneCount }, (_, index) => index + 1), named).map(line => typeof line === "string" ? line : translate(line)).join("\n");
+}
+
+// Music is laid over the joined film afterwards, so every shot keeps only the sound of the scene and cuts stay seamless.
+export const defaultVideoTemplate = () => [
+  translate("Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged."),
+  "{{shot}}",
+  translate("No background music: only dialogue and the sounds of the scene."),
+].join("\n");
+
+/** What the Build shot nodes dialog proposes: every scene and character, each person's first view, the suggested master shot. */
+export function defaultShotNodesChoice(plan: ShotNodesPlan): ShotNodesChoice {
+  const characters = plan.characters.map(item => ({ name: item.name, person: item.person, cells: item.cells.map(cell => cell.nodeId) }));
+  const cast = defaultCast(plan);
+  return {
+    scenes: plan.scenes.map(item => item.nodeId), characters,
+    cast: Object.fromEntries(plan.keyframesToBuild.map(span => [span.shot, characters.flatMap((item, index) => cast[span.shot]![item.person] === item.name ? [index] : [])])),
+    masterShot: plan.keyframesToBuild.length ? plan.masterSuggestion?.shot ?? 0 : 0,
+    template: shotNodesTemplate(plan.scenes.length, characters.map(item => ({ ...item, view: item.cells[0]! }))),
+    videoTemplate: defaultVideoTemplate(), textNodes: true,
+  };
+}
 
 const imageUrl = (node: GraphNode) => node.data?.outputs?.image?.value?.url as string | undefined;
 const labelOf = (node: GraphNode) => String(node.data?.label ?? "");

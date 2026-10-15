@@ -65,6 +65,7 @@ First and last frames have explicit semantics, and a change of order may swap th
 
 ## Configuration questions must not cut off Seedance
 
+- A MiniMax H3 task is never latched here: it follows the main `SKILL.md`'s MiniMax H3 route, where `node:prepareVideos` writes and preflights the prompts and this file only checks the real node settings before generation.
 - Configuration verification in this file may happen only after the main `SKILL.md` has latched the Seedance route and completed the A0 target-model confirmation; if the user did not specify 2.0/2.5, the main PART A must first confirm "Seedance 2.0 or 2.5" with one short question. That model confirmation question belongs to the main PART A; this file must not choose a default model on its own or ask it again.
 - If the host must confirm execution parameters such as `ratio`, `resolution`, `mode`, `generateAudio`, or provider with the user, both the question and the user's answer are supplementary execution parameters of the same Seedance task. After the answer, continue using the prompt PART A planned or finalized; do not re-enter the general workflow.
 - If, in a configuration answer, the user explicitly changes the model to 2.0/2.5, this is an A0 input update: return to PART A to re-route the affected formal prompts for the new target model, then come back to this file to execute; never just switch the model at the node configuration layer while keeping the other model's prompt shell.

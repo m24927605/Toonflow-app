@@ -28,7 +28,7 @@ import { computed, h, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
 import { ElLoading, ElMessage, ElMessageBox } from "element-plus";
-import { nodeSkeleton, useNode, useNodeFiles, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
+import { nodeSkeleton, nodeTools, useNode, useNodeFiles, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
@@ -502,6 +502,34 @@ async function generate(previsShot?: number) {
     if (!disposed) tasks.value = tasks.value.map(item => item.id === task.id ? { ...item, error: error instanceof Error ? error.message : translate("生成失败，请重试") } : item);
   }
 }
+// The AI agent drives a shot list's previs through the same step as the bar's button; a step runs in the background.
+let previsStepping = false;
+nodeTools.register({
+  name: "stepPrevis",
+  description: "For a previs node made from a shot list: block the next shot (the director model plans it in the background, people as cylinders), or, once node:getPrevisStatus says the shot is ready to confirm, export its layout image and previs video to the canvas and block the shot after it, as the bar's Block shot and Confirm shot buttons do. ratio is the film's aspect ratio. Have each blocked shot checked, by the user in the Director's Studio unless they let you go on, before confirming it.",
+  parameters: z.strictObject({ ratio: z.string().regex(/^[1-9]\d?:[1-9]\d?$/).default("16:9") }),
+  execute({ ratio }) {
+    const step = previsStep.value;
+    if (!step) throw new Error("This node has no previs shot left to block");
+    if (previsStepping || step.running) throw new Error(`Shot ${step.shot} is still being blocked or exported; poll node:getPrevisStatus`);
+    const [width, height] = ratio.split(":").map(Number) as [number, number];
+    previsStepping = true;
+    void stepPrevis(width / height).finally(() => { previsStepping = false; });
+    return { shot: step.shot, action: step.confirm ? "confirm" : "block" };
+  },
+});
+
+nodeTools.register({
+  name: "getPrevisStatus",
+  description: "This node's shot list previs: the confirmed shots, and the next shot with whether it is being blocked or exported, ready to confirm, or failed and why.",
+  parameters: z.strictObject({}),
+  execute() {
+    const queue = data.value.previs;
+    if (!queue) return { previs: false };
+    const step = previsStep.value;
+    return { previs: true, total: queue.shots.length, done: queue.done, next: step ? { ...step, busy: previsStepping || step.running } : null };
+  },
+});
 </script>
 
 <style scoped lang="scss">

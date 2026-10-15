@@ -12,7 +12,7 @@
     :style="{ width: (previewUrl || inpaintGuideUrl) && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
-      <roleSelect :roles="['keyframe', 'character', 'scene', 'layout']" />
+      <roleSelect :roles="roles" />
       <assetLora />
       <el-button :icon="IconPanoramaHorizontal" :disabled="generating || deleting || uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down :size="14" /></el-button>
       <el-button :icon="IconBrush" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
@@ -125,7 +125,7 @@ import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, Icon
 import { planMasterShot } from "@toonflow/node-shared/masterShot";
 import roleSelect from "@toonflow/node-shared/roleSelect";
 import assetLora from "@toonflow/node-shared/assetLora";
-import { roleOf } from "@toonflow/node-shared/nodeRole";
+import { roleOf, registerRoleTool, type NodeRole } from "@toonflow/node-shared/nodeRole";
 import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
@@ -158,6 +158,8 @@ const vLoading = ElLoading.directive;
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({
   label: "图片生成",
 });
+const roles: NodeRole[] = ["keyframe", "character", "scene", "layout"];
+registerRoleTool(roles);
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
 const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; inpaintPrompt: string; inpaintPromptModel: PromptModel; model: string; size: string; ratio: string; inpaint?: ImageInpaint; loras?: AttachedLora[] });
 const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });

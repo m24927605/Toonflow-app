@@ -8,7 +8,7 @@
     :style="{ width: previewUrl && videoWidth ? `${videoWidth + 18}px` : undefined }"
     @fullscreen="player?.enterFullscreen()">
     <template #topActions>
-      <roleSelect :roles="['previs']" />
+      <roleSelect :roles="roles" />
       <el-button :icon="IconMusic" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
       <el-button :icon="IconLayersSubtract" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
       <el-button :icon="IconScissors" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import roleSelect from "@toonflow/node-shared/roleSelect";
+import { registerRoleTool, type NodeRole } from "@toonflow/node-shared/nodeRole";
 import { translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, ref } from "vue";
 import { IconVideo, IconUpload, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconClock, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward, IconPhotoDown } from "@tabler/icons-vue";
@@ -80,6 +81,8 @@ defineOptions({
 const { node, nodeProps, outputs, nodeEvent, files, updateNodeInternals } = useNode({
   label: "视频",
 });
+const roles: NodeRole[] = ["previs"];
+registerRoleTool(roles);
 const fileInput = ref<HTMLInputElement>();
 const uploading = ref(false);
 const player = ref<InstanceType<typeof videoPlayer>>();
