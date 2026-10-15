@@ -53,10 +53,10 @@ diffusion = "qwen_image_2.1_turbo_bf16.safetensors"
 encoder = "qwen3vl_8b_bf16.safetensors"
 vae = "qwen_image_2.1_vae_bf16.safetensors"
 controlPatch = "qwen_image_2.1_fun_controlnet_union_int8_convrot.safetensors"
-# ACT: The depth map fixes layout and viewpoint over the early steps and then lets go, so the references can carry the
-# design detail; at full strength through every step the result kept the proxy's plain shapes. Tune per shot if needed.
+# ACT: The depth map steers every step at 0.7 strength: at full strength the result kept the proxy's plain shapes, and
+# steering only the early steps lost the layout, because the Turbo schedule's first 5 of 8 steps only take sigma from
+# 1.0 to 0.9 and the layout forms in the last 3. Tune per shot if needed.
 controlStrength = 0.7
-controlEnd = 0.6
 weights = [(f"diffusion_models/{diffusion}", "diffusion_models"), (f"text_encoders/{encoder}", "text_encoders"), (f"vae/{vae}", "vae")]
 # The patch is only downloaded when a batch actually uses it.
 if any(item.get("control") for item in items):
@@ -134,7 +134,7 @@ def build(item):
         graph["30"] = {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}}
         graph["31"] = {"class_type": "QwenImageDiffsynthControlnet", "inputs": {
             "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "image": ["ctrlScaled", 0],
-            "strength": controlStrength, "start_percent": 0.0, "end_percent": controlEnd}}
+            "strength": controlStrength, "start_percent": 0.0, "end_percent": 1.0}}
     return graph
 
 

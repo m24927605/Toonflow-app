@@ -9084,6 +9084,18 @@
   "{0}: centre of the frame, about {1} m from the camera": [
     "packages/nodes/director3dNode/src/blocking.ts"
   ],
+  "{0} faces {1}, towards the camera": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0} faces {1}, seen in three-quarter view": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0} faces {1}, seen in profile": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
+  "{0} faces {1}, seen from behind": [
+    "packages/nodes/director3dNode/src/blocking.ts"
+  ],
   "camera about {0} m high, looking down": [
     "packages/nodes/director3dNode/src/blocking.ts"
   ],
@@ -10313,7 +10325,7 @@
   "{0} is this shot''s previs layout and fixes its composition: keep its camera position, angle and crop, where each person stands, how large they are in the frame and who hides whom, and add or remove no one and nothing; take no shape, material or colour from its plain blocks.": [
     "packages/nodeShared/src/keyframePrompt.ts"
   ],
-  "Write a still-frame description of shot {0} ({1}) of the attached shot list as one paragraph of 80 to 200 words, based on that row''s description and action columns: the shot size; the camera position, height and angle from the shot list; and for each person in frame their place in the picture (left, centre or right, foreground or background), posture, action, expression and gaze. Describe only the opening moment. Do not write reference markers, the setting, lighting, style words or anyone''s appearance.": [
+  "Write a still-frame description of shot {0} ({1}) of the attached shot list as one paragraph of 80 to 200 words, based on that row''s description and action columns: the shot size; the camera position, height and angle from the shot list; and for each person in frame their place in the picture (left, centre or right, foreground or background), posture, action, expression and what they look at; no one looks into the lens unless the shot list says so. Describe only the opening moment. Do not write reference markers, the setting, lighting, style words or anyone''s appearance.": [
     "packages/nodeShared/src/keyframePrompt.ts"
   ],
   "The people in this shot are exactly: {0}. Describe only them and call them by these names. When only part of someone is in frame, such as a hand, their back or a silhouette, say which part and how it is framed, so the rest of them is not drawn.": [

@@ -11,7 +11,7 @@ const personTypes = new Set(["cylinder", "capsule", "mannequin"]);
 /**
  * Describes where each person stands in the opening frame of a plan and where the camera is, measured in the scene, so
  * text-only models and keyframe prompts can follow the previs without seeing it: the side of the frame, the distance
- * from the camera, and the camera's height and tilt.
+ * from the camera, which way people sharing the frame face, and the camera's height and tilt.
  */
 export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan, aspect: number) {
   const runtime = await createStage(document.createElement("canvas"), scene, undefined, aspect);
@@ -24,20 +24,37 @@ export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan,
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
     const metres = (value: number) => Number(value.toFixed(1));
-    const lines = scene.objectList.filter(object => personTypes.has(object.objType)).flatMap(object => {
+    const people = scene.objectList.filter(object => personTypes.has(object.objType)).flatMap(object => {
       const root = getObjectByThreeJsonId(object.threeJsonId, runtime.scene);
       if (!root) return [];
       root.updateMatrixWorld(true);
       const box = new Box3().setFromObject(root);
       const centre = box.getCenter(new Vector3());
-      const distance = metres(camera.position.distanceTo(centre));
       // The head decides whether and where a person is in frame: a close-up leaves the middle of the body out.
       const point = new Vector3(centre.x, box.min.y + (box.max.y - box.min.y) * 0.9, centre.z).project(camera);
-      if (point.z > 1 || Math.abs(point.x) > 1 || Math.abs(point.y) > 1) return [t`${object.name}: out of frame`];
-      if (point.x < -1 / 3) return [t`${object.name}: left of the frame, about ${distance} m from the camera`];
-      if (point.x > 1 / 3) return [t`${object.name}: right of the frame, about ${distance} m from the camera`];
-      return [t`${object.name}: centre of the frame, about ${distance} m from the camera`];
+      return [{ name: object.name, centre, point, framed: point.z <= 1 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1 }];
     });
+    const lines = people.map(({ name, centre, point, framed }) => {
+      const distance = metres(camera.position.distanceTo(centre));
+      if (!framed) return t`${name}: out of frame`;
+      if (point.x < -1 / 3) return t`${name}: left of the frame, about ${distance} m from the camera`;
+      if (point.x > 1 / 3) return t`${name}: right of the frame, about ${distance} m from the camera`;
+      return t`${name}: centre of the frame, about ${distance} m from the camera`;
+    });
+    // ACT: A cylinder has no front, so people sharing the frame are taken to face the nearest other one, as in most
+    // two-shots; people who look elsewhere, at a view or a screen, are told the wrong way. Letting the director agent
+    // turn each person and reading the turn here would lift that.
+    const framed = people.filter(person => person.framed);
+    const level = (vector: Vector3) => vector.setY(0).normalize();
+    for (const person of framed) {
+      const other = framed.filter(item => item !== person).sort((a, b) => a.centre.distanceTo(person.centre) - b.centre.distanceTo(person.centre))[0];
+      if (!other) continue;
+      const angle = level(other.centre.clone().sub(person.centre)).angleTo(level(camera.position.clone().sub(person.centre))) * 180 / Math.PI;
+      lines.push(angle < 30 ? t`${person.name} faces ${other.name}, towards the camera`
+        : angle < 75 ? t`${person.name} faces ${other.name}, seen in three-quarter view`
+          : angle < 120 ? t`${person.name} faces ${other.name}, seen in profile`
+            : t`${person.name} faces ${other.name}, seen from behind`);
+    }
     const tilt = Math.asin(camera.getWorldDirection(new Vector3()).y) * 180 / Math.PI;
     const height = metres(camera.position.y);
     lines.push(tilt < -10 ? t`camera about ${height} m high, looking down` : tilt > 10 ? t`camera about ${height} m high, looking up` : t`camera about ${height} m high, level`);
