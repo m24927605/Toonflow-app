@@ -12,6 +12,9 @@ const worker = createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 
 // used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
 const videoSteps = 1;
 
+/** Stops the A100 as soon as the clips already requested are done, for a caller that has no more to send. */
+export const stopMinimaxH3WhenIdle = () => worker.stopWhenIdle();
+
 /** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
 export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio }: MinimaxH3Request, signal?: AbortSignal) {
   if (!prompt.trim()) throw new Error("MiniMax H3 prompt cannot be empty");

@@ -4,6 +4,7 @@ import { shotSpans } from "@toonflow/node-shared/shotList";
 import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { generateMedia } from "@/utils/media/generation";
+import { stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
 import { productionDirectory, type Production } from "./state";
 
 export type ProductionClip = { shot: number; prompt?: string; video?: string };
@@ -64,25 +65,30 @@ export async function writeClipPrompts(production: Production, script: string, s
  * its cast's H3 LoRAs. All are requested at once and run one after another on one Colab machine.
  */
 export async function renderClips(cwd: string, production: Production, resolution: "480p" | "720p" | "1080p", signal: AbortSignal, save: () => Promise<void>) {
-  await Promise.all(production.videos!.filter(item => !item.video).map(async item => {
-    const keyframe = production.keyframes!.shots.find(shot => shot.shot === item.shot)!;
-    const previs = production.previs!.find(shot => shot.shot === item.shot);
-    const track = production.dub!.shots.find(shot => shot.shot === item.shot)?.track;
-    const loras = keyframe.cast.flatMap(name => production.assets!.characters.find(person => person.name === name)?.loras?.filter(lora => lora.family === "h3") ?? []);
-    const [video] = await generateMedia(cwd, "video", {
-      ...h3, mode: "startFrameOptional", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
-      generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/clips`,
-      firstFrame: { path: keyframe.image!, mimeType: mimeOf(keyframe.image!) },
-      // ACT: The previs goes in as a reference video rather than a control video, as the shot nodes do; skipPrevis only
-      // lifts the server's control-video gate, which the previs reference satisfies.
-      skipPrevis: true,
-      videos: previs ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
-      audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
-      loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
-    }, signal);
-    item.video = video!.path;
-    await save();
-  }));
+  try {
+    await Promise.all(production.videos!.filter(item => !item.video).map(async item => {
+      const keyframe = production.keyframes!.shots.find(shot => shot.shot === item.shot)!;
+      const previs = production.previs!.find(shot => shot.shot === item.shot);
+      const track = production.dub!.shots.find(shot => shot.shot === item.shot)?.track;
+      const loras = keyframe.cast.flatMap(name => production.assets!.characters.find(person => person.name === name)?.loras?.filter(lora => lora.family === "h3") ?? []);
+      const [video] = await generateMedia(cwd, "video", {
+        ...h3, mode: "startFrameOptional", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
+        generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/clips`,
+        firstFrame: { path: keyframe.image!, mimeType: mimeOf(keyframe.image!) },
+        // ACT: The previs goes in as a reference video rather than a control video, as the shot nodes do; skipPrevis only
+        // lifts the server's control-video gate, which the previs reference satisfies.
+        skipPrevis: true,
+        videos: previs ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
+        audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
+        loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
+      }, signal);
+      item.video = video!.path;
+      await save();
+    }));
+  } finally {
+    // These are all the clips the production has to render, so the A100 stops when they are done rather than idling on.
+    stopMinimaxH3WhenIdle();
+  }
 }
 
 const finished = (command: FfmpegCommand) => new Promise<void>((resolve, reject) => command.on("end", () => resolve()).on("error", reject).run());

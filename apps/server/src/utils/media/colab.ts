@@ -508,6 +508,7 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
   let epoch = 0;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   let running: AbortController | undefined;
+  let stopSoon = false;
 
   async function close(failure?: unknown) {
     const open = session;
@@ -524,11 +525,13 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
 
   function scheduleIdleStop() {
     clearTimeout(idleTimer);
+    const wait = stopSoon ? 0 : idleMs;
+    stopSoon = false;
     idleTimer = setTimeout(() => {
       // Queued behind running jobs, and skipped when a job arrived meanwhile.
       void enqueue(() => pending ? Promise.resolve() : close())
         .catch((error: unknown) => console.error("[colab] Idle session stop failed; check with `colab sessions`:", error));
-    }, idleMs);
+    }, wait);
     // A pending idle stop must not keep the process alive; the exit handlers stop the session instead.
     idleTimer.unref();
   }
@@ -579,6 +582,15 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     };
   }
 
+  /**
+   * Stops the session once no job runs or waits, instead of after `idleMs`, for a caller that knows no more jobs follow;
+   * other callers' queued jobs still run first.
+   */
+  function stopWhenIdle() {
+    stopSoon = true;
+    if (!pending && session) scheduleIdleStop();
+  }
+
   /** Stops the session now, cancelling the running job and every queued one. */
   function stop() {
     clearTimeout(idleTimer);
@@ -587,7 +599,7 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     return enqueue(() => close());
   }
 
-  return { run, hold, stop };
+  return { run, hold, stopWhenIdle, stop };
 }
 
 /** A random seed with 53 bits, so it stays exact as a JavaScript number. */
