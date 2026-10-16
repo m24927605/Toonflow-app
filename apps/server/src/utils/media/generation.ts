@@ -195,7 +195,7 @@ export async function generateMedia(
       lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
       loras,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
-      generateAudio: request.generateAudio, mode: request.mode, seed: request.seed,
+      generateAudio: request.generateAudio, mode: request.mode, seed: request.seed, parts: request.parts,
     });
   if (!Array.isArray(assets) || !assets.length) invalid("The provider did not return any generation results");
   // The provider has been paid once it returns results, so the run counts even if writing them fails.

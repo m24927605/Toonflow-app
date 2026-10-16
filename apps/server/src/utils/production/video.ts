@@ -6,17 +6,18 @@ import { mkdir, readFile } from "@toonflow/file";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
-import { stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
+import { longTakeParts, stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
 import { maxLoras, referenceImages, shotReferences } from "./shots";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 
 /**
  * `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest; `check` is the model's
  * verdict on its frames, `retried` marks a clip rendered again with a new seed after it failed, and `rejected` keeps the
- * verdict that sent it back.
+ * verdict that sent it back. A shot longer than one render is a long take: `parts` holds the prompt of each part, and
+ * `prompt` all of them, for the clip check.
  */
 export type ProductionClip = {
-  shot: number; prompt?: string; video?: string; seed?: number;
+  shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number;
   check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean; rejected?: ProductionClip["check"];
 };
 
@@ -52,34 +53,61 @@ export async function writeClipPrompts(production: Production, script: string, s
     const people = references.people.map(({ person }) => ({ name: person.name, trigger: loras.find(lora => lora.name === person.name)?.trigger, gaze: previs.framed.gaze[person.name] }));
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
-    const instructions = `${referenceVideoPromptInstructions(span, 1, { duration: clip, dubbed, people, place: references.place?.place.look, blocking: previs.blocking }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
-    // A person the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in
-    // the mouth of someone described otherwise is spoken by the wrong person.
-    const finish = (draft: string) => {
-      const missing = loras.filter(lora => !draft.includes(lora.trigger));
-      if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man"`).join(" and ")} every time they are mentioned`);
-      // A trigger word before both "woman" and "man" gives one person's LoRA to two people.
-      const shared = loras.filter(lora => new Set([...draft.matchAll(new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "gi"))].map(match => match[1]!.toLowerCase())).size > 1);
-      if (shared.length) throw new Error(`${shared.map(lora => `"${lora.trigger}" names ${lora.name} alone`).join(" and ")}: write it only for them, always followed by the same word, woman or man`);
-      for (const { speaker } of parseDialogue(span.dialogue)) {
-        const lora = loras.find(item => item.name === speaker);
-        const at = draft.indexOf(`(${ids.get(speaker ?? "")}) says`);
-        // ACT: The speaker's description is taken as the 200 characters before their ID; a longer one fails this check.
-        if (lora && at >= 0 && !draft.slice(Math.max(0, at - 200), at).includes(lora.trigger)) {
-          throw new Error(`The line of ${speaker} must be said by "${lora.trigger} woman" or "${lora.trigger} man", described right before (${ids.get(speaker!)}) says`);
+    const instructionsOf = (part: typeof span, duration: number, note: string) =>
+      `${referenceVideoPromptInstructions(part, 1, { duration, dubbed, people, place: references.place?.place.look, blocking: previs.blocking }, ids)}${note}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    // Has the text model write one prompt and fills in the lines of `dialogue`, rewritten once with the error. A person
+    // the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in the mouth
+    // of someone described otherwise is spoken by the wrong person.
+    const write = async (instructions: string, dialogue?: string) => {
+      const finish = (draft: string) => {
+        const missing = loras.filter(lora => !draft.includes(lora.trigger));
+        if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man"`).join(" and ")} every time they are mentioned`);
+        // A trigger word before both "woman" and "man" gives one person's LoRA to two people.
+        const shared = loras.filter(lora => new Set([...draft.matchAll(new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "gi"))].map(match => match[1]!.toLowerCase())).size > 1);
+        if (shared.length) throw new Error(`${shared.map(lora => `"${lora.trigger}" names ${lora.name} alone`).join(" and ")}: write it only for them, always followed by the same word, woman or man`);
+        for (const { speaker } of parseDialogue(dialogue)) {
+          const lora = loras.find(item => item.name === speaker);
+          const at = draft.indexOf(`(${ids.get(speaker ?? "")}) says`);
+          // ACT: The speaker's description is taken as the 200 characters before their ID; a longer one fails this check.
+          if (lora && at >= 0 && !draft.slice(Math.max(0, at - 200), at).includes(lora.trigger)) {
+            throw new Error(`The line of ${speaker} must be said by "${lora.trigger} woman" or "${lora.trigger} man", described right before (${ids.get(speaker!)}) says`);
+          }
         }
+        return fillDialogue(draft, parseDialogue(dialogue));
+      };
+      const draft = await complete(instructions);
+      try {
+        return finish(draft);
+      } catch (error) {
+        return finish(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`));
       }
-      return fillDialogue(draft, parseDialogue(span.dialogue));
     };
-    let draft = await complete(instructions);
-    let prompt: string;
-    try {
-      prompt = finish(draft);
-    } catch (error) {
-      draft = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`);
-      prompt = finish(draft);
+    const plan = longTakeParts(clip);
+    if (plan.parts > 1) {
+      // A long take: each part's prompt covers its own seconds of the shot and the lines that start in them, and
+      // carries on from the part before without a cut.
+      const lines = production.dub!.shots.find(item => item.shot === span.shot)!.lines;
+      const dialogue = parseDialogue(span.dialogue);
+      const seconds = (frames: number) => Number((frames / 24).toFixed(2));
+      const parts: string[] = [];
+      for (let part = 0; part < plan.parts; part++) {
+        const from = part * plan.step, to = from + plan.frames;
+        // A part delivers its frames after the 22 it repeats; a line belongs to the part that delivers its start.
+        const owns = (start: number) => start >= (part ? from + 22 : 0) && (part + 1 === plan.parts || start < (part + 1) * plan.step + 22);
+        const own = dialogue.filter((_, index) => owns(Math.round((lines[index]?.start ?? 0) * 24)));
+        const partSpan = { ...span, dialogue: own.map(line => line.speaker ? `${line.speaker}\uFF1A${line.words}` : line.words).join("\uFF1B") };
+        const note = [
+          `\n\nThis shot is one continuous take of ${clip} seconds without any cut, rendered in ${plan.parts} parts of ${seconds(plan.frames)} seconds. This prompt is part ${part + 1} of ${plan.parts}: seconds ${seconds(from)}\u2013${seconds(Math.min(to, clip * 24))} of the shot.`,
+          "Describe only what happens in those seconds, in time order; the other parts describe the rest. <Video 1> and <Audio 1> cover only this part.",
+          ...part ? [`Its first 0.92 seconds repeat the end of part ${part} exactly: open on the same picture, positions and motion that part ends on, and carry on with the same camera.`] : [],
+          ...part + 1 < plan.parts ? ["End with the take still going, mid-action, not on a pause or a resolved moment."] : [],
+        ].join(" ");
+        parts.push(await write(instructionsOf(partSpan, seconds(plan.frames), note), partSpan.dialogue));
+      }
+      Object.assign(video, { parts, prompt: parts.join("\n\n") });
+    } else {
+      video.prompt = await write(instructionsOf(span, clip, cut), span.dialogue);
     }
-    video.prompt = prompt;
     await save();
   }
 }
@@ -106,7 +134,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
         skipPrevis: true,
         videos: previs.video ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
         audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
-        loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed,
+        loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed, parts: item.parts,
       }, signal);
       item.video = video!.path;
       item.seed = video!.seed;

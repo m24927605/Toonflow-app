@@ -17,8 +17,9 @@ const voices = {
 // Silence before the first line and between lines of one shot, in seconds.
 const lead = 0.3;
 const gap = 0.3;
-// MiniMax H3 renders whole seconds from 4 to 15.
-const clipSeconds = (seconds: number) => Math.min(15, Math.max(4, Math.ceil(seconds)));
+// MiniMax H3 renders whole seconds from 4 to 15 in one part, and up to 120 as a long take in parts, except at 1080p,
+// where a shot keeps to one part and the film cuts it at 15 seconds.
+const clipSeconds = (seconds: number, quality: string) => Math.min(quality === "1080p" ? 15 : 120, Math.max(4, Math.ceil(seconds)));
 // Gemini pads each line with about a third of a second of near silence at both ends; it is cut off, so the pauses above
 // and the subtitles follow the spoken words. -50 dB keeps the soft start of a word and a trailing breath.
 const trimSilence = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse";
@@ -85,12 +86,12 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
     // The track runs the whole clip, silence after the last line, since H3 takes it as the clip's complete soundtrack.
     const filters = [
       ...delays.map((start, index) => `[${index}:a]aresample=48000,adelay=${Math.round(start * 1000)}:all=1[l${index}]`),
-      `${delays.map((_, index) => `[l${index}]`).join("")}amix=inputs=${delays.length}:normalize=0,apad=whole_dur=${clipSeconds(shot.seconds)}[out]`,
+      `${delays.map((_, index) => `[l${index}]`).join("")}amix=inputs=${delays.length}:normalize=0,apad=whole_dur=${clipSeconds(shot.seconds, production.input.quality)}[out]`,
     ];
     const command = inputs.reduce((current, input) => current.input(input), ffmpeg()).complexFilter(filters, "out").audioChannels(2).output(track);
     await finished(command);
     shot.track = track;
     await save();
   }
-  return dub.shots.map(shot => ({ shot: shot.shot, clip: clipSeconds(shot.seconds) }));
+  return dub.shots.map(shot => ({ shot: shot.shot, clip: clipSeconds(shot.seconds, production.input.quality) }));
 }

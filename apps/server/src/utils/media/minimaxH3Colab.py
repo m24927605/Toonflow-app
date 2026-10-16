@@ -3,6 +3,10 @@
 # first.* and last.* frames, an optional control.* structure video
 # (depth, pose or edges) for the Fun ControlNet Union 2.0, and the H3_* environment variables.
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
+# A long take (H3_SEGMENTS above 1, longer than one 15-second render) is rendered as that many segments in a row, one
+# prompt each from h3in_<job>_prompts.json: every segment after the first continues the last 22 frames of the one before
+# through H3 Motion Context, then is resampled lightly and blended back in as H3-LongTakeNoCuts does, so faces keep their
+# detail along the chain; the segments are joined into one take without cuts.
 # 480p samples just above the target size; 720p samples at the model's native ~768p and downscales;
 # 1080p upscales the 768p video latent with the LBH 3D latent upscaler and resamples it.
 import json
@@ -27,10 +31,15 @@ prefix = f"h3in_{job}_"
 outputs = Path("/content/h3out")
 comfy = Path("/content/ComfyUI")
 upscalerNode = comfy / "custom_nodes" / "Comfyui_Minimax_h3_latent_Upscaler"
+motionContextNode = comfy / "custom_nodes" / "ComfyUI-H3-Motion-Context"
+longTakeNode = comfy / "custom_nodes" / "H3-LongTakeNoCuts"
 # Pinned to the revisions this pipeline was verified with, the weights' repos too, so a changed upload upstream never
 # reaches a render unnoticed.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
 upscalerCommit = "40316cf008b2fd8663263270669eb4da23f89d2c"
+# NikoDemon80/ComfyUI-H3-Motion-Context (GPL-3.0, fetched at run time, not distributed) and xyzDist/H3-LongTakeNoCuts (MIT).
+motionContextCommit = "5335715abe54c1a9bfbe3494da29aae3e8635ce3"
+longTakeCommit = "0cad00ab92e4ad8de3d54ddd5254142bccb702d9"
 weightRevisions = {
     "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
     "LBH-123-AI/Minimax_h3_latent_Upscaler": "3f941d5d182014dd5c0a5e16330420ee2d4aa0c6",
@@ -39,6 +48,7 @@ weightRevisions = {
 seed = int(os.environ["H3_SEED"])
 resolution = os.environ["H3_RESOLUTION"]
 duration = int(os.environ["H3_DURATION"])
+segments = int(os.environ.get("H3_SEGMENTS", "1"))
 audio = os.environ["H3_AUDIO"] == "1"
 # Sampling steps that attend to the reference videos. A previs is flat Three.js footage: attended to throughout, H3
 # copies its look, so it is dropped once the early steps have set the layout, motion and camera (Code Video Model's
@@ -47,7 +57,9 @@ steps = 4
 videoSteps = int(os.environ["H3_VIDEO_STEPS"])
 ratioWidth, ratioHeight = (int(part) for part in os.environ["H3_RATIO"].split(":"))
 shortSides = {"480p": 480, "720p": 720, "1080p": 1080}
-assert resolution in shortSides and 4 <= duration <= 15 and 1 <= videoSteps <= steps and ratioWidth > 0 and ratioHeight > 0
+assert resolution in shortSides and 1 <= videoSteps <= steps and ratioWidth > 0 and ratioHeight > 0
+# The 1080p pass upscales each render on its own, which a chain carried over in the sample latent cannot follow.
+assert (segments == 1 and 4 <= duration <= 15) or (2 <= segments <= 8 and duration <= 120 and resolution != "1080p")
 
 
 def ceil32(value):
@@ -71,8 +83,19 @@ refine = resolution == "1080p"
 generateWidth, generateHeight = (ceil32(outputWidth), ceil32(outputHeight)) if resolution == "480p" else sized(768, ceil32)
 upscaleWidth, upscaleHeight = ceil32(outputWidth), ceil32(outputHeight)
 frames = round(duration * 24)
-# Snapped up to the model's 17k+5 grid and kept within its trained 124–362 frames; ffmpeg trims to the duration.
-length = max(124, frames + (5 - frames % 17) % 17)
+# Every segment after the first repeats the last 22 frames of the one before, which its output drops.
+contextFrames = 22
+
+
+def snapped(value):
+    # Up to the model's 17k+5 grid and its trained minimum of 124 frames.
+    return max(124, value + (5 - value % 17) % 17)
+
+
+# Every segment of a long take is the length minimaxH3.ts planned, whose segments cover the take; ffmpeg trims to the
+# duration.
+length = snapped(frames) if segments == 1 else int(os.environ["H3_SEGMENT_LENGTH"])
+assert 124 <= length <= 362 and (length - 5) % 17 == 0 and segments * (length - contextFrames) + contextFrames >= frames
 
 def fetch(directory, url, commit):
     subprocess.run(["git", "init", "-q", str(directory)], check=True)
@@ -88,6 +111,14 @@ if not comfy.exists():
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(comfy / "requirements.txt"), "huggingface_hub", "hf_xet", "requests"], check=True)
 if refine and not upscalerNode.exists():
     fetch(upscalerNode, "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git", upscalerCommit)
+# The long-take nodes are installed with the machine, before ComfyUI starts, so a warm machine can render a long take too.
+# They need nothing beyond ComfyUI; the long-take repo's compiled caches and examples are not kept.
+if not motionContextNode.exists():
+    fetch(motionContextNode, "https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context.git", motionContextCommit)
+if not longTakeNode.exists():
+    fetch(longTakeNode, "https://github.com/xyzDist/H3-LongTakeNoCuts.git", longTakeCommit)
+    for extra in ("__pycache__", "example_workflow"):
+        shutil.rmtree(longTakeNode / extra, ignore_errors=True)
 
 import requests
 from huggingface_hub import hf_hub_download
@@ -147,165 +178,229 @@ except requests.RequestException:
 refs = sorted(inputs.glob(f"{prefix}ref_*"))
 firstFrame = next(inputs.glob(f"{prefix}first.*"), None)
 lastFrame = next(inputs.glob(f"{prefix}last.*"), None)
+assert segments == 1 or not (firstFrame or lastFrame or controlSource), "A long take takes no first, last or control frames"
 (comfy / "input").mkdir(exist_ok=True)
 for image in [*refs, *filter(None, [firstFrame, lastFrame])]:
     shutil.copy(image, comfy / "input" / image.name)
-# Reference videos are re-encoded to 24 fps, silent and at most 15 s, the shape H3 expects for <Video N>.
-videos = []
-for index, source in enumerate(sorted(inputs.glob(f"{prefix}vid_*"))):
-    target = comfy / "input" / f"h3vid{job}_{index}.mp4"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True)
+# Each segment covers frames start to start + length of the take; a single render is one segment from frame 0.
+starts = [index * (length - contextFrames) for index in range(segments)]
+
+
+def clipped(source, target, start, audioOnly=False):
+    # The part of a reference a segment covers. Videos become 24 fps, silent and at least two seconds, the shape H3
+    # expects for <Video N> (a previs shorter than that, such as a brief shot's, holds its last frame); audio becomes
+    # the audio VAE's 32 kHz stereo.
+    window = ["-ss", f"{start / 24:.3f}", "-t", f"{min(length, frames - start) / 24 if segments > 1 else 15:.3f}"]
+    if audioOnly:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", *window, "-i", str(source), "-ar", "32000", "-ac", "2", str(target)], check=True)
+        return target.name
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *window, "-i", str(source), "-r", "24", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(target)], check=True)
     seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(target)], capture_output=True, text=True, check=True).stdout)
     if seconds < 2:
-        # H3 takes at least two seconds of reference; a shorter one, such as the previs of a brief shot, holds its last
-        # frame for the rest.
-        padded = target.with_name(f"h3vidpad{job}_{index}.mp4")
+        padded = target.with_name(f"pad{target.name}")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(target), "-vf", f"tpad=stop_mode=clone:stop_duration={2.1 - seconds:.2f}",
                         "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(padded)], check=True)
         target = padded
-    videos.append(target.name)
-# Standalone reference audio (<Audio N>), resampled to the audio VAE's 32 kHz stereo; a clip marked fully_copy in the
+    return target.name
+
+
+# Reference videos and standalone reference audio (<Video N>, <Audio N>) per segment; audio marked fully_copy in the
 # prompt becomes the soundtrack and the speaker lip-syncs to it.
-audios = []
-for index, source in enumerate(sorted(inputs.glob(f"{prefix}aud_*"))):
-    target = comfy / "input" / f"h3aud{job}_{index}.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-ar", "32000", "-ac", "2", str(target)], check=True)
-    audios.append(target.name)
+segmentVideos = [[clipped(source, comfy / "input" / f"h3vid{job}_{segment}_{index}.mp4", start)
+                  for index, source in enumerate(sorted(inputs.glob(f"{prefix}vid_*")))] for segment, start in enumerate(starts)]
+segmentAudios = [[clipped(source, comfy / "input" / f"h3aud{job}_{segment}_{index}.wav", start, True)
+                  for index, source in enumerate(sorted(inputs.glob(f"{prefix}aud_*")))] for segment, start in enumerate(starts)]
 if controlSource:
     # The control video only drives structure and motion; its look never reaches the output.
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(controlSource), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     str(comfy / "input" / f"h3control{job}.mp4")], check=True)
-prompt = (inputs / f"{prefix}prompt.txt").read_text()
+prompts = json.loads((inputs / f"{prefix}prompts.json").read_text()) if segments > 1 else [(inputs / f"{prefix}prompt.txt").read_text()]
+assert len(prompts) == segments
 
-videoFormat = {"format": "mp4", "format.codec": "h264", "format.codec.encoding": "re-encode", "format.codec.encoding.crf": 16}
-graph = {
-    "1": {"class_type": "UNETLoader", "inputs": {"unet_name": diffusion, "weight_dtype": "default"}},
-    "2": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": lora, "strength_model": 1.0}},
-    "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "type": "minimax", "device": "default"}},
-    "4": {"class_type": "VAELoader", "inputs": {"vae_name": videoVae}},
-    "5": {"class_type": "VAELoader", "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
-    "7": {"class_type": "MiniMaxH3ReferenceToVideo", "inputs": {
-        "clip": ["3", 0], "vae": ["4", 0], "audio_vae": ["5", 0], "prompt": prompt,
-        "width": generateWidth, "height": generateHeight, "length": length, "ref_image_size": "match",
-        **{f"ref_images.ref_image_{index}": [f"ref{index}", 0] for index in range(len(refs))},
-        **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))},
-        **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
-    "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
-    "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
-    "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
-    "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
-}
-sampled = ["12", 0]
-early = bool(videos) and videoSteps < steps
-if early:
-    # The same request without the reference videos conditions the remaining steps, continuing the first sampler's
-    # latent without new noise.
-    withoutVideos = json.loads(json.dumps(graph["7"]))
-    withoutVideos["inputs"] = {name: value for name, value in withoutVideos["inputs"].items() if not name.startswith("ref_videos.")}
-    graph.update({
-        "7b": withoutVideos,
-        "17": {"class_type": "SplitSigmas", "inputs": {"sigmas": ["11", 0], "step": videoSteps}},
-        "18": {"class_type": "DisableNoise", "inputs": {}},
-        "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": ["12", 0]}},
-    })
-    graph["12"]["inputs"]["sigmas"] = ["17", 0]
-    sampled = ["19", 0]
-graph["14"] = {"class_type": "VAEDecodeAudio", "inputs": {"samples": sampled, "vae": ["5", 0]}}
-for index, ref in enumerate(refs):
-    graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
-for index, name in enumerate(audios):
-    graph[f"aud{index}"] = {"class_type": "LoadAudio", "inputs": {"audio": name}}
-for index, name in enumerate(videos):
-    graph[f"vidFile{index}"] = {"class_type": "LoadVideo", "inputs": {"file": name}}
-    graph[f"vid{index}"] = {"class_type": "GetVideoComponents", "inputs": {"video": [f"vidFile{index}", 0]}}
-# Official Union 2.0 setting: strength 1.0 over the whole schedule; the patched model feeds both passes.
-model = ["2", 0]
-if controlSource:
-    graph.update({
-        "cvFile": {"class_type": "LoadVideo", "inputs": {"file": f"h3control{job}.mp4"}},
-        "cv": {"class_type": "GetVideoComponents", "inputs": {"video": ["cvFile", 0]}},
-        "30": {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}},
-        "31": {"class_type": "MiniMaxH3FunControlNetApply", "inputs": {
-            "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
-    })
-    model = ["31", 0]
-    graph["11"]["inputs"]["model"] = model
-for name, image in (("first", firstFrame), ("last", lastFrame)):
-    if image:
-        graph[f"{name}Frame"] = {"class_type": "LoadImage", "inputs": {"image": image.name}}
-
-
-def guided(prefix, latent, source="7"):
-    # Pins the first frame at frame 0 and the last frame at the last frame that survives the final trim.
-    # Guides are encoded at the latent's own size, so the 1080p refine pass gets its own chain.
-    conditioning = [source, 0]
-    for name, image, frameIndex in (("first", firstFrame, 0), ("last", lastFrame, frames - 1)):
-        if image:
-            graph[f"{prefix}{name}"] = {"class_type": "MiniMaxH3AddGuide", "inputs": {
-                "positive": conditioning, "vae": ["4", 0], "latent": latent, "image": [f"{name}Frame", 0], "frame_idx": frameIndex}}
-            conditioning = [f"{prefix}{name}", 0]
-    return conditioning
-
-
-graph["8"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": guided("guide", ["7", 1])}}
-if early:
-    graph["8b"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": guided("baseGuide", ["7", 1], "7b")}}
-videoLatent = sampled
-if refine:
-    # Second-pass schedule from the LBH r2v example; the soundtrack stays from the first pass.
-    graph.update({
-        "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": sampled}},
-        "21": {"class_type": "MinimaxH3LatentUpscaler3D", "inputs": {
-            "latent": ["20", 0], "model_name": upscaler, "mode": "target dimensions", "mode.width": upscaleWidth, "mode.height": upscaleHeight,
-            "align": 32, "enable_temporal_chunking": True, "force_unload": True, "device": "cuda", "precision": "fp16"}},
-        "22": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["21", 0], "audio_latent": ["20", 1]}},
-        "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
-        "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0], "7b" if early else "7")}},
-        "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
-        "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": ["22", 0]}},
-    })
-    videoLatent = ["26", 0]
-graph.update({
-    "13": {"class_type": "VAEDecode", "inputs": {"samples": videoLatent, "vae": ["4", 0]}},
-    "15": {"class_type": "CreateVideo", "inputs": {"images": ["13", 0], "audio": ["14", 0], "fps": 24}},
-    "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": "toonflow/h3", **videoFormat}},
-})
-
-# LoRAs ride after the Turbo LoRA at their strength; every node that used the Turbo model takes the last one. Each is
-# named by its content and stays on the machine, so the session's later clips use it without another upload.
-characterModel = ["2", 0]
+# LoRAs ride after the Turbo LoRA at their strength. Each is named by its content and stays on the machine, so the
+# session's later clips use it without another upload.
 characterLoras = json.loads((inputs / f"{prefix}loras.json").read_text()) if (inputs / f"{prefix}loras.json").exists() else []
-for index, entry in enumerate(characterLoras):
+for entry in characterLoras:
     assert "/" not in entry["name"] and entry["name"].startswith("h3lora_")
     target = comfy / "models" / "loras" / entry["name"]
     if not target.exists():
         shutil.copy(inputs / entry["name"], target)
-    graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": entry["name"], "strength_model": float(entry["strength"])}}
-    characterModel = [f"lora{index}", 0]
-if characterModel != ["2", 0]:
-    for key, node in graph.items():
-        if not key.startswith("lora"):
-            node["inputs"] = {name: characterModel if value == ["2", 0] else value for name, value in node["inputs"].items()}
-response = requests.post(base + "/prompt", json={"prompt": graph}, timeout=60)
-if not response.ok:
-    raise RuntimeError(response.text[-4000:])
-promptId = response.json()["prompt_id"]
-while True:
-    history = requests.get(f"{base}/history/{promptId}", timeout=30).json().get(promptId)
-    if history and history.get("status", {}).get("completed") is not None:
-        break
-    time.sleep(15)
-if history["status"].get("status_str") != "success":
-    raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
+videoFormat = {"format": "mp4", "format.codec": "h264", "format.codec.encoding": "re-encode", "format.codec.encoding.crf": 16}
+# Where each segment of a long take saves its latent for the next: output/h3ctx_<job>/clip_0000<n>.safetensors.
+contextFolder = f"h3ctx_{job}"
 
-produced = sorted((comfy / "output" / "toonflow").glob("h3_*.mp4"))[-1]
+
+def segmentGraph(segment, prompt, videos, audios):
+    # The render of one segment (numbered from 1); the first is the whole clip of a single render.
+    graph = {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": diffusion, "weight_dtype": "default"}},
+        "2": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": lora, "strength_model": 1.0}},
+        "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "type": "minimax", "device": "default"}},
+        "4": {"class_type": "VAELoader", "inputs": {"vae_name": videoVae}},
+        "5": {"class_type": "VAELoader", "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
+        "7": {"class_type": "MiniMaxH3ReferenceToVideo", "inputs": {
+            "clip": ["3", 0], "vae": ["4", 0], "audio_vae": ["5", 0], "prompt": prompt,
+            "width": generateWidth, "height": generateHeight, "length": length, "ref_image_size": "match",
+            **{f"ref_images.ref_image_{index}": [f"ref{index}", 0] for index in range(len(refs))},
+            **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))},
+            **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
+        "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed + 1000 * (segment - 1)}},
+        "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
+        "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
+    }
+    sampled = ["12", 0]
+    early = bool(videos) and videoSteps < steps
+    if early:
+        # The same request without the reference videos conditions the remaining steps, continuing the first sampler's
+        # latent without new noise.
+        withoutVideos = json.loads(json.dumps(graph["7"]))
+        withoutVideos["inputs"] = {name: value for name, value in withoutVideos["inputs"].items() if not name.startswith("ref_videos.")}
+        graph.update({
+            "7b": withoutVideos,
+            "17": {"class_type": "SplitSigmas", "inputs": {"sigmas": ["11", 0], "step": videoSteps}},
+            "18": {"class_type": "DisableNoise", "inputs": {}},
+            "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": ["12", 0]}},
+        })
+        graph["11"]["inputs"]["sigmas"] = ["17", 0]
+        sampled = ["19", 0]
+    for index, ref in enumerate(refs):
+        graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
+    for index, name in enumerate(audios):
+        graph[f"aud{index}"] = {"class_type": "LoadAudio", "inputs": {"audio": name}}
+    for index, name in enumerate(videos):
+        graph[f"vidFile{index}"] = {"class_type": "LoadVideo", "inputs": {"file": name}}
+        graph[f"vid{index}"] = {"class_type": "GetVideoComponents", "inputs": {"video": [f"vidFile{index}", 0]}}
+    # Official Union 2.0 setting: strength 1.0 over the whole schedule; the patched model feeds both passes.
+    model = ["2", 0]
+    if controlSource:
+        graph.update({
+            "cvFile": {"class_type": "LoadVideo", "inputs": {"file": f"h3control{job}.mp4"}},
+            "cv": {"class_type": "GetVideoComponents", "inputs": {"video": ["cvFile", 0]}},
+            "30": {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}},
+            "31": {"class_type": "MiniMaxH3FunControlNetApply", "inputs": {
+                "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
+        })
+        model = ["31", 0]
+        graph["11"]["inputs"]["model"] = model
+    for name, image in (("first", firstFrame), ("last", lastFrame)):
+        if image:
+            graph[f"{name}Frame"] = {"class_type": "LoadImage", "inputs": {"image": image.name}}
+
+    def guided(prefix, latent, source="7"):
+        # Pins the first frame at frame 0 and the last frame at the last frame that survives the final trim.
+        # Guides are encoded at the latent's own size, so the 1080p refine pass gets its own chain.
+        conditioning = [source, 0]
+        for name, image, frameIndex in (("first", firstFrame, 0), ("last", lastFrame, frames - 1)):
+            if image:
+                graph[f"{prefix}{name}"] = {"class_type": "MiniMaxH3AddGuide", "inputs": {
+                    "positive": conditioning, "vae": ["4", 0], "latent": latent, "image": [f"{name}Frame", 0], "frame_idx": frameIndex}}
+                conditioning = [f"{prefix}{name}", 0]
+        return conditioning
+
+    def continued(key, conditioning, source="7"):
+        # After the first segment, the last 22 frames and last second of sound of the one before are pinned as the head
+        # of this one, never denoised, so picture, motion and sound carry on; output 1 is how many frames to drop.
+        if segment == 1:
+            return conditioning
+        graph[key] = {"class_type": "MiniMaxH3MotionContext", "inputs": {
+            "conditioning": conditioning, "vae": ["4", 0], "latent": [source, 1], "context_length": str(contextFrames),
+            "audio_context_length": 24, "context_latent": ["context", 0]}}
+        return [key, 0]
+
+    if segment > 1:
+        graph["context"] = {"class_type": "MiniMaxH3MotionContextLoadLatent", "inputs": {"latent_path": contextFolder, "clip_index": segment - 1}}
+    graph["8"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": continued("motion", guided("guide", ["7", 1]))}}
+    if early:
+        graph["8b"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": continued("motionB", guided("baseGuide", ["7", 1], "7b"), "7b")}}
+    videoLatent = sampled
+    if segment > 1:
+        # H3-LongTakeNoCuts: the segment is resampled lightly with fresh noise and without the pinned head, and blended
+        # in from frame 22 to 44, so the tail the next segment carries on from is re-detailed rather than a copy of a
+        # copy; the sound stays from the first pass.
+        graph.update({
+            "refineNoise": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed + 1000 * (segment - 1) + 1}},
+            "refineGuider": {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": ["7b" if early else "7", 0]}},
+            "refineSigmas": {"class_type": "BasicScheduler", "inputs": {"model": model, "scheduler": "beta", "steps": steps, "denoise": 0.55}},
+            "refine": {"class_type": "SamplerCustomAdvanced", "inputs": {
+                "noise": ["refineNoise", 0], "guider": ["refineGuider", 0], "sampler": ["10", 0], "sigmas": ["refineSigmas", 0], "latent_image": sampled}},
+            "blend": {"class_type": "H3BlendLatentsByFrames", "inputs": {
+                "latent1": sampled, "latent2": ["refine", 0], "keyframes": f"0:0, {contextFrames}:0, {2 * contextFrames}:1", "duration": length / 24,
+                "fps": 24.0, "interpolation": "linear", "audio_source": "latent1", "blend_audio": False}},
+        })
+        videoLatent = ["blend", 0]
+    if segments > 1:
+        graph["save"] = {"class_type": "MiniMaxH3MotionContextSaveLatent", "inputs": {"latent": videoLatent, "filename_prefix": f"{contextFolder}/clip", "clip_index": segment}}
+    if refine:
+        # Second-pass schedule from the LBH r2v example; the soundtrack stays from the first pass.
+        graph.update({
+            "20": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": sampled}},
+            "21": {"class_type": "MinimaxH3LatentUpscaler3D", "inputs": {
+                "latent": ["20", 0], "model_name": upscaler, "mode": "target dimensions", "mode.width": upscaleWidth, "mode.height": upscaleHeight,
+                "align": 32, "enable_temporal_chunking": True, "force_unload": True, "device": "cuda", "precision": "fp16"}},
+            "22": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["21", 0], "audio_latent": ["20", 1]}},
+            "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
+            "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0], "7b" if early else "7")}},
+            "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
+            "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": ["22", 0]}},
+        })
+        videoLatent = ["26", 0]
+    images, sound = ["13", 0], ["14", 0]
+    graph.update({
+        "13": {"class_type": "VAEDecode", "inputs": {"samples": videoLatent, "vae": ["4", 0]}},
+        "14": {"class_type": "VAEDecodeAudio", "inputs": {"samples": sampled, "vae": ["5", 0]}},
+    })
+    if segment > 1:
+        # The repeated head comes off picture and sound alike.
+        graph["trim"] = {"class_type": "MiniMaxH3MotionContextTrim", "inputs": {"images": images, "trim_frames": ["motion", 1], "audio": sound, "fps": 24.0, "match_tail": True}}
+        images, sound = ["trim", 0], ["trim", 1]
+    graph.update({
+        "15": {"class_type": "CreateVideo", "inputs": {"images": images, "audio": sound, "fps": 24}},
+        "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": f"toonflow/h3_{job}_{segment}", **videoFormat}},
+    })
+    # Every node that used the Turbo model takes the last character LoRA.
+    characterModel = ["2", 0]
+    for index, entry in enumerate(characterLoras):
+        graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": entry["name"], "strength_model": float(entry["strength"])}}
+        characterModel = [f"lora{index}", 0]
+    if characterModel != ["2", 0]:
+        for key, node in graph.items():
+            if not key.startswith("lora"):
+                node["inputs"] = {name: characterModel if value == ["2", 0] else value for name, value in node["inputs"].items()}
+    return graph
+
+
+# Segments render one after another: each needs the latent the one before saved.
+rendered = []
+for segment, (prompt, videos, audios) in enumerate(zip(prompts, segmentVideos, segmentAudios), start=1):
+    response = requests.post(base + "/prompt", json={"prompt": segmentGraph(segment, prompt, videos, audios)}, timeout=60)
+    if not response.ok:
+        raise RuntimeError(response.text[-4000:])
+    promptId = response.json()["prompt_id"]
+    while True:
+        history = requests.get(f"{base}/history/{promptId}", timeout=30).json().get(promptId)
+        if history and history.get("status", {}).get("completed") is not None:
+            break
+        time.sleep(15)
+    if history["status"].get("status_str") != "success":
+        raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
+    rendered.append(sorted((comfy / "output" / "toonflow").glob(f"h3_{job}_{segment}_*.mp4"))[-1])
+
 outputs.mkdir(exist_ok=True)
+produced = rendered[0]
+if segments > 1:
+    # The segments join without re-encoding; the finish below cuts the take to its duration.
+    joined = Path(f"/content/h3joined_{job}.txt")
+    joined.write_text("".join(f"file '{path}'\n" for path in rendered))
+    produced = Path(f"/content/h3joined_{job}.mp4")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(joined), "-c", "copy", str(produced)], check=True)
 finish = f"scale={outputWidth}:{outputHeight}:force_original_aspect_ratio=increase:flags=lanczos,crop={outputWidth}:{outputHeight}"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), "-t", str(duration), "-vf", finish,
                 "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
                 *(["-c:a", "aac", "-b:a", "192k"] if audio else ["-an"]),
                 "-movflags", "+faststart", str(outputs / "final.mp4")], check=True)
-# The job's inputs are deleted so a long session does not fill the disk.
-for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*")]:
+# The job's inputs and saved latents are deleted so a long session does not fill the disk.
+for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*"), *inputs.glob(f"h3joined_{job}*")]:
     leftover.unlink(missing_ok=True)
+shutil.rmtree(comfy / "output" / contextFolder, ignore_errors=True)
 print("COLAB_DONE", resolution, f"{outputWidth}x{outputHeight}")

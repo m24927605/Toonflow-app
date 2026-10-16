@@ -1,6 +1,6 @@
 const rules = [] as const;
 
-const version = "1.4.0";
+const version = "1.5.0";
 
 export default {
   id: "minimaxH3" as const,
@@ -37,6 +37,7 @@ export default {
       ratio: request.ratio ?? "16:9",
       audio: request.generateAudio !== false,
       seed: request.seed,
+      parts: request.parts,
     });
     return [{ mediaType: "video", type: "binary", data, mimeType, seed }];
   },

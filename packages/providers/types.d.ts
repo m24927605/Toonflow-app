@@ -166,8 +166,13 @@ interface ProviderTools {
     lastFrame?: MediaInput;
     /** LoRAs (.safetensors) chained after the Turbo LoRA at their strength. */
     loras?: LoraInput[];
-    /** Whole seconds, 4–15. */
+    /** Whole seconds, 4–15, or up to 120 for a long take with `parts`. */
     duration: number;
+    /**
+     * A long take: the prompt of each of its consecutive parts, as many as `longTakeParts` gives for the duration. Each
+     * part continues the last 22 frames of the one before, and they are joined without cuts; not at 1080p.
+     */
+    parts?: string[];
     resolution: "480p" | "720p" | "1080p";
     /** Aspect ratio such as 16:9 or 9:16. */
     ratio: string;
@@ -263,6 +268,8 @@ interface VideoRequest extends MediaRequest {
   watermark?: boolean;
   /** Seed to draw with, so a rerun that changes one thing keeps the rest; providers without seeds ignore it. */
   seed?: number;
+  /** A take longer than one generation: the prompt of each consecutive part; providers without long takes ignore it. */
+  parts?: string[];
 }
 
 /**

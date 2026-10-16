@@ -6,6 +6,23 @@ import pipeline from "./minimaxH3Colab.py" with { type: "text" };
 export type MinimaxH3Request = Parameters<ProviderTools["minimaxH3"]>[0];
 
 const resolutions = new Set(["480p", "720p", "1080p"]);
+// A long take renders as parts of one length on the model's 17k+5 frame grid, at most 362 frames; every part after the
+// first repeats the last 22 frames of the one before, which it drops.
+const contextFrames = 22;
+const maxPartFrames = 362;
+const snapped = (frames: number) => Math.max(124, frames + ((5 - frames % 17) % 17 + 17) % 17);
+
+/**
+ * How a take of `duration` seconds renders: in one part up to 15 seconds, else in the fewest parts of one length that
+ * cover it, each starting `step` frames after the one before.
+ */
+export function longTakeParts(duration: number) {
+  const frames = Math.round(duration * 24);
+  if (duration <= 15) return { parts: 1, frames: snapped(frames), step: 0 };
+  const parts = Math.ceil((frames - contextFrames) / (maxPartFrames - contextFrames));
+  const length = snapped(Math.ceil((frames - contextFrames) / parts) + contextFrames);
+  return { parts, frames: length, step: length - contextFrames };
+}
 // Clips share high-RAM A100s kept for five idle minutes, so a batch of shots pays the ComfyUI install and the 30+ GB
 // model download once a machine; the high-RAM shape is needed for those weights to pass through host memory. Two
 // machines render a batch side by side, leaving Colab's third for the text model that checks the clips; each clip goes
@@ -41,9 +58,15 @@ export function warmMinimaxH3(resolution: string, ratio: string, ms: number, sig
 export const stopMinimaxH3WhenIdle = () => workers.forEach(worker => worker.stopWhenIdle());
 
 /** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
-export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio, seed = randomSeed() }: MinimaxH3Request, signal?: AbortSignal) {
+export async function runMinimaxH3({ prompt, parts, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio, seed = randomSeed() }: MinimaxH3Request, signal?: AbortSignal) {
   if (!prompt.trim()) throw new Error("MiniMax H3 prompt cannot be empty");
-  if (!Number.isInteger(duration) || duration < 4 || duration > 15) throw new Error("MiniMax H3 duration must be a whole number of seconds from 4 to 15");
+  if (!parts && (!Number.isInteger(duration) || duration < 4 || duration > 15)) throw new Error("MiniMax H3 duration must be a whole number of seconds from 4 to 15");
+  const plan = longTakeParts(duration);
+  if (parts) {
+    if (!Number.isInteger(duration) || duration <= 15 || duration > 120) throw new Error("A MiniMax H3 long take is a whole number of seconds from 16 to 120");
+    if (parts.length !== plan.parts || parts.some(part => !part.trim())) throw new Error(`A ${duration}-second MiniMax H3 long take needs ${plan.parts} part prompts`);
+    if (resolution === "1080p" || controlVideo || firstFrame || lastFrame) throw new Error("A MiniMax H3 long take renders at 480p or 720p, without control video or pinned frames");
+  }
   if (!resolutions.has(resolution)) throw new Error("MiniMax H3 only supports 480p, 720p and 1080p");
   if (!/^[1-9]\d?:[1-9]\d?$/.test(ratio)) throw new Error("Invalid MiniMax H3 aspect ratio");
   if (images.length > 9) throw new Error("MiniMax H3 supports at most 9 reference images");
@@ -65,6 +88,7 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
     script: pipeline,
     uploads: [
       { name: name("prompt.txt"), data: prompt },
+      ...parts ? [{ name: name("prompts.json"), data: JSON.stringify(parts) }] : [],
       ...images.map((image, index) => ({ name: name(`ref_${index}.${inputExtension(image)}`), data: inputBytes(image) })),
       ...videos.map((video, index) => ({ name: name(`vid_${index}.${inputExtension(video)}`), data: inputBytes(video) })),
       ...audios.map((audio, index) => ({ name: name(`aud_${index}.${inputExtension(audio)}`), data: inputBytes(audio) })),
@@ -74,7 +98,10 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
       ...loraUploads,
       ...characterLoras.length ? [{ name: name("loras.json"), data: JSON.stringify(characterLoras.map(({ name, strength }) => ({ name, strength }))) }] : [],
     ],
-    env: { H3_JOB: job, H3_SEED: seed, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps },
+    env: {
+      H3_JOB: job, H3_SEED: seed, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps,
+      H3_SEGMENTS: parts?.length ?? 1, H3_SEGMENT_LENGTH: plan.frames,
+    },
     outputs: ["/content/h3out/final.mp4"],
     }, sessionSignal);
     for (const { name } of loraUploads) sent.add(name);
