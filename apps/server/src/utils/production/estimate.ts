@@ -38,15 +38,14 @@ export function estimateProduction(input: Pick<ProductionInput, "seconds" | "qua
   const people = Math.max(input.photos.length, 2);
   const trainedPeople = people - reusedPeople;
   const places = 1 + Math.floor(input.seconds / 60);
-  const finalMinutes = { "480p": 0, "720p": 10 + shots * 2.8, "1080p": 35 + shots * 6 }[input.quality];
+  const clipMinutes = { "480p": 10 + shots * 1.5, "720p": 10 + shots * 2.8, "1080p": 35 + shots * 6 }[input.quality];
   const steps = [
     { step: "text", units: l4 * hours(30) },
     { step: "assets", units: a100 * hours(5 + 0.5 * (people * 6 + places * 3)) },
     { step: "loras", units: l4 * (trainedPeople * 2 + places) + a100 * hours((trainedPeople + places) * (5 + 0.5 * 12)) },
     // Two images a shot: the draft and its redraw.
     { step: "keyframes", units: a100 * hours(5 + 0.5 * shots * 2) },
-    { step: "roughCut", units: a100 * hours(10 + shots * 1.5) },
-    { step: "final", units: a100 * hours(finalMinutes) },
+    { step: "clips", units: a100 * hours(clipMinutes) },
   ].map(item => ({ ...item, units: Number((item.units * 1.3 * ratio).toFixed(2)) }));
   return { shots, steps, total: Number(steps.reduce((sum, item) => sum + item.units, 0).toFixed(2)) };
 }

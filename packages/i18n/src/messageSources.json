@@ -6566,16 +6566,13 @@
   "Checking the keyframes against the shot list ({0}/{1})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Rendering the clips ({0}/{1})…": [
+  "Rendering the clips at {0} ({1}/{2})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Checking the clips frame by frame ({0}/{1})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Joining the rough cut…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Rendering the clips at {0} ({1}/{2})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Finishing the film: music, sound levels and subtitles…": [
@@ -6648,7 +6645,7 @@
   "Film ({0})": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Rough cut (480p)": [
+  "Rough cut ({0})": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Character photos": [

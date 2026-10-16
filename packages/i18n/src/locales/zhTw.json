@@ -3292,6 +3292,7 @@
   "Ratio": "比例",
   "Request failed": "請求失敗",
   "Revise": "依意見修改",
+  "Rough cut ({0})": "粗剪（{0}）",
   "Spend at most (units)": "最多花費（單元）",
   "Start": "開始",
   "Start an automatic production of about {0} seconds? It spends at most {1} Colab compute units (estimate {2}) and stops for your review where you asked. It keeps running if you close this page.": "要開始自動製作約 {0} 秒的影片嗎？最多花費 {1} 個 Colab 運算單元（預估 {2}），並在你指定的地方停下來等你審核。關閉這個頁面也會繼續執行。",
@@ -3327,7 +3328,6 @@
   "Designing the characters and places while blocking every shot in the previs…": "正在設計角色與場景，同時進行每鏡預演…",
   "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…": "正在訓練 LoRA 讓人物與場景保持一致（約一小時），同時進行每鏡預演…",
   "Writing the video prompts…": "正在寫影片提示詞…",
-  "Rendering the clips ({0}/{1})…": "正在生成影片片段（{0}/{1}）…",
   "Joining the rough cut…": "正在剪接粗剪…",
   "Checking the clips frame by frame ({0}/{1})…": "正在逐格檢查片段（{0}/{1}）…",
   "Checking the keyframes against the shot list ({0}/{1})…": "正在對照分鏡表檢查關鍵影格（{0}/{1}）…",
@@ -3359,6 +3359,5 @@
   "Trigger word": "觸發詞",
   "Video: MiniMax H3 on Colab, lip-synced to the dubbed lines": "影片：Colab 上的 MiniMax H3，依配音對嘴",
   "Writing the delivery report…": "正在撰寫交付報告…",
-  "Rough cut (480p)": "粗剪（480p）",
   "The server address is not known yet; try again in a moment": "伺服器位址還未就緒，請稍後再試"
 }

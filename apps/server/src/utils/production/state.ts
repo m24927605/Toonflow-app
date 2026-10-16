@@ -69,8 +69,6 @@ export type Production = {
   roughCut?: string;
   /** Each shot's clip length in whole seconds, set by its dubbed lines. */
   clips?: { shot: number; clip: number }[];
-  /** The clips rendered again at the final quality, with the rough cut's prompts and seeds; absent at 480p. */
-  finals?: ProductionClip[];
   /** The style prompt of the Suno score, written with the other texts, and the score under the whole film, when the production asked for music. */
   musicStyle?: string;
   music?: string;

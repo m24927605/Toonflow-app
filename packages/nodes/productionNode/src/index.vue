@@ -112,7 +112,7 @@ type Production = {
   keyframes?: { master: number; shots: Keyframe[] };
   dub?: unknown; clips?: unknown; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
   videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
-  finals?: { shot: number; video?: string }[]; music?: string; film?: string; report?: string;
+  music?: string; film?: string; report?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
@@ -191,11 +191,9 @@ const headline = computed(() => {
     if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
     if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
     if (production.keyframes.shots.some(item => !item.check)) return t`Checking the keyframes against the shot list (${production.keyframes.shots.filter(item => item.check).length}/${production.keyframes.shots.length})…`;
-    if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
+    if (production.videos.some(item => !item.video)) return t`Rendering the clips at ${production.input.quality} (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
     if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");
-    const finals = production.finals ?? [];
-    if (production.input.quality !== "480p" && (!production.finals || finals.some(item => !item.video))) return t`Rendering the clips at ${production.input.quality} (${finals.filter(item => item.video).length}/${production.videos.length})…`;
     if (!production.film) return translate("Finishing the film: music, sound levels and subtitles…");
     return translate("Writing the delivery report…");
   }
@@ -370,11 +368,11 @@ function syncFilm(path: string, quality: Quality) {
 }
 
 /** Puts the rough cut on the canvas as a video node to the right of this node, once. */
-function syncRoughCut(path: string) {
+function syncRoughCut(path: string, quality: string) {
   if (data.value.roughCut) return;
   const nodeId = crypto.randomUUID();
   flow.addNodes([{ id: nodeId, type: "remote-videoNode", position: { x: node.computedPosition.x - 520, y: node.computedPosition.y }, data: {
-    label: translate("Rough cut (480p)"), outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType: "video/mp4" } } },
+    label: t`Rough cut (${quality})`, outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType: "video/mp4" } } },
   } }]);
   data.value.roughCut = nodeId;
 }
@@ -387,7 +385,7 @@ async function refresh() {
     if (state.value.shotList) syncText("shotList", state.value.shotList);
     if (state.value.production.assets) syncAssets(state.value.production.assets);
     if (state.value.production.keyframes && state.value.production.previs) await syncKeyframes(state.value.production.keyframes, state.value.production.previs);
-    if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut);
+    if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut, state.value.production.input.quality);
     if (state.value.production.film) syncFilm(state.value.production.film, state.value.production.input.quality);
     if (state.value.report) syncText("report", state.value.report);
     newBudget.value ??= state.value.production.input.budget;

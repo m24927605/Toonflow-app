@@ -3292,6 +3292,7 @@
   "Ratio": "Ratio",
   "Request failed": "Request failed",
   "Revise": "Revise",
+  "Rough cut ({0})": "Rough cut ({0})",
   "Spend at most (units)": "Spend at most (units)",
   "Start": "Start",
   "Start an automatic production of about {0} seconds? It spends at most {1} Colab compute units (estimate {2}) and stops for your review where you asked. It keeps running if you close this page.": "Start an automatic production of about {0} seconds? It spends at most {1} Colab compute units (estimate {2}) and stops for your review where you asked. It keeps running if you close this page.",
@@ -3327,7 +3328,6 @@
   "Designing the characters and places while blocking every shot in the previs…": "Designing the characters and places while blocking every shot in the previs…",
   "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…": "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…",
   "Writing the video prompts…": "Writing the video prompts…",
-  "Rendering the clips ({0}/{1})…": "Rendering the clips ({0}/{1})…",
   "Joining the rough cut…": "Joining the rough cut…",
   "Checking the clips frame by frame ({0}/{1})…": "Checking the clips frame by frame ({0}/{1})…",
   "Checking the keyframes against the shot list ({0}/{1})…": "Checking the keyframes against the shot list ({0}/{1})…",
@@ -3359,6 +3359,5 @@
   "Trigger word": "Trigger word",
   "Video: MiniMax H3 on Colab, lip-synced to the dubbed lines": "Video: MiniMax H3 on Colab, lip-synced to the dubbed lines",
   "Writing the delivery report…": "Writing the delivery report…",
-  "Rough cut (480p)": "Rough cut (480p)",
   "The server address is not known yet; try again in a moment": "The server address is not known yet; try again in a moment"
 }

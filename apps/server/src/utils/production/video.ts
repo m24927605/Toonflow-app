@@ -167,7 +167,7 @@ function srtTime(seconds: number) {
 export async function finishFilm(cwd: string, production: Production, signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   const duration = (path: string) => new Promise<number>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
-  const clips = [...production.finals ?? production.videos!].sort((a, b) => a.shot - b.shot);
+  const clips = [...production.videos!].sort((a, b) => a.shot - b.shot);
   const lengths = await Promise.all(clips.map(async clip => Math.min(await duration(clip.video!), shotSeconds(production, clip.shot))));
   const total = lengths.reduce((sum, length) => sum + length, 0);
   const folder = productionDirectory(production.id);

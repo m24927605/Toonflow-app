@@ -325,11 +325,12 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
 
-  // The rough cut is always 480p: cheap to watch through; the chosen final quality is rendered only for approved shots.
+  // The clips render once, at the chosen quality: no one reviews a cheaper pass between the keyframes and the film, and
+  // rendering every clip twice doubled the longest step.
   const videos = production.videos!;
   if (videos.some(item => !item.video)) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "roughCut")!.units, signal)) return false;
-    await renderClips(cwd, production, videos, "480p", "clips", signal, () => saveProduction(cwd, production));
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "clips")!.units, signal)) return false;
+    await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
     return true;
   }
   // Each clip is checked against its keyframe by the model reading frames of it: a clip that fails is rendered once more
@@ -353,18 +354,6 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     return true;
   }
 
-  // The film: the clips render again at the chosen quality with the rough cut's prompts and seeds, so the shots keep
-  // what the rough cut showed; a 480p film uses the rough cut's clips.
-  if (production.input.quality !== "480p" && !production.finals) {
-    production.finals = videos.map(({ shot, prompt, seed }) => ({ shot, prompt, seed }));
-    await saveProduction(cwd, production);
-    return true;
-  }
-  if (production.finals?.some(item => !item.video)) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "final")!.units, signal)) return false;
-    await renderClips(cwd, production, production.finals, production.input.quality, "final", signal, () => saveProduction(cwd, production));
-    return true;
-  }
   // Suno bills the sunoapi.org account, so the score is made only once every clip is rendered; its style was written
   // with the other texts.
   if (production.input.music && !production.music) {
@@ -435,7 +424,7 @@ function musicPrompt(script: string, seconds: number) {
 async function deliveryReport(cwd: string, production: Production, signal: AbortSignal) {
   const spent = await spentUnits(production, signal).then(units => units.toFixed(2), () => "?");
   if (spent !== "?") await recordProductionCost(production.estimate, Number(spent));
-  const clips = production.finals ?? production.videos!;
+  const clips = production.videos!;
   const loras = [...production.assets!.characters, ...production.assets!.places].flatMap(asset => (asset.loras ?? []).map(lora => `| ${asset.name} | ${lora.family} | ${lora.trigger} | ${lora.path} |`));
   const lines = [
     `# ${t`Production report`}`,
