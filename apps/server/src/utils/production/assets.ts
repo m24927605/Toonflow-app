@@ -129,8 +129,10 @@ async function ratioOf(cwd: string, path: string) {
 /**
  * Draws every person of each shot's opening in the outfit they wear there and in their pose in the previs: pose
  * transfer puts the person of their outfit's front view into the pose of their full-body previs figure, so the clip's
- * reference shows them kneeling, seated or turned as the shot begins rather than standing facing the camera. Requests
- * go out together, so Qwen-Image draws them in one batch. A person without a pose render keeps the front view.
+ * reference shows them kneeling, seated or turned as the shot begins rather than standing facing the camera. The front
+ * view looks into the lens and the figure's featureless head barely shows a turn, so the prompt says which way the head
+ * and eyes turn, or the drawn person stares at the viewer and the clip copies the stare. Requests go out together, so
+ * Qwen-Image draws them in one batch. A person without a pose render keeps the front view.
  * ACT: Each pose costs well under a minute of the Qwen machine, left out of the production estimate.
  */
 export async function drawPoses(cwd: string, production: Production, signal: AbortSignal, save: () => Promise<void>) {
@@ -139,7 +141,8 @@ export async function drawPoses(cwd: string, production: Production, signal: Abo
     const person = production.assets!.characters.find(item => item.name === name);
     const view = person && outfitView(person, shot);
     if (shot.poses?.[name] || !view) return;
-    const posed = await draw(cwd, production.id, finish, await ratioOf(cwd, render), [render, view], signal, poseModel);
+    const look = previs.framed.looks[name];
+    const posed = await draw(cwd, production.id, `${look ? `The person is ${look}. ` : ""}${finish}`, await ratioOf(cwd, render), [render, view], signal, poseModel);
     (shot.poses ??= {})[name] = posed;
   })));
   await save();

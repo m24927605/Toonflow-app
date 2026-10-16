@@ -8,12 +8,14 @@ import { productionDirectory, type Production } from "./state";
 
 /**
  * Every shot's measured blocking as text for its clip prompt; who it shows by name, in the opening and at any moment,
- * whom the clip names and gives as references; where each person in the opening looks, in English; and once the shot is rendered, its opening as a colour layout
+ * whom the clip names and gives as references; where each person framed in the opening or at the end looks, in English
+ * with the side of the frame, and the way each person of the opening turns their head, without names, for their pose;
+ * and once the shot is rendered, its opening as a colour layout
  * and a depth map, its animation as the previs video, and each person of the opening alone as a full-body mannequin
  * render in their opening pose, by name, for pose transfer.
  */
 export type ProductionPrevis = {
-  shot: number; blocking: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }; layout?: string; depth?: string; video?: string;
+  shot: number; blocking: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }; layout?: string; depth?: string; video?: string;
   poses?: Record<string, string>;
 }[];
 

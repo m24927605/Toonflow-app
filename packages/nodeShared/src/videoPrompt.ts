@@ -117,7 +117,10 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
   ].join("\n");
 }
 
-/** A person a reference-mode clip shows: their name, their LoRA's trigger word if any, and where the previs has them look. */
+/**
+ * A person a reference-mode clip shows: their name, their LoRA's trigger word if any, and how the previs camera sees
+ * them and where they look, such as "seen in profile, looks at Ren, towards the right of the frame".
+ */
 export type ReferencePerson = { name: string; trigger?: string; gaze?: string };
 
 /**
@@ -144,18 +147,18 @@ export function referenceVideoPromptInstructions(span: ShotSpan, scripts: number
     `- <Video 1> is this shot's grey-box previs. It fixes the camera, the framing, where each person stands and moves, and the timing: ${video.blocking}.`,
     ...video.dubbed && lines.length ? ["- <Audio 1> is the shot's complete recorded soundtrack; the speakers lip-sync to it."] : [],
     "Output exactly these six sections in this order and nothing else, each starting with its name and a colon:",
-    `subject_definitions: one line per person, "<Subject N> is <who, age, sex>, whose face, hair and clothes come from <Picture N>." in the same order as the pictures; ${video.place ? `then the place as the next <Subject>, "from <Picture ${placePicture}>"; ` : ""}then exactly this: "<Video 1> is a grey-box previs used only for blocking: it gives the camera position, angle, framing and move, where each person stands and moves, and the timing; take no shapes, materials or colours from it."` + (video.dubbed && lines.length ? " and then exactly this: \"<Audio 1>: fully_copy - <Audio 1> is reused 1:1 as the complete final audio track; each speaker says their words in time with <Audio 1>.\"" : ""),
+    `subject_definitions: one line per person, "<Subject N> is <their trigger word and woman or man if they have one, else a short visual description, with their age; never a name>, whose face, hair and clothes come from <Picture N>." in the same order as the pictures; ${video.place ? `then the place as the next <Subject>, "from <Picture ${placePicture}>"; ` : ""}then exactly this: "<Video 1> is a grey-box previs used only for blocking: it gives the camera position, angle, framing and move, where each person stands and moves, and the timing; take no shapes, materials or colours from it."` + (video.dubbed && lines.length ? " and then exactly this: \"<Audio 1>: fully_copy - <Audio 1> is reused 1:1 as the complete final audio track; each speaker says their words in time with <Audio 1>.\"" : ""),
     `summary: one sentence: a ${video.duration}-second shot of whom, where, doing what, framed and blocked as <Video 1> shows.`,
     "retention_analysis: one sentence: every person keeps the face, hair and clothes of their picture, the place is kept as its picture, and the camera, framing and positions follow <Video 1>.",
     `detailed_description: starts with exactly "[Shot 1] " followed by the style (live-action, cinematic, unless the script says otherwise), the shot size and camera from the row, the place and its light, and where each person is and what they hold, as <Video 1> places them; then in time order what happens over the ${video.duration} seconds from the row's action, camera and character-state cells and the story around it in the script: each person's movements, expressions and gaze, and the camera, as natural phrases such as "the camera holds a static shot". Use no cuts or timestamps. Show the action of the row actually happening, in the right direction (taking a jacket off is not putting it on; coming in is not standing inside).`,
-    `- The people in frame are exactly ${video.people.length ? video.people.map(person => person.name).join(", ") : "no one; describe only the place"}. Refer to each person by ${video.people.some(person => person.trigger) ? "their trigger word as listed below" : "a short visual description"}, never by a name label.`,
-    ...video.people.map(person => `- ${person.name}: ${person.trigger ? `every time they are mentioned write "${person.trigger}" followed by woman or man as fits, never a pronoun alone; this word makes the video model draw that exact person. ` : ""}${person.gaze ? `At the start, ${person.name} ${person.gaze}.` : ""}`),
-    "- Nobody looks into the camera lens unless the row says so: say where each person looks.",
+    `- The people in frame are exactly ${video.people.length ? video.people.map(person => person.name).join(", ") : "no one; describe only the place"}. Refer to each person by their trigger word as listed below, or by a short visual description when they have none, never by a name.`,
+    ...video.people.map(person => `- ${person.name}: ${person.trigger ? `every time they are mentioned write "${person.trigger}" followed by woman or man as fits, never a pronoun alone; this word makes the video model draw that exact person. ` : ""}${person.gaze ? `In <Video 1>, ${person.name} is ${person.gaze}: write this view and where their eyes go, with the side of the frame and anyone they look at written as you refer to them, never by name, when they first appear, and keep their eyes there until the row makes them look elsewhere.` : ""}`),
+    "- Nobody looks into the camera lens unless the row says so. Every time you say where someone looks, give the person or thing and the side of the frame it is on, such as \"looks at her, towards the left of the frame\" or \"looks off the right edge of the frame\"; never write that someone looks forward, ahead, out, at the camera, at the viewer or into the lens. Someone out of frame is never named or described: they are \"someone off the left (or right) edge of the frame\".",
     lines.length
       ? [
           "- The shot has these spoken lines, in this order:",
           ...lines.map((line, index) => `  [[LINE ${index + 1}]] spoken by ${line.speaker ? `${line.speaker} (${ids.get(line.speaker)})` : "the person speaking in this shot"}`),
-          "  Where each line is spoken, write the speaker as above (their trigger word when they have one), their voice, the speaker ID in brackets, then \"says:\" and the marker itself: <the speaker> with <their voice> (S1) says: [[LINE 1]]. The speaker is the person the line is spoken by, never someone else in the scene.",
+          "  Where each line is spoken, write the speaker by their trigger word followed by woman or man when they have one, otherwise by a short visual description, never by name, then their voice, the speaker ID in brackets, then \"says:\" and the marker itself: <the speaker> with <their voice> (S1) says: [[LINE 1]]. The speaker is the person the line is spoken by, never someone else in the scene.",
           "  Write each marker exactly once and never write the words of a line yourself; they are filled in later. No one says anything else.",
         ].join("\n")
       : "- Nobody speaks in this shot: write no dialogue and no speech.",

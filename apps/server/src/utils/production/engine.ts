@@ -305,8 +305,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const previs = production.previs!.find(other => other.shot === item.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
       const frames = await clipFrames(cwd, production, item, [previs.layout!, ...referenceImages(references)], signal);
-      const { gaze, opening } = previs.framed;
-      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", opening.map(name => `${name} ${gaze[name]}`).join("; "), references.people.length + (references.place ? 1 : 0)), signal, frames));
+      const gazes = Object.entries(previs.framed.gaze).map(([name, gaze]) => `${name}: ${gaze}`).join(" | ");
+      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, references.people.length + (references.place ? 1 : 0)), signal, frames));
       if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
       await saveProduction(cwd, production);
     }

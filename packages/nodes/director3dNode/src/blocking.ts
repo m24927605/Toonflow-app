@@ -1,4 +1,4 @@
-import { Box3, Raycaster, Vector3, type Object3D, type PerspectiveCamera } from "three";
+import { Box3, Quaternion, Raycaster, Vector3, type Object3D, type PerspectiveCamera } from "three";
 import { getObjectByThreeJsonId } from "threejson/core";
 import { t } from "@toonflow/i18n/vue";
 import { createStage, disposeStage, type SceneDocument } from "./scene";
@@ -7,6 +7,9 @@ import { prepareMotion, sampleMotion } from "./motion";
 
 // People are blocked as cylinders, or as mannequins when the user allows them.
 const personTypes = new Set(["cylinder", "capsule", "mannequin"]);
+const level = (vector: Vector3) => vector.setY(0).normalize();
+// A person whose column no longer stands upright lies down, and has no facing on the floor.
+const lyingDown = (root: Object3D) => new Vector3(0, 1, 0).applyQuaternion(root.getWorldQuaternion(new Quaternion())).y < 0.5;
 // The head decides where a person is in frame: a close-up leaves the middle of the body out.
 const headPoint = (box: Box3, camera: PerspectiveCamera) => new Vector3((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * 0.9, (box.min.z + box.max.z) / 2).project(camera);
 const inFrame = (point: Vector3) => point.z <= 1 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1;
@@ -61,7 +64,6 @@ export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan,
     // in most two-shots; people who look elsewhere, at a view or a screen, are told the wrong way. Turned people are
     // named facing another only when that one stands within 30 degrees of the way they look.
     const framed = people.filter(person => person.framed);
-    const level = (vector: Vector3) => vector.setY(0).normalize();
     for (const person of framed) {
       const toward = (other: (typeof framed)[number]) => level(other.centre.clone().sub(person.centre));
       const others = framed.filter(item => item !== person).sort((a, b) => a.centre.distanceTo(person.centre) - b.centre.distanceTo(person.centre));
@@ -162,34 +164,70 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
 // How often a shot is looked at for people coming into frame, in seconds.
 const framedStep = 0.5;
 
+// The least angle, in degrees, between where a person faces and the camera: closer, a frame reads them as looking into
+// the lens, which video models then draw.
+const lensMargin = 25;
+// A person looks up or down at another whose head is this much higher or lower, in metres.
+const eyeHeightStep = 0.3;
+
 /**
- * Where each person in the opening looks, in English for image and video prompts: at the person they are most turned
- * to (within 60 degrees), in frame or not, or else the way they face as the frame shows it. Image models draw people
- * looking into the lens unless told otherwise. ACT: People are read as turned the way they look, as planPrevis stages
- * them; a shot that wants a look into the lens needs that said in its own description.
+ * How the camera sees each person `framed` at the posed moment and where they look, in English for video prompts and
+ * the clip check: their view (towards the camera, three-quarter, profile, from behind), and the person they are most
+ * turned to (within 60 degrees), or else the named prop they face (within 30), with the side of the frame the look
+ * goes to, how far off the lens and whether up or down. Someone out of frame is not named, as a prompt can only point
+ * at them. `look` is the same as an image direction without names, for drawing the person's pose. Video and image
+ * models draw people looking into the lens unless told otherwise, so every look is given a side of the frame. ACT:
+ * People are read as turned the way they look, as planPrevis stages them; a look into the lens cannot be planned.
  */
-function gazeOf(people: { object: { name?: string }; root: Object3D }[], opening: string[], camera: PerspectiveCamera) {
-  const level = (vector: Vector3) => vector.setY(0).normalize();
-  const placed = people.flatMap(({ object, root }) => {
+function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: string }; root: Object3D }[], framed: string[], camera: PerspectiveCamera) {
+  // The set's props are prop1, prop2…; its walls, floor and ceiling are not looked at.
+  const placed = roots.flatMap(({ object, root }) => {
     const box = new Box3().setFromObject(root);
-    return object.name && box.max.y >= 0 ? [{ name: object.name, centre: box.getCenter(new Vector3()), facing: level(root.getWorldDirection(new Vector3())) }] : [];
+    const person = personTypes.has(object.objType);
+    return object.name && box.max.y >= 0 && (person || /^prop\d+$/.test(object.threeJsonId))
+      ? [{ name: object.name, person, lying: person && lyingDown(root), centre: box.getCenter(new Vector3()), head: box.max.y, facing: level(root.getWorldDirection(new Vector3())) }] : [];
   });
-  const right = level(new Vector3(1, 0, 0).applyQuaternion(camera.quaternion));
-  const toCamera = (centre: Vector3) => level(camera.position.clone().sub(centre));
-  return Object.fromEntries(placed.filter(person => opening.includes(person.name)).map(person => {
-    const angleTo = (item: (typeof placed)[number]) => level(item.centre.clone().sub(person.centre)).angleTo(person.facing);
-    const other = placed.filter(item => item !== person && angleTo(item) < Math.PI / 3).sort((a, b) => angleTo(a) - angleTo(b))[0];
-    if (other) return [person.name, `looks at ${other.name}${opening.includes(other.name) ? "" : ", who is out of frame"}`];
-    const side = person.facing.dot(right);
-    if (Math.abs(side) > 0.5) return [person.name, `looks towards the ${side > 0 ? "right" : "left"} of the frame`];
-    return [person.name, person.facing.angleTo(toCamera(person.centre)) < Math.PI / 2 ? "looks ahead, past the camera" : "looks away from the camera, into the scene"];
+  const degrees = (radians: number) => radians * 180 / Math.PI;
+  return Object.fromEntries(placed.filter(item => item.person && framed.includes(item.name)).map(person => {
+    // ACT: Someone lying down is taken to look up; a head turned on the pillow is not planned.
+    if (person.lying) return [person.name, { gaze: "lying down, looks up, away from the camera", look: "lying down, the face turned up, the eyes looking up, not at the viewer" }];
+    const angleTo = (item: (typeof placed)[number]) => degrees(level(item.centre.clone().sub(person.centre)).angleTo(person.facing));
+    const nearest = (items: typeof placed, limit: number) => items.filter(item => item !== person && angleTo(item) < limit).sort((a, b) => angleTo(a) - angleTo(b))[0];
+    const other = nearest(placed.filter(item => item.person && !item.lying), 60);
+    // Props named in lowerCamelCase English, as the plan names them, such as lowTable, are read as "low table".
+    const prop = other ? undefined : nearest(placed.filter(item => !item.person && /^[a-z][A-Za-z]*\d*$/.test(item.name)), 30);
+    const toLens = level(camera.position.clone().sub(person.centre));
+    const fromLens = degrees(person.facing.angleTo(toLens));
+    // The right of the frame as seen along this person's own line to the lens, as the shot and their pose render see
+    // them; the look goes to the side its target is on, or else the side they face.
+    const screenRight = new Vector3(0, 1, 0).cross(toLens);
+    const sideOf = (direction: Vector3) => direction.dot(screenRight) >= 0 ? "right" : "left";
+    const aim = other ?? prop;
+    const side = sideOf(aim ? level(aim.centre.clone().sub(person.centre)) : person.facing);
+    const turn = sideOf(person.facing);
+    const view = fromLens < lensMargin ? "turned towards the camera" : fromLens < 75 ? "seen in three-quarter view" : fromLens < 120 ? "seen in profile" : "seen from behind";
+    const height = other ? other.head - person.head : 0;
+    const tilt = height > eyeHeightStep ? "up " : height < -eyeHeightStep ? "down " : "";
+    const past = fromLens < 45 ? ", just past the lens" : "";
+    const target = !aim ? `${fromLens < 120 ? "looks" : "faces away from the camera, looking"} towards the ${side} of the frame`
+      : prop ? `looks at the ${prop.name.replace(/\d+$/, "").replace(/([A-Z])/g, " $1").toLowerCase()}, towards the ${side} of the frame`
+        : framed.includes(other!.name) ? `looks ${tilt}at ${other!.name}, towards the ${side} of the frame`
+          : `looks ${tilt}off the ${side} edge of the frame${past}, at someone out of frame`;
+    const gaze = `${view}, ${target}${fromLens < lensMargin ? `, the eyes off the lens to the ${side}` : ""}`;
+    const look = fromLens < lensMargin ? `shown with the body facing the viewer, the head turned slightly to the ${turn} of the image, the eyes looking past the viewer to the ${turn}`
+      : fromLens < 75 ? `seen in three-quarter view, the face turned to the ${turn} of the image, the eyes looking off to the ${turn}, not at the viewer`
+        : fromLens < 120 ? `seen in profile, facing the ${turn} of the image, the eyes looking ahead to the ${turn}, not at the viewer`
+          : "seen from behind, the face turned away from the viewer and hidden";
+    return [person.name, { gaze, look }];
   }));
 }
 
 /**
  * Who a plan shows, by name: the people any of whom is in frame in the opening, and everyone who is at any moment of
- * the shot, by the same measure as describeBlocking; and where each person in the opening looks. The shot list's cast cell may leave out someone the
- * camera sees, such as the person a close shot looks past, who is drawn all the same.
+ * the shot, by the same measure as describeBlocking; where each person framed in the opening or at the end looks, as
+ * the opening's gaze and the end's when it changes; and the opening's look of each person in it, for their pose. The
+ * shot list's cast cell may leave out someone the camera sees, such as the person a close shot looks past, who is drawn
+ * all the same.
  */
 export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, aspect: number) {
   const stage = await framingStage(scene, plan, aspect);
@@ -209,9 +247,15 @@ export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, asp
     for (const time of [...Array.from({ length: Math.floor(plan.duration / framedStep) }, (_, index) => (index + 1) * framedStep), plan.duration]) {
       for (const name of framedAt(time)) shown.add(name);
     }
+    const ending = gazeOf(stage.roots, framedAt(plan.duration), stage.camera);
     const opening = framedAt(0);
     for (const name of opening) shown.add(name);
-    return { opening, shown: [...shown], gaze: gazeOf(people, opening, stage.camera) };
+    const start = gazeOf(stage.roots, opening, stage.camera);
+    const gaze = Object.fromEntries([...new Set([...Object.keys(start), ...Object.keys(ending)])].map(name => {
+      const [first, last] = [start[name]?.gaze, ending[name]?.gaze];
+      return [name, !first ? `by the end ${last}` : !last || last === first ? first : `at the start ${first}; by the end ${last}`];
+    }));
+    return { opening, shown: [...shown], gaze, looks: Object.fromEntries(Object.entries(start).map(([name, item]) => [name, item.look])) };
   } finally {
     stage.dispose();
   }
@@ -281,8 +325,8 @@ export type ShotCamera = { direction: { x: number; z: number }; angle: "eye" | "
  * Frames a shot by computation: the camera stands on the asked side of the people, level with the part of them the
  * shot size shows (or low, or a metre above it), aims at it, and steps back until all of it is inside the safe area:
  * wherever they move while the camera holds, or for a close shot at its opening, as people may well leave a close-up.
- * When something is in the way it swings round in 30° steps, at most 60° either way so it keeps to its side of the
- * action. A move adds a keyframe at the end: a push in starts further back, a pull out ends there, and a follow frames
+ * When something is in the way, or someone would face within lensMargin of the lens, it swings round in 30° steps, at
+ * most 60° either way so it keeps to its side of the action. A move adds a keyframe at the end: a push in starts further back, a pull out ends there, and a follow frames
  * the people again where they end. Over a shoulder it stands just behind that person at their eye height, looking past
  * them at the others' heads over the shot, on the side `direction` gives. The camera stays below `ceiling`.
  */
@@ -333,7 +377,15 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
     const side = new Vector3(shot.direction.x, 0, shot.direction.z).normalize();
     /** The camera that frames the people at all of `times`, from the first of `turns` that sees them clearly. */
     const fit = (times: number[], turns = [0, 1, -1, 2, -2]) => {
-      const boxes = times.flatMap(time => boxesAt(time));
+      // Where each person stands and faces at each of the times, so no camera stands on anyone's line of sight.
+      const facings: { centre: Vector3; facing: Vector3 }[] = [];
+      const boxes = times.flatMap(time => {
+        const posed = boxesAt(time);
+        people.forEach((person, index) => {
+          if (!lyingDown(person.root)) facings.push({ centre: posed[index]!.getCenter(new Vector3()), facing: level(person.root.getWorldDirection(new Vector3())) });
+        });
+        return posed;
+      });
       // The top of each person and the lowest point the shot size shows, on their axis.
       const marks = boxes.flatMap(box => {
         const centre = box.getCenter(new Vector3());
@@ -370,10 +422,14 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
         const rects = people.map(person => screenRect(new Box3().setFromObject(person.root), camera));
         return Math.max(0, ...rects.flatMap((a, index) => rects.slice(index + 1).map(b => overlapShare(a, b))));
       };
-      // The asked side unless something hides someone or people cover each other there; then the nearest side that
-      // is clear, or the clear side where they cover each other least.
-      const clear = candidates.filter(({ from }) => people.every(person => !stage.blockerOf(from, person))).map(item => ({ ...item, overlap: overlapFrom(item.from) }));
-      return clear.find(item => item.overlap <= overlapLimit) ?? clear.sort((a, b) => a.overlap - b.overlap)[0] ?? candidates[0]!;
+      // Whether everyone faces at least lensMargin away from the camera: closer, they read as looking into the lens.
+      const offLens = (from: Vector3) => facings.every(({ centre, facing }) => facing.angleTo(level(from.clone().sub(centre))) * 180 / Math.PI >= lensMargin);
+      // The asked side unless something hides someone, someone faces the lens or people cover each other there; then
+      // the nearest side that is clear, preferring one where no one faces the lens, then the clear side where they
+      // cover each other least.
+      const clear = candidates.filter(({ from }) => people.every(person => !stage.blockerOf(from, person))).map(item => ({ ...item, overlap: overlapFrom(item.from), offLens: offLens(item.from) }));
+      return clear.find(item => item.offLens && item.overlap <= overlapLimit) ?? clear.find(item => item.offLens)
+        ?? clear.find(item => item.overlap <= overlapLimit) ?? clear.sort((a, b) => a.overlap - b.overlap)[0] ?? candidates[0]!;
     };
     const backed = (framing: ReturnType<typeof fit>) => {
       const offset = framing.from.clone().sub(framing.target).setY(0).multiplyScalar(moveRatio);
@@ -383,7 +439,11 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
     let cameraFrames: DirectorPlan["cameraFrames"];
     if (shot.move === "follow") {
       const first = fit([0]);
-      cameraFrames = [key(0, first), key(end, fit([end], [first.turn]))];
+      // The end keeps the opening's side unless someone has turned to face the lens there; then it moves to the
+      // nearest side where no one does, so the move between the two stays short.
+      const kept = fit([end], [first.turn]);
+      const nearby = [first.turn, first.turn + 1, first.turn - 1].filter(turn => Math.abs(turn) <= 2);
+      cameraFrames = [key(0, first), key(end, "offLens" in kept && !kept.offLens ? fit([end], nearby) : kept)];
     } else {
       const held = fit(lowest >= 0.6 ? [0] : [0, end / 2, end]);
       cameraFrames = shot.move === "pushIn" ? [key(0, backed(held)), key(end, held)]

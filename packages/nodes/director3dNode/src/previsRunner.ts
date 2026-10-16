@@ -105,14 +105,15 @@ async function renderPoses(still: SceneDocument, plan: DirectorPlan, aspect: num
       sceneConfig: { ...still.sceneConfig, scene: { background: poseBackground }, lights: [] },
       objectList: [{ ...figure, material: { type: "standard", color: "#c4c4c4", roughness: 0.8 } }],
     };
-    // The whole body seen from the shot camera's direction: pose transfer keeps a full-body posture but loses one cut to
-    // a bust, so the camera backs off along its own line until 2.4 m of height fits.
+    // The whole body seen round from where the shot camera stands, which for someone off the frame's centre is not the
+    // camera's own axis, at the camera's tilt: pose transfer keeps a full-body posture but loses one cut to a bust, so
+    // the camera backs off along that line until 2.4 m of height fits.
     const centre = { x: figure.position.x, y: figure.position.y + 0.75, z: figure.position.z };
-    const away = { x: position.x - target.x, y: position.y - target.y, z: position.z - target.z };
-    const length = Math.hypot(away.x, away.y, away.z) || 1;
+    const round = Math.atan2(position.x - centre.x, position.z - centre.z);
+    const tilt = Math.atan2(position.y - target.y, Math.hypot(position.x - target.x, position.z - target.z));
     const distance = 1.2 / Math.tan(fov * Math.PI / 360);
     const anchor = anchorSchema.parse({
-      camera: { ...view.camera, position: { x: centre.x + away.x / length * distance, y: centre.y + away.y / length * distance, z: centre.z + away.z / length * distance } },
+      camera: { ...view.camera, position: { x: centre.x + Math.sin(round) * Math.cos(tilt) * distance, y: centre.y + Math.sin(tilt) * distance, z: centre.z + Math.cos(round) * Math.cos(tilt) * distance } },
       controls: { target: centre }, time: 0,
     });
     const image = await renderImage(solo, anchor, aspect, 0, signal, undefined, lighting, { gridVisible: false, skyVisible: false }, "color");
@@ -140,9 +141,10 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
 
 /**
  * The film's previs plan, every shot's framed plan, the measured blocking of each shot's opening as text for keyframe
- * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name.
+ * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name, with where
+ * each of them looks and, for the people of the opening, the way their head turns in their pose render.
  */
-export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }[] };
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }[] };
 
 /**
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,

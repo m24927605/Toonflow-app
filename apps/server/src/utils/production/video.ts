@@ -27,6 +27,12 @@ const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
  * seconds of at least four, so the film cuts each clip to this.
  */
 const shotSeconds = (production: Production, shot: number) => production.dub!.shots.find(item => item.shot === shot)!.seconds;
+// Wording that sends someone's eyes into the lens, which the video model then draws; allowed only when the row asks
+// for that look ("\u770b"/"\u76ef"/"\u6ce8\u8996"/"\u76f4\u8996" "\u93e1\u982d"/"\u30ab\u30e1\u30e9" is "looks at the
+// camera"). "Camera left" and "the camera's" are sides and things of the frame, not the lens.
+const lensAt = /\b(?:looks?|looking|gaz(?:e|es|ed|ing)|stares?|stared|staring|glanc(?:e|es|ed|ing)|eyes)\b(?![-\s]level)[^.;:,|]{0,15}?\b(?:into|at|on|to|toward|towards)\s+(?:the\s+)?(?:camera|lens|viewer)\b(?!['\u2019]s\b|\s+(?:left|right)\b)/i;
+const lensLook = new RegExp(`${lensAt.source}|\\b(?:looks?|looking|gaz(?:e|es|ed|ing)|eyes|stares?|staring)\\s+(?:\\w+\\s+)?(?:forward|ahead)\\b`, "i");
+const lensRow = new RegExp(`${lensAt.source}|\\bbreak\\w*\\s+the\\s+fourth\\s+wall\\b|(?:\u770b|\u76ef|\u6ce8\u8996|\u6ce8\u89c6|\u76f4\u8996|\u76f4\u89c6)[\u5411\u7740\u8457]?(?:\u93e1\u982d|\u955c\u5934|\u30ab\u30e1\u30e9)|\u30ab\u30e1\u30e9\u76ee\u7dda`, "i");
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 
 /**
@@ -34,12 +40,14 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * shared instructions, here with the script and shot list inline, the people the previs shows and the place as
  * <Picture N>, the previs as <Video 1> and the dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
  * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, that never names
- * a person by their LoRA's trigger word, or that gives one person's word to two, is rewritten once with the error.
+ * a person by their LoRA's trigger word, that gives one person's word to two, that writes a name from the script, or
+ * that sends someone's eyes into the lens when the row does not ask for it, is rewritten once with the error.
  */
 export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
   const ids = speakerIds(spans);
   const videos = production.videos ??= spans.map((span): ProductionClip => ({ shot: span.shot }));
+  const names = production.assets!.characters.map(person => person.name);
   for (const span of spans) {
     const video = videos.find(item => item.shot === span.shot)!;
     if (video.prompt) continue;
@@ -51,6 +59,7 @@ export async function writeClipPrompts(production: Production, script: string, s
     const references = shotReferences(shot, production.assets!, previs.framed);
     const loras = references.people.flatMap(({ person }) => person.triggers?.h3 ? [{ name: person.name, trigger: person.triggers.h3 }] : []).slice(0, maxLoras);
     const people = references.people.map(({ person }) => ({ name: person.name, trigger: loras.find(lora => lora.name === person.name)?.trigger, gaze: previs.framed.gaze[person.name] }));
+    const lensAsked = lensRow.test(span.row ?? "");
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
     const instructionsOf = (part: typeof span, duration: number, note: string) =>
@@ -60,8 +69,14 @@ export async function writeClipPrompts(production: Production, script: string, s
     // of someone described otherwise is spoken by the wrong person.
     const write = async (instructions: string, dialogue?: string) => {
       const finish = (draft: string) => {
-        const missing = loras.filter(lora => !draft.includes(lora.trigger));
-        if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man"`).join(" and ")} every time they are mentioned`);
+        // A trigger word run into the next word ("siknsrman") is not the word the LoRA was trained on.
+        const missing = loras.filter(lora => !new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "i").test(draft) || new RegExp(`${lora.trigger}(?!\\s+(woman|man)\\b)`, "i").test(draft));
+        if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man", with a space,`).join(" and ")} every time they are mentioned, and use that word for no one else`);
+        // A name label means nothing to the video model, and someone out of frame named in it is drawn by guess.
+        const labels = names.filter(name => new RegExp(`(?<!\\p{L})${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "u").test(draft));
+        if (labels.length) throw new Error(`Never write the name ${labels.join(" or ")}: refer to people in frame by their trigger word or look, and to someone out of frame as "someone off the left (or right) edge of the frame"`);
+        const lens = lensLook.exec(draft);
+        if (lens && !lensAsked) throw new Error(`"${lens[0]}" makes the person look into the lens: say where their eyes go instead, at a person or thing and the side of the frame it is on`);
         // A trigger word before both "woman" and "man" gives one person's LoRA to two people.
         const shared = loras.filter(lora => new Set([...draft.matchAll(new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "gi"))].map(match => match[1]!.toLowerCase())).size > 1);
         if (shared.length) throw new Error(`${shared.map(lora => `"${lora.trigger}" names ${lora.name} alone`).join(" and ")}: write it only for them, always followed by the same word, woman or man`);
@@ -98,6 +113,7 @@ export async function writeClipPrompts(production: Production, script: string, s
         const partSpan = { ...span, dialogue: own.map(line => line.speaker ? `${line.speaker}\uFF1A${line.words}` : line.words).join("\uFF1B") };
         const note = [
           `\n\nThis shot is one continuous take of ${clip} seconds without any cut, rendered in ${plan.parts} parts of ${seconds(plan.frames)} seconds. This prompt is part ${part + 1} of ${plan.parts}: seconds ${seconds(from)}\u2013${seconds(Math.min(to, clip * 24))} of the shot.`,
+          "Where each person looks, as given above, is for the whole take: the start is the start of part 1 and the end the end of the last part; this part goes from where the part before leaves their eyes towards that end only as far as its seconds allow.",
           "Describe only what happens in those seconds, in time order; the other parts describe the rest. <Video 1> and <Audio 1> cover only this part.",
           ...part ? [`Its first 0.92 seconds repeat the end of part ${part} exactly: open on the same picture, positions and motion that part ends on, and carry on with the same camera.`] : [],
           ...part + 1 < plan.parts ? ["End with the take still going, mid-action, not on a pause or a resolved moment."] : [],
