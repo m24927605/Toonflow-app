@@ -5,10 +5,10 @@ import conf from "@/utils/conf";
 import type { ProductionDub } from "./dub";
 import type { ProductionPrevis } from "./previs";
 import type { ProductionClip } from "./video";
-import type { ProductionKeyframe } from "./keyframes";
+import type { ProductionShot } from "./shots";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
-export const productionGates = ["script", "keyframes"] as const;
+export const productionGates = ["script"] as const;
 export type ProductionGate = typeof productionGates[number];
 export const productionQualities = ["480p", "720p", "1080p"] as const;
 export const productionRatios = ["16:9", "9:16", "1:1", "4:3", "3:4"] as const;
@@ -59,10 +59,10 @@ export type Production = {
   shotList?: ProductionText & { shots: number; issues: MessageDescriptor[] };
   /**
    * The cast and places of the script with their look; `base` is the photo or generated design every other view is
-   * drawn from, `views` the reference images keyframes and LoRAs use.
+   * drawn from, `views` the reference images clips and LoRAs use.
    */
   assets?: { characters: ProductionAsset[]; places: ProductionAsset[] };
-  keyframes?: { master: number; shots: ProductionKeyframe[] };
+  shots?: ProductionShot[];
   dub?: ProductionDub;
   previs?: ProductionPrevis;
   videos?: ProductionClip[];

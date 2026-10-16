@@ -15,7 +15,7 @@ export default Router().post("/", validateFields({
   ratio: z.enum(u.production.productionRatios),
   quality: z.enum(u.production.productionQualities),
   budget: z.number().positive().max(1000),
-  gates: z.array(z.enum(u.production.productionGates)).max(2),
+  gates: z.array(z.enum(u.production.productionGates)).max(1),
   photos: z.array(z.strictObject({ name: z.string().trim().min(1).max(64), path: z.string().min(1).max(4096) })).max(20),
   subtitles: z.boolean(),
   music: z.boolean(),

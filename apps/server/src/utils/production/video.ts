@@ -1,12 +1,13 @@
 import type { FfmpegCommand } from "@toonflow/ffmpeg";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
-import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
+import { fillDialogue, parseDialogue, referenceVideoPromptInstructions, speakerIds } from "@toonflow/node-shared/videoPrompt";
 import { mkdir, readFile } from "@toonflow/file";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
+import { maxLoras, referenceImages, shotReferences } from "./shots";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 
 /**
@@ -28,9 +29,9 @@ const shotSeconds = (production: Production, shot: number) => production.dub!.sh
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 
 /**
- * Writes the MiniMax H3 prompt of every shot without one with the text model, saving each: the shared instructions, here
- * with the script and shot list inline, the keyframe's description for <Picture 1>, the previs as <Video 1> and the
- * dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
+ * Writes the MiniMax H3 prompt of every shot without one with the text model, saving each, in full-reference mode: the
+ * shared instructions, here with the script and shot list inline, the people the previs shows and the place as
+ * <Picture N>, the previs as <Video 1> and the dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
  * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, that never names
  * a person by their LoRA's trigger word, or that gives one person's word to two, is rewritten once with the error.
  */
@@ -43,16 +44,15 @@ export async function writeClipPrompts(production: Production, script: string, s
     if (video.prompt) continue;
     const clip = production.clips!.find(item => item.shot === span.shot)!.clip;
     const dubbed = !!production.dub!.shots.find(item => item.shot === span.shot)?.track;
-    const keyframe = production.keyframes!.shots.find(item => item.shot === span.shot);
+    const shot = production.shots!.find(item => item.shot === span.shot)!;
+    const previs = production.previs!.find(item => item.shot === span.shot)!;
     // Everyone the previs shows at any moment of the shot, which the shot list's cast cell may leave out.
-    const people = production.previs!.find(item => item.shot === span.shot)!.framed.shown;
-    const loras = people.flatMap(name => {
-      const trigger = production.assets!.characters.find(item => item.name === name)?.triggers?.h3;
-      return trigger ? [{ name, trigger }] : [];
-    });
+    const references = shotReferences(shot, production.assets!, previs.framed);
+    const loras = references.people.flatMap(({ person }) => person.triggers?.h3 ? [{ name: person.name, trigger: person.triggers.h3 }] : []).slice(0, maxLoras);
+    const people = references.people.map(({ person }) => ({ name: person.name, trigger: loras.find(lora => lora.name === person.name)?.trigger, gaze: previs.framed.gaze[person.name] }));
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
-    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description, people }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const instructions = `${referenceVideoPromptInstructions(span, 1, { duration: clip, dubbed, people, place: references.place?.place.look, blocking: previs.blocking }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // A person the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in
     // the mouth of someone described otherwise is spoken by the wrong person.
     const finish = (draft: string) => {
@@ -85,21 +85,22 @@ export async function writeClipPrompts(production: Production, script: string, s
 }
 
 /**
- * Renders each clip not rendered yet into `folder`, from its keyframe as the first frame, its previs as the blocking
- * reference, its dubbed track, the H3 LoRAs of everyone its previs shows and its own seed. All are requested at once
+ * Renders each clip not rendered yet into `folder`, with no first frame: the people its previs shows and the place as
+ * reference images, its previs as the blocking reference, its dubbed track, those people's H3 LoRAs and its own seed. All are requested at once
  * and run one after another on one Colab machine.
  */
 export async function renderClips(cwd: string, production: Production, clips: ProductionClip[], resolution: "480p" | "720p" | "1080p", folder: string, signal: AbortSignal, save: () => Promise<void>) {
   try {
     await Promise.all(clips.filter(item => !item.video).map(async item => {
-      const keyframe = production.keyframes!.shots.find(shot => shot.shot === item.shot)!;
-      const previs = production.previs!.find(shot => shot.shot === item.shot)!;
+      const shot = production.shots!.find(other => other.shot === item.shot)!;
+      const previs = production.previs!.find(other => other.shot === item.shot)!;
+      const references = shotReferences(shot, production.assets!, previs.framed);
       const track = production.dub!.shots.find(shot => shot.shot === item.shot)?.track;
-      const loras = previs.framed.shown.flatMap(name => production.assets!.characters.find(person => person.name === name)?.loras?.filter(lora => lora.family === "h3") ?? []);
+      const loras = references.people.flatMap(({ person }) => person.loras?.filter(lora => lora.family === "h3") ?? []).slice(0, maxLoras);
       const [video] = await generateMedia(cwd, "video", {
         ...h3, mode: "startFrameOptional", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
         generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`,
-        firstFrame: { path: keyframe.image!, mimeType: mimeOf(keyframe.image!) },
+        images: referenceImages(references).map(path => ({ path, mimeType: mimeOf(path) })),
         // ACT: The previs goes in as a reference video rather than a control video, as the shot nodes do; skipPrevis only
         // lifts the server's control-video gate, which the previs reference satisfies.
         skipPrevis: true,
@@ -214,16 +215,16 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
 const checkTimes = [0.05, 0.25, 0.45, 0.65, 0.85, 0.98];
 
 /**
- * The keyframe and four frames of the part of a clip the film keeps as base64 PNGs, the frames saved beside the clips for
- * a person to see.
+ * The references a clip is checked against (its previs layout, then the people's and the place's images) and frames of
+ * the part of the clip the film keeps, as base64 PNGs, the frames saved beside the clips for a person to see.
  */
-export async function clipFrames(cwd: string, production: Production, clip: ProductionClip, keyframe: string, signal: AbortSignal) {
+export async function clipFrames(cwd: string, production: Production, clip: ProductionClip, references: string[], signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   const probed = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(clip.video!, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
   const length = Math.min(probed, shotSeconds(production, clip.shot));
   const folder = await checksFolder(cwd, production);
-  const frames = [`${folder}/shot${clip.shot}Keyframe.png`];
-  await finished(ffmpeg(keyframe).frames(1).outputOptions(["-vf scale=640:-2"]).output(frames[0]!));
+  const frames = references.map((_, index) => `${folder}/shot${clip.shot}Reference${index + 1}.png`);
+  await Promise.all(references.map((image, index) => finished(ffmpeg(image).frames(1).outputOptions(["-vf scale=640:-2"]).output(frames[index]!))));
   for (const [index, share] of checkTimes.entries()) {
     const frame = `${folder}/shot${clip.shot}Frame${index + 1}.png`;
     await finished(ffmpeg(clip.video!).seekInput(length * share).frames(1).outputOptions(["-vf scale=640:-2"]).output(frame));
@@ -239,31 +240,23 @@ async function checksFolder(cwd: string, production: Production) {
   return folder;
 }
 
-/** A keyframe as the check reads it, PNG bytes as base64. */
-export async function keyframeImage(cwd: string, production: Production, shot: number, image: string, signal: AbortSignal) {
-  const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
-  const path = `${await checksFolder(cwd, production)}/shot${shot}KeyframeCheck.png`;
-  await finished(ffmpeg(image).frames(1).outputOptions(["-vf scale=640:-2"]).output(path));
-  return Buffer.from(await readFile((await resolveWorkspacePath(cwd, path)).path)).toString("base64");
-}
-
 /**
  * Asks for every problem in a clip, each marked major or minor, as JSON. ACT: The model names problems well but scored
  * clips 85/92 whatever it found, a changed set and clothes included, so the verdict follows the problems it marks major.
- * Looks are judged against the keyframe image only: given the keyframe's written description as well, the model took
- * the words for the picture and failed every clip of the first production, natural movement included. The action and
+ * Looks are judged against the reference images only: given a written description of the picture as well, the model
+ * took the words for the picture and failed every clip of the first production, natural movement included. The action and
  * the gaze are judged against the shot-list row: judging looks alone, the check passed a jacket put on instead of taken
  * off and five people staring into the lens, while most "melted faces" it failed were one motion-blurred frame.
  */
-export function clipCheckPrompt(prompt: string, row: string, gazes: string) {
+export function clipCheckPrompt(prompt: string, row: string, gazes: string, looks: number) {
   return [
-    `The first image is a shot's keyframe, the first frame its video clip had to start from; the next six are frames from the clip at ${checkTimes.map(time => `${Math.round(time * 100)}%`).join(", ")} of the part the film keeps.`,
+    `The first image is the shot's grey-box previs layout, which fixes the camera, framing and where each person stands; the next ${looks} show how the people and the place must look; the last six are frames from the video clip at ${checkTimes.map(time => `${Math.round(time * 100)}%`).join(", ")} of the part the film keeps.`,
     `The shot-list row (shot size, camera, action, dialogue, cast, state): ${row}`,
     ...gazes ? [`Where each person should look: ${gazes}.`] : [],
     `The clip was asked for: ${prompt}`,
     "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
-    "Compare looks with the keyframe image, never with the words: where the words describe the picture differently, the keyframe image is right.",
-    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; the set, the light or someone's clothes, hair or face differ from the keyframe; the clip does not open on the keyframe's place, framing and people; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
+    "Compare the framing and positions with the previs layout and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right.",
+    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the framing or the people's positions clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }

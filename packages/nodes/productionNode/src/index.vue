@@ -8,7 +8,6 @@
         <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
         <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
         <!-- Clips that failed the frame check twice; the film keeps them, so a person decides whether to redo them. -->
-        <span v-for="keyframe in flaggedKeyframes" :key="`keyframe${keyframe.shot}`" class="warning">{{ t`Shot ${keyframe.shot} keyframe needs a look: ${keyframe.check.issues.filter(issue => issue.major).map(issue => issue.problem).join("; ")}` }}</span>
         <span v-for="clip in flaggedClips" :key="clip.shot" class="warning">{{ t`Shot ${clip.shot} needs a look: ${clip.check.issues.filter(issue => issue.major).map(issue => issue.problem).join("; ")}` }}</span>
         <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
       </template>
@@ -35,7 +34,6 @@
           <span v-if="canvasCast.length" class="hint">{{ t`Characters already on the canvas keep their look: ${canvasCast.map(item => item.name).join(", ")}` }}</span>
           <div class="formRow">
             <el-checkbox v-model="form.reviewScript">{{ translate("Let me review the script") }}</el-checkbox>
-            <el-checkbox v-model="form.reviewKeyframes">{{ translate("Let me review the keyframes") }}</el-checkbox>
           </div>
           <div class="formRow">
             <el-checkbox v-model="form.subtitles">{{ translate("Subtitles from the dialogue") }}</el-checkbox>
@@ -55,12 +53,6 @@
             <el-input v-model="notes" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :placeholder="translate('What to change (leave empty to approve)')" :aria-label="translate('What to change')" />
             <div class="footer">
               <el-button :loading="busy" :disabled="!notes.trim()" @click="answer(true)">{{ translate("Revise") }}</el-button>
-              <el-button type="primary" :loading="busy" @click="answer(false)">{{ translate("Approve") }}</el-button>
-            </div>
-          </div>
-          <div v-else-if="state.production.review?.gate === 'keyframes' && state.production.status === 'waiting'" class="review">
-            <span>{{ translate("The keyframes are on the canvas. Regenerate any you do not like in its own node, then approve.") }}</span>
-            <div class="footer">
               <el-button type="primary" :loading="busy" @click="answer(false)">{{ translate("Approve") }}</el-button>
             </div>
           </div>
@@ -88,7 +80,6 @@ import { t, translate } from "@toonflow/i18n/vue";
 import type { MessageDescriptor } from "@toonflow/i18n";
 import { nodeSkeleton, useNode, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
-import { listLoras } from "@toonflow/node-shared/loraRegistry";
 
 defineOptions({
   inheritAttrs: false,
@@ -105,16 +96,14 @@ type Production = {
   status: "running" | "waiting" | "failed" | "done";
   message?: string;
   detail?: string;
-  review?: { gate: "script" | "keyframes"; notes?: string };
+  review?: { gate: "script"; notes?: string };
   script?: { path: string };
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
-  keyframes?: { master: number; shots: Keyframe[] };
   dub?: unknown; clips?: unknown; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
   videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
   music?: string; film?: string; report?: string;
 };
-type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean } };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
 type State = { production: Production; script?: string; shotList?: string; report?: string; estimate: Estimate };
 type TextKind = "script" | "shotList" | "report";
@@ -122,15 +111,14 @@ type TextKind = "script" | "shotList" | "report";
 // replaces it only while nobody has edited it.
 type Data = {
   texts?: Partial<Record<TextKind, { node: string; synced: string }>>;
-  // The image nodes this production made, by the image they show, and its keyframe nodes by shot; `top` is where its
-  // rows of images start, below everything that was on the canvas when the first of them was placed.
+  // The image nodes this production made, by the image they show; `top` is where its rows of images start, below
+  // everything that was on the canvas when the first of them was placed.
   images?: Record<string, string>;
   top?: number;
   roughCut?: string;
   film?: string;
-  keyframes?: Record<number, string>;
   // The budget follows the estimate until someone sets it (`budgetSet`).
-  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; reviewKeyframes: boolean; subtitles: boolean; music: boolean; names: Record<string, string> };
+  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; subtitles: boolean; music: boolean; names: Record<string, string> };
   started?: boolean;
 };
 
@@ -140,7 +128,7 @@ const { id, node, nodeProps, files } = useNode({ label: "Auto production" });
 const flow = useVueFlow();
 const { refList } = useNodeReferences();
 const data = computed(() => node.data as typeof node.data & Data);
-data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, reviewKeyframes: true, subtitles: true, music: false, names: {} };
+data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, subtitles: true, music: false, names: {} };
 const form = reactive(data.value.form);
 const state = ref<State>();
 const quote = ref<Estimate>();
@@ -170,7 +158,6 @@ watch(photos, list => {
 }, { immediate: true });
 
 const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
-const flaggedKeyframes = computed(() => (state.value?.production.keyframes?.shots ?? []).flatMap(item => item.check && !item.check.passed ? [{ shot: item.shot, check: item.check }] : []));
 const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed && clip.retried ? [{ shot: clip.shot, check: clip.check }] : []));
 const headline = computed(() => {
   const production = state.value!.production;
@@ -189,7 +176,6 @@ const headline = computed(() => {
     if (!blocked) return translate("Blocking every shot in the previs…");
     if (!production.clips) return translate("Recording the dialogue…");
     if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
-    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return t`Drawing and checking the keyframes, the master shot first (${production.keyframes?.shots.filter(item => item.image).length ?? 0}/${production.keyframes?.shots.length ?? 0})…`;
     if (production.videos.some(item => !item.video)) return t`Rendering the clips at ${production.input.quality} (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
     if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");
@@ -202,7 +188,6 @@ const headline = computed(() => {
     budget: translate("Stopped: the next step would go over the budget"),
     balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
     stopped: translate("Stopped"),
-    reviewKeyframes: translate("Waiting for your review of the keyframes"),
     filmDone: translate("The film and its delivery report are ready on the canvas."),
   } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
 });
@@ -246,7 +231,7 @@ async function start() {
   try {
     await api("create", {
       directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality, budget: form.budget,
-      gates: [...form.reviewScript ? ["script"] : [], ...form.reviewKeyframes ? ["keyframes"] : []], subtitles: form.subtitles, music: form.music,
+      gates: form.reviewScript ? ["script"] : [], subtitles: form.subtitles, music: form.music,
       photos: [...photos.value.map(photo => ({ name: form.names[photo.key]!.trim(), path: photo.url })), ...canvasCast.value.map(item => ({ name: item.name, path: item.url }))],
     });
     data.value.started = true;
@@ -315,47 +300,6 @@ function syncAssets(assets: NonNullable<Production["assets"]>) {
   }));
 }
 
-/**
- * Puts the keyframes on the canvas as image generation nodes with their shot number, prompt, LoRAs and references
- * connected in prompt order, so any of them can be adjusted and regenerated by hand: the depth model's first
- * reference is the shot's previs depth map, placed below its keyframe.
- */
-async function syncKeyframes(keyframes: NonNullable<Production["keyframes"]>, previs: NonNullable<Production["previs"]>) {
-  const placed = data.value.keyframes ??= {};
-  const ready = keyframes.shots.filter(item => item.image && item.prompt && !placed[item.shot]);
-  if (!ready.length) return;
-  const records = await listLoras(files.getWorkspaceFiles()).catch(() => []);
-  const assets = state.value?.production.assets;
-  const rows = assets ? assets.characters.reduce((sum, item) => sum + 1 + (item.outfits?.length ?? 0), 0) + assets.places.length : 0;
-  const top = (data.value.top ??= Math.max(...flow.getNodes.value.map(entry => entry.computedPosition.y + (entry.dimensions.height || 240))) + 160) + rows * 320;
-  // The master keyframe is placed first, so the others can connect to it.
-  for (const item of [...ready].sort((a, b) => Number(b.shot === keyframes.master) - Number(a.shot === keyframes.master))) {
-    const depth = previs.find(shot => shot.shot === item.shot)?.depth;
-    if (depth && !data.value.images?.[depth]) {
-      const depthId = crypto.randomUUID();
-      flow.addNodes([{ id: depthId, type: "remote-imageNode", position: { x: node.computedPosition.x + (item.shot - 1) * 400, y: top + 360 }, data: {
-        label: t`Shot ${item.shot} previs depth`, role: "layout", shot: item.shot, outputs: { image: { dataType: "IMAGE", value: { url: depth, mimeType: mimeOf(depth) } } },
-      } }]);
-      (data.value.images ??= {})[depth] = depthId;
-    }
-    const sources = item.references!.map(path => data.value.images?.[path] ?? keyframes.shots.flatMap(other => other.image === path && placed[other.shot] ? [placed[other.shot]!] : [])[0]);
-    if (sources.some(source => !source)) continue;
-    const nodeId = crypto.randomUUID();
-    const loras = item.loras!.flatMap(lora => {
-      const record = records.find(entry => entry.path === lora.path);
-      return record ? [{ path: record.path, trigger: record.trigger, name: record.name, kind: record.kind, family: record.family, strength: lora.strength }] : [];
-    });
-    flow.addNodes([{ id: nodeId, type: "remote-imageGenerationNode", position: { x: node.computedPosition.x + (item.shot - 1) * 400, y: top }, data: {
-      label: t`Shot ${item.shot} keyframe (${item.time})`, role: "keyframe", shot: item.shot, prompt: item.prompt, promptModel: item.prompt!.split("\n").map(text => [{ type: "Write", text }]),
-      model: JSON.stringify(["qwenImage", "qwen_image_2_1_turbo_depth"]), ratio: state.value?.production.input.ratio ?? "16:9", size: "1K", loras,
-      outputs: { image: { dataType: "IMAGE", value: { url: item.image, mimeType: mimeOf(item.image!) } } },
-      referenceOrder: { in: sources.map(source => encodeURIComponent(JSON.stringify([source, "image"]))) },
-    } }]);
-    flow.addEdges(sources.map(source => ({ id: crypto.randomUUID(), source: source!, sourceHandle: "image", target: nodeId, targetHandle: "in" })));
-    placed[item.shot] = nodeId;
-  }
-}
-
 /** Puts the finished film on the canvas as a video node below the rough cut, once. */
 function syncFilm(path: string, quality: Quality) {
   if (data.value.film) return;
@@ -383,7 +327,6 @@ async function refresh() {
     if (state.value.script) syncText("script", state.value.script);
     if (state.value.shotList) syncText("shotList", state.value.shotList);
     if (state.value.production.assets) syncAssets(state.value.production.assets);
-    if (state.value.production.keyframes && state.value.production.previs) await syncKeyframes(state.value.production.keyframes, state.value.production.previs);
     if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut, state.value.production.input.quality);
     if (state.value.production.film) syncFilm(state.value.production.film, state.value.production.input.quality);
     if (state.value.report) syncText("report", state.value.report);

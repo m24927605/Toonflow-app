@@ -5217,14 +5217,7 @@
     "packages/nodes/textNode/src/shotNodesDialog.vue",
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
-  "Keyframe": [
-    "apps/server/src/utils/production/engine.ts",
-    "packages/nodeShared/src/components/roleSelect.vue"
-  ],
   "Clip": [
-    "apps/server/src/utils/production/engine.ts"
-  ],
-  "Keyframe seed": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "Clip seed": [
@@ -5253,13 +5246,13 @@
   "Models": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Script, shot list, descriptions and prompts: {0} on Colab": [
+  "Script, shot list and prompts: {0} on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Keyframes and designs: Qwen-Image 2.1 Turbo on Colab, keyframes with previs depth control": [
+  "Designs: Qwen-Image 2.1 Turbo on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Video: MiniMax H3 on Colab, lip-synced to the dubbed lines": [
+  "Video: MiniMax H3 on Colab from the previs and the designs as references, lip-synced to the dubbed lines": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "This production is not waiting for a review": [
@@ -6441,9 +6434,6 @@
   "Shot list: {0} shots": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Shot {0} keyframe needs a look: {1}": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Shot {0} needs a look: {1}": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6485,9 +6475,6 @@
   "Let me review the script": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Let me review the keyframes": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Subtitles from the dialogue": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6519,9 +6506,6 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Approve": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "The keyframes are on the canvas. Regenerate any you do not like in its own node, then approve.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "New budget (units)": [
@@ -6560,9 +6544,6 @@
   "Writing the video prompts…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Drawing and checking the keyframes, the master shot first ({0}/{1})…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Rendering the clips at {0} ({1}/{2})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6591,9 +6572,6 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Stopped": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Waiting for your review of the keyframes": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "The film and its delivery report are ready on the canvas.": [
@@ -6631,13 +6609,6 @@
   ],
   "Delivery report": [
     "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Shot {0} previs depth": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Shot {0} keyframe ({1})": [
-    "packages/nodes/productionNode/src/index.vue",
-    "packages/nodes/textNode/src/index.vue"
   ],
   "Film ({0})": [
     "packages/nodes/productionNode/src/index.vue"
@@ -7764,6 +7735,9 @@
     "packages/nodes/textNode/src/index.vue"
   ],
   "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.": [
+    "packages/nodes/textNode/src/index.vue"
+  ],
+  "Shot {0} keyframe ({1})": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Shot {0} prompt": [
@@ -10300,6 +10274,9 @@
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
   "Every image of the same place keeps the same name; a scene LoRA with this name loads with its keyframes": [
+    "packages/nodeShared/src/components/roleSelect.vue"
+  ],
+  "Keyframe": [
     "packages/nodeShared/src/components/roleSelect.vue"
   ],
   "Previs layout": [

@@ -49,7 +49,7 @@ const finish = "Photorealistic, sharp focus, natural texture, one single photogr
 const studio = "plain light grey studio background, even soft light";
 
 // A person's face close-ups, drawn once from their base image, and the full-body views drawn for every outfit; the
-// first outfit view, facing the camera, is the reference keyframes use.
+// first outfit view, facing the camera, is the reference image clips use.
 const faceViews: [ratio: string, view: string][] = [
   ["1:1", `Tight close-up of the face, front view, neutral expression, ${studio}.`],
   ["1:1", `Close-up of the face in three-quarter view, slight smile, ${studio}.`],
@@ -142,8 +142,10 @@ export async function planAssetLoras(cwd: string, production: Production, shotLi
   const counts = appearances(shotList, assets, production.previs!);
   const existing = await workspaceLoras(cwd);
   const jobs = [
-    ...assets.characters.map(item => ({ item, kind: "character" as const, families: ["h3", "qwen"] as const, shots: counts.people.get(item.name) ?? 0 })),
-    ...assets.places.map(item => ({ item, kind: "scene" as const, families: ["qwen"] as const, shots: counts.places.get(item.name) ?? 0 })),
+    // Only the video model takes LoRAs: clips get people and places as reference images, so a person needs an H3 LoRA to
+    // keep their face and a place none.
+    ...assets.characters.map(item => ({ item, kind: "character" as const, families: ["h3"] as ("h3" | "qwen")[], shots: counts.people.get(item.name) ?? 0 })),
+    ...assets.places.map(item => ({ item, kind: "scene" as const, families: [] as ("h3" | "qwen")[], shots: counts.places.get(item.name) ?? 0 })),
   ].filter(job => !job.item.loras).map(({ item, kind, families, shots }) => {
     if (shots < minShotsForLora) return { item, kind, kept: [] as LoraRecord[], missing: [] as ("h3" | "qwen")[] };
     item.triggers ??= Object.fromEntries(families.map(family =>
@@ -164,10 +166,10 @@ export async function trainAssetLoras(cwd: string, plan: Awaited<ReturnType<type
   }));
 }
 
-/** How many of these people already have both their H3 and Qwen-Image character LoRAs, which a production reuses. */
+/** How many of these people already have their H3 character LoRA, which a production reuses. */
 export async function peopleWithLoras(cwd: string, names: string[]) {
   const records = await workspaceLoras(cwd);
-  const ready = (name: string) => (["h3", "qwen"] as const).every(family => records.some(record => record.kind === "character" && record.family === family && record.name === name));
+  const ready = (name: string) => records.some(record => record.kind === "character" && record.family === "h3" && record.name === name);
   return [...new Set(names.filter(Boolean))].filter(ready).length;
 }
 

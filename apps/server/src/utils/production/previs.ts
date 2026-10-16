@@ -7,8 +7,8 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { productionDirectory, type Production } from "./state";
 
 /**
- * Every shot's measured blocking as text for its keyframe description; who it shows by name, in the opening, whom the
- * keyframe draws, and at any moment, whom the clip names; where each person in the opening looks, in English; and once the shot is rendered, its opening as a colour layout
+ * Every shot's measured blocking as text for its clip prompt; who it shows by name, in the opening and at any moment,
+ * whom the clip names and gives as references; where each person in the opening looks, in English; and once the shot is rendered, its opening as a colour layout
  * and a depth map and its animation as the previs video.
  */
 export type ProductionPrevis = {
