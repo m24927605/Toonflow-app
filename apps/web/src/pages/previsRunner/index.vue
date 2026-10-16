@@ -10,7 +10,7 @@ import { installNodeHost } from "@/lib/nodeHost";
 import { loadNodeComponent } from "@/pages/workspace/panels/canvas/loadNodeComponent";
 
 type Shot = { shot: number; seconds: number; cast: string[]; size: string };
-type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[]; framed: { opening: string[]; shown: string[] }[] };
+type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }[] };
 /**
  * What the server's previs step hands this page before it loads: the workspace, the previs folder and every shot of the
  * film. To plan, the director model and the script and shot list the plan refers to as {{ref 1}} and {{ref 2}}; the plan

@@ -76,7 +76,7 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
  * The film's previs plan, every shot's framed plan, the measured blocking of each shot's opening as text for keyframe
  * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name.
  */
-export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[] }[] };
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }[] };
 
 /**
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,

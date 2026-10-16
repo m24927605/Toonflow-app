@@ -163,8 +163,32 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
 const framedStep = 0.5;
 
 /**
+ * Where each person in the opening looks, in English for image and video prompts: at the person they are most turned
+ * to (within 60 degrees), in frame or not, or else the way they face as the frame shows it. Image models draw people
+ * looking into the lens unless told otherwise. ACT: People are read as turned the way they look, as planPrevis stages
+ * them; a shot that wants a look into the lens needs that said in its own description.
+ */
+function gazeOf(people: { object: { name?: string }; root: Object3D }[], opening: string[], camera: PerspectiveCamera) {
+  const level = (vector: Vector3) => vector.setY(0).normalize();
+  const placed = people.flatMap(({ object, root }) => {
+    const box = new Box3().setFromObject(root);
+    return object.name && box.max.y >= 0 ? [{ name: object.name, centre: box.getCenter(new Vector3()), facing: level(root.getWorldDirection(new Vector3())) }] : [];
+  });
+  const right = level(new Vector3(1, 0, 0).applyQuaternion(camera.quaternion));
+  const toCamera = (centre: Vector3) => level(camera.position.clone().sub(centre));
+  return Object.fromEntries(placed.filter(person => opening.includes(person.name)).map(person => {
+    const angleTo = (item: (typeof placed)[number]) => level(item.centre.clone().sub(person.centre)).angleTo(person.facing);
+    const other = placed.filter(item => item !== person && angleTo(item) < Math.PI / 3).sort((a, b) => angleTo(a) - angleTo(b))[0];
+    if (other) return [person.name, `looks at ${other.name}${opening.includes(other.name) ? "" : ", who is out of frame"}`];
+    const side = person.facing.dot(right);
+    if (Math.abs(side) > 0.5) return [person.name, `looks towards the ${side > 0 ? "right" : "left"} of the frame`];
+    return [person.name, person.facing.angleTo(toCamera(person.centre)) < Math.PI / 2 ? "looks ahead, past the camera" : "looks away from the camera, into the scene"];
+  }));
+}
+
+/**
  * Who a plan shows, by name: the people any of whom is in frame in the opening, and everyone who is at any moment of
- * the shot, by the same measure as describeBlocking. The shot list's cast cell may leave out someone the
+ * the shot, by the same measure as describeBlocking; and where each person in the opening looks. The shot list's cast cell may leave out someone the
  * camera sees, such as the person a close shot looks past, who is drawn all the same.
  */
 export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, aspect: number) {
@@ -180,13 +204,14 @@ export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, asp
         return object.name && box.max.y >= 0 && framedBy(box, stage.camera) ? [object.name] : [];
       });
     };
-    const opening = framedAt(0);
-    const shown = new Set(opening);
+    const shown = new Set<string>();
     // The last moment too, where a move or a walk may end on someone.
     for (const time of [...Array.from({ length: Math.floor(plan.duration / framedStep) }, (_, index) => (index + 1) * framedStep), plan.duration]) {
       for (const name of framedAt(time)) shown.add(name);
     }
-    return { opening, shown: [...shown] };
+    const opening = framedAt(0);
+    for (const name of opening) shown.add(name);
+    return { opening, shown: [...shown], gaze: gazeOf(people, opening, stage.camera) };
   } finally {
     stage.dispose();
   }

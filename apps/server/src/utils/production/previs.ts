@@ -8,11 +8,11 @@ import { productionDirectory, type Production } from "./state";
 
 /**
  * Every shot's measured blocking as text for its keyframe description; who it shows by name, in the opening, whom the
- * keyframe draws, and at any moment, whom the clip names; and once the shot is rendered, its opening as a colour layout
+ * keyframe draws, and at any moment, whom the clip names; where each person in the opening looks, in English; and once the shot is rendered, its opening as a colour layout
  * and a depth map and its animation as the previs video.
  */
 export type ProductionPrevis = {
-  shot: number; blocking: string; framed: { opening: string[]; shown: string[] }; layout?: string; depth?: string; video?: string;
+  shot: number; blocking: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }; layout?: string; depth?: string; video?: string;
 }[];
 
 // The director model writes the plan of the whole film in one reply, which with a fix and a machine start can take

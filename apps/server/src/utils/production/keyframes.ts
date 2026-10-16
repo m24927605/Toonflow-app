@@ -58,7 +58,8 @@ export function descriptionsPrompt(script: string, shotList: string, shots: Prod
     "The screenplay and its shot list are below. For every shot, follow that shot's instructions; write the sections one after another.",
     ...shots.flatMap(item => {
       const { framed, blocking } = previs.find(shot => shot.shot === item.shot)!;
-      return ["", ...keyframeDescriptionInstructions(item.shot, item.time, framed.opening, item.state, blocking).map(english)];
+      const gazes = framed.opening.map(name => `${name} ${framed.gaze[name]}`).join("; ");
+      return ["", ...keyframeDescriptionInstructions(item.shot, item.time, framed.opening, item.state, gazes ? `${blocking}; ${gazes}` : blocking).map(english)];
     }),
     "",
     "Screenplay:",
@@ -106,8 +107,11 @@ export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Pr
   // A person's trigger word stands next to their name, so the LoRA binds to that person rather than the whole picture.
   const trigger = (asset: ProductionAsset) => asset.loras?.find(lora => lora.family === "qwen")?.trigger;
   const template = keyframeTemplate(setView ? [2] : [], people.map((person, index) => ({ name: trigger(person) ? `${person.name} (${trigger(person)})` : person.name, ref: (setView ? 3 : 2) + index })));
+  // Image models draw people looking into the lens unless told where they look, so the previs's gazes are stated outright.
+  const gazes = people.length ? [`Where they look: ${people.map(person => `${person.name} ${previs.framed.gaze[person.name] ?? "looks past the camera"}`).join("; ")}. Nobody looks into the camera lens.`] : [];
   const fixed = [
     ...item.state ? [english(stateLine(item.state))] : [],
+    ...gazes,
     ...masterImage ? [english(masterLine(`{{ref ${references.length + 1}}}`))] : [],
   ];
   const prompt = template.map(english).join("\n").replace("{{shot}}", [...fixed, item.description ?? ""].join("\n"));
@@ -118,6 +122,7 @@ export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Pr
     ...set ? [`The place: ${set.look}`] : [],
     ...people.length ? [`The people in the frame: ${people.map(person => trigger(person) ? `${person.name} is ${trigger(person)}: ${look(person)}` : `${person.name}: ${look(person)}`).join(" ")}`] : [],
     ...item.state ? [`Their state at the start of this shot: ${item.state}.`] : [],
+    ...gazes,
     item.description ?? "",
     "Natural skin, sharp focus. The picture contains no text, no captions, no letters and no watermark.",
   ].join("\n");
