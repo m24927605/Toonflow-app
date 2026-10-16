@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n/vue";
 import type { NodeAiRequest } from "@toonflow/nodes-scaffold/runtime";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
-import { describeBlocking, frameShot, framingIssues } from "./blocking";
+import { describeBlocking, frameShot, framedPeople, framingIssues } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot } from "./previsSpec";
 import { buildSet, ceilingOf, emptyShotView, figureScene, renderSettings, stageShots } from "./previsStage";
@@ -72,14 +72,17 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
   throw new Error(`The previs plan cannot be used: ${fixed.problems.join(" ")}`);
 }
 
-/** The film's previs plan, every shot's framed plan, and the measured blocking of each shot's opening as text for keyframe prompts. */
-export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[] };
+/**
+ * The film's previs plan, every shot's framed plan, the measured blocking of each shot's opening as text for keyframe
+ * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name.
+ */
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[] }[] };
 
 /**
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,
  * where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from where
- * the previous one ended, frames the camera from the shot size, checks the framing and describes the blocking. Nothing
- * is rendered, so the texts written from the blocking need not wait for the renders.
+ * the previous one ended, frames the camera from the shot size, checks the framing, describes the blocking and finds
+ * who is in frame. Nothing is rendered, so the texts written from the blocking need not wait for the renders.
  */
 export async function planPrevis(options: {
   generate: Generate; providerId: string; modelId: string; shots: (SpecShot & { size: string })[]; aspect: number; signal: AbortSignal;
@@ -89,6 +92,7 @@ export async function planPrevis(options: {
   const ceiling = ceilingOf(spec);
   const plans: SavedPlan[] = [];
   const blocking: string[] = [];
+  const framed: PrevisPlan["framed"] = [];
   for (const [index, staged] of stageShots(spec, options.shots).entries()) {
     const { shot, seconds, tracks, subjects, camera } = staged;
     options.signal.throwIfAborted();
@@ -107,8 +111,9 @@ export async function planPrevis(options: {
     if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
     plans.push({ ...plan, id: crypto.randomUUID() });
     blocking.push(await describeBlocking(scene, plan, options.aspect, true));
+    framed.push(await framedPeople(scene, plan, options.aspect));
   }
-  return { spec, plans, blocking };
+  return { spec, plans, blocking, framed };
 }
 
 /**

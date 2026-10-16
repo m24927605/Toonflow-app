@@ -94,10 +94,22 @@ export default {
       }),
       signal,
     });
-    if (!response.ok) throw new Error(`Request failed: HTTP ${response.status}`);
-    const result = await response.json() as { candidates?: { content?: { parts?: { inlineData?: { data?: string } }[] } }[] };
-    const audio = result.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.data)?.inlineData?.data;
-    if (!audio) throw new Error("No generation result returned");
+    if (!response.ok) {
+      // Google says why it refused, such as a text its safety filter blocked, in the error body.
+      const detail = await response.json().then(body => (body as { error?: { message?: string } }).error?.message, () => undefined);
+      throw new Error(`Request failed: HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+    }
+    const result = await response.json() as {
+      promptFeedback?: { blockReason?: string };
+      candidates?: { finishReason?: string; finishMessage?: string; content?: { parts?: { inlineData?: { data?: string } }[] } }[];
+    };
+    const candidate = result.candidates?.[0];
+    const audio = candidate?.content?.parts?.find(part => part.inlineData?.data)?.inlineData?.data;
+    if (!audio) {
+      // A blocked text comes back without audio, the reason in the prompt feedback or the candidate's finish reason.
+      const reason = result.promptFeedback?.blockReason ?? [candidate?.finishReason, candidate?.finishMessage].filter(Boolean).join(": ");
+      throw new Error(reason ? `No audio returned: ${reason}` : "No generation result returned");
+    }
     // Non-streaming responses are complete 24 kHz mono 16-bit WAV files.
     let bytes: Uint8Array = Buffer.from(audio, "base64");
     if (format !== "wav" || (request.sampleRate && request.sampleRate !== 24000)) {

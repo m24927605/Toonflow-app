@@ -5188,6 +5188,9 @@
   "The server address is not known yet; try again in a moment": [
     "apps/server/src/utils/production/previs.ts"
   ],
+  "Previs failed: the plan does not cover every shot": [
+    "apps/server/src/utils/production/previs.ts"
+  ],
   "The model did not list the cast as JSON": [
     "apps/server/src/utils/production/assets.ts"
   ],
@@ -5197,7 +5200,7 @@
   "Film: {0}, {1}, {2} shots.": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Colab compute units: {0} spent of a {1} budget (estimate {2}); the balance shows spending a few minutes late.": [
+  "Colab compute units: {0} spent of a {1} budget (estimate {2}).": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "Dialogue: Gemini TTS, billed by the Google account.": [
@@ -5264,6 +5267,9 @@
   ],
   "This production has nothing to continue": [
     "apps/server/src/utils/production/engine.ts"
+  ],
+  "Shot {0}, line {1} ({2}) could not be voiced: {3}": [
+    "apps/server/src/utils/production/dub.ts"
   ],
   "The skill root directory must be a non-symbolic link directory": [
     "apps/server/src/utils/skills/files.ts"
@@ -5491,6 +5497,9 @@
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Invalid Qwen-Image seed": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Redrawing an image with Qwen-Image needs a denoise above 0 and up to 1": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Failed to read image: HTTP {0}": [
@@ -6542,13 +6551,13 @@
   "Blocking every shot in the previs…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Drawing the keyframes, the master shot first…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Recording the dialogue…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Writing the video prompts…": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Drawing the keyframes, the master shot first…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Rendering the clips ({0}/{1})…": [

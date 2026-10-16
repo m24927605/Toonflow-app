@@ -50,8 +50,9 @@ export type Production = {
   /** The review the production waits on, with the change requests a person sent back. */
   review?: { gate: ProductionGate; notes?: string };
   approved: ProductionGate[];
-  /** Compute units: the balance when the production started and the estimate shown then. */
+  /** Compute units: the balance and the metered units when the production started, and the estimate shown then. */
   balanceAtStart?: number;
+  meterAtStart?: number;
   estimate: number;
   script?: ProductionText;
   /** The shot list and the problems its timing check still finds after one fix, as message descriptors. */

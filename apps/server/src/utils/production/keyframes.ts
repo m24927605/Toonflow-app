@@ -8,8 +8,8 @@ import { productionDirectory, type Production, type ProductionAsset } from "./st
 
 export type ProductionKeyframe = {
   /** `row` is the shot's shot-list row, the description's fallback when the model skipped the shot. */
-  shot: number; time: string; cast: string[]; state?: string; place?: string; row?: string;
-  /** The outfit each person in the shot wears, by name. */
+  shot: number; time: string; state?: string; place?: string; row?: string;
+  /** The outfit each person wears in the shot, by name; everyone has one, as the previs may show anyone. */
   outfits?: Record<string, string>;
   description?: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string;
   /** The first stage of the keyframe, drawn from the previs depth map without reference images, and its prompt. */
@@ -21,7 +21,10 @@ export type ProductionKeyframe = {
 const english = (line: PromptLine | MessageDescriptor) => typeof line === "string" ? line : translate(line, undefined, "en");
 const seconds = (value: number) => Number(value.toFixed(2));
 
-/** One keyframe per shot of the shot list, with the people of its cast cell and the place its row names (or the only one). */
+/**
+ * One keyframe per shot of the shot list, with the place its row names (or the only one) and everyone's outfit; who is
+ * in it comes from the shot's previs.
+ */
 export function planKeyframes(shotList: string, assets: NonNullable<Production["assets"]>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
   const people = new Set(assets.characters.map(item => item.name));
@@ -30,10 +33,11 @@ export function planKeyframes(shotList: string, assets: NonNullable<Production["
   const worn = new Map<string, string>();
   const shots: ProductionKeyframe[] = spans.map(span => {
     const cast = castNames(span).filter(name => people.has(name));
-    const outfits = Object.fromEntries(cast.map(name => {
-      const options = assets.characters.find(item => item.name === name)!.outfits ?? [];
+    const outfits = Object.fromEntries(assets.characters.map(({ name, outfits: options = [] }) => {
       // Within the person's part of the state ("日男：…；"), the outfit named first is the one worn: "白襯衫（已脫下西裝外套）".
-      const named = [segmentOf(span.state ?? "", name, cast.length), segmentOf(span.row ?? "", name, cast.length)]
+      // A whole cell is one person's only when the cast cell names them alone.
+      const size = cast.includes(name) ? cast.length : 0;
+      const named = [segmentOf(span.state ?? "", name, size), segmentOf(span.row ?? "", name, size)]
         .map(text => options.filter(outfit => text.includes(outfit.name)).sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name))[0])
         .find(Boolean);
       const outfit = named?.name ?? worn.get(name) ?? options[0]?.name ?? "";
@@ -41,7 +45,7 @@ export function planKeyframes(shotList: string, assets: NonNullable<Production["
       return [name, outfit];
     }));
     return {
-      shot: span.shot, time: `${seconds(span.start)}–${seconds(span.end)}s`, state: span.state, row: span.row, cast, outfits,
+      shot: span.shot, time: `${seconds(span.start)}–${seconds(span.end)}s`, state: span.state, row: span.row, outfits,
       place: (assets.places.find(item => span.row?.includes(item.name)) ?? assets.places[0])?.name,
     };
   });
@@ -52,7 +56,10 @@ export function planKeyframes(shotList: string, assets: NonNullable<Production["
 export function descriptionsPrompt(script: string, shotList: string, shots: ProductionKeyframe[], previs: NonNullable<Production["previs"]>) {
   return [
     "The screenplay and its shot list are below. For every shot, follow that shot's instructions; write the sections one after another.",
-    ...shots.flatMap(item => ["", ...keyframeDescriptionInstructions(item.shot, item.time, item.cast, item.state, previs.find(shot => shot.shot === item.shot)?.blocking).map(english)]),
+    ...shots.flatMap(item => {
+      const { framed, blocking } = previs.find(shot => shot.shot === item.shot)!;
+      return ["", ...keyframeDescriptionInstructions(item.shot, item.time, framed.opening, item.state, blocking).map(english)];
+    }),
     "",
     "Screenplay:",
     script,
@@ -80,15 +87,17 @@ function segmentOf(text: string, name: string, castSize: number) {
 
 /**
  * The prompts, references and LoRAs of one keyframe: the shot's previs depth map first, which fixes the composition
- * through the depth model, then the place's base image, each person's front view and, for every other shot, the master
- * keyframe, which set the look; Qwen-Image LoRAs of the cast and place, at most 4, people first. The draft's prompt
- * points at no reference image: it names each person by their trigger word with their look and clothes, and the place
- * by its look, in full sentences, since short "X is Y." lines came out as text in the picture.
+ * through the depth model, then the place's base image, the front view of each person the previs shows in the opening
+ * and, for every other shot, the master keyframe, which set the look; Qwen-Image LoRAs of those people and the place, at
+ * most 4, people first. The draft's prompt points at no reference image: it names each person by their trigger word
+ * with their look and clothes, and the place by its look, in full sentences, since short "X is Y." lines came out as
+ * text in the picture.
  */
-export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, depth: string, masterImage?: string) {
+export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, previs: NonNullable<Production["previs"]>[number], masterImage?: string) {
   const set = byName(assets.places, item.place);
   const setView = set?.views?.[0];
-  const people = item.cast.flatMap(name => byName(assets.characters, name) ?? []);
+  const people = previs.framed.opening.flatMap(name => byName(assets.characters, name) ?? []);
+  const depth = previs.depth!;
   const outfitOf = (person: ProductionAsset) => person.outfits?.find(outfit => outfit.name === item.outfits?.[person.name]) ?? person.outfits?.[0];
   // A person's reference is the front view of the outfit they wear in this shot, so the keyframe draws those clothes.
   const outfitView = (person: ProductionAsset) => outfitOf(person)?.views?.[0] ?? person.base!;

@@ -5,11 +5,11 @@ import { stripVTControlCharacters } from "node:util";
 import { z } from "zod";
 import { lstat, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from "@toonflow/file";
 import { findCommand } from "@/utils/cli";
-import { checkColabBudget, recordColabUnits } from "@/utils/media/usage";
+import { checkColabBudget, meterColab, recordColabUnits } from "@/utils/media/usage";
 
-// Compute units per hour of a high-RAM A100 (colab usage, 2026-10-11), used when the live rate cannot be read.
-// ACT: Smaller GPUs bill less, so the fallback over-counts them; read the rate per machine if that ever matters.
-const fallbackHourlyRate = 6.77;
+// Compute units per hour of each machine as Toonflow opens it, the A100 with high RAM (colab usage, 2026-10-15), for a
+// session whose own rate the account's cannot show.
+const machineRates = { A100: 6.77, L4: 1.54 };
 // How long a refused or unavailable session start keeps retrying.
 const allocationWait = 60 * 60_000;
 // The Colab CLI uploads through the Jupyter contents API as base64, whose request limit (about 100 MiB) refuses files
@@ -64,6 +64,31 @@ async function guardColabLog() {
 
 // Sessions this process opened and has not stopped yet, with the CLI path that opened them.
 const activeSessions = new Map<string, string>();
+// The hourly rate of each session this process has running, which the compute unit meter adds up.
+const sessionRates = new Map<string, number>();
+// How often the meter is written while sessions run, well within releaseAfter.
+const meterTick = 60_000;
+let meterTimer: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * Meters the running sessions' rates from now on, and while any run, every meterTick. A longer gap since the last
+ * reading means this host was asleep, offline or killed, and its sessions' VMs released themselves releaseAfter after it
+ * last reached them, so a gap counts for at most that long.
+ */
+function meterSessions() {
+  try {
+    meterColab([...sessionRates.values()].reduce((sum, rate) => sum + rate, 0), releaseAfter);
+  } catch (error) {
+    console.error("[colab] The compute unit meter could not be updated:", error);
+  }
+  if (sessionRates.size && !meterTimer) {
+    meterTimer = setInterval(meterSessions, meterTick);
+    meterTimer.unref();
+  } else if (!sessionRates.size && meterTimer) {
+    clearInterval(meterTimer);
+    meterTimer = undefined;
+  }
+}
 
 // Colab gives an account about three GPU sessions at once, at most two of them L4s; a start beyond that waits here for
 // one of this process's sessions to stop rather than being refused. ACT: Only this process's sessions count; another
@@ -123,6 +148,8 @@ function guardProcessExit() {
       }
     }
     activeSessions.clear();
+    sessionRates.clear();
+    meterSessions();
   };
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
     const handler = () => {
@@ -141,9 +168,11 @@ function guardProcessExit() {
 
 /**
  * Stops every Toonflow session left on the signed-in Colab account, such as one orphaned when a server was killed
- * outright (SIGKILL, crash, power loss), where no exit handler runs. Called once when the server starts.
+ * outright (SIGKILL, crash, power loss), where no exit handler runs. Called once when the server starts, after the
+ * compute unit meter has counted what such sessions billed meanwhile.
  */
 export async function stopOrphanedColabSessions() {
+  meterSessions();
   let command: string;
   try {
     command = findCommand("colab", "");
@@ -334,7 +363,7 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   const directory = await mkdtemp(join(tmpdir(), "toonflow-colab-"));
   const name = `toonflow-${crypto.randomUUID().slice(0, 8)}`;
   let startedAt = 0;
-  let hourlyRate = fallbackHourlyRate;
+  let hourlyRate = machineRates[gpu];
   let files = 0;
   let stopped = false;
 
@@ -490,11 +519,18 @@ for _name, _count in ${JSON.stringify(split)}:
     for (const firstTry = Date.now(); ; ) {
       if (await colab(command, ["stop", "--session", name]).then(() => true, () => !startedAt)) break;
       const reason = failure instanceof Error ? ` (it was stopping after: ${failure.message.slice(0, 500)})` : "";
-      if (Date.now() - firstTry > stopRetry) throw new Error(`Colab session ${name} could not be stopped; run colab stop --session ${name} so it stops billing${reason}`, { cause: failure });
+      if (Date.now() - firstTry > stopRetry) {
+        // Its VM releases itself releaseAfter after this host last reached it, which has passed by now.
+        sessionRates.delete(name);
+        meterSessions();
+        throw new Error(`Colab session ${name} could not be stopped; run colab stop --session ${name} so it stops billing${reason}`, { cause: failure });
+      }
       await scheduler.wait(30_000);
     }
     stopped = true;
     activeSessions.delete(name);
+    sessionRates.delete(name);
+    meterSessions();
     releaseMachine();
     if (startedAt) await recordColabUnits(provider, (Date.now() - startedAt) / 3_600_000 * hourlyRate);
     await rm(directory, { recursive: true, force: true });
@@ -524,8 +560,13 @@ for _name, _count in ${JSON.stringify(split)}:
     }
     startedAt = Date.now();
     signal?.throwIfAborted();
-    // ACT: The account-wide rate right after start stands for this session; with parallel sessions it over-counts.
-    hourlyRate = Number(/Usage rate:\s*([\d.]+)/.exec(await colab(command, ["usage"]).catch(() => ""))?.[1]) || fallbackHourlyRate;
+    // The account's rate is this session's own only while it is the account's one assignment; otherwise, or when the
+    // usage cannot be read, its machine's measured rate stands for it.
+    const usage = await colab(command, ["usage"]).catch(() => "");
+    const accountRate = Number(/Usage rate:\s*([\d.]+)/.exec(usage)?.[1]);
+    if (/Active assignments:\s*1\b/.test(usage) && accountRate > 0) hourlyRate = accountRate;
+    sessionRates.set(name, hourlyRate);
+    meterSessions();
     await startHeartbeat(signal);
   } catch (error) {
     await close(error);

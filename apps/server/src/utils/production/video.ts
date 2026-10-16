@@ -31,8 +31,8 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * Writes the MiniMax H3 prompt of every shot without one with the text model, saving each: the shared instructions, here
  * with the script and shot list inline, the keyframe's description for <Picture 1>, the previs as <Video 1> and the
  * dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
- * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, or that never names
- * a person by their LoRA's trigger word, is rewritten once with the error.
+ * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, that never names
+ * a person by their LoRA's trigger word, or that gives one person's word to two, is rewritten once with the error.
  */
 export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
@@ -44,19 +44,23 @@ export async function writeClipPrompts(production: Production, script: string, s
     const clip = production.clips!.find(item => item.shot === span.shot)!.clip;
     const dubbed = !!production.dub!.shots.find(item => item.shot === span.shot)?.track;
     const keyframe = production.keyframes!.shots.find(item => item.shot === span.shot);
-    const people = keyframe?.cast ?? [];
+    // Everyone the previs shows at any moment of the shot, which the shot list's cast cell may leave out.
+    const people = production.previs!.find(item => item.shot === span.shot)!.framed.shown;
     const loras = people.flatMap(name => {
       const trigger = production.assets!.characters.find(item => item.name === name)?.triggers?.h3;
       return trigger ? [{ name, trigger }] : [];
     });
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
-    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const instructions = `${videoPromptInstructions(span, 1, { duration: clip, previs: true, dubbed, loras, keyframe: keyframe?.description, people }, ids)}${cut}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // A person the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in
     // the mouth of someone described otherwise is spoken by the wrong person.
     const finish = (draft: string) => {
       const missing = loras.filter(lora => !draft.includes(lora.trigger));
       if (missing.length) throw new Error(`Name ${missing.map(lora => `${lora.name} as "${lora.trigger} woman" or "${lora.trigger} man"`).join(" and ")} every time they are mentioned`);
+      // A trigger word before both "woman" and "man" gives one person's LoRA to two people.
+      const shared = loras.filter(lora => new Set([...draft.matchAll(new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "gi"))].map(match => match[1]!.toLowerCase())).size > 1);
+      if (shared.length) throw new Error(`${shared.map(lora => `"${lora.trigger}" names ${lora.name} alone`).join(" and ")}: write it only for them, always followed by the same word, woman or man`);
       for (const { speaker } of parseDialogue(span.dialogue)) {
         const lora = loras.find(item => item.name === speaker);
         const at = draft.indexOf(`(${ids.get(speaker ?? "")}) says`);
@@ -82,16 +86,16 @@ export async function writeClipPrompts(production: Production, script: string, s
 
 /**
  * Renders each clip not rendered yet into `folder`, from its keyframe as the first frame, its previs as the blocking
- * reference, its dubbed track, its cast's H3 LoRAs and its own seed. All are requested at once and run one after
- * another on one Colab machine.
+ * reference, its dubbed track, the H3 LoRAs of everyone its previs shows and its own seed. All are requested at once
+ * and run one after another on one Colab machine.
  */
 export async function renderClips(cwd: string, production: Production, clips: ProductionClip[], resolution: "480p" | "720p" | "1080p", folder: string, signal: AbortSignal, save: () => Promise<void>) {
   try {
     await Promise.all(clips.filter(item => !item.video).map(async item => {
       const keyframe = production.keyframes!.shots.find(shot => shot.shot === item.shot)!;
-      const previs = production.previs!.find(shot => shot.shot === item.shot);
+      const previs = production.previs!.find(shot => shot.shot === item.shot)!;
       const track = production.dub!.shots.find(shot => shot.shot === item.shot)?.track;
-      const loras = keyframe.cast.flatMap(name => production.assets!.characters.find(person => person.name === name)?.loras?.filter(lora => lora.family === "h3") ?? []);
+      const loras = previs.framed.shown.flatMap(name => production.assets!.characters.find(person => person.name === name)?.loras?.filter(lora => lora.family === "h3") ?? []);
       const [video] = await generateMedia(cwd, "video", {
         ...h3, mode: "startFrameOptional", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
         generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`,
@@ -99,7 +103,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
         // ACT: The previs goes in as a reference video rather than a control video, as the shot nodes do; skipPrevis only
         // lifts the server's control-video gate, which the previs reference satisfies.
         skipPrevis: true,
-        videos: previs?.video ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
+        videos: previs.video ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
         audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
         loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed,
       }, signal);

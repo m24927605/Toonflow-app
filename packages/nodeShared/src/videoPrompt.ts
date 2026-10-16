@@ -56,9 +56,10 @@ export function fillDialogue(prompt: string, lines: DialogueLine[]) {
  * Instructions for the text model that writes one shot's MiniMax H3 first-frame (I2VA) prompt. They go to the model
  * only and stay in English, because H3 prompts are written in English. The original scripts come first in the
  * references and the shot list last, so `scripts` is their count; dialogue is written as [[LINE n]] markers that
- * fillDialogue replaces with the exact words.
+ * fillDialogue replaces with the exact words. `people`, when given, is who the shot shows, which the row's cast cell may
+ * not list in full.
  */
-export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; dubbed?: boolean; loras?: { name: string; trigger: string }[]; keyframe?: string }, ids: Map<string, string>) {
+export function videoPromptInstructions(span: ShotSpan, scripts: number, video: { duration: number; previs?: boolean; dubbed?: boolean; loras?: { name: string; trigger: string }[]; keyframe?: string; people?: string[] }, ids: Map<string, string>) {
   const shotList = `{{ref ${scripts + 1}}}`;
   const time = `${Number(span.start.toFixed(2))}–${Number(span.end.toFixed(2))} s`;
   const lines = parseDialogue(span.dialogue);
@@ -85,7 +86,7 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
     "- integrated_multimodal_description starts with exactly \"[Shot 1] \" followed by the style (live-action, cinematic, unless the script says otherwise) and the first frame: the setting, the light, where each person is and what they wear and hold, as shown in <Picture 1>; say that their appearance, clothing, positions and the set stay unchanged.",
     "- <Picture 1> is the first frame and wins over the shot list: describe the clothes, the set, the light and the time of day only as <Picture 1> shows them, and add no window view, fire, prop or set piece it does not show. When the row's action is already done in <Picture 1> (a jacket already off, a person already seated), start from <Picture 1> and describe only what still happens.",
     `- Then describe in time order what happens over the ${video.duration} seconds, from the row's action, camera and character-state cells and the story around it in the script: each person's movements, expressions and gaze, and the camera, written as natural phrases such as "the camera holds a static shot" or "the camera pushes in with small amplitude at slow speed". Use no cuts or timestamps.`,
-    `- The people in frame are exactly those in the row's cast cell${span.cast ? ` (${span.cast})` : ""}. Refer to each by a short visual description of their age, sex and the clothes <Picture 1> shows, never by a name label. If nobody is in frame, describe only the place.`,
+    `- The people in frame are exactly ${video.people ? (video.people.length ? video.people.join(", ") : "no one") : `those in the row's cast cell${span.cast ? ` (${span.cast})` : ""}`}. Refer to each by a short visual description of their age, sex and the clothes <Picture 1> shows, never by a name label. If nobody is in frame, describe only the place.`,
     ...(video.loras ?? []).map(lora => `- ${lora.name} has a trained identity: every time ${lora.name} is mentioned, write the word "${lora.trigger}" followed by woman or man as fits, then their clothes as <Picture 1> shows them, never a pronoun alone; this word makes the video model draw that exact person.`),
     lines.length
       ? [

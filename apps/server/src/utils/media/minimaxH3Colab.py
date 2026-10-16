@@ -27,9 +27,14 @@ prefix = f"h3in_{job}_"
 outputs = Path("/content/h3out")
 comfy = Path("/content/ComfyUI")
 upscalerNode = comfy / "custom_nodes" / "Comfyui_Minimax_h3_latent_Upscaler"
-# Pinned to the revisions this pipeline was verified with.
+# Pinned to the revisions this pipeline was verified with, the weights' repos too, so a changed upload upstream never
+# reaches a render unnoticed.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
 upscalerCommit = "40316cf008b2fd8663263270669eb4da23f89d2c"
+weightRevisions = {
+    "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
+    "LBH-123-AI/Minimax_h3_latent_Upscaler": "3f941d5d182014dd5c0a5e16330420ee2d4aa0c6",
+}
 
 seed = int(os.environ["H3_SEED"])
 resolution = os.environ["H3_RESOLUTION"]
@@ -113,7 +118,7 @@ for repo, remote, folder in weights:
     target = comfy / "models" / folder / Path(remote).name
     if target.exists():
         continue
-    downloaded = Path(hf_hub_download(repo_id=repo, filename=remote, local_dir="/content/hf"))
+    downloaded = Path(hf_hub_download(repo_id=repo, filename=remote, revision=weightRevisions[repo], local_dir="/content/hf"))
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
 

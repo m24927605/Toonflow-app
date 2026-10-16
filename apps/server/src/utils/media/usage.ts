@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { readFile, writeAtomic } from "@toonflow/file";
+import { readFile, readFileSync, writeAtomic, writeAtomicSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 
@@ -90,3 +90,32 @@ export function recordColabUnits(providerId: string, units: number) {
     (ledger.providers[providerId] ??= { count: 0, units: 0 }).units += units;
   });
 }
+
+// The compute units this server's Colab sessions have used: `units` up to `at`, and since then `rate` an hour, the sum
+// of the sessions open.
+const meterPath = () => join(dirname(conf.path), "colabMeter.json");
+type Meter = { units: number; rate: number; at: number };
+
+function readMeter(): Meter {
+  try {
+    return JSON.parse(readFileSync(meterPath(), "utf8")) as Meter;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { units: 0, rate: 0, at: Date.now() };
+    throw error;
+  }
+}
+
+const unitsSince = (meter: Meter, longest = Infinity) => meter.units + meter.rate * Math.max(0, Math.min(Date.now() - meter.at, longest)) / 3_600_000;
+
+/**
+ * Meters the Colab sessions as they open and stop: the units at the old rate are added and `rate`, the hourly rate of
+ * the sessions open now, runs on. A session counts the moment it runs, while the account balance shows its units only
+ * minutes after it ends. Synchronous, so the exit handler that stops every session can call it; `longest` caps the
+ * time counted at the old rate.
+ */
+export function meterColab(rate: number, longest?: number) {
+  writeAtomicSync(meterPath(), JSON.stringify({ units: unitsSince(readMeter(), longest), rate, at: Date.now() }));
+}
+
+/** The compute units metered so far, with the sessions still open counted up to now. */
+export const meteredColabUnits = () => unitsSince(readMeter());

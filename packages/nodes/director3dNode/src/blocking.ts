@@ -7,6 +7,21 @@ import { prepareMotion, sampleMotion } from "./motion";
 
 // People are blocked as cylinders, or as mannequins when the user allows them.
 const personTypes = new Set(["cylinder", "capsule", "mannequin"]);
+// The head decides where a person is in frame: a close-up leaves the middle of the body out.
+const headPoint = (box: Box3, camera: PerspectiveCamera) => new Vector3((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * 0.9, (box.min.z + box.max.z) / 2).project(camera);
+const inFrame = (point: Vector3) => point.z <= 1 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1;
+/**
+ * Whether any of a person is in frame: their head, or else part of their body in front of the camera, such as the
+ * shoulder an over-the-shoulder shot looks past, whose head the frame cuts off.
+ */
+function framedBy(box: Box3, camera: PerspectiveCamera) {
+  if (inFrame(headPoint(box, camera))) return true;
+  const corners = [0, 1].flatMap(x => [0, 1].flatMap(y => [0, 1].map(z => new Vector3(x ? box.max.x : box.min.x, y ? box.max.y : box.min.y, z ? box.max.z : box.min.z).project(camera))))
+    .filter(point => Math.abs(point.z) <= 1);
+  if (!corners.length) return false;
+  const xs = corners.map(point => point.x), ys = corners.map(point => point.y);
+  return Math.max(...xs) > -1 && Math.min(...xs) < 1 && Math.max(...ys) > -1 && Math.min(...ys) < 1;
+}
 
 /**
  * Describes where each person stands in the opening frame of a plan and where the camera is, measured in the scene, so
@@ -32,10 +47,8 @@ export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan,
       const box = new Box3().setFromObject(root);
       // People who have not come in yet wait below the floor.
       if (box.max.y < 0) return [];
-      const centre = box.getCenter(new Vector3());
-      // The head decides whether and where a person is in frame: a close-up leaves the middle of the body out.
-      const point = new Vector3(centre.x, box.min.y + (box.max.y - box.min.y) * 0.9, centre.z).project(camera);
-      return [{ name: object.name, centre, facing: root.getWorldDirection(new Vector3()), point, framed: point.z <= 1 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1 }];
+      const point = headPoint(box, camera);
+      return [{ name: object.name, centre: box.getCenter(new Vector3()), facing: root.getWorldDirection(new Vector3()), point, framed: framedBy(box, camera) }];
     });
     const lines = people.map(({ name, centre, point, framed }) => {
       const distance = metres(camera.position.distanceTo(centre));
@@ -144,6 +157,39 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
     disposeStage(runtime);
   };
   return { camera, roots, blockerOf, pose, dispose };
+}
+
+// How often a shot is looked at for people coming into frame, in seconds.
+const framedStep = 0.5;
+
+/**
+ * Who a plan shows, by name: the people any of whom is in frame in the opening, and everyone who is at any moment of
+ * the shot, by the same measure as describeBlocking. The shot list's cast cell may leave out someone the
+ * camera sees, such as the person a close shot looks past, who is drawn all the same.
+ */
+export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, aspect: number) {
+  const stage = await framingStage(scene, plan, aspect);
+  try {
+    const people = stage.roots.filter(({ object }) => personTypes.has(object.objType));
+    const motion = prepareMotion(plan.cameraFrames);
+    const framedAt = (time: number) => {
+      stage.pose(time, motion);
+      return people.flatMap(({ object, root }) => {
+        const box = new Box3().setFromObject(root);
+        // People who have not come in yet wait below the floor.
+        return object.name && box.max.y >= 0 && framedBy(box, stage.camera) ? [object.name] : [];
+      });
+    };
+    const opening = framedAt(0);
+    const shown = new Set(opening);
+    // The last moment too, where a move or a walk may end on someone.
+    for (const time of [...Array.from({ length: Math.floor(plan.duration / framedStep) }, (_, index) => (index + 1) * framedStep), plan.duration]) {
+      for (const name of framedAt(time)) shown.add(name);
+    }
+    return { opening, shown: [...shown] };
+  } finally {
+    stage.dispose();
+  }
 }
 
 /**

@@ -4,6 +4,7 @@ import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/s
 import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
+import { meteredColabUnits } from "@/utils/media/usage";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
@@ -109,15 +110,23 @@ async function wait(cwd: string, production: Production, message: string, review
 }
 
 /**
- * Stops before a step that would take the production past its budget. The spend is the drop of the account balance
- * since the start, so other Colab jobs running meanwhile count too; it never spends on a guess when the balance cannot
- * be read.
+ * What the production has spent since it started: the drop of the account balance, in which other Colab jobs running
+ * meanwhile count too, or the compute units metered meanwhile, which count a session while it runs, where the balance
+ * shows it only minutes after it ends; whichever is more.
  */
-async function withinBudget(cwd: string, production: Production, nextUnits: number, signal: AbortSignal) {
-  const balance = await readColabBalance(signal).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
-  if (balance instanceof Error) return wait(cwd, production, "balanceUnreadable", undefined, balance.message);
+async function spentUnits(production: Production, signal: AbortSignal) {
+  const balance = await readColabBalance(signal);
+  const metered = meteredColabUnits();
   production.balanceAtStart ??= balance;
-  if (production.balanceAtStart - balance + nextUnits > production.input.budget) return wait(cwd, production, "budget");
+  production.meterAtStart ??= metered;
+  return Math.max(production.balanceAtStart - balance, metered - production.meterAtStart);
+}
+
+/** Stops before a step that would take the production past its budget; it never spends on a guess when the spend cannot be read. */
+async function withinBudget(cwd: string, production: Production, nextUnits: number, signal: AbortSignal) {
+  const spent = await spentUnits(production, signal).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
+  if (spent instanceof Error) return wait(cwd, production, "balanceUnreadable", undefined, spent.message);
+  if (spent + nextUnits > production.input.budget) return wait(cwd, production, "budget");
   return true;
 }
 
@@ -267,7 +276,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const master = keyframes.shots.find(item => item.shot === keyframes.master) ?? keyframes.shots[0]!;
   if (keyframes.shots.some(item => !item.image)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
-    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth!, item === master ? undefined : master.image));
+    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!, item === master ? undefined : master.image));
     const release = holdQwenImage();
     try {
       await Promise.all(keyframes.shots.filter(item => !item.image && !item.draft).map(async item => {
@@ -395,8 +404,7 @@ function musicPrompt(script: string, seconds: number) {
 
 /** The delivery report in the interface language: the film, what it cost, each shot's files and seeds, the LoRAs and models used. */
 async function deliveryReport(cwd: string, production: Production, signal: AbortSignal) {
-  const balance = await readColabBalance(signal).catch(() => undefined);
-  const spent = balance !== undefined && production.balanceAtStart !== undefined ? (production.balanceAtStart - balance).toFixed(2) : "?";
+  const spent = await spentUnits(production, signal).then(units => units.toFixed(2), () => "?");
   if (spent !== "?") await recordProductionCost(production.estimate, Number(spent));
   const clips = production.finals ?? production.videos!;
   const loras = [...production.assets!.characters, ...production.assets!.places].flatMap(asset => (asset.loras ?? []).map(lora => `| ${asset.name} | ${lora.family} | ${lora.trigger} | ${lora.path} |`));
@@ -404,7 +412,7 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `# ${t`Production report`}`,
     "",
     t`Film: ${production.film}, ${production.input.quality}, ${clips.length} shots.`,
-    t`Colab compute units: ${spent} spent of a ${production.input.budget} budget (estimate ${production.estimate}); the balance shows spending a few minutes late.`,
+    t`Colab compute units: ${spent} spent of a ${production.input.budget} budget (estimate ${production.estimate}).`,
     t`Dialogue: Gemini TTS, billed by the Google account.`,
     ...production.music ? [t`Music: Suno V6, billed by the sunoapi.org account.`] : [],
     "",

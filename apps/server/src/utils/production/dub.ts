@@ -2,6 +2,7 @@ import type { FfmpegCommand } from "@toonflow/ffmpeg";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
 import { parseDialogue } from "@toonflow/node-shared/videoPrompt";
+import { t } from "@/lib/i18n";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { generateMedia } from "@/utils/media/generation";
 import { productionDirectory, type Production } from "./state";
@@ -60,7 +61,10 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
   const duration = (path: string) => new Promise<number>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
   await Promise.all(dub.shots.flatMap(shot => shot.lines.filter(line => !line.path).map(async line => {
     const { voice, style } = dub.voices[line.speaker]!;
-    const [audio] = await generateMedia(cwd, "audio", { ...tts, prompt: line.words, voice, emotion: style, format: "wav", outputDirectory: folder }, signal);
+    // A line Gemini refuses fails the whole dub, so the error names the line along with Gemini's reason.
+    const [audio] = await generateMedia(cwd, "audio", { ...tts, prompt: line.words, voice, emotion: style, format: "wav", outputDirectory: folder }, signal).catch((error: unknown) => {
+      throw new Error(t`Shot ${shot.shot}, line ${shot.lines.indexOf(line) + 1} (${line.speaker}) could not be voiced: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+    });
     const spoken = `${audio!.path.replace(/\.[^./]+$/, "")}Spoken.wav`;
     await finished(ffmpeg(audio!.path).audioFilters(trimSilence).output(spoken));
     line.path = spoken;

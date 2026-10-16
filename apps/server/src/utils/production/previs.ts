@@ -7,10 +7,13 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { productionDirectory, type Production } from "./state";
 
 /**
- * Every shot's measured blocking as text for its keyframe description, and once the shot is rendered, its opening as a
- * colour layout and a depth map and its animation as the previs video.
+ * Every shot's measured blocking as text for its keyframe description; who it shows by name, in the opening, whom the
+ * keyframe draws, and at any moment, whom the clip names; and once the shot is rendered, its opening as a colour layout
+ * and a depth map and its animation as the previs video.
  */
-export type ProductionPrevis = { shot: number; blocking: string; layout?: string; depth?: string; video?: string }[];
+export type ProductionPrevis = {
+  shot: number; blocking: string; framed: { opening: string[]; shown: string[] }; layout?: string; depth?: string; video?: string;
+}[];
 
 // The director model writes the plan of the whole film in one reply, which with a fix and a machine start can take
 // many minutes; the page only counts as hung when it makes no progress for this long. The page is polled often, so the
@@ -79,14 +82,14 @@ async function runPage<T extends object>(job: object, signal: AbortSignal, progr
 /**
  * Plans every shot's previs: the director model writes the plan of the whole film and the Director's Studio code stages,
  * frames and describes each shot, without rendering; the page saves the plan as plan.json in the previs folder for the
- * render. Returns every shot's blocking.
+ * render. Returns every shot's blocking and who it shows.
  */
 export async function planPrevis(cwd: string, production: Production, script: string, shotList: string, model: { providerId: string; modelId: string }, signal: AbortSignal): Promise<ProductionPrevis> {
   const shots = previsShots(shotList);
   const job = { mode: "plan", directory: cwd, folder: previsFolder(production), ...model, aspect: aspectOf(production), script, shotList, shots };
-  const { blocking } = await runPage<{ blocking: string[] }>(job, signal);
-  if (blocking.length !== shots.length) throw new Error("Previs failed: the plan does not cover every shot");
-  return shots.map((item, index) => ({ shot: item.shot, blocking: blocking[index]! }));
+  const { blocking, framed } = await runPage<{ blocking: string[]; framed?: ProductionPrevis[number]["framed"][] }>(job, signal);
+  if (blocking.length !== shots.length || framed?.length !== shots.length) throw new Error("Previs failed: the plan does not cover every shot");
+  return shots.map((item, index) => ({ shot: item.shot, blocking: blocking[index]!, framed: framed[index]! }));
 }
 
 /**

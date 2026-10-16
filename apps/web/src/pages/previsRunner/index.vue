@@ -10,7 +10,7 @@ import { installNodeHost } from "@/lib/nodeHost";
 import { loadNodeComponent } from "@/pages/workspace/panels/canvas/loadNodeComponent";
 
 type Shot = { shot: number; seconds: number; cast: string[]; size: string };
-type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[] };
+type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[]; framed: { opening: string[]; shown: string[] }[] };
 /**
  * What the server's previs step hands this page before it loads: the workspace, the previs folder and every shot of the
  * film. To plan, the director model and the script and shot list the plan refers to as {{ref 1}} and {{ref 2}}; the plan
@@ -29,7 +29,7 @@ type Director = {
     onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob }) => Promise<void>;
   }) => Promise<void>;
 };
-type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { blocking?: string[]; error?: string } };
+type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: Partial<Pick<PrevisPlan, "blocking" | "framed">> & { error?: string } };
 
 // A page without the workspace UI that the server opens in a headless browser for auto production's previs. It works
 // on the directory the job names and never opens a project, so the people's own pages keep their current project.
@@ -56,7 +56,7 @@ onMounted(async () => {
       });
       await files.mkdir(job.folder).catch(() => undefined);
       await files.writeJson(planPath, plan);
-      runner.previsResult = { blocking: plan.blocking };
+      runner.previsResult = { blocking: plan.blocking, framed: plan.framed };
       return;
     }
     const render = new Map(job.render.map(item => [item.shot, item]));

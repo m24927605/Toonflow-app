@@ -22,8 +22,10 @@ os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1
 inputs = Path("/content")
 outputs = Path("/content/qwout")
 comfy = Path("/content/ComfyUI")
-# Pinned to the revision this pipeline was verified with.
+# Pinned to the revisions this pipeline was verified with, the weights' repo too, so a changed upload upstream never
+# reaches a render unnoticed.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
+weightRevision = "a8342359c61979b06a8dafb1a47991fe1f30e994"
 
 items = json.loads((inputs / "qwin_job.json").read_text())
 assert 1 <= len(items) <= 32
@@ -67,7 +69,7 @@ for remote, folder in weights:
     target = comfy / "models" / folder / Path(remote).name
     if target.exists():
         continue
-    downloaded = Path(hf_hub_download(repo_id="Comfy-Org/Qwen-Image-2.1", filename=remote, local_dir="/content/hf"))
+    downloaded = Path(hf_hub_download(repo_id="Comfy-Org/Qwen-Image-2.1", filename=remote, revision=weightRevision, local_dir="/content/hf"))
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
 

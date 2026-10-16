@@ -12,7 +12,16 @@ import sys
 from pathlib import Path
 
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
+# Pinned to the revisions this pipeline was verified with, the weights' repos too, so a changed upload upstream never
+# reaches a training unnoticed.
 fizgigCommit = "7ee4986dae28fe35cc4ef636b984729624b32b42"
+weightRevisions = {
+    "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
+    "circlestone-labs/MiniMax-H3-Image-Training-Adapter": "7c6c04f75ba597232d4ce2bb4a14709948ec723a",
+    "Comfy-Org/Qwen-Image-2.1": "a8342359c61979b06a8dafb1a47991fe1f30e994",
+    "Qwen/Qwen-Image-2.1": "d26bb61231c349cf6b7896fa83353113880e1ba3",
+    "ShootTheSound/Fizgig-Qwen-Image-2.1-Training-Adapter": "f55fcaa0cb9e3705d331a1268bc3dd4cc4e02d51",
+}
 repo, venv, models, data = Path("/content/fizgig"), Path("/content/fzenv"), Path("/content/models"), Path("/content/loradata")
 job = json.loads(Path("/content/lora_job.json").read_text())
 trigger, family, kind = job["trigger"], job["family"], job["kind"]
@@ -58,7 +67,7 @@ files = {
         **({"speed": ("Comfy-Org/Qwen-Image-2.1", "loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors")} if kind == "slider" else {}),
     },
 }[family]
-paths = {key: hf_hub_download(repoId, name, local_dir=models / family) for key, (repoId, name) in files.items()}
+paths = {key: hf_hub_download(repoId, name, revision=weightRevisions[repoId], local_dir=models / family) for key, (repoId, name) in files.items()}
 fizgigFamily = "minimax" if family == "h3" else "qwen_image21"
 env = {**os.environ, "PYTHONPATH": str(repo / "src")}
 out = data / "out"
@@ -161,9 +170,9 @@ from pathlib import Path
 from PIL import Image
 from transformers import AutoModelForImageTextToText, AutoProcessor
 media, trigger, ask = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-name = "Qwen/Qwen3-VL-4B-Instruct"
-model = AutoModelForImageTextToText.from_pretrained(name, torch_dtype=torch.bfloat16, device_map="cuda")
-processor = AutoProcessor.from_pretrained(name)
+name, revision = "Qwen/Qwen3-VL-4B-Instruct", "ebb281ec70b05090aa6165b016eac8ec08e71b17"
+model = AutoModelForImageTextToText.from_pretrained(name, revision=revision, torch_dtype=torch.bfloat16, device_map="cuda")
+processor = AutoProcessor.from_pretrained(name, revision=revision)
 prompt = "Describe this picture for an image caption in one short English phrase: " + ask + " No full sentence, no quotes."
 for path in sorted(media.iterdir()):
     if path.suffix == ".txt" or path.with_suffix(".txt").exists():
