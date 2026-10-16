@@ -6560,10 +6560,7 @@
   "Writing the video prompts…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Drawing the keyframes, the master shot first…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Checking the keyframes against the shot list ({0}/{1})…": [
+  "Drawing and checking the keyframes, the master shot first ({0}/{1})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Rendering the clips at {0} ({1}/{2})…": [

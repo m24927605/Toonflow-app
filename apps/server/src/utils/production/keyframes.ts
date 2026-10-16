@@ -6,6 +6,10 @@ import { castNames, shotSpans, suggestMasterShot } from "@toonflow/node-shared/s
 import { generateMedia } from "@/utils/media/generation";
 import { productionDirectory, type Production, type ProductionAsset } from "./state";
 
+type KeyframeCheck = { issues: { problem: string; major: boolean }[]; passed: boolean };
+// How many candidates a keyframe gets at most before the best of them is kept, flagged.
+export const keyframeTries = 3;
+
 export type ProductionKeyframe = {
   /** `row` is the shot's shot-list row, the description's fallback when the model skipped the shot. */
   shot: number; time: string; state?: string; place?: string; row?: string;
@@ -16,8 +20,9 @@ export type ProductionKeyframe = {
   draft?: string; draftPrompt?: string;
   /** The seed the keyframe was drawn with, kept so a redraw after a change request changes only what was asked. */
   seed?: number;
-  /** The model's verdict on the keyframe against its row; `retried` marks one drawn again after it failed. */
-  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean; rejected?: ProductionKeyframe["check"];
+  /** The check of the kept image against its row, and every candidate drawn, each with its own check. */
+  check?: KeyframeCheck;
+  candidates?: { draft: string; image: string; seed: number; check: KeyframeCheck }[];
 };
 
 const english = (line: PromptLine | MessageDescriptor) => typeof line === "string" ? line : translate(line, undefined, "en");

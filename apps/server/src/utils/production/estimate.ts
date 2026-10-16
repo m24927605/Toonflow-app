@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { readFile, writeAtomic } from "@toonflow/file";
 import conf from "@/utils/conf";
+import { keyframeTries } from "./keyframes";
 import type { ProductionInput } from "./state";
 
 // Finished productions' estimates and what they spent, kept with the settings.
@@ -44,8 +45,8 @@ export function estimateProduction(input: Pick<ProductionInput, "seconds" | "qua
     { step: "text", units: l4 * hours(30) },
     { step: "assets", units: a100 * hours(5 + 0.5 * (people * 6 + places * 3)) },
     { step: "loras", units: l4 * (trainedPeople * 2 + places) + a100 * hours((trainedPeople + places) * (5 + 0.5 * 12)) },
-    // Two images a shot: the draft and its redraw.
-    { step: "keyframes", units: a100 * hours(5 + 0.5 * shots * 2) },
+    // Two images a candidate, the draft and its redraw, and up to keyframeTries candidates a shot.
+    { step: "keyframes", units: a100 * hours(5 + 0.5 * shots * 2 * keyframeTries) },
     { step: "clips", units: a100 * hours(clipMinutes) },
   ].map(item => ({ ...item, units: Number((item.units * 1.3 * ratio).toFixed(2)) }));
   return { shots, steps, total: Number(steps.reduce((sum, item) => sum + item.units, 0).toFixed(2)) };

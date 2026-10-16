@@ -5,14 +5,14 @@ import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
-import { stopMinimaxH3WhenIdle, warmMinimaxH3 } from "@/utils/media/minimaxH3";
+import { warmMinimaxH3 } from "@/utils/media/minimaxH3";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, keyframeImage, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
-import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeCheckPrompt, keyframeRevisionPrompt, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
+import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeCheckPrompt, keyframeRevisionPrompt, keyframeTries, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
 import {
   productionDirectory, readProduction, readProductionText, readRegistry, saveProduction, setRegistered, writeProductionText,
   type Production, type ProductionGate, type ProductionInput,
@@ -278,12 +278,11 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const description = sections.get(item.shot);
       if (description === undefined) continue;
       item.description = description;
+      // The keyframe is drawn and chosen again from new candidates.
       delete item.image;
       delete item.draft;
-      // The redrawn keyframe is checked again, with a retry of its own.
       delete item.check;
-      delete item.retried;
-      delete item.rejected;
+      delete item.candidates;
       const video = production.videos?.find(clip => clip.shot === item.shot);
       if (video) delete video.prompt;
     }
@@ -293,76 +292,31 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   // Every keyframe is drawn in two stages: a draft from its previs depth map alone, since the model copies the layout of
   // reference images and would drop the previs composition, then the draft redrawn with the references for the set,
-  // people and clothes. The drafts depend on nothing, so they are drawn together first; then the master shot's redraw,
-  // which every other keyframe takes as the reference for light, colour and clothing; then the others together, so
-  // Qwen-Image draws each group in one batch. The session is held between the batches, so all run on one machine.
+  // people and clothes. Each is drawn up to keyframeTries times with new seeds and checked against its row by the text
+  // model; the first that passes is kept, or else the one with the fewest major problems, flagged. The image model draws
+  // people looking into the lens whatever the prompt says, and picking among a few draws costs seconds where a clip that
+  // keeps the mistake costs minutes. The master shot is chosen first, as every other keyframe takes its light, colour and
+  // clothing; then the others together, so Qwen-Image draws them in batches. The A100 and the L4 are held throughout.
   const master = keyframes.shots.find(item => item.shot === keyframes.master) ?? keyframes.shots[0]!;
   if (keyframes.shots.some(item => !item.image)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
-    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!, item === master ? undefined : master.image));
-    const release = holdQwenImage();
-    let releaseText = () => {};
+    const releaseQwen = holdQwenImage();
+    const releaseText = warmTextModel(30 * 60_000, signal);
+    let releaseH3 = () => {};
     try {
-      await Promise.all(keyframes.shots.filter(item => !item.image && !item.draft).map(async item => {
-        compose(item);
-        Object.assign(item, await drawDraft(cwd, production, item, signal));
-        await saveProduction(cwd, production);
-      }));
       for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
-        // The check after the last batch reads every keyframe with the text model, whose L4 starts meanwhile.
-        if (batch[0] !== master) releaseText = warmTextModel(15 * 60_000, signal);
-        await Promise.all(batch.filter(item => !item.image).map(async item => {
-          compose(item);
-          Object.assign(item, await drawKeyframe(cwd, production, item, signal));
-          await saveProduction(cwd, production);
-        }));
+        // When the clips follow at once (no keyframe review, room in the budget), the A100s for them start meanwhile.
+        const units = estimate.steps.filter(item => item.step === "text" || item.step === "clips").reduce((sum, item) => sum + item.units, 0);
+        if (batch[0] !== master && !needs("keyframes") && await affordable(production, units, signal)) {
+          releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, 20 * 60_000, signal);
+        }
+        await Promise.all(batch.filter(item => !item.image).map(item => chooseKeyframe(cwd, production, item, item === master ? undefined : master.image, signal)));
       }
     } finally {
-      release();
-      // Released, the L4 still waits its idle minutes, which the check that follows at once falls within.
+      releaseQwen();
       releaseText();
-    }
-    return true;
-  }
-  // Each keyframe is checked against its row before any clip is rendered: one that fails has its description rewritten
-  // from the problems found and is drawn again with a new seed, once; one that fails again stays, flagged.
-  const uncheckedKeyframes = keyframes.shots.filter(item => !item.check);
-  const textUnits = estimate.steps.find(item => item.step === "text")!.units;
-  const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
-  if (uncheckedKeyframes.length) {
-    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
-    // When the clips follow at once (no keyframe review, room in the budget), the A100s start and set up meanwhile.
-    const warm = !needs("keyframes") && await affordable(production, textUnits + clipUnits, signal);
-    const releaseH3 = warm ? warmMinimaxH3(production.input.quality, production.input.ratio, 15 * 60_000, signal) : () => {};
-    try {
-      for (const item of uncheckedKeyframes) {
-        const image = await keyframeImage(cwd, production, item.shot, item.image!, signal);
-        item.check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, production.previs!.find(shot => shot.shot === item.shot)!), signal, [image]));
-        await saveProduction(cwd, production);
-      }
-    } finally {
       releaseH3();
     }
-    // A redraw comes before any clip and needs a machine slot for Qwen-Image, so warm A100s stop at once.
-    if (warm && uncheckedKeyframes.some(item => !item.check!.passed && !item.retried)) stopMinimaxH3WhenIdle();
-    return true;
-  }
-  const failedKeyframes = keyframes.shots.filter(item => item.check && !item.check.passed && !item.retried);
-  if (failedKeyframes.length) {
-    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
-    const notes = failedKeyframes.map(item => `Shot ${item.shot}: ${item.check!.issues.filter(issue => issue.major).map(issue => issue.problem).join(" ")}`).join("\n");
-    const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(failedKeyframes, notes), signal));
-    for (const item of failedKeyframes) {
-      Object.assign(item, { description: sections.get(item.shot) ?? item.description, retried: true, rejected: item.check, check: undefined, image: undefined, draft: undefined, seed: undefined });
-      const video = production.videos?.find(clip => clip.shot === item.shot);
-      if (video) delete video.prompt;
-    }
-    // The others took light, colour and clothes from the master's image, so a new master redraws them too, each from
-    // its own draft and seed, and checks them again.
-    if (failedKeyframes.includes(master)) {
-      for (const item of keyframes.shots.filter(shot => !failedKeyframes.includes(shot))) Object.assign(item, { image: undefined, check: undefined });
-    }
-    await saveProduction(cwd, production);
     return true;
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
@@ -374,6 +328,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   if (unrendered) {
     // ACT: The clips still to render take their share of the step's estimate; a clip rendered again after its check is
     // one share. The machine start in the estimate is shared out too, so a lone retry on a cold machine is undercounted.
+    const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
     if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
     // Each clip is checked by the text model once rendered, so its L4 starts while they render.
     const releaseText = warmTextModel((10 + unrendered * 3) * 60_000, signal);
@@ -431,6 +386,29 @@ const videoWriter = "You write prompts for the MiniMax H3 video model.";
 const composer = "You describe film scores for a music generation model.";
 const checker = "You check AI-generated video clips for a film editor.";
 const keyframeChecker = "You check AI-generated film stills for a film editor.";
+
+/**
+ * Draws a keyframe's candidates, a draft and its redraw each with a new seed, until one passes the check against its
+ * row or keyframeTries are drawn, and keeps the one that passed or else the one with the fewest major problems. The
+ * candidates are saved as they come, so a stopped run carries on from them.
+ */
+async function chooseKeyframe(cwd: string, production: Production, item: ProductionKeyframe, masterImage: string | undefined, signal: AbortSignal) {
+  const previs = production.previs!.find(shot => shot.shot === item.shot)!;
+  const candidates = item.candidates ??= [];
+  while (candidates.length < keyframeTries && !candidates.some(candidate => candidate.check.passed)) {
+    Object.assign(item, composeKeyframe(item, production.assets!, previs, masterImage), { seed: undefined });
+    const { draft, seed } = await drawDraft(cwd, production, item, signal);
+    const { image } = await drawKeyframe(cwd, production, { ...item, draft, seed }, signal);
+    const read = await keyframeImage(cwd, production, item.shot, image, signal);
+    const check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, previs), signal, [read]));
+    candidates.push({ draft, image, seed: seed!, check });
+    await saveProduction(cwd, production);
+  }
+  const majors = (candidate: (typeof candidates)[number]) => candidate.check.issues.filter(issue => issue.major).length;
+  const chosen = candidates.find(candidate => candidate.check.passed) ?? [...candidates].sort((a, b) => majors(a) - majors(b))[0]!;
+  Object.assign(item, { draft: chosen.draft, image: chosen.image, seed: chosen.seed, check: chosen.check });
+  await saveProduction(cwd, production);
+}
 
 /** Whether a text written from the previs plan is missing: a keyframe description, a clip prompt or the music's style. */
 const textsMissing = (production: Production) => production.keyframes!.shots.some(item => item.description === undefined)

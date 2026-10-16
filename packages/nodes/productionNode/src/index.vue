@@ -114,7 +114,7 @@ type Production = {
   videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
   music?: string; film?: string; report?: string;
 };
-type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean };
+type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean } };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
 type State = { production: Production; script?: string; shotList?: string; report?: string; estimate: Estimate };
 type TextKind = "script" | "shotList" | "report";
@@ -170,7 +170,7 @@ watch(photos, list => {
 }, { immediate: true });
 
 const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
-const flaggedKeyframes = computed(() => (state.value?.production.keyframes?.shots ?? []).flatMap(item => item.check && !item.check.passed && item.retried ? [{ shot: item.shot, check: item.check }] : []));
+const flaggedKeyframes = computed(() => (state.value?.production.keyframes?.shots ?? []).flatMap(item => item.check && !item.check.passed ? [{ shot: item.shot, check: item.check }] : []));
 const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed && clip.retried ? [{ shot: clip.shot, check: clip.check }] : []));
 const headline = computed(() => {
   const production = state.value!.production;
@@ -189,8 +189,7 @@ const headline = computed(() => {
     if (!blocked) return translate("Blocking every shot in the previs…");
     if (!production.clips) return translate("Recording the dialogue…");
     if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
-    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
-    if (production.keyframes.shots.some(item => !item.check)) return t`Checking the keyframes against the shot list (${production.keyframes.shots.filter(item => item.check).length}/${production.keyframes.shots.length})…`;
+    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return t`Drawing and checking the keyframes, the master shot first (${production.keyframes?.shots.filter(item => item.image).length ?? 0}/${production.keyframes?.shots.length ?? 0})…`;
     if (production.videos.some(item => !item.video)) return t`Rendering the clips at ${production.input.quality} (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
     if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");
