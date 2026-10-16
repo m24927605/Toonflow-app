@@ -2,9 +2,10 @@ import { translate } from "@toonflow/i18n";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { t } from "@/lib/i18n";
-import { getConfiguredModel, holdColab, listAiModels, streamAi } from "@/utils/ai";
+import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
+import { warmMinimaxH3 } from "@/utils/media/minimaxH3";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
@@ -38,6 +39,15 @@ async function complete(systemPrompt: string, prompt: string, signal: AbortSigna
   const message = await stream.result();
   if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
   return message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
+}
+
+/**
+ * Starts the text model's L4 and loads the model with a one-word request while other work runs, so the checks that
+ * follow find it ready, and holds it for at most `ms`.
+ */
+function warmTextModel(ms: number, signal: AbortSignal) {
+  holdColabFor(ms);
+  void complete("Reply with one word.", "Ready?", signal).catch(() => {});
 }
 
 const screenwriter = "You write screenplays for short films made with AI image and video models.";
@@ -289,6 +299,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
         await saveProduction(cwd, production);
       }));
       for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
+        // The check after the last batch reads every keyframe with the text model, whose L4 starts meanwhile.
+        if (batch[0] !== master) warmTextModel(15 * 60_000, signal);
         await Promise.all(batch.filter(item => !item.image).map(async item => {
           compose(item);
           Object.assign(item, await drawKeyframe(cwd, production, item, signal));
@@ -305,6 +317,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const uncheckedKeyframes = keyframes.shots.filter(item => !item.check);
   if (uncheckedKeyframes.length) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    // The clips follow the check, so the A100 starts and sets up meanwhile.
+    warmMinimaxH3(production.input.quality, production.input.ratio, 15 * 60_000);
     for (const item of uncheckedKeyframes) {
       const image = await keyframeImage(cwd, production, item.shot, item.image!, signal);
       item.check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, production.previs!.find(shot => shot.shot === item.shot)!), signal, [image]));
@@ -330,6 +344,9 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const videos = production.videos!;
   if (videos.some(item => !item.video)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "clips")!.units, signal)) return false;
+    // Each clip is checked by the text model once rendered, so its L4 starts while they render, held about as long as
+    // the clips take.
+    warmTextModel((10 + videos.filter(item => !item.video).length * 3) * 60_000, signal);
     await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
     return true;
   }

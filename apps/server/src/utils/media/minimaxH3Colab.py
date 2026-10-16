@@ -122,6 +122,28 @@ for repo, remote, folder in weights:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
 
+
+base = "http://127.0.0.1:8188"
+log = Path("/content/comfyui.log")
+try:
+    requests.get(base + "/system_stats", timeout=2).raise_for_status()
+except requests.RequestException:
+    launch = [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188", "--disable-auto-launch"]
+    if torch.cuda.get_device_properties(0).total_memory < 48 * 2**30:
+        launch.append("--lowvram")
+    server = subprocess.Popen(launch, cwd=comfy, stdout=open(log, "a"), stderr=subprocess.STDOUT)
+    for _ in range(300):
+        if server.poll() is not None:
+            raise RuntimeError(log.read_text()[-4000:])
+        try:
+            requests.get(base + "/system_stats", timeout=2).raise_for_status()
+            break
+        except requests.RequestException:
+            time.sleep(2)
+    else:
+        raise TimeoutError("ComfyUI did not start")
+
+# The machine is set up above this line; warmMinimaxH3 runs only that part, ahead of the first clip.
 refs = sorted(inputs.glob(f"{prefix}ref_*"))
 firstFrame = next(inputs.glob(f"{prefix}first.*"), None)
 lastFrame = next(inputs.glob(f"{prefix}last.*"), None)
@@ -154,26 +176,6 @@ if controlSource:
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(controlSource), "-r", "24", "-t", "15", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     str(comfy / "input" / f"h3control{job}.mp4")], check=True)
 prompt = (inputs / f"{prefix}prompt.txt").read_text()
-
-base = "http://127.0.0.1:8188"
-log = Path("/content/comfyui.log")
-try:
-    requests.get(base + "/system_stats", timeout=2).raise_for_status()
-except requests.RequestException:
-    launch = [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188", "--disable-auto-launch"]
-    if torch.cuda.get_device_properties(0).total_memory < 48 * 2**30:
-        launch.append("--lowvram")
-    server = subprocess.Popen(launch, cwd=comfy, stdout=open(log, "a"), stderr=subprocess.STDOUT)
-    for _ in range(300):
-        if server.poll() is not None:
-            raise RuntimeError(log.read_text()[-4000:])
-        try:
-            requests.get(base + "/system_stats", timeout=2).raise_for_status()
-            break
-        except requests.RequestException:
-            time.sleep(2)
-    else:
-        raise TimeoutError("ComfyUI did not start")
 
 videoFormat = {"format": "mp4", "format.codec": "h264", "format.codec.encoding": "re-encode", "format.codec.encoding.crf": 16}
 graph = {

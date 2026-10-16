@@ -45,6 +45,8 @@ export const stopColab = () => worker.stop();
 
 /** Keeps the text session open between requests until the returned release is called. */
 export const holdColab = () => worker.hold();
+/** Keeps the text model's L4 for at most `ms`, for requests known to follow. */
+export const holdColabFor = (ms: number) => worker.holdFor(ms);
 
 export function streamColab(providerId: string, modelId: string, context: Context, signal: AbortSignal, references: Awaited<ReturnType<typeof readAiReferences>>) {
   const model = provider.models.find(item => item.id === modelId);

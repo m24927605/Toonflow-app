@@ -663,6 +663,14 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
   }
 
   /**
+   * Holds the session for at most `ms`, for jobs known to follow but not yet sent: a warm machine nothing comes to bills
+   * no longer than that before its idle stop.
+   */
+  function holdFor(ms: number) {
+    setTimeout(hold(), ms).unref();
+  }
+
+  /**
    * Stops the session once no job runs or waits, instead of after `idleMs`, for a caller that knows no more jobs follow;
    * other callers' queued jobs still run first.
    */
@@ -679,7 +687,7 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     return enqueue(() => close());
   }
 
-  return { run, hold, stopWhenIdle, stop };
+  return { run, hold, holdFor, stopWhenIdle, stop };
 }
 
 /** A random seed with 53 bits, so it stays exact as a JavaScript number. */
