@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
-import { castNames, shotSpans } from "@toonflow/node-shared/shotList";
+import { shotSpans } from "@toonflow/node-shared/shotList";
 import { readdir, readFile } from "@toonflow/file";
 import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
@@ -115,10 +115,13 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
 // their reference images. Tune it once productions show where identity drifts.
 const minShotsForLora = 3;
 
-/** In how many shots each person and place appears: people by the cast cell, places by name in the row (all, if one). */
-export function appearances(shotList: string, assets: NonNullable<Production["assets"]>) {
+/**
+ * In how many shots each person and place appears: people by who the shot's previs shows, which the cast cell may leave
+ * out, places by name in the row (all, if one).
+ */
+export function appearances(shotList: string, assets: NonNullable<Production["assets"]>, previs: NonNullable<Production["previs"]>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
-  const people = new Map(assets.characters.map(item => [item.name, spans.filter(span => castNames(span).includes(item.name)).length]));
+  const people = new Map(assets.characters.map(item => [item.name, previs.filter(shot => shot.framed.shown.includes(item.name)).length]));
   const places = new Map(assets.places.map(item => [item.name, assets.places.length === 1 ? spans.length : spans.filter(span => span.row?.includes(item.name)).length]));
   return { people, places };
 }
@@ -136,7 +139,7 @@ const unitsPerTopUp = 6.77 / 6 * 1.3;
  */
 export async function planAssetLoras(cwd: string, production: Production, shotList: string) {
   const assets = production.assets!;
-  const counts = appearances(shotList, assets);
+  const counts = appearances(shotList, assets, production.previs!);
   const existing = await workspaceLoras(cwd);
   const jobs = [
     ...assets.characters.map(item => ({ item, kind: "character" as const, families: ["h3", "qwen"] as const, shots: counts.people.get(item.name) ?? 0 })),

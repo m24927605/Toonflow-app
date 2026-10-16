@@ -176,7 +176,9 @@ const headline = computed(() => {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
-    // Designs and LoRAs run side by side with the previs, the dub and the texts written from the previs plan.
+    // The previs plan comes first; then designs and LoRAs run side by side with the previs renders, the dub and the
+    // texts written from the plan.
+    if (production.assets && !production.previs) return translate("Blocking every shot in the previs…");
     const designing = !production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views));
     const training = assets.some(item => !item.loras);
     const blocked = !!production.previs?.every(shot => shot.video);

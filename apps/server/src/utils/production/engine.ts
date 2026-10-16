@@ -190,17 +190,29 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
-  // Designs and their LoRAs, the dub and the previs need only the cast and the shot list, so they run side by side on
-  // separate machines, the budget checked once for all; the keyframes start when all are done. Only the LoRAs actually
-  // trained count against the budget; reused and skipped ones cost nothing. The text model, still warm from the cast, is
-  // held from the previs plan until every text written from it is done, so none of them starts a machine of its own
-  // later, and released then, while the designs, LoRAs and previs renders, which take far longer, go on without it.
+  // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the reference
+  // image: the text model, still warm from the cast, plans the film's staging in one reply and the Director's Studio
+  // code builds and frames every shot in a headless Chrome. The plan comes first because it says who each shot shows,
+  // which decides who is seen often enough for a LoRA.
+  if (!production.previs) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const model = textModel();
+    const shotList = await readProductionText(cwd, production.shotList);
+    production.previs = await planPrevis(cwd, production, await readProductionText(cwd, production.script), shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+    await saveProduction(cwd, production);
+    return true;
+  }
+  // Designs and their LoRAs, the dub, the texts and the previs renders run side by side on separate machines, the
+  // budget checked once for all; the keyframes start when all are done. Only the LoRAs actually trained count against
+  // the budget; reused and skipped ones cost nothing. The text model, still warm from the previs plan, is held until
+  // every text written from the plan is done, so none of them starts a machine of its own later, and released then,
+  // while the designs, LoRAs and previs renders, which take far longer, go on without it.
   // Dubbing comes before the clip prompts: H3 lip-syncs to each shot's track, and a shot is as long as its lines need.
   // Gemini TTS bills its own API, not Colab units.
   const everyAsset = [...production.assets.characters, ...production.assets.places];
   const drawn = everyAsset.every(assetDrawn);
   const trained = everyAsset.every(item => item.loras);
-  const rendered = !!production.previs?.every(item => item.video);
+  const rendered = production.previs.every(item => item.video);
   const writing = textsMissing(production);
   if (!drawn || !trained || !rendered || !production.clips || writing) {
     const shotList = await readProductionText(cwd, production.shotList);
@@ -217,27 +229,19 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
         production.clips = clips;
         return save();
       });
-      // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the reference
-      // image: the text model plans the film's staging in one reply, the Director's Studio code builds and frames every
-      // shot in a headless Chrome and renders it there, and each keyframe keeps its shot's previs composition, so the
-      // first frame and the previs a clip is given never disagree.
-      const planned = production.previs ? Promise.resolve() : (async () => {
-        const model = textModel();
-        production.previs = await planPrevis(cwd, production, await readProductionText(cwd, production.script!), shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
-        await save();
-      })();
+      // Each keyframe keeps its shot's previs composition, so the first frame and the previs a clip is given never disagree.
       const results = await Promise.allSettled([
         (async () => {
           if (!drawn) await drawAssets(cwd, production, production.input.ratio, signal, save);
           if (plan) await trainAssetLoras(cwd, plan, signal, save);
         })(),
         dubbed,
-        planned.then(() => writeTexts(cwd, production, dubbed, signal)).finally(release),
-        planned.then(async () => {
+        writeTexts(cwd, production, dubbed, signal).finally(release),
+        (async () => {
           if (rendered) return;
           await renderPrevis(cwd, production, shotList, signal);
           await save();
-        }),
+        })(),
       ]);
       // All are awaited before an error is passed on, so nothing keeps running unwatched.
       const failure = results.find(result => result.status === "rejected");
