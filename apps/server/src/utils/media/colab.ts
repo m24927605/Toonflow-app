@@ -15,6 +15,10 @@ const allocationWait = 60 * 60_000;
 // The Colab CLI uploads through the Jupyter contents API as base64, whose request limit (about 100 MiB) refuses files
 // over about 75 MB, such as a rank 16 LoRA, so larger files travel in parts that the job joins before its script runs.
 const uploadPart = 48 * 1024 * 1024;
+// The CLI sets no timeout on a transfer, and one has hung for 22 minutes until the VM had released itself. An upload is
+// given this much, plus a second for every 128 KiB, before it is cut and sent again. ACT: assumes an uplink of at
+// least 1 Mbit/s; a slower one needs a measured rate here.
+const uploadTimeout = (bytes: number) => 120_000 + bytes / 128;
 // Seconds one exec may run. LoRA training on an L4 runs past two hours (clips, slider practice images); a kernel that
 // dies sooner is caught by the heartbeat, so this only bounds a job that keeps running.
 const execTimeout = 6 * 3600;
@@ -44,6 +48,9 @@ export type ColabMachine = { gpu: "A100" | "L4"; highMem?: boolean };
 
 /** The job's Python script raised; the kernel is still running and keeps whatever earlier jobs loaded. */
 export class ColabScriptError extends Error {}
+
+/** The session's VM is gone (released or reclaimed) before the job reached its kernel, so nothing of it ran. */
+class ColabSessionGoneError extends Error {}
 
 /**
  * The Colab CLI always writes a DEBUG log to ~/.config/colab-cli/colab.log, which records the Google OAuth tokens in
@@ -195,14 +202,20 @@ const idempotent = new Set(["upload", "download", "sessions", "usage"]);
 // Includes the proxy's 502, 503 and 504, which it answers for a moment while the VM is busy or briefly unreachable.
 const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|50[234] Server Error/;
 
-async function colab(command: string, args: string[], signal?: AbortSignal) {
+async function colab(command: string, args: string[], signal?: AbortSignal, timeout?: number) {
   for (let attempt = 1; ; attempt++) {
+    const limit = timeout ? AbortSignal.timeout(timeout) : undefined;
+    const attemptSignal = limit && signal ? AbortSignal.any([signal, limit]) : limit ?? signal;
     // `new` runs in its own process group, so a Ctrl-C in the terminal cannot kill it midway (see openColabSession).
-    const child = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal, detached: args[0] === "new" });
+    const child = Bun.spawn([command, ...args], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal: attemptSignal, detached: args[0] === "new" });
     const [stdout, stderr] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
     await child.exited;
     signal?.throwIfAborted();
     if (child.exitCode === 0) return stdout;
+    if (limit?.aborted) {
+      if (idempotent.has(args[0]!) && attempt < 4) continue;
+      throw new Error(`Colab CLI ${args[0]} did not finish within ${Math.round(timeout! / 1000)} s, ${attempt} times`);
+    }
     // Parallel jobs share the CLI's local session database, which another CLI process can hold for a moment.
     if (stderr.includes("unable to open database") && attempt < 5) {
       await scheduler.wait(attempt * 3_000, { signal });
@@ -485,7 +498,11 @@ print("COLAB_DONE")
       for (const [index, part] of parts.entries()) {
         const local = join(directory, `upload${files++}`);
         await writeFile(local, part);
-        await colab(command, ["upload", "--session", name, local, `/content/${parts.length > 1 ? `${remote}.part${index}` : remote}`], signal);
+        await colab(command, ["upload", "--session", name, local, `/content/${parts.length > 1 ? `${remote}.part${index}` : remote}`], signal, uploadTimeout(part.length))
+          .catch((error: unknown) => {
+            // /content always exists on a running VM, so its contents API answering "not found" means the VM is gone.
+            throw /File or directory not found/.test(String(error)) ? new ColabSessionGoneError(`Colab session ${name} lost its VM`, { cause: error }) : error;
+          });
       }
       if (parts.length > 1) split.push([remote, parts.length]);
     }
@@ -628,7 +645,15 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
       const jobSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
       try {
         session ??= await openColabSession(provider, machine, jobSignal);
-        return await task(session, jobSignal);
+        try {
+          return await task(session, jobSignal);
+        } catch (error) {
+          // A VM released while the session was held idle took nothing of the job, which runs once more on a new one.
+          if (!(error instanceof ColabSessionGoneError)) throw error;
+          await close(error);
+          session = await openColabSession(provider, machine, jobSignal);
+          return await task(session, jobSignal);
+        }
       } catch (error) {
         if (!(error instanceof ColabScriptError)) await close(error);
         throw error;
