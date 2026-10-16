@@ -9,9 +9,9 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
-import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
+import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, keyframeImage, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
-import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
+import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeCheckPrompt, keyframeRevisionPrompt, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
 import {
   productionDirectory, readProduction, readProductionText, readRegistry, saveProduction, setRegistered, writeProductionText,
   type Production, type ProductionGate, type ProductionInput,
@@ -300,6 +300,29 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     }
     return true;
   }
+  // Each keyframe is checked against its row before any clip is rendered: one that fails has its description rewritten
+  // from the problems found and is drawn again with a new seed, once; one that fails again stays, flagged.
+  const uncheckedKeyframes = keyframes.shots.filter(item => !item.check);
+  if (uncheckedKeyframes.length) {
+    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    for (const item of uncheckedKeyframes) {
+      const image = await keyframeImage(cwd, production, item.shot, item.image!, signal);
+      item.check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, production.previs!.find(shot => shot.shot === item.shot)!), signal, [image]));
+      await saveProduction(cwd, production);
+    }
+    const failed = uncheckedKeyframes.filter(item => !item.check!.passed && !item.retried);
+    if (failed.length) {
+      const notes = failed.map(item => `Shot ${item.shot}: ${item.check!.issues.filter(issue => issue.major).map(issue => issue.problem).join(" ")}`).join("\n");
+      const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(failed, notes), signal));
+      for (const item of failed) {
+        Object.assign(item, { description: sections.get(item.shot) ?? item.description, retried: true, rejected: item.check, check: undefined, image: undefined, draft: undefined, seed: undefined });
+        const video = production.videos?.find(clip => clip.shot === item.shot);
+        if (video) delete video.prompt;
+      }
+      await saveProduction(cwd, production);
+    }
+    return true;
+  }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
 
   // The rough cut is always 480p: cheap to watch through; the chosen final quality is rendered only for approved shots.
@@ -366,6 +389,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
 const videoWriter = "You write prompts for the MiniMax H3 video model.";
 const composer = "You describe film scores for a music generation model.";
 const checker = "You check AI-generated video clips for a film editor.";
+const keyframeChecker = "You check AI-generated film stills for a film editor.";
 
 /** Whether a text written from the previs plan is missing: a keyframe description, a clip prompt or the music's style. */
 const textsMissing = (production: Production) => production.keyframes!.shots.some(item => item.description === undefined)

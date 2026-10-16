@@ -16,6 +16,8 @@ export type ProductionKeyframe = {
   draft?: string; draftPrompt?: string;
   /** The seed the keyframe was drawn with, kept so a redraw after a change request changes only what was asked. */
   seed?: number;
+  /** The model's verdict on the keyframe against its row; `retried` marks one drawn again after it failed. */
+  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean; rejected?: ProductionKeyframe["check"];
 };
 
 const english = (line: PromptLine | MessageDescriptor) => typeof line === "string" ? line : translate(line, undefined, "en");
@@ -171,5 +173,22 @@ export function keyframeRevisionPrompt(shots: ProductionKeyframe[], notes: strin
     notes,
     "",
     ...shots.flatMap(item => [`### Shot ${item.shot}`, item.description ?? "", ""]),
+  ].join("\n");
+}
+
+/**
+ * Asks whether a keyframe can open its shot: the image against the shot-list row, the people the previs puts in it and
+ * where each looks. A clip starts from its keyframe and keeps its mistakes, and a keyframe is drawn again in seconds
+ * where a clip takes minutes, so this is checked before any clip is rendered.
+ */
+export function keyframeCheckPrompt(item: ProductionKeyframe, previs: NonNullable<Production["previs"]>[number]) {
+  const { opening, gaze } = previs.framed;
+  return [
+    `The image is the first frame of shot ${item.shot} of a film, which its video clip will start from.`,
+    `The shot-list row (shot size, camera, action, dialogue, cast, state): ${item.row ?? ""}`,
+    ...item.state ? [`The characters' state at the start of the shot: ${item.state}`] : [],
+    opening.length ? `It should show ${opening.length} ${opening.length === 1 ? "person" : "people"}, placed as follows: ${previs.blocking}. Where they look: ${opening.map(name => `${name} ${gaze[name]}`).join("; ")}.` : "It should show no one.",
+    "List every problem. A problem is major when someone looks into the camera lens though the row does not ask for it; there are more or fewer people than it should show; someone's posture, position or action at this first moment contradicts the start of the row's action (for example they are already inside when the row has them come in, or seated on a table instead of at it); the framing is clearly another shot size than the row's; a face, hand or body is deformed; or the picture has text. Anything smaller is minor.",
+    "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }

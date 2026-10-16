@@ -220,9 +220,7 @@ export async function clipFrames(cwd: string, production: Production, clip: Prod
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   const probed = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(clip.video!, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
   const length = Math.min(probed, shotSeconds(production, clip.shot));
-  const folder = `${productionDirectory(production.id)}/checks`;
-  await mkdir((await resolveWorkspacePath(cwd, folder, true)).path, { recursive: true });
-  // Everything is scaled to 640 px wide, which keeps the model's image reading short.
+  const folder = await checksFolder(cwd, production);
   const frames = [`${folder}/shot${clip.shot}Keyframe.png`];
   await finished(ffmpeg(keyframe).frames(1).outputOptions(["-vf scale=640:-2"]).output(frames[0]!));
   for (const [index, share] of checkTimes.entries()) {
@@ -231,6 +229,21 @@ export async function clipFrames(cwd: string, production: Production, clip: Prod
     frames.push(frame);
   }
   return Promise.all(frames.map(async path => Buffer.from(await readFile((await resolveWorkspacePath(cwd, path)).path)).toString("base64")));
+}
+
+// Everything a check reads is scaled to 640 px wide, which keeps the model's image reading short.
+async function checksFolder(cwd: string, production: Production) {
+  const folder = `${productionDirectory(production.id)}/checks`;
+  await mkdir((await resolveWorkspacePath(cwd, folder, true)).path, { recursive: true });
+  return folder;
+}
+
+/** A keyframe as the check reads it, PNG bytes as base64. */
+export async function keyframeImage(cwd: string, production: Production, shot: number, image: string, signal: AbortSignal) {
+  const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+  const path = `${await checksFolder(cwd, production)}/shot${shot}KeyframeCheck.png`;
+  await finished(ffmpeg(image).frames(1).outputOptions(["-vf scale=640:-2"]).output(path));
+  return Buffer.from(await readFile((await resolveWorkspacePath(cwd, path)).path)).toString("base64");
 }
 
 /**
