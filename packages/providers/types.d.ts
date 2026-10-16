@@ -196,6 +196,10 @@ interface ProviderTools {
     loras?: LoraInput[];
     /** Seed to draw with; a random one when left out. */
     seed?: number;
+    /** A picture to redraw: the result keeps its composition and changes as much as `denoise` allows. */
+    initImage?: MediaInput;
+    /** With `initImage`, required: the noise level the redraw starts from, above 0 (kept) up to 1 (drawn anew). */
+    denoise?: number;
   }): Promise<{ data: Uint8Array; mimeType: "image/png"; seed: number }>;
 }
 
@@ -226,6 +230,10 @@ interface ImageRequest extends MediaRequest {
   characterId?: string;
   /** Seed to draw with, so a rerun that changes one thing keeps the rest; providers without seeds ignore it. */
   seed?: number;
+  /** A picture to redraw instead of drawing from noise, for models that redraw an image; others ignore it. */
+  initImage?: MediaInput;
+  /** With `initImage`: how much of it is redrawn, from 0 (kept) to 1 (drawn anew). */
+  denoise?: number;
 }
 
 interface VideoRequest extends MediaRequest {

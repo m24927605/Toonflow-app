@@ -126,6 +126,10 @@ export interface MediaGenerationRequest {
   skipTextCheck?: boolean;
   /** Image and video only: the seed to draw with, so a rerun that changes one thing keeps the rest; models without seeds ignore it. */
   seed?: number;
+  /** Image only: a picture in the workspace to redraw instead of drawing from noise, for models that redraw an image. */
+  initImage?: MediaReference;
+  /** Image only, with `initImage`: how much of it is redrawn, from 0 (kept) to 1 (drawn anew). */
+  denoise?: number;
   mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension" | "videoControl"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }

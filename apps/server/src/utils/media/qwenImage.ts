@@ -65,6 +65,8 @@ async function drawBatch() {
       seed: request.seed ?? randomSeed(),
       refs: (request.images ?? []).map(imageName),
       control: request.controlImage ? imageName(request.controlImage) : null,
+      init: request.initImage ? imageName(request.initImage) : null,
+      denoise: request.initImage ? request.denoise : null,
       loras: loras[index]!.map(({ name, strength }) => ({ name, strength })),
     }));
     const results = await worker.run(async (session, signal) => {
@@ -74,7 +76,7 @@ async function drawBatch() {
         script: pipeline,
         uploads: [
           { name: "qwin_job.json", data: JSON.stringify(items) },
-          ...new Map(batch.flatMap(({ request }) => [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []])
+          ...new Map(batch.flatMap(({ request }) => [...request.images ?? [], ...request.controlImage ? [request.controlImage] : [], ...request.initImage ? [request.initImage] : []])
             .map(image => [imageName(image), { name: imageName(image), data: inputBytes(image) }])).values(),
           ...loraUploads,
         ],
@@ -108,7 +110,8 @@ export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
   if ((request.loras?.length ?? 0) > 4) throw new Error("Qwen-Image loads at most 4 LoRAs");
   if (request.seed !== undefined && (!Number.isSafeInteger(request.seed) || request.seed < 0)) throw new Error("Invalid Qwen-Image seed");
-  for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : []]) inputBytes(image);
+  if (request.initImage && !(typeof request.denoise === "number" && request.denoise > 0 && request.denoise <= 1)) throw new Error("Redrawing an image with Qwen-Image needs a denoise above 0 and up to 1");
+  for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : [], ...request.initImage ? [request.initImage] : []]) inputBytes(image);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {
     const item: Pending = { request, signal, resolve, reject };

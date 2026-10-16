@@ -10,7 +10,7 @@ import { planDub, recordDub } from "./dub";
 import { renderPrevis } from "./previs";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
-import { composeKeyframe, descriptionsPrompt, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes } from "./keyframes";
+import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
 import {
   productionDirectory, readProduction, readProductionText, readRegistry, saveProduction, setRegistered, writeProductionText,
   type Production, type ProductionGate, type ProductionInput,
@@ -239,22 +239,31 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       if (description === undefined) continue;
       item.description = description;
       delete item.image;
+      delete item.draft;
     }
     production.review = undefined;
     await saveProduction(cwd, production);
     return true;
   }
-  // The master shot is drawn first; every other keyframe then takes it as the reference for light, colour and clothing,
-  // and they are drawn together so Qwen-Image draws them in one batch. The session is held between the two batches, so
-  // both run on one machine.
+  // Every keyframe is drawn in two stages: a draft from its previs depth map alone, since the model copies the layout of
+  // reference images and would drop the previs composition, then the draft redrawn with the references for the set,
+  // people and clothes. The drafts depend on nothing, so they are drawn together first; then the master shot's redraw,
+  // which every other keyframe takes as the reference for light, colour and clothing; then the others together, so
+  // Qwen-Image draws each group in one batch. The session is held between the batches, so all run on one machine.
   const master = keyframes.shots.find(item => item.shot === keyframes.master) ?? keyframes.shots[0]!;
   if (keyframes.shots.some(item => !item.image)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
+    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
     const release = holdQwenImage();
     try {
+      await Promise.all(keyframes.shots.filter(item => !item.image && !item.draft).map(async item => {
+        compose(item);
+        Object.assign(item, await drawDraft(cwd, production, item, signal));
+        await saveProduction(cwd, production);
+      }));
       for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
         await Promise.all(batch.filter(item => !item.image).map(async item => {
-          Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
+          compose(item);
           Object.assign(item, await drawKeyframe(cwd, production, item, signal));
           await saveProduction(cwd, production);
         }));

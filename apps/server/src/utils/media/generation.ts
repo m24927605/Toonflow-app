@@ -184,7 +184,10 @@ export async function generateMedia(
       voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate, duration: request.duration,
     })
     : mediaType === "image"
-    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras, seed: request.seed })
+    ? await provider.generateImage!({
+      model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras, seed: request.seed,
+      initImage: request.initImage ? await readReference(directory, request.initImage, "image", signal) : undefined, denoise: request.denoise,
+    })
     : await provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,
       videos: await references(request.videos, "video"), audios: await references(request.audios, "audio"),

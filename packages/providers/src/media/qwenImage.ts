@@ -1,6 +1,6 @@
 const rules = [] as const;
 
-const version = "1.4.0";
+const version = "1.5.0";
 
 export default {
   id: "qwenImage" as const,
@@ -32,10 +32,13 @@ export default {
     const [first, ...rest] = request.images ?? [];
     const depth = request.model === "qwen_image_2_1_turbo_depth";
     if (depth && !first) throw new Error("Connect a depth map as the first reference image for depth control");
-    // The depth map leaves the reference list, so {{ref 1}} names it and later markers shift down to the images sent.
-    const prompt = depth ? request.prompt.replace(/\{\{ref (\d+)\}\}/g, (_, index) => index === "1" ? "the depth map" : `{{ref ${Number(index) - 1}}}`) : request.prompt;
+    // Qwen-Image 2.1 labels the reference images it is given <image1>, <image2>… in its prompt template, so each
+    // {{ref N}} marker is written as that label. The depth map leaves the reference list, so {{ref 1}} names it and
+    // later markers shift down to the images sent.
+    const label = (index: number) => !depth ? `<image${index}>` : index === 1 ? "the depth map" : `<image${index - 1}>`;
+    const prompt = request.prompt.replace(/\{\{ref (\d+)\}\}/g, (_, index) => label(Number(index)));
     const { data, mimeType, seed } = await this.tool.qwenImage({
-      prompt, ratio: request.ratio ?? "1:1", size, loras: request.loras, seed: request.seed,
+      prompt, ratio: request.ratio ?? "1:1", size, loras: request.loras, seed: request.seed, initImage: request.initImage, denoise: request.denoise,
       ...(depth ? { images: rest, controlImage: first } : { images: request.images ?? [] }),
     });
     return [{ mediaType: "image", type: "binary", data, mimeType, seed }];

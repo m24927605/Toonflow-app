@@ -1,6 +1,7 @@
 # Qwen-Image 2.1 Turbo pipeline executed on a Colab GPU session by qwenImage.ts.
-# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control}) and the files it names; control
-# is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch.
+# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control, init, denoise}) and the files it
+# names; control is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch, and init an
+# optional picture redrawn from the noise level denoise instead of drawing from pure noise.
 # Output: /content/qwout/image_<n>.png for every item, followed by a COLAB_DONE line on success.
 # The model loads once and the items are drawn one by one, always at the requested ratio and size; references reach
 # the model through the text encoder's conditioning, so the output canvas does not have to share their aspect.
@@ -37,6 +38,7 @@ def dimensions(item):
 
 # The checkpoint's own Turbo schedule (8 steps at CFG 1, scheduler shift 1.0, so the values are used as they are).
 turboSigmas = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0"
+turboSteps = [float(value) for value in turboSigmas.split(",")]
 
 print("GPU:", torch.cuda.get_device_name(0), round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1), "GiB")
 
@@ -71,7 +73,7 @@ for remote, folder in weights:
 
 (comfy / "input").mkdir(exist_ok=True)
 for item in items:
-    for name in item["refs"] + ([item["control"]] if item.get("control") else []):
+    for name in item["refs"] + ([item["control"]] if item.get("control") else []) + ([item["init"]] if item.get("init") else []):
         assert "/" not in name and name.startswith("qwin_")
         shutil.copy(inputs / name, comfy / "input" / name)
 
@@ -135,6 +137,16 @@ def build(item):
         graph["31"] = {"class_type": "QwenImageDiffsynthControlnet", "inputs": {
             "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "image": ["ctrlScaled", 0],
             "strength": controlStrength, "start_percent": 0.0, "end_percent": 1.0}}
+    if item.get("init"):
+        # A redraw starts from the picture, scaled to the canvas like the depth map, noised to the Turbo step nearest to
+        # denoise (never the final 0, so at least one step draws): it keeps the picture's composition and redraws as
+        # much as that noise level allows.
+        start = min(range(len(turboSteps) - 1), key=lambda index: abs(turboSteps[index] - float(item["denoise"])))
+        graph["init"] = {"class_type": "LoadImage", "inputs": {"image": item["init"]}}
+        graph["initScaled"] = {"class_type": "ImageScale", "inputs": {"image": ["init", 0], "upscale_method": "lanczos", "width": width, "height": height, "crop": "center"}}
+        graph["initLatent"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["initScaled", 0], "vae": ["4", 0]}}
+        graph["11"]["inputs"]["latent_image"] = ["initLatent", 0]
+        graph["10"]["inputs"]["sigmas"] = ", ".join(str(value) for value in turboSteps[start:])
     return graph
 
 

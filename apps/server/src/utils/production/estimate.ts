@@ -43,7 +43,8 @@ export function estimateProduction(input: Pick<ProductionInput, "seconds" | "qua
     { step: "text", units: l4 * hours(30) },
     { step: "assets", units: a100 * hours(5 + 0.5 * (people * 6 + places * 3)) },
     { step: "loras", units: l4 * (trainedPeople * 2 + places) + a100 * hours((trainedPeople + places) * (5 + 0.5 * 12)) },
-    { step: "keyframes", units: a100 * hours(5 + 0.5 * shots) },
+    // Two images a shot: the draft and its redraw.
+    { step: "keyframes", units: a100 * hours(5 + 0.5 * shots * 2) },
     { step: "roughCut", units: a100 * hours(10 + shots * 1.5) },
     { step: "final", units: a100 * hours(finalMinutes) },
   ].map(item => ({ ...item, units: Number((item.units * 1.3 * ratio).toFixed(2)) }));

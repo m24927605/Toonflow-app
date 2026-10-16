@@ -12,6 +12,8 @@ export type ProductionKeyframe = {
   /** The outfit each person in the shot wears, by name. */
   outfits?: Record<string, string>;
   description?: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string;
+  /** The first stage of the keyframe, drawn from the previs depth map without reference images, and its prompt. */
+  draft?: string; draftPrompt?: string;
   /** The seed the keyframe was drawn with, kept so a redraw after a change request changes only what was asked. */
   seed?: number;
 };
@@ -77,16 +79,19 @@ function segmentOf(text: string, name: string, castSize: number) {
 }
 
 /**
- * The prompt, references and LoRAs of one keyframe: the shot's previs depth map first, which fixes the composition
+ * The prompts, references and LoRAs of one keyframe: the shot's previs depth map first, which fixes the composition
  * through the depth model, then the place's base image, each person's front view and, for every other shot, the master
- * keyframe, which set the look; Qwen-Image LoRAs of the cast and place, at most 4, people first.
+ * keyframe, which set the look; Qwen-Image LoRAs of the cast and place, at most 4, people first. The draft's prompt
+ * points at no reference image: it names each person by their trigger word with their look and clothes, and the place
+ * by its look, in full sentences, since short "X is Y." lines came out as text in the picture.
  */
 export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Production["assets"]>, depth: string, masterImage?: string) {
   const set = byName(assets.places, item.place);
   const setView = set?.views?.[0];
   const people = item.cast.flatMap(name => byName(assets.characters, name) ?? []);
+  const outfitOf = (person: ProductionAsset) => person.outfits?.find(outfit => outfit.name === item.outfits?.[person.name]) ?? person.outfits?.[0];
   // A person's reference is the front view of the outfit they wear in this shot, so the keyframe draws those clothes.
-  const outfitView = (person: ProductionAsset) => (person.outfits?.find(outfit => outfit.name === item.outfits?.[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base!;
+  const outfitView = (person: ProductionAsset) => outfitOf(person)?.views?.[0] ?? person.base!;
   // {{ref 1}} is the depth map, which the depth model takes as its control image, so the look references start at 2.
   const references = [depth, ...setView ? [setView] : [], ...people.map(outfitView)];
   // A person's trigger word stands next to their name, so the LoRA binds to that person rather than the whole picture.
@@ -98,18 +103,45 @@ export function composeKeyframe(item: ProductionKeyframe, assets: NonNullable<Pr
   ];
   const prompt = template.map(english).join("\n").replace("{{shot}}", [...fixed, item.description ?? ""].join("\n"));
   const loras = [...people, ...set ? [set] : []].flatMap(asset => (asset.loras ?? []).filter(lora => lora.family === "qwen").map(lora => ({ ...lora, name: asset.name }))).slice(0, 4);
+  const look = (person: ProductionAsset) => `${person.look} ${outfitOf(person)?.look ?? ""}`.trim();
+  const draftPrompt = [
+    "One single photorealistic film still, not a collage.",
+    ...set ? [`The place: ${set.look}`] : [],
+    ...people.length ? [`The people in the frame: ${people.map(person => trigger(person) ? `${person.name} is ${trigger(person)}: ${look(person)}` : `${person.name}: ${look(person)}`).join(" ")}`] : [],
+    ...item.state ? [`Their state at the start of this shot: ${item.state}.`] : [],
+    item.description ?? "",
+    "Natural skin, sharp focus. The picture contains no text, no captions, no letters and no watermark.",
+  ].join("\n");
   return {
-    prompt: withTriggers(prompt, loras), references: [...references, ...masterImage ? [masterImage] : []],
+    prompt: withTriggers(prompt, loras), draftPrompt: withTriggers(draftPrompt, loras), references: [...references, ...masterImage ? [masterImage] : []],
     loras: loras.map(lora => ({ path: lora.path, strength: 1 })),
   };
 }
 
-/** Draws a keyframe with its own seed when it has one, and returns the image with the seed it was drawn with. */
+// How much of a draft its redraw changes: on two-person, single and close shots, 0.927 barely took the references' set
+// and clothes, and 0.978 lost the draft's composition.
+const keyframeRedraw = 0.954;
+const imageReference = (path: string) => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : "image/png" });
+
+/**
+ * Draws a keyframe's draft from its previs depth map alone, since the model copies the layout of reference images and
+ * would drop the previs composition; with the keyframe's own seed when it has one, and returns the seed it drew with.
+ */
+export async function drawDraft(cwd: string, production: Production, item: ProductionKeyframe, signal: AbortSignal) {
+  const [image] = await generateMedia(cwd, "image", {
+    providerId: "qwenImage", modelId: "qwen_image_2_1_turbo_depth", prompt: item.draftPrompt!, ratio: production.input.ratio, size: "1K",
+    outputDirectory: `${productionDirectory(production.id)}/keyframes`, loras: item.loras, seed: item.seed,
+    images: [imageReference(item.references![0]!)],
+  }, signal);
+  return { draft: image!.path, seed: image!.seed };
+}
+
+/** Redraws a keyframe's draft with its references and seed, keeping the draft's composition and taking their look. */
 export async function drawKeyframe(cwd: string, production: Production, item: ProductionKeyframe, signal: AbortSignal) {
   const [image] = await generateMedia(cwd, "image", {
     providerId: "qwenImage", modelId: "qwen_image_2_1_turbo_depth", prompt: item.prompt!, ratio: production.input.ratio, size: "1K",
     outputDirectory: `${productionDirectory(production.id)}/keyframes`, loras: item.loras, seed: item.seed,
-    images: item.references!.map(path => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : "image/png" })),
+    images: item.references!.map(imageReference), initImage: imageReference(item.draft!), denoise: keyframeRedraw,
   }, signal);
   return { image: image!.path, seed: image!.seed };
 }
