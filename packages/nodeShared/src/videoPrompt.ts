@@ -38,9 +38,18 @@ export function speakerIds(spans: ShotSpan[]) {
 
 /**
  * Puts each dialogue line into the written prompt at its [[LINE n]] marker as H3's <d> tag with the exact words, so
- * the text model never retypes, translates or drops a line. Throws when a marker is missing, repeated or unknown.
+ * the text model never retypes, translates or drops a line. Throws when a marker is missing or unknown.
  */
-export function fillDialogue(prompt: string, lines: DialogueLine[]) {
+export function fillDialogue(draft: string, lines: DialogueLine[]) {
+  // A model that writes a marker twice, such as once in a summary and once where it is spoken, keeps the one after
+  // "says:" (or else the first): a line is spoken once, and the other mention reads fine without it.
+  let prompt = draft;
+  for (const marker of new Set(draft.match(/\[\[LINE \d+\]\]/g))) {
+    const pattern = marker.replace(/[[\]]/g, "\\$&");
+    const spoken = new RegExp(`says:\\s*${pattern}`).exec(prompt);
+    const keep = spoken ? spoken.index + spoken[0].length - marker.length : prompt.indexOf(marker);
+    prompt = prompt.replace(new RegExp(pattern, "g"), (match: string, offset: number) => offset === keep ? match : "");
+  }
   const markers = [...prompt.matchAll(/\[\[LINE (\d+)\]\]/g)].map(match => Number(match[1]));
   const expected = lines.map((_, index) => index + 1);
   if (markers.length !== expected.length || expected.some(index => !markers.includes(index))) {
