@@ -6,9 +6,12 @@ import pipeline from "./minimaxH3Colab.py" with { type: "text" };
 export type MinimaxH3Request = Parameters<ProviderTools["minimaxH3"]>[0];
 
 const resolutions = new Set(["480p", "720p", "1080p"]);
-// Clips share one high-RAM A100 kept for five idle minutes, so a batch of shots pays the ComfyUI install and the
-// 30+ GB model download once; the high-RAM shape is needed for those weights to pass through host memory.
-const worker = createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000);
+// Clips share high-RAM A100s kept for five idle minutes, so a batch of shots pays the ComfyUI install and the 30+ GB
+// model download once a machine; the high-RAM shape is needed for those weights to pass through host memory. Two
+// machines render a batch side by side, leaving Colab's third for the text model that checks the clips; each clip goes
+// to the machine with the fewest waiting. ACT: The second machine pays its own start, about half a unit.
+const workers = [0, 1].map(() => createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000));
+const waiting = workers.map(() => 0);
 // Of the four Turbo sampling steps, the reference videos condition only the first: Code Video Model found a previs
 // used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
 const videoSteps = 1;
@@ -23,15 +26,17 @@ const setup = `${pipeline.slice(0, pipeline.indexOf("# The machine is set up abo
  * and holds it for at most `ms`.
  */
 export function warmMinimaxH3(resolution: string, ratio: string, ms: number) {
-  worker.holdFor(ms);
-  void worker.run(session => session.job({
-    script: setup, uploads: [],
-    env: { H3_JOB: "warm", H3_SEED: 0, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: 4, H3_AUDIO: 0, H3_VIDEO_STEPS: videoSteps }, outputs: [],
-  })).catch((error: unknown) => console.error("[minimaxH3] Warming the A100 failed:", error));
+  for (const worker of workers) {
+    worker.holdFor(ms);
+    void worker.run(session => session.job({
+      script: setup, uploads: [],
+      env: { H3_JOB: "warm", H3_SEED: 0, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: 4, H3_AUDIO: 0, H3_VIDEO_STEPS: videoSteps }, outputs: [],
+    })).catch((error: unknown) => console.error("[minimaxH3] Warming an A100 failed:", error));
+  }
 }
 
 /** Stops the A100 as soon as the clips already requested are done, for a caller that has no more to send. */
-export const stopMinimaxH3WhenIdle = () => worker.stopWhenIdle();
+export const stopMinimaxH3WhenIdle = () => workers.forEach(worker => worker.stopWhenIdle());
 
 /** Renders one MiniMax H3 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
 export async function runMinimaxH3({ prompt, images = [], videos = [], audios = [], controlVideo, firstFrame, lastFrame, loras = [], duration, resolution, ratio, audio, seed = randomSeed() }: MinimaxH3Request, signal?: AbortSignal) {
@@ -49,7 +54,9 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
   // A LoRA is named by its content and kept on the machine, so a session's later clips never upload it again.
   const characterLoras = loras.map(lora => ({ data: inputBytes(lora.file), strength: lora.strength }))
     .map(lora => ({ ...lora, name: `h3lora_${createHash("sha256").update(lora.data).digest("hex").slice(0, 32)}.safetensors` }));
-  const video = await worker.run(async (session, sessionSignal) => {
+  const index = waiting.indexOf(Math.min(...waiting));
+  waiting[index]!++;
+  const video = await workers[index]!.run(async (session, sessionSignal) => {
     const sent = sentLoras.get(session) ?? new Set<string>();
     const loraUploads = [...new Map(characterLoras.filter(lora => !sent.has(lora.name)).map(lora => [lora.name, { name: lora.name, data: lora.data }])).values()];
     const [output] = await session.job({
@@ -71,6 +78,6 @@ export async function runMinimaxH3({ prompt, images = [], videos = [], audios = 
     for (const { name } of loraUploads) sent.add(name);
     sentLoras.set(session, sent);
     return output!;
-  }, signal);
+  }, signal).finally(() => waiting[index]!--);
   return { data: video, mimeType: "video/mp4" as const, seed };
 }
