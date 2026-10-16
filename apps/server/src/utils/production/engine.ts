@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
-import { warmMinimaxH3 } from "@/utils/media/minimaxH3";
+import { stopMinimaxH3WhenIdle, warmMinimaxH3 } from "@/utils/media/minimaxH3";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
@@ -43,11 +43,12 @@ async function complete(systemPrompt: string, prompt: string, signal: AbortSigna
 
 /**
  * Starts the text model's L4 and loads the model with a one-word request while other work runs, so the checks that
- * follow find it ready, and holds it for at most `ms`.
+ * follow find it ready; it is held for at most `ms`, until `signal` aborts or the returned release is called.
  */
 function warmTextModel(ms: number, signal: AbortSignal) {
-  holdColabFor(ms);
+  const release = holdColabFor(ms, signal);
   void complete("Reply with one word.", "Ready?", signal).catch(() => {});
+  return release;
 }
 
 const screenwriter = "You write screenplays for short films made with AI image and video models.";
@@ -131,6 +132,10 @@ async function spentUnits(production: Production, signal: AbortSignal) {
   production.meterAtStart ??= metered;
   return Math.max(production.balanceAtStart - balance, metered - production.meterAtStart);
 }
+
+/** Whether the budget has room for `units` more, for work worth starting early only when what follows is affordable. */
+const affordable = (production: Production, units: number, signal: AbortSignal) =>
+  spentUnits(production, signal).then(spent => spent + units <= production.input.budget, () => false);
 
 /** Stops before a step that would take the production past its budget; it never spends on a guess when the spend cannot be read. */
 async function withinBudget(cwd: string, production: Production, nextUnits: number, signal: AbortSignal) {
@@ -275,6 +280,10 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       item.description = description;
       delete item.image;
       delete item.draft;
+      // The redrawn keyframe is checked again, with a retry of its own.
+      delete item.check;
+      delete item.retried;
+      delete item.rejected;
       const video = production.videos?.find(clip => clip.shot === item.shot);
       if (video) delete video.prompt;
     }
@@ -292,6 +301,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
     const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!, item === master ? undefined : master.image));
     const release = holdQwenImage();
+    let releaseText = () => {};
     try {
       await Promise.all(keyframes.shots.filter(item => !item.image && !item.draft).map(async item => {
         compose(item);
@@ -300,7 +310,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       }));
       for (const batch of [[master], keyframes.shots.filter(item => item !== master)]) {
         // The check after the last batch reads every keyframe with the text model, whose L4 starts meanwhile.
-        if (batch[0] !== master) warmTextModel(15 * 60_000, signal);
+        if (batch[0] !== master) releaseText = warmTextModel(15 * 60_000, signal);
         await Promise.all(batch.filter(item => !item.image).map(async item => {
           compose(item);
           Object.assign(item, await drawKeyframe(cwd, production, item, signal));
@@ -309,32 +319,50 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       }
     } finally {
       release();
+      // Released, the L4 still waits its idle minutes, which the check that follows at once falls within.
+      releaseText();
     }
     return true;
   }
   // Each keyframe is checked against its row before any clip is rendered: one that fails has its description rewritten
   // from the problems found and is drawn again with a new seed, once; one that fails again stays, flagged.
   const uncheckedKeyframes = keyframes.shots.filter(item => !item.check);
+  const textUnits = estimate.steps.find(item => item.step === "text")!.units;
+  const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
   if (uncheckedKeyframes.length) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    // The clips follow the check, so the A100 starts and sets up meanwhile.
-    warmMinimaxH3(production.input.quality, production.input.ratio, 15 * 60_000);
-    for (const item of uncheckedKeyframes) {
-      const image = await keyframeImage(cwd, production, item.shot, item.image!, signal);
-      item.check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, production.previs!.find(shot => shot.shot === item.shot)!), signal, [image]));
-      await saveProduction(cwd, production);
-    }
-    const failed = uncheckedKeyframes.filter(item => !item.check!.passed && !item.retried);
-    if (failed.length) {
-      const notes = failed.map(item => `Shot ${item.shot}: ${item.check!.issues.filter(issue => issue.major).map(issue => issue.problem).join(" ")}`).join("\n");
-      const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(failed, notes), signal));
-      for (const item of failed) {
-        Object.assign(item, { description: sections.get(item.shot) ?? item.description, retried: true, rejected: item.check, check: undefined, image: undefined, draft: undefined, seed: undefined });
-        const video = production.videos?.find(clip => clip.shot === item.shot);
-        if (video) delete video.prompt;
+    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
+    // When the clips follow at once (no keyframe review, room in the budget), the A100s start and set up meanwhile.
+    const warm = !needs("keyframes") && await affordable(production, textUnits + clipUnits, signal);
+    const releaseH3 = warm ? warmMinimaxH3(production.input.quality, production.input.ratio, 15 * 60_000, signal) : () => {};
+    try {
+      for (const item of uncheckedKeyframes) {
+        const image = await keyframeImage(cwd, production, item.shot, item.image!, signal);
+        item.check = readClipCheck(await complete(keyframeChecker, keyframeCheckPrompt(item, production.previs!.find(shot => shot.shot === item.shot)!), signal, [image]));
+        await saveProduction(cwd, production);
       }
-      await saveProduction(cwd, production);
+    } finally {
+      releaseH3();
     }
+    // A redraw comes before any clip and needs a machine slot for Qwen-Image, so warm A100s stop at once.
+    if (warm && uncheckedKeyframes.some(item => !item.check!.passed && !item.retried)) stopMinimaxH3WhenIdle();
+    return true;
+  }
+  const failedKeyframes = keyframes.shots.filter(item => item.check && !item.check.passed && !item.retried);
+  if (failedKeyframes.length) {
+    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
+    const notes = failedKeyframes.map(item => `Shot ${item.shot}: ${item.check!.issues.filter(issue => issue.major).map(issue => issue.problem).join(" ")}`).join("\n");
+    const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(failedKeyframes, notes), signal));
+    for (const item of failedKeyframes) {
+      Object.assign(item, { description: sections.get(item.shot) ?? item.description, retried: true, rejected: item.check, check: undefined, image: undefined, draft: undefined, seed: undefined });
+      const video = production.videos?.find(clip => clip.shot === item.shot);
+      if (video) delete video.prompt;
+    }
+    // The others took light, colour and clothes from the master's image, so a new master redraws them too, each from
+    // its own draft and seed, and checks them again.
+    if (failedKeyframes.includes(master)) {
+      for (const item of keyframes.shots.filter(shot => !failedKeyframes.includes(shot))) Object.assign(item, { image: undefined, check: undefined });
+    }
+    await saveProduction(cwd, production);
     return true;
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
@@ -342,12 +370,18 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   // The clips render once, at the chosen quality: no one reviews a cheaper pass between the keyframes and the film, and
   // rendering every clip twice doubled the longest step.
   const videos = production.videos!;
-  if (videos.some(item => !item.video)) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "clips")!.units, signal)) return false;
-    // Each clip is checked by the text model once rendered, so its L4 starts while they render, held about as long as
-    // the clips take.
-    warmTextModel((10 + videos.filter(item => !item.video).length * 3) * 60_000, signal);
-    await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
+  const unrendered = videos.filter(item => !item.video).length;
+  if (unrendered) {
+    // ACT: The clips still to render take their share of the step's estimate; a clip rendered again after its check is
+    // one share. The machine start in the estimate is shared out too, so a lone retry on a cold machine is undercounted.
+    if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
+    // Each clip is checked by the text model once rendered, so its L4 starts while they render.
+    const releaseText = warmTextModel((10 + unrendered * 3) * 60_000, signal);
+    try {
+      await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
+    } finally {
+      releaseText();
+    }
     return true;
   }
   // Each clip is checked against its keyframe by the model reading frames of it: a clip that fails is rendered once more

@@ -664,10 +664,17 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
 
   /**
    * Holds the session for at most `ms`, for jobs known to follow but not yet sent: a warm machine nothing comes to bills
-   * no longer than that before its idle stop.
+   * no longer than that before its idle stop. The hold also ends when `signal` aborts or the returned release is called.
    */
-  function holdFor(ms: number) {
-    setTimeout(hold(), ms).unref();
+  function holdFor(ms: number, signal?: AbortSignal) {
+    const release = hold();
+    const timer = setTimeout(release, ms);
+    timer.unref();
+    signal?.addEventListener("abort", release, { once: true });
+    return () => {
+      clearTimeout(timer);
+      release();
+    };
   }
 
   /**

@@ -22,17 +22,19 @@ const sentLoras = new WeakMap<ColabSession, Set<string>>();
 const setup = `${pipeline.slice(0, pipeline.indexOf("# The machine is set up above this line"))}\nprint("COLAB_DONE")\n`;
 
 /**
- * Starts the A100 and sets it up for clips of this resolution while other work runs, so the first clip finds it ready,
- * and holds it for at most `ms`.
+ * Starts the A100s and sets them up for clips of this resolution while other work runs, so the first clips find them
+ * ready; each is held for at most `ms`, until `signal` aborts or the returned release is called.
  */
-export function warmMinimaxH3(resolution: string, ratio: string, ms: number) {
-  for (const worker of workers) {
-    worker.holdFor(ms);
+export function warmMinimaxH3(resolution: string, ratio: string, ms: number, signal: AbortSignal) {
+  const releases = workers.map(worker => {
+    const release = worker.holdFor(ms, signal);
     void worker.run(session => session.job({
       script: setup, uploads: [],
       env: { H3_JOB: "warm", H3_SEED: 0, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: 4, H3_AUDIO: 0, H3_VIDEO_STEPS: videoSteps }, outputs: [],
-    })).catch((error: unknown) => console.error("[minimaxH3] Warming an A100 failed:", error));
-  }
+    }, signal)).catch((error: unknown) => signal.aborted || console.error("[minimaxH3] Warming an A100 failed:", error));
+    return release;
+  });
+  return () => releases.forEach(release => release());
 }
 
 /** Stops the A100 as soon as the clips already requested are done, for a caller that has no more to send. */
