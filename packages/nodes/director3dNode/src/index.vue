@@ -34,7 +34,7 @@ import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
 import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, createTurnaround, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
-import { planShot, runPrevis } from "./previsRunner";
+import { planPrevis, planShot, renderPrevis } from "./previsRunner";
 import { anchorSchema, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
 import { directorPlanSchema, prepareSceneAnimation, type DirectorPlan, type DirectorGeneration } from "./sceneAnimation";
 import { renderImage, renderVideo, type RenderPass } from "./renderMedia";
@@ -50,8 +50,9 @@ type ModelDocument = z.infer<typeof modelDocumentSchema>;
 defineOptions({
   inheritAttrs: false,
   icon: IconCube3dSphere,
-  // The headless previs runner of auto production loads this plugin and calls it, without a canvas.
-  runPrevis,
+  // The headless previs runner of auto production loads this plugin and calls these, without a canvas.
+  planPrevis,
+  renderPrevis,
   handles: [{ id: "in", type: "target", dataType: ["STRING", "IMAGE", "VIDEO"], label: "文本、图片、视频输入" }] satisfies NodeHandle[],
 });
 const { node, nodeProps, previewReady, ai, files, nodeEvent } = useNode({ label: "3D导演台" });

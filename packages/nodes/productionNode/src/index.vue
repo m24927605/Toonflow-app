@@ -109,8 +109,8 @@ type Production = {
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
   keyframes?: { master: number; shots: Keyframe[] };
-  dub?: unknown; clips?: unknown; previs?: { shot: number; depth: string }[]; roughCut?: string;
-  videos?: { shot: number; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
+  dub?: unknown; clips?: unknown; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
+  videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
   finals?: { shot: number; video?: string }[]; music?: string; film?: string; report?: string;
 };
 type Keyframe = { shot: number; time: string; prompt?: string; references?: string[]; loras?: { path: string; strength: number }[]; image?: string };
@@ -176,15 +176,16 @@ const headline = computed(() => {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");
     const assets = production.assets ? [...production.assets.characters, ...production.assets.places] : [];
-    // Designs and LoRAs run side by side with previs.
+    // Designs and LoRAs run side by side with the previs, the dub and the texts written from the previs plan.
     const designing = !production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views));
     const training = assets.some(item => !item.loras);
-    if (designing) return production.previs ? translate("Designing the characters and places…") : translate("Designing the characters and places while blocking every shot in the previs…");
-    if (training) return production.previs ? translate("Training LoRAs so faces and places stay the same (about an hour)…") : translate("Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…");
-    if (!production.previs) return translate("Blocking every shot in the previs…");
-    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
+    const blocked = !!production.previs?.every(shot => shot.video);
+    if (designing) return blocked ? translate("Designing the characters and places…") : translate("Designing the characters and places while blocking every shot in the previs…");
+    if (training) return blocked ? translate("Training LoRAs so faces and places stay the same (about an hour)…") : translate("Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…");
+    if (!blocked) return translate("Blocking every shot in the previs…");
     if (!production.clips) return translate("Recording the dialogue…");
-    if (!production.videos) return translate("Writing the video prompts…");
+    if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
+    if (!production.keyframes || production.keyframes.shots.some(item => !item.image)) return translate("Drawing the keyframes, the master shot first…");
     if (production.videos.some(item => !item.video)) return t`Rendering the clips (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
     if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");

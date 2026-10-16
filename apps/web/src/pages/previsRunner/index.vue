@@ -9,22 +9,27 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { installNodeHost } from "@/lib/nodeHost";
 import { loadNodeComponent } from "@/pages/workspace/panels/canvas/loadNodeComponent";
 
+type Shot = { shot: number; seconds: number; cast: string[]; size: string };
+type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[] };
 /**
- * What the server's previs step hands this page before it loads: the workspace, where the files go, the director
- * model, the script and shot list the previs plan refers to as {{ref 1}} and {{ref 2}}, every shot of the film, and the
- * previs plan and shot plans of the shots a stopped run already finished.
+ * What the server's previs step hands this page before it loads: the workspace, the previs folder and every shot of the
+ * film. To plan, the director model and the script and shot list the plan refers to as {{ref 1}} and {{ref 2}}; the plan
+ * is saved as plan.json in the folder. To render, the shots of that plan still to render and where each one's files go.
  */
-type PrevisJob = {
-  directory: string; folder: string; providerId: string; modelId: string; aspect: number; script: string; shotList: string;
-  shots: { shot: number; seconds: number; cast: string[]; size: string }[];
-  start?: { spec: unknown; plans: unknown[] };
+type PrevisJob = { directory: string; folder: string; aspect: number; shots: Shot[] } & (
+  | { mode: "plan"; providerId: string; modelId: string; script: string; shotList: string }
+  | { mode: "render"; render: { shot: number; layout: string; depth: string; video: string }[] }
+);
+type Director = {
+  planPrevis?: (options: {
+    generate: (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>; providerId: string; modelId: string; shots: Shot[]; aspect: number; signal: AbortSignal;
+  }) => Promise<PrevisPlan>;
+  renderPrevis?: (options: {
+    plan: PrevisPlan; shots: Shot[]; rendered: number[]; aspect: number; signal: AbortSignal;
+    onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob }) => Promise<void>;
+  }) => Promise<void>;
 };
-type RunPrevis = (options: {
-  generate: (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>; providerId: string; modelId: string; aspect: number; signal: AbortSignal;
-  shots: PrevisJob["shots"]; start?: PrevisJob["start"];
-  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: unknown; plans: unknown[]; spec: unknown }) => Promise<void>;
-}) => Promise<void>;
-type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { done?: { shot: number; layout: string; depth: string; video: string; blocking: string }[]; error?: string } };
+type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: { blocking?: string[]; error?: string } };
 
 // A page without the workspace UI that the server opens in a headless browser for auto production's previs. It works
 // on the directory the job names and never opens a project, so the people's own pages keep their current project.
@@ -35,31 +40,41 @@ const ai = useNodeAi();
 
 onMounted(async () => {
   const job = runner.previsJob;
-  const done: NonNullable<NonNullable<RunnerWindow["previsResult"]>["done"]> = [];
   try {
     if (!job) throw new Error("No previs job");
     const files = useWorkspaceFiles(job.directory);
-    await files.mkdir(job.folder).catch(() => undefined);
-    const director = await loadNodeComponent("director3dNode", "/api/nodes/files?name=director3dNode") as unknown as { runPrevis?: RunPrevis };
-    if (!director.runPrevis) throw new Error("The Director's Studio plugin cannot run previs; update it");
-    const references: NodeAiRequest["references"] = [{ dataType: "STRING", value: job.script }, { dataType: "STRING", value: job.shotList }];
-    await director.runPrevis({
-      generate: request => ai.generate({ ...request, directory: job.directory, references: [...references, ...request.references ?? []] }), providerId: job.providerId, modelId: job.modelId, aspect: job.aspect,
-      signal: new AbortController().signal, shots: job.shots, start: job.start,
-      async onShot({ shot, layout, depth, video, blocking, scene, plans, spec }) {
+    const director = await loadNodeComponent("director3dNode", "/api/nodes/files?name=director3dNode") as unknown as Director;
+    if (!director.planPrevis || !director.renderPrevis) throw new Error("The Director's Studio plugin cannot run previs; update it");
+    const signal = new AbortController().signal;
+    const planPath = `${job.folder}/plan.json`;
+    if (job.mode === "plan") {
+      status.value = "plan";
+      const references: NodeAiRequest["references"] = [{ dataType: "STRING", value: job.script }, { dataType: "STRING", value: job.shotList }];
+      const plan = await director.planPrevis({
+        generate: request => ai.generate({ ...request, directory: job.directory, references: [...references, ...request.references ?? []] }),
+        providerId: job.providerId, modelId: job.modelId, shots: job.shots, aspect: job.aspect, signal,
+      });
+      await files.mkdir(job.folder).catch(() => undefined);
+      await files.writeJson(planPath, plan);
+      runner.previsResult = { blocking: plan.blocking };
+      return;
+    }
+    const render = new Map(job.render.map(item => [item.shot, item]));
+    await director.renderPrevis({
+      plan: await files.readJson<PrevisPlan>(planPath), shots: job.shots, aspect: job.aspect, signal,
+      rendered: job.shots.flatMap(({ shot }) => render.has(shot) ? [] : [shot]),
+      async onShot({ shot, layout, depth, video }) {
         status.value = `shot ${shot}`;
-        const paths = { layout: `${job.folder}/shot${shot}.png`, depth: `${job.folder}/shot${shot}Depth.png`, video: `${job.folder}/shot${shot}.mp4` };
+        const paths = render.get(shot)!;
         await files.write(paths.layout, layout);
         await files.write(paths.depth, depth);
+        // Written last, so a shot counts as rendered only once all its files are saved; a stopped run resumes after it.
         await files.write(paths.video, video);
-        // Written last, so a shot counts as done only once its media are saved; a stopped run resumes after it.
-        await files.writeJson(`${job.folder}/shot${shot}.json`, { blocking, scene, plans, spec });
-        done.push({ shot, ...paths, blocking });
       },
     });
-    runner.previsResult = { done };
+    runner.previsResult = {};
   } catch (error) {
-    runner.previsResult = { done, error: error instanceof Error ? error.message : String(error) };
+    runner.previsResult = { error: error instanceof Error ? error.message : String(error) };
   }
 });
 </script>

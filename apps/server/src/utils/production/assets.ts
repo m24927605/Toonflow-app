@@ -2,7 +2,7 @@ import { z } from "zod";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { castNames, shotSpans } from "@toonflow/node-shared/shotList";
 import { readdir, readFile } from "@toonflow/file";
-import { trainLora, type LoraRecord } from "@/utils/media/lora";
+import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { holdQwenImage } from "@/utils/media/qwenImage";
@@ -130,7 +130,9 @@ const unitsPerTopUp = 6.77 / 6 * 1.3;
 
 /**
  * Which LoRAs each person and place gets: none when seen in too few shots, the workspace's own LoRA of the same name
- * when it has one, else trained for the missing families. `units` is what the training will cost.
+ * when it has one, else trained for the missing families. Each LoRA's trigger word is fixed the first time it is
+ * planned, the reused LoRA's own or a new one it is then trained with, and kept on the asset, so texts can name it
+ * while it trains. `units` is what the training will cost.
  */
 export async function planAssetLoras(cwd: string, production: Production, shotList: string) {
   const assets = production.assets!;
@@ -141,7 +143,9 @@ export async function planAssetLoras(cwd: string, production: Production, shotLi
     ...assets.places.map(item => ({ item, kind: "scene" as const, families: ["qwen"] as const, shots: counts.places.get(item.name) ?? 0 })),
   ].filter(job => !job.item.loras).map(({ item, kind, families, shots }) => {
     if (shots < minShotsForLora) return { item, kind, kept: [] as LoraRecord[], missing: [] as ("h3" | "qwen")[] };
-    const kept = families.flatMap(family => existing.find(record => record.kind === kind && record.family === family && record.name === item.name) ?? []);
+    item.triggers ??= Object.fromEntries(families.map(family =>
+      [family, existing.find(record => record.kind === kind && record.family === family && record.name === item.name)?.trigger ?? triggerWord()]));
+    const kept = existing.filter(record => record.trigger === item.triggers![record.family]);
     return { item, kind, kept, missing: families.filter(family => !kept.some(record => record.family === family)) };
   });
   const units = jobs.reduce((sum, job) => sum + (job.missing.length ? job.missing.length * unitsPerFamily + unitsPerTopUp : 0), 0);
@@ -151,7 +155,7 @@ export async function planAssetLoras(cwd: string, production: Production, shotLi
 /** Trains the planned LoRAs all at once; Colab hands out the L4s as they free up. */
 export async function trainAssetLoras(cwd: string, plan: Awaited<ReturnType<typeof planAssetLoras>>, signal: AbortSignal, save: () => Promise<void>) {
   await Promise.all(plan.jobs.map(async ({ item, kind, kept, missing }) => {
-    const trained = missing.length ? await trainLora(cwd, { kind, families: missing, name: item.name, items: assetViews(item).map(path => ({ path })) }, signal) : [];
+    const trained = missing.length ? await trainLora(cwd, { kind, families: missing, name: item.name, items: assetViews(item).map(path => ({ path })), triggers: item.triggers }, signal) : [];
     item.loras = [...kept, ...trained].map(record => ({ family: record.family, path: record.path, trigger: record.trigger }));
     await save();
   }));

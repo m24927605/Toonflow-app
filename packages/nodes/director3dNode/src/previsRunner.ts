@@ -44,18 +44,16 @@ export async function planShot(options: {
 }
 
 /**
- * The previs of one blocked shot: the opening frame as the colour layout image and as a depth map for depth-controlled
- * keyframes, both from `still` (the opening with jointed figures), the colour animation as the previs video, and the
- * measured blocking of the opening frame as text for keyframe prompts.
+ * The previs of one framed shot: the opening frame as the colour layout image and as a depth map for depth-controlled
+ * keyframes, both from `still` (the opening with jointed figures), and the colour animation as the previs video.
  */
 async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, settings: SceneSettings, still: { scene: SceneDocument; plan: DirectorPlan }) {
   const lighting = getSceneLighting(scene);
   const anchor = anchorSchema.parse({ ...plan.cameraFrames[0]!.view, time: 0 });
-  const blocking = await describeBlocking(scene, plan, aspect, true);
   const layout = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "color");
   const depth = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "depth");
   const video = await renderVideo(scene, plan, aspect, signal, () => {}, lighting, settings, "color");
-  return { layout, depth, video, blocking };
+  return { layout, depth, video };
 }
 
 /**
@@ -74,26 +72,25 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
   throw new Error(`The previs plan cannot be used: ${fixed.problems.join(" ")}`);
 }
 
+/** The film's previs plan, every shot's framed plan, and the measured blocking of each shot's opening as text for keyframe prompts. */
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[] };
+
 /**
- * Blocks and exports every shot in order without a person: the director model writes one plan for the whole film (the
- * set, where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from
- * where the previous one ended, frames the camera from the shot size and checks the framing. A stopped run passes the
- * plan and the shots it finished as `start` and carries on after them. People are columns in the previs video and
- * jointed figures in the opening's still images, both posed by code.
+ * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,
+ * where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from where
+ * the previous one ended, frames the camera from the shot size, checks the framing and describes the blocking. Nothing
+ * is rendered, so the texts written from the blocking need not wait for the renders.
  */
-export async function runPrevis(options: {
-  generate: Generate; providerId: string; modelId: string; shots: (SpecShot & { size: string })[];
-  aspect: number; signal: AbortSignal;
-  start?: { spec: PrevisSpec; plans: SavedPlan[] };
-  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; blocking: string; scene: SceneDocument; plans: SavedPlan[]; spec: PrevisSpec }) => Promise<void>;
-}) {
-  const spec = options.start?.spec ?? await writeSpec(options, options.shots);
+export async function planPrevis(options: {
+  generate: Generate; providerId: string; modelId: string; shots: (SpecShot & { size: string })[]; aspect: number; signal: AbortSignal;
+}): Promise<PrevisPlan> {
+  const spec = await writeSpec(options, options.shots);
   const scene = buildSet(spec);
   const ceiling = ceilingOf(spec);
-  const plans: SavedPlan[] = [...options.start?.plans ?? []];
+  const plans: SavedPlan[] = [];
+  const blocking: string[] = [];
   for (const [index, staged] of stageShots(spec, options.shots).entries()) {
     const { shot, seconds, tracks, subjects, camera } = staged;
-    if (index < plans.length) continue;
     options.signal.throwIfAborted();
     const size = options.shots[index]!.size;
     const base: DirectorPlan = { name: `Shot ${shot}`, duration: seconds, tracks, cameraFrames: [{ time: 0, easing: "smooth", view: emptyShotView(spec) }] };
@@ -109,8 +106,27 @@ export async function runPrevis(options: {
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
     if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
     plans.push({ ...plan, id: crypto.randomUUID() });
+    blocking.push(await describeBlocking(scene, plan, options.aspect, true));
+  }
+  return { spec, plans, blocking };
+}
+
+/**
+ * Renders the shots of a previs plan in order, skipping the `rendered` ones, so a stopped run carries on after them.
+ * People are columns in the previs video and jointed figures in the opening's still images, both posed by code.
+ */
+export async function renderPrevis(options: {
+  plan: Pick<PrevisPlan, "spec" | "plans">; shots: SpecShot[]; rendered: number[]; aspect: number; signal: AbortSignal;
+  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob }) => Promise<void>;
+}) {
+  const { spec, plans } = options.plan;
+  const scene = buildSet(spec);
+  for (const [index, staged] of stageShots(spec, options.shots).entries()) {
+    if (options.rendered.includes(staged.shot)) continue;
+    options.signal.throwIfAborted();
+    const plan = plans[index]!;
     // The stills show the opening with jointed figures and no motion, which the people's tracks would move.
     const exported = await exportShot(scene, plan, options.aspect, options.signal, renderSettings(spec), { scene: figureScene(scene, staged), plan: { ...plan, tracks: [] } });
-    await options.onShot({ shot, ...exported, scene, plans, spec });
+    await options.onShot({ shot: staged.shot, ...exported });
   }
 }

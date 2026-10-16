@@ -70,7 +70,8 @@ export type Production = {
   clips?: { shot: number; clip: number }[];
   /** The clips rendered again at the final quality, with the rough cut's prompts and seeds; absent at 480p. */
   finals?: ProductionClip[];
-  /** The Suno score under the whole film, when the production asked for music. */
+  /** The style prompt of the Suno score, written with the other texts, and the score under the whole film, when the production asked for music. */
+  musicStyle?: string;
   music?: string;
   /** The finished film and its delivery report. */
   film?: string;
@@ -82,12 +83,14 @@ export type Production = {
  * A person or place: `base` is the photo or design every view is drawn from, `views` its reference images (for a
  * person the face close-ups) and `outfits` a person's clothes in the story, each with its full-body views. A photo
  * fixes who someone is, never what they wear: the script decides that. `loras` are its trained LoRAs, empty when it
- * appears in too few shots to be worth one.
+ * appears in too few shots to be worth one; `triggers` their trigger words, fixed when the LoRAs are planned, so texts
+ * can name them while they train.
  */
 export type ProductionAsset = {
   name: string; look: string; photo?: string; base?: string; views?: string[];
   outfits?: { name: string; look: string; views?: string[] }[];
   loras?: { family: "h3" | "qwen"; path: string; trigger: string }[];
+  triggers?: Partial<Record<"h3" | "qwen", string>>;
 };
 
 export const productionDirectory = (id: string) => `productions/${id}`;

@@ -15,6 +15,8 @@ export type LoraInput = {
   items: { path: string; caption?: string }[];
   /** A slider's two ends, added to the base prompt: +1 at full strength, -1 at negative strength. */
   slider?: { base: string; positive: string; negative: string };
+  /** The trigger word of a family's LoRA when the caller fixed it beforehand; otherwise a new one is drawn. */
+  triggers?: Partial<Record<LoraFamily, string>>;
 };
 /** Stored beside each LoRA as `loras/<trigger>.json`, so nodes find the workspace's LoRAs and their trigger words. */
 export type LoraRecord = { name: string; kind: LoraKind; family: LoraFamily; trigger: string; path: string; createdAt: string };
@@ -72,7 +74,7 @@ async function topUp(kind: LoraKind, reference: Uint8Array, count: number, signa
 const training = new Set<string>();
 
 // A trigger word of plain letters the text encoder has no meaning for, so the LoRA owns it.
-const triggerWord = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), value => String.fromCharCode(97 + value % 26)).join("");
+export const triggerWord = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), value => String.fromCharCode(97 + value % 26)).join("");
 
 /**
  * Trains a LoRA for each model family on its own Colab L4 at the same time and saves each with its record in the
@@ -111,7 +113,7 @@ async function trainSet(cwd: string, input: LoraInput, signal?: AbortSignal) {
 }
 
 async function trainFamily(cwd: string, input: LoraInput, family: LoraFamily, items: { extension: string; caption?: string; data: Uint8Array }[], signal?: AbortSignal) {
-  const trigger = triggerWord();
+  const trigger = input.triggers?.[family] ?? triggerWord();
   const uploads = items.flatMap(({ extension, caption, data }, index) => {
     const name = `lora_item_${String(index).padStart(2, "0")}`;
     return [{ name: `${name}.${extension}`, data }, ...caption ? [{ name: `${name}.txt`, data: caption.replaceAll("{trigger}", trigger) }] : []];

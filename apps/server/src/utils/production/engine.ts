@@ -7,7 +7,7 @@ import { readColabBalance } from "@/utils/media/colab";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
-import { renderPrevis } from "./previs";
+import { planPrevis, renderPrevis } from "./previs";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { composeKeyframe, descriptionsPrompt, drawDraft, drawKeyframe, keyframeRevisionPrompt, parseDescriptions, planKeyframes, type ProductionKeyframe } from "./keyframes";
@@ -169,68 +169,80 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
-  // Designs and their LoRAs need the cast while previs needs only the shot list, so the two run side by side on
-  // separate machines, the budget checked once for both; the keyframes start when both are done. Only the LoRAs
-  // actually trained count against the budget; reused and skipped ones cost nothing.
-  const everyAsset = [...production.assets.characters, ...production.assets.places];
-  const drawn = everyAsset.every(assetDrawn);
-  const trained = everyAsset.every(item => item.loras);
-  if (!drawn || !trained || !production.previs) {
-    const plan = trained ? undefined : await planAssetLoras(cwd, production, await readProductionText(cwd, production.shotList));
-    const units = (drawn ? 0 : estimate.steps.find(item => item.step === "assets")!.units) + (plan?.units ?? 0)
-      + (production.previs ? 0 : estimate.steps.find(item => item.step === "text")!.units);
-    if (units && !await withinBudget(cwd, production, units, signal)) return false;
-    const save = () => saveProduction(cwd, production);
-    const results = await Promise.allSettled([
-      (async () => {
-        if (!drawn) await drawAssets(cwd, production, production.input.ratio, signal, save);
-        if (plan) await trainAssetLoras(cwd, plan, signal, save);
-      })(),
-      // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the
-      // reference image: the text model plans the film's staging in one reply, the Director's Studio code builds and
-      // frames every shot with cylinders in a headless Chrome, and each keyframe keeps its shot's previs composition,
-      // so the first frame and the previs a clip is given never disagree.
-      (async () => {
-        if (production.previs) return;
-        const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
-        const model = textModel();
-        // The model is loaded here first, so a failed Colab start stops the step before Chrome opens, and held while
-        // the page writes the plan, so the session's idle stop never falls between the plan and its fix.
-        production.previs = await renderPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal, async () => {
-          const release = holdColab();
-          try {
-            await complete("Reply with OK.", "OK?", signal);
-            return release;
-          } catch (error) {
-            release();
-            throw error;
-          }
-        });
-        await save();
-      })(),
-    ]);
-    // Both are awaited before an error is passed on, so nothing keeps running unwatched.
-    const failure = results.find(result => result.status === "rejected");
-    if (failure) throw failure.reason;
-    return true;
-  }
-
+  // The keyframes and the dub are planned from the shot list and the cast alone, before anything is drawn, so the texts
+  // written from them can follow the previs plan at once.
   if (!production.keyframes) {
     production.keyframes = planKeyframes(await readProductionText(cwd, production.shotList), production.assets);
     await saveProduction(cwd, production);
     return true;
   }
-  const keyframes = production.keyframes;
-  if (keyframes.shots.some(item => item.description === undefined)) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
-    const sections = parseDescriptions(await complete(shotListWriter, descriptionsPrompt(script, shotList, keyframes.shots, production.previs), signal));
-    for (const item of keyframes.shots) item.description = sections.get(item.shot) ?? item.row ?? "";
+  if (!production.dub) {
+    production.dub = planDub(await readProductionText(cwd, production.shotList), production.assets);
     await saveProduction(cwd, production);
     return true;
   }
+  // Designs and their LoRAs, the dub and the previs need only the cast and the shot list, so they run side by side on
+  // separate machines, the budget checked once for all; the keyframes start when all are done. Only the LoRAs actually
+  // trained count against the budget; reused and skipped ones cost nothing. The text model, still warm from the cast, is
+  // held from the previs plan until every text written from it is done, so none of them starts a machine of its own
+  // later, and released then, while the designs, LoRAs and previs renders, which take far longer, go on without it.
+  // Dubbing comes before the clip prompts: H3 lip-syncs to each shot's track, and a shot is as long as its lines need.
+  // Gemini TTS bills its own API, not Colab units.
+  const everyAsset = [...production.assets.characters, ...production.assets.places];
+  const drawn = everyAsset.every(assetDrawn);
+  const trained = everyAsset.every(item => item.loras);
+  const rendered = !!production.previs?.every(item => item.video);
+  const writing = textsMissing(production);
+  if (!drawn || !trained || !rendered || !production.clips || writing) {
+    const shotList = await readProductionText(cwd, production.shotList);
+    const plan = trained ? undefined : await planAssetLoras(cwd, production, shotList);
+    const units = (drawn ? 0 : estimate.steps.find(item => item.step === "assets")!.units) + (plan?.units ?? 0)
+      + (writing ? estimate.steps.find(item => item.step === "text")!.units : 0);
+    if (units && !await withinBudget(cwd, production, units, signal)) return false;
+    const save = () => saveProduction(cwd, production);
+    // The trigger words the LoRAs are planned with are kept before the clip prompts name them.
+    await save();
+    const release = writing ? holdColab() : () => {};
+    try {
+      const dubbed = production.clips ? Promise.resolve() : recordDub(cwd, production, signal, save).then(clips => {
+        production.clips = clips;
+        return save();
+      });
+      // Every shot is blocked in previs before its keyframe, as Code Video Model renders its proxy before the reference
+      // image: the text model plans the film's staging in one reply, the Director's Studio code builds and frames every
+      // shot in a headless Chrome and renders it there, and each keyframe keeps its shot's previs composition, so the
+      // first frame and the previs a clip is given never disagree.
+      const planned = production.previs ? Promise.resolve() : (async () => {
+        const model = textModel();
+        production.previs = await planPrevis(cwd, production, await readProductionText(cwd, production.script!), shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+        await save();
+      })();
+      const results = await Promise.allSettled([
+        (async () => {
+          if (!drawn) await drawAssets(cwd, production, production.input.ratio, signal, save);
+          if (plan) await trainAssetLoras(cwd, plan, signal, save);
+        })(),
+        dubbed,
+        planned.then(() => writeTexts(cwd, production, dubbed, signal)).finally(release),
+        planned.then(async () => {
+          if (rendered) return;
+          await renderPrevis(cwd, production, shotList, signal);
+          await save();
+        }),
+      ]);
+      // All are awaited before an error is passed on, so nothing keeps running unwatched.
+      const failure = results.find(result => result.status === "rejected");
+      if (failure) throw failure.reason;
+    } finally {
+      release();
+    }
+    return true;
+  }
+
+  const keyframes = production.keyframes;
   // A reviewer's change requests rewrite the descriptions of the shots they concern; those shots are drawn again with
-  // their own seeds, so only what was asked changes, and the review comes round again.
+  // their own seeds, so only what was asked changes, their clip prompts, which describe the keyframe, are written again,
+  // and the review comes round again.
   if (production.review?.gate === "keyframes" && production.review.notes) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const sections = parseDescriptions(await complete(shotListWriter, keyframeRevisionPrompt(keyframes.shots, production.review.notes), signal));
@@ -240,6 +252,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       item.description = description;
       delete item.image;
       delete item.draft;
+      const video = production.videos?.find(clip => clip.shot === item.shot);
+      if (video) delete video.prompt;
     }
     production.review = undefined;
     await saveProduction(cwd, production);
@@ -253,7 +267,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const master = keyframes.shots.find(item => item.shot === keyframes.master) ?? keyframes.shots[0]!;
   if (keyframes.shots.some(item => !item.image)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "keyframes")!.units, signal)) return false;
-    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth, item === master ? undefined : master.image));
+    const compose = (item: ProductionKeyframe) => Object.assign(item, composeKeyframe(item, production.assets!, production.previs!.find(shot => shot.shot === item.shot)!.depth!, item === master ? undefined : master.image));
     const release = holdQwenImage();
     try {
       await Promise.all(keyframes.shots.filter(item => !item.image && !item.draft).map(async item => {
@@ -275,40 +289,20 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   if (needs("keyframes")) return wait(cwd, production, "reviewKeyframes", { gate: "keyframes" });
 
-  // Dubbing comes before video: H3 lip-syncs to each shot's track, and a shot is as long as its lines need. Gemini TTS
-  // bills its own API, not Colab units.
-  if (!production.dub) {
-    production.dub = planDub(await readProductionText(cwd, production.shotList), production.assets);
-    await saveProduction(cwd, production);
-    return true;
-  }
-  if (!production.clips) {
-    production.clips = await recordDub(cwd, production, signal, () => saveProduction(cwd, production));
-    await saveProduction(cwd, production);
-    return true;
-  }
-
-  const videoWriter = "You write prompts for the MiniMax H3 video model.";
-  if (!production.videos) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
-    production.videos = await writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, signal));
-    await saveProduction(cwd, production);
-    return true;
-  }
   // The rough cut is always 480p: cheap to watch through; the chosen final quality is rendered only for approved shots.
-  if (production.videos.some(item => !item.video)) {
+  const videos = production.videos!;
+  if (videos.some(item => !item.video)) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "roughCut")!.units, signal)) return false;
-    await renderClips(cwd, production, production.videos, "480p", "clips", signal, () => saveProduction(cwd, production));
+    await renderClips(cwd, production, videos, "480p", "clips", signal, () => saveProduction(cwd, production));
     return true;
   }
   // Each clip is checked against its keyframe by the model reading frames of it: a clip that fails is rendered once more
   // with a new seed, and one that fails again stays, flagged for a person to look at.
-  const unchecked = production.videos.filter(item => !item.check);
+  const unchecked = videos.filter(item => !item.check);
   if (unchecked.length) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     for (const item of unchecked) {
-      const keyframe = production.keyframes.shots.find(shot => shot.shot === item.shot)!;
+      const keyframe = keyframes.shots.find(shot => shot.shot === item.shot)!;
       const frames = await clipFrames(cwd, production, item, keyframe.image!, signal);
       item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? ""), signal, frames));
       if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
@@ -325,7 +319,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   // The film: the clips render again at the chosen quality with the rough cut's prompts and seeds, so the shots keep
   // what the rough cut showed; a 480p film uses the rough cut's clips.
   if (production.input.quality !== "480p" && !production.finals) {
-    production.finals = production.videos.map(({ shot, prompt, seed }) => ({ shot, prompt, seed }));
+    production.finals = videos.map(({ shot, prompt, seed }) => ({ shot, prompt, seed }));
     await saveProduction(cwd, production);
     return true;
   }
@@ -334,11 +328,10 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await renderClips(cwd, production, production.finals, production.input.quality, "final", signal, () => saveProduction(cwd, production));
     return true;
   }
+  // Suno bills the sunoapi.org account, so the score is made only once every clip is rendered; its style was written
+  // with the other texts.
   if (production.input.music && !production.music) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const seconds = production.clips.reduce((sum, item) => sum + item.clip, 0);
-    const style = await complete(composer, musicPrompt(await readProductionText(cwd, production.script), seconds), signal);
-    production.music = await scoreFilm(cwd, production, style, seconds, signal);
+    production.music = await scoreFilm(cwd, production, production.musicStyle!, production.clips!.reduce((sum, item) => sum + item.clip, 0), signal);
     await saveProduction(cwd, production);
     return true;
   }
@@ -357,8 +350,37 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   return false;
 }
 
+const videoWriter = "You write prompts for the MiniMax H3 video model.";
 const composer = "You describe film scores for a music generation model.";
 const checker = "You check AI-generated video clips for a film editor.";
+
+/** Whether a text written from the previs plan is missing: a keyframe description, a clip prompt or the music's style. */
+const textsMissing = (production: Production) => production.keyframes!.shots.some(item => item.description === undefined)
+  || !production.videos || production.videos.some(item => !item.prompt) || (production.input.music && !production.musicStyle);
+
+/**
+ * Writes the texts the previs plan allows that the production still lacks, in the order they need each other: the
+ * keyframe descriptions from the previs blocking, then, once the dub has set each shot's length, the clip prompts from
+ * those descriptions and the style of the music.
+ */
+async function writeTexts(cwd: string, production: Production, dubbed: Promise<unknown>, signal: AbortSignal) {
+  const keyframes = production.keyframes!;
+  const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
+  const save = () => saveProduction(cwd, production);
+  if (keyframes.shots.some(item => item.description === undefined)) {
+    const sections = parseDescriptions(await complete(shotListWriter, descriptionsPrompt(script, shotList, keyframes.shots, production.previs!), signal));
+    for (const item of keyframes.shots) item.description = sections.get(item.shot) ?? item.row ?? "";
+    await save();
+  }
+  // ACT: The dub starts with the previs plan and is nearly always done by now; one slower than the plan and the
+  // descriptions keeps the held text model waiting. Release the hold while waiting if dubs ever run that long.
+  await dubbed;
+  await writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, signal), save);
+  if (production.input.music && !production.musicStyle) {
+    production.musicStyle = await complete(composer, musicPrompt(script, production.clips!.reduce((sum, item) => sum + item.clip, 0)), signal);
+    await save();
+  }
+}
 
 /** Asks for the Suno style prompt of an instrumental score that follows the story under its dialogue. */
 function musicPrompt(script: string, seconds: number) {

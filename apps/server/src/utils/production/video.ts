@@ -28,23 +28,26 @@ const shotSeconds = (production: Production, shot: number) => production.dub!.sh
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 
 /**
- * Writes every shot's MiniMax H3 prompt with the text model: the shared instructions, here with the script and shot
- * list inline, the keyframe's description for <Picture 1>, the previs as <Video 1> and the dubbed track as <Audio 1>; the
- * lines go in by fillDialogue. A prompt whose line markers are wrong, or that never names a person by their LoRA's
- * trigger word, is rewritten once with the error.
+ * Writes the MiniMax H3 prompt of every shot without one with the text model, saving each: the shared instructions, here
+ * with the script and shot list inline, the keyframe's description for <Picture 1>, the previs as <Video 1> and the
+ * dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
+ * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, or that never names
+ * a person by their LoRA's trigger word, is rewritten once with the error.
  */
-export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>) {
+export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
   const ids = speakerIds(spans);
-  const clips: ProductionClip[] = [];
+  const videos = production.videos ??= spans.map((span): ProductionClip => ({ shot: span.shot }));
   for (const span of spans) {
+    const video = videos.find(item => item.shot === span.shot)!;
+    if (video.prompt) continue;
     const clip = production.clips!.find(item => item.shot === span.shot)!.clip;
     const dubbed = !!production.dub!.shots.find(item => item.shot === span.shot)?.track;
     const keyframe = production.keyframes!.shots.find(item => item.shot === span.shot);
     const people = keyframe?.cast ?? [];
     const loras = people.flatMap(name => {
-      const lora = production.assets!.characters.find(item => item.name === name)?.loras?.find(item => item.family === "h3");
-      return lora ? [{ name, trigger: lora.trigger }] : [];
+      const trigger = production.assets!.characters.find(item => item.name === name)?.triggers?.h3;
+      return trigger ? [{ name, trigger }] : [];
     });
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
@@ -72,9 +75,9 @@ export async function writeClipPrompts(production: Production, script: string, s
       draft = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`);
       prompt = finish(draft);
     }
-    clips.push({ shot: span.shot, prompt });
+    video.prompt = prompt;
+    await save();
   }
-  return clips;
 }
 
 /**
@@ -96,7 +99,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
         // ACT: The previs goes in as a reference video rather than a control video, as the shot nodes do; skipPrevis only
         // lifts the server's control-video gate, which the previs reference satisfies.
         skipPrevis: true,
-        videos: previs ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
+        videos: previs?.video ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
         audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
         loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed,
       }, signal);
