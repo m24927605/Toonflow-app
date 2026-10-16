@@ -210,7 +210,8 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
 }
 
 // Frames a clip check reads, as shares of the part of the clip the film keeps.
-const checkTimes = [0.1, 0.4, 0.7, 0.95];
+// Six frames across the part of the clip the film keeps, so an action is seen from start to end.
+const checkTimes = [0.05, 0.25, 0.45, 0.65, 0.85, 0.98];
 
 /**
  * The keyframe and four frames of the part of a clip the film keeps as base64 PNGs, the frames saved beside the clips for
@@ -249,16 +250,20 @@ export async function keyframeImage(cwd: string, production: Production, shot: n
 /**
  * Asks for every problem in a clip, each marked major or minor, as JSON. ACT: The model names problems well but scored
  * clips 85/92 whatever it found, a changed set and clothes included, so the verdict follows the problems it marks major.
- * The clip is judged against the keyframe image only: given the keyframe's written description as well, the model took
- * the words for the picture and failed every clip of the first production, natural movement included.
+ * Looks are judged against the keyframe image only: given the keyframe's written description as well, the model took
+ * the words for the picture and failed every clip of the first production, natural movement included. The action and
+ * the gaze are judged against the shot-list row: judging looks alone, the check passed a jacket put on instead of taken
+ * off and five people staring into the lens, while most "melted faces" it failed were one motion-blurred frame.
  */
-export function clipCheckPrompt(prompt: string) {
+export function clipCheckPrompt(prompt: string, row: string, gazes: string) {
   return [
-    "The first image is a shot's keyframe, the first frame its video clip had to start from; the next four are frames from the clip at 10%, 40%, 70% and 95% of its length.",
+    `The first image is a shot's keyframe, the first frame its video clip had to start from; the next six are frames from the clip at ${checkTimes.map(time => `${Math.round(time * 100)}%`).join(", ")} of the part the film keeps.`,
+    `The shot-list row (shot size, camera, action, dialogue, cast, state): ${row}`,
+    ...gazes ? [`Where each person should look: ${gazes}.`] : [],
     `The clip was asked for: ${prompt}`,
-    "Compare the frames with the keyframe image, never with the words: they only tell you which movements and camera move were asked for, and where they describe the picture differently, the keyframe image is right.",
-    "List every problem you see. A problem is major when the set, the light or someone's clothes, hair or face differ from the keyframe; the clip does not open on the keyframe's place, framing and people; someone who should be seen has their head or face out of frame; someone or something appears from nowhere, vanishes or jumps to another place; a face, hand or body melts or deforms; someone passes through furniture or another person; or the picture flickers or morphs. Anything smaller is minor, such as a small drift of the framing.",
-    "Movement is what a clip is for: people turning, looking around, speaking, changing expression, gesturing, standing up, sitting down or walking, and a camera move such as a push in, pull back, pan or follow, are no problem as long as they carry on naturally from the keyframe's moment.",
+    "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
+    "Compare looks with the keyframe image, never with the words: where the words describe the picture differently, the keyframe image is right.",
+    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; the set, the light or someone's clothes, hair or face differ from the keyframe; the clip does not open on the keyframe's place, framing and people; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }

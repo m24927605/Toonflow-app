@@ -340,7 +340,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     for (const item of unchecked) {
       const keyframe = keyframes.shots.find(shot => shot.shot === item.shot)!;
       const frames = await clipFrames(cwd, production, item, keyframe.image!, signal);
-      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? ""), signal, frames));
+      const { gaze, opening } = production.previs!.find(shot => shot.shot === item.shot)!.framed;
+      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", keyframe.row ?? "", opening.map(name => `${name} ${gaze[name]}`).join("; ")), signal, frames));
       if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
       await saveProduction(cwd, production);
     }
