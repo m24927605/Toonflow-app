@@ -67,6 +67,7 @@ async function drawBatch() {
       control: request.controlImage ? imageName(request.controlImage) : null,
       init: request.initImage ? imageName(request.initImage) : null,
       denoise: request.initImage ? request.denoise : null,
+      recipe: request.recipe ?? null,
       loras: loras[index]!.map(({ name, strength }) => ({ name, strength })),
     }));
     const results = await worker.run(async (session, signal) => {
@@ -98,11 +99,12 @@ async function drawBatch() {
 
 /**
  * Keeps the Qwen-Image session open between batches until the returned release is called, for a caller whose next
- * batch depends on this one, such as a production's other keyframes on its master; release in a finally block.
+ * batch depends on this one, such as a production's poses on its designs; release in a finally block. With `ms`, the
+ * hold ends by itself after that long or when `signal` aborts, so a stalled caller cannot keep the machine on.
  */
-export const holdQwenImage = () => worker.hold();
+export const holdQwenImage = (ms?: number, signal?: AbortSignal) => ms ? worker.holdFor(ms, signal) : worker.hold();
 
-/** Queues one Qwen-Image 2.1 Turbo image; it is drawn on Colab together with the other requests of its batch. */
+/** Queues one Qwen-Image 2.1 image, Turbo unless a recipe asks for the base model; it is drawn on Colab together with the other requests of its batch. */
 export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (!request.prompt.trim()) throw new Error("Qwen-Image prompt cannot be empty");
   if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");
@@ -110,6 +112,7 @@ export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
   if ((request.loras?.length ?? 0) > 4) throw new Error("Qwen-Image loads at most 4 LoRAs");
   if (request.seed !== undefined && (!Number.isSafeInteger(request.seed) || request.seed < 0)) throw new Error("Invalid Qwen-Image seed");
+  if (request.recipe === "pose" && (request.images?.length ?? 0) < 2) throw new Error("Pose transfer needs a mannequin render and a picture of the person");
   if (request.initImage && !(typeof request.denoise === "number" && request.denoise > 0 && request.denoise <= 1)) throw new Error("Redrawing an image with Qwen-Image needs a denoise above 0 and up to 1");
   for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : [], ...request.initImage ? [request.initImage] : []]) inputBytes(image);
   signal?.throwIfAborted();

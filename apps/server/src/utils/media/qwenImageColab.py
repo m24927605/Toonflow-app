@@ -1,7 +1,8 @@
 # Qwen-Image 2.1 Turbo pipeline executed on a Colab GPU session by qwenImage.ts.
-# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control, init, denoise}) and the files it
-# names; control is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch, and init an
-# optional picture redrawn from the noise level denoise instead of drawing from pure noise.
+# Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control, init, denoise, recipe}) and the
+# files it names; control is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch, and
+# init an optional picture redrawn from the noise level denoise instead of drawing from pure noise. recipe "pose" and
+# "photo" draw with the base model instead of Turbo (see build).
 # Output: /content/qwout/image_<n>.png for every item, followed by a COLAB_DONE line on success.
 # The model loads once and the items are drawn one by one, always at the requested ratio and size; references reach
 # the model through the text encoder's conditioning, so the output canvas does not have to share their aspect.
@@ -32,7 +33,8 @@ assert 1 <= len(items) <= 32
 
 
 def dimensions(item):
-    side = {"1K": 1024, "2K": 2048}[item["size"]]
+    # The photo recipe draws at about 1152x1728 whatever the size, the area its recipe was verified at.
+    side = 1408 if item.get("recipe") == "photo" else {"1K": 1024, "2K": 2048}[item["size"]]
     ratioWidth, ratioHeight = (int(part) for part in item["ratio"].split(":"))
     assert ratioWidth > 0 and ratioHeight > 0
     return side, round(math.sqrt(side * side * ratioWidth / ratioHeight) / 32) * 32, round(math.sqrt(side * side * ratioHeight / ratioWidth) / 32) * 32
@@ -65,6 +67,11 @@ weights = [(f"diffusion_models/{diffusion}", "diffusion_models"), (f"text_encode
 # The patch is only downloaded when a batch actually uses it.
 if any(item.get("control") for item in items):
     weights.append((f"model_patches/{controlPatch}", "model_patches"))
+# The base (not Turbo) model, int8, for the recipes taken from the Apache-2.0 qwen21-nsfw-pose-skill
+# (github.com/Arekejoker/qwen21-nsfw-pose-skill), which were verified on it; Turbo ignores the pose LoRA.
+baseModel = "qwen_image_2.1_int8_convrot.safetensors"
+if any(item.get("recipe") for item in items):
+    weights.append((f"diffusion_models/{baseModel}", "diffusion_models"))
 for remote, folder in weights:
     target = comfy / "models" / folder / Path(remote).name
     if target.exists():
@@ -72,6 +79,12 @@ for remote, folder in weights:
     downloaded = Path(hf_hub_download(repo_id="Comfy-Org/Qwen-Image-2.1", filename=remote, revision=weightRevision, local_dir="/content/hf"))
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(downloaded, target)
+# The VNCCS PoseStudio LoRA makes the base model take the pose of a textureless mannequin render, pinned like the weights.
+poseLora = "VNCCS_QI2_PoseStudioV1.1.safetensors"
+if any(item.get("recipe") == "pose" for item in items) and not (comfy / "models" / "loras" / poseLora).exists():
+    downloaded = Path(hf_hub_download(repo_id="MIUProject/VNCCS_PoseStudio_QI2.1", filename=poseLora, revision="9857b8a256655da446772a3f1f2b033e33181a6d", local_dir="/content/hf"))
+    (comfy / "models" / "loras").mkdir(parents=True, exist_ok=True)
+    shutil.move(downloaded, comfy / "models" / "loras" / poseLora)
 
 (comfy / "input").mkdir(exist_ok=True)
 for item in items:
@@ -123,6 +136,9 @@ def build(item):
         graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
     # LoRAs sit between the model and its cache, so every sampler and the ControlNet patch see them.
     model = ["1", 0]
+    if item.get("recipe") == "pose":
+        graph["poseLora"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": model, "lora_name": poseLora, "strength_model": 1.0}}
+        model = ["poseLora", 0]
     for index, lora in enumerate(item.get("loras") or []):
         target = comfy / "models" / "loras" / lora["name"]
         if not target.exists():
@@ -131,6 +147,18 @@ def build(item):
         graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": model, "lora_name": lora["name"], "strength_model": float(lora["strength"])}}
         model = [f"lora{index}", 0]
     graph["2"]["inputs"]["model"] = model
+    if item.get("recipe"):
+        graph["1"]["inputs"]["unet_name"] = baseModel
+    if item.get("recipe") == "pose":
+        # Pose transfer: <image 1> is the mannequin, <image 2> the person; the edit starts from the mannequin's latent,
+        # 25 steps at CFG 1, euler/simple, as the skill's verified recipe.
+        graph["11"]["inputs"]["latent_image"] = ["5", 2]
+        graph["10"] = {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "simple", "steps": 25, "denoise": 1.0}}
+    if item.get("recipe") == "photo":
+        # The skill's text-to-image recipe without its Civitai LoRA: er_sde/beta, CFG 2.5, 50 steps.
+        graph["8"] = {"class_type": "CFGGuider", "inputs": {"model": ["2", 0], "positive": ["5", 0], "negative": ["5", 1], "cfg": 2.5}}
+        graph["9"]["inputs"]["sampler_name"] = "er_sde"
+        graph["10"] = {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": 50, "denoise": 1.0}}
     if item.get("control"):
         # The depth map is scaled to the output canvas so the structure lines up with the latent.
         graph["ctrl"] = {"class_type": "LoadImage", "inputs": {"image": item["control"]}}

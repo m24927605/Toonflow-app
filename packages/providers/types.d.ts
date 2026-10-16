@@ -200,6 +200,11 @@ interface ProviderTools {
     initImage?: MediaInput;
     /** With `initImage`, required: the noise level the redraw starts from, above 0 (kept) up to 1 (drawn anew). */
     denoise?: number;
+    /**
+     * Draws with the base model instead of Turbo: "pose" puts the person of the second image into the pose of the
+     * textureless mannequin render given as the first image; "photo" is a slower, more detailed photographic recipe.
+     */
+    recipe?: "pose" | "photo";
   }): Promise<{ data: Uint8Array; mimeType: "image/png"; seed: number }>;
 }
 

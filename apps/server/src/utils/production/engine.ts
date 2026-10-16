@@ -6,7 +6,8 @@ import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } f
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
 import { warmMinimaxH3 } from "@/utils/media/minimaxH3";
-import { assetDrawn, castPrompt, drawAssets, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
+import { holdQwenImage } from "@/utils/media/qwenImage";
+import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
@@ -226,8 +227,9 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const drawn = everyAsset.every(assetDrawn);
   const trained = everyAsset.every(item => item.loras);
   const rendered = production.previs.every(item => item.video);
+  const posed = production.previs.every(item => Object.keys(item.poses ?? {}).every(name => production.shots!.find(shot => shot.shot === item.shot)?.poses?.[name]));
   const writing = textsMissing(production);
-  if (!drawn || !trained || !rendered || !production.clips || writing) {
+  if (!drawn || !trained || !rendered || !posed || !production.clips || writing) {
     const shotList = await readProductionText(cwd, production.shotList);
     const plan = trained ? undefined : await planAssetLoras(cwd, production, shotList);
     const units = (drawn ? 0 : estimate.steps.find(item => item.step === "assets")!.units) + (plan?.units ?? 0)
@@ -239,33 +241,37 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     const release = writing ? holdColab() : () => {};
     const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
     let releaseH3 = () => {};
+    // The Qwen-Image machine stays on from the designs to the poses drawn from them, so the poses never start their own;
+    // for 15 minutes at most, should the previs renders the poses wait for stall.
+    const releaseQwen = holdQwenImage(15 * 60_000, signal);
     try {
       const dubbed = production.clips ? Promise.resolve() : recordDub(cwd, production, signal, save).then(clips => {
         production.clips = clips;
         return save();
       });
-      const designed = (async () => {
-        if (!drawn) await drawAssets(cwd, production, production.input.ratio, signal, save);
-        if (plan) await trainAssetLoras(cwd, plan, signal, save);
-      })();
+      const drawing = drawn ? Promise.resolve() : drawAssets(cwd, production, production.input.ratio, signal, save);
+      const designed = drawing.then(() => plan && trainAssetLoras(cwd, plan, signal, save));
       const blocked = (async () => {
         if (rendered) return;
         await renderPrevis(cwd, production, shotList, signal);
         await save();
       })();
-      // Once the designs, LoRAs and previs renders are done, only texts are left before the clips, and Qwen-Image has
-      // freed its machine slot: the H3 A100s start and set up meanwhile, when the budget has room for the clips too.
-      const warmed = Promise.all([designed, blocked]).then(async () => {
+      // Each person's opening pose needs only their design and the previs figure, so it is drawn while the LoRAs train.
+      const posing = Promise.all([drawing, blocked]).then(() => drawPoses(cwd, production, signal, save)).finally(releaseQwen);
+      // Once the designs, LoRAs, previs renders and poses are done, only texts are left before the clips, and Qwen-Image
+      // has freed its machine slot: the H3 A100s start and set up meanwhile, when the budget has room for the clips too.
+      const warmed = Promise.all([designed, blocked, posing]).then(async () => {
         if (await affordable(production, (writing ? estimate.steps.find(item => item.step === "text")!.units : 0) + clipUnits, signal)) {
           releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, 20 * 60_000, signal);
         }
       });
-      const results = await Promise.allSettled([designed, dubbed, writeTexts(cwd, production, dubbed, signal).finally(release), blocked, warmed]);
+      const results = await Promise.allSettled([designed, dubbed, writeTexts(cwd, production, dubbed, signal).finally(release), blocked, posing, warmed]);
       // All are awaited before an error is passed on, so nothing keeps running unwatched.
       const failure = results.find(result => result.status === "rejected");
       if (failure) throw failure.reason;
     } finally {
       release();
+      releaseQwen();
       releaseH3();
     }
     return true;

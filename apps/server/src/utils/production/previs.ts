@@ -9,10 +9,12 @@ import { productionDirectory, type Production } from "./state";
 /**
  * Every shot's measured blocking as text for its clip prompt; who it shows by name, in the opening and at any moment,
  * whom the clip names and gives as references; where each person in the opening looks, in English; and once the shot is rendered, its opening as a colour layout
- * and a depth map and its animation as the previs video.
+ * and a depth map, its animation as the previs video, and each person of the opening alone as a full-body mannequin
+ * render in their opening pose, by name, for pose transfer.
  */
 export type ProductionPrevis = {
   shot: number; blocking: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string> }; layout?: string; depth?: string; video?: string;
+  poses?: Record<string, string>;
 }[];
 
 // The director model writes the plan of the whole film in one reply, which with a fix and a machine start can take
@@ -100,11 +102,13 @@ export async function renderPrevis(cwd: string, production: Production, shotList
   const folder = previsFolder(production);
   const previs = production.previs!;
   const filesOf = (shot: number) => ({ layout: `${folder}/shot${shot}.png`, depth: `${folder}/shot${shot}Depth.png`, video: `${folder}/shot${shot}.mp4` });
+  // Named by their place in the opening, so a path holds no name from the script.
+  const posesOf = (item: ProductionPrevis[number]) => Object.fromEntries(item.framed.opening.map((name, index) => [name, `${folder}/shot${item.shot}Pose${index + 1}.png`]));
   const unrendered = async () => (await Promise.all(previs.map(async ({ shot }) =>
     stat((await resolveWorkspacePath(cwd, filesOf(shot).video, true)).path).then(() => [], () => [shot])))).flat();
   let pending = await unrendered();
   if (pending.length) {
-    const render = pending.map(shot => ({ shot, ...filesOf(shot) }));
+    const render = pending.map(shot => ({ shot, ...filesOf(shot), poses: posesOf(previs.find(item => item.shot === shot)!) }));
     await runPage({ mode: "render", directory: cwd, folder, aspect: aspectOf(production), shots: previsShots(shotList), render }, signal, async () => {
       const now = await unrendered();
       if (now.length === pending.length) return false;
@@ -112,5 +116,10 @@ export async function renderPrevis(cwd: string, production: Production, shotList
       return true;
     });
   }
-  for (const item of previs) Object.assign(item, filesOf(item.shot));
+  // A shot rendered before pose renders existed has none; it keeps its people's outfit views.
+  for (const item of previs) {
+    const poses = await Promise.all(Object.entries(posesOf(item)).map(async ([name, path]) =>
+      stat((await resolveWorkspacePath(cwd, path, true)).path).then(() => [[name, path] as const], () => [])));
+    Object.assign(item, filesOf(item.shot), { poses: Object.fromEntries(poses.flat()) });
+  }
 }

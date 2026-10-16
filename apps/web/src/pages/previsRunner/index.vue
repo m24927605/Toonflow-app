@@ -14,11 +14,12 @@ type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[]; framed:
 /**
  * What the server's previs step hands this page before it loads: the workspace, the previs folder and every shot of the
  * film. To plan, the director model and the script and shot list the plan refers to as {{ref 1}} and {{ref 2}}; the plan
- * is saved as plan.json in the folder. To render, the shots of that plan still to render and where each one's files go.
+ * is saved as plan.json in the folder. To render, the shots of that plan still to render and where each one's files go,
+ * with a pose image path for each person whose pose render the server wants.
  */
 type PrevisJob = { directory: string; folder: string; aspect: number; shots: Shot[] } & (
   | { mode: "plan"; providerId: string; modelId: string; script: string; shotList: string }
-  | { mode: "render"; render: { shot: number; layout: string; depth: string; video: string }[] }
+  | { mode: "render"; render: { shot: number; layout: string; depth: string; video: string; poses: Record<string, string> }[] }
 );
 type Director = {
   planPrevis?: (options: {
@@ -26,7 +27,7 @@ type Director = {
   }) => Promise<PrevisPlan>;
   renderPrevis?: (options: {
     plan: PrevisPlan; shots: Shot[]; rendered: number[]; aspect: number; signal: AbortSignal;
-    onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob }) => Promise<void>;
+    onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; poses: Record<string, Blob> }) => Promise<void>;
   }) => Promise<void>;
 };
 type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: Partial<Pick<PrevisPlan, "blocking" | "framed">> & { error?: string } };
@@ -63,11 +64,12 @@ onMounted(async () => {
     await director.renderPrevis({
       plan: await files.readJson<PrevisPlan>(planPath), shots: job.shots, aspect: job.aspect, signal,
       rendered: job.shots.flatMap(({ shot }) => render.has(shot) ? [] : [shot]),
-      async onShot({ shot, layout, depth, video }) {
+      async onShot({ shot, layout, depth, video, poses }) {
         status.value = `shot ${shot}`;
         const paths = render.get(shot)!;
         await files.write(paths.layout, layout);
         await files.write(paths.depth, depth);
+        for (const [name, path] of Object.entries(paths.poses)) if (poses[name]) await files.write(path, poses[name]);
         // Written last, so a shot counts as rendered only once all its files are saved; a stopped run resumes after it.
         await files.write(paths.video, video);
       },

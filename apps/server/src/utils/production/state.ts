@@ -87,7 +87,7 @@ export type Production = {
  */
 export type ProductionAsset = {
   name: string; look: string; photo?: string; base?: string; views?: string[];
-  outfits?: { name: string; look: string; views?: string[] }[];
+  outfits?: { name: string; look: string; adult?: boolean; views?: string[] }[];
   loras?: { family: "h3" | "qwen"; path: string; trigger: string }[];
   triggers?: Partial<Record<"h3" | "qwen", string>>;
 };

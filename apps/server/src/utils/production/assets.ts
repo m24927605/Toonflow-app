@@ -6,12 +6,13 @@ import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { holdQwenImage } from "@/utils/media/qwenImage";
+import { outfitView } from "./shots";
 import { productionDirectory, type Production, type ProductionAsset } from "./state";
 
 const castSchema = z.object({
   characters: z.array(z.object({
     name: z.string().trim().min(1), look: z.string().trim().min(1),
-    outfits: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })).min(1),
+    outfits: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1), adult: z.boolean().optional() })).min(1),
   })),
   places: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })),
 });
@@ -20,8 +21,8 @@ const castSchema = z.object({
 export function castPrompt(script: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
-    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\"}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
+    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\",\"adult\":false}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too; adult: true for an outfit that leaves the person nude or partly nude, or that the screenplay uses in a sexual scene, else false. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
     "Output only the JSON.",
     "",
     "Screenplay:",
@@ -45,6 +46,8 @@ export function parseCast(text: string, photos: Production["input"]["photos"]) {
 }
 
 const qwen = { providerId: "qwenImage", modelId: "qwen_image_2_1_turbo" };
+// Adult outfits are drawn with the slower photographic recipe of the base model, which Turbo's distilled style lacks.
+const photo = "qwen_image_2_1_photo";
 const finish = "Photorealistic, sharp focus, natural texture, one single photograph, no text.";
 const studio = "plain light grey studio background, even soft light";
 
@@ -65,9 +68,9 @@ const placeViews = [
   "The left part of the same place seen closer from the same side, empty.",
 ];
 
-async function draw(cwd: string, id: string, prompt: string, ratio: string, references: string[], signal: AbortSignal) {
+async function draw(cwd: string, id: string, prompt: string, ratio: string, references: string[], signal: AbortSignal, modelId = qwen.modelId) {
   const [image] = await generateMedia(cwd, "image", {
-    ...qwen, prompt, ratio, size: "1K", outputDirectory: `${productionDirectory(id)}/assets`,
+    ...qwen, modelId, prompt, ratio, size: "1K", outputDirectory: `${productionDirectory(id)}/assets`,
     images: references.map(path => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.webp$/i.test(path) ? "image/webp" : "image/png" })),
   }, signal);
   return image!.path;
@@ -84,7 +87,8 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
   try {
     await Promise.all([
       ...assets.characters.filter(item => !item.base).map(async item => {
-        item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${item.outfits![0]!.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal);
+        const outfit = item.outfits![0]!;
+        item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${outfit.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal, outfit.adult ? photo : undefined);
       }),
       ...assets.places.filter(item => !item.base).map(async item => {
         item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, empty, no people. ${finish}`, ratio, [], signal);
@@ -98,7 +102,7 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
       }),
       ...assets.characters.flatMap(item => (item.outfits ?? []).filter(outfit => !outfit.views).map(async outfit => {
         const rule = `The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body, now wearing ${outfit.look}.`;
-        outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
+        outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal, outfit.adult ? photo : undefined)));
       })),
       ...assets.places.filter(item => !item.views).map(async item => {
         const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, layout and light.";
@@ -109,6 +113,36 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
   } finally {
     release();
   }
+}
+
+const poseModel = "qwen_image_2_1_pose";
+const poseRatios = [[1, 1], [3, 4], [2, 3], [9, 16], [4, 3], [3, 2], [16, 9]] as const;
+
+/** The supported ratio closest to a PNG's own, read from its header. */
+async function ratioOf(cwd: string, path: string) {
+  const header = await readFile((await resolveWorkspacePath(cwd, path)).path).then(data => data.subarray(16, 24));
+  const aspect = header.readUInt32BE(0) / header.readUInt32BE(4);
+  const [width, height] = poseRatios.reduce((best, ratio) => Math.abs(Math.log(ratio[0] / ratio[1] / aspect)) < Math.abs(Math.log(best[0] / best[1] / aspect)) ? ratio : best);
+  return `${width}:${height}`;
+}
+
+/**
+ * Draws every person of each shot's opening in the outfit they wear there and in their pose in the previs: pose
+ * transfer puts the person of their outfit's front view into the pose of their full-body previs figure, so the clip's
+ * reference shows them kneeling, seated or turned as the shot begins rather than standing facing the camera. Requests
+ * go out together, so Qwen-Image draws them in one batch. A person without a pose render keeps the front view.
+ * ACT: Each pose costs well under a minute of the Qwen machine, left out of the production estimate.
+ */
+export async function drawPoses(cwd: string, production: Production, signal: AbortSignal, save: () => Promise<void>) {
+  await Promise.all(production.previs!.flatMap(previs => Object.entries(previs.poses ?? {}).map(async ([name, render]) => {
+    const shot = production.shots!.find(item => item.shot === previs.shot)!;
+    const person = production.assets!.characters.find(item => item.name === name);
+    const view = person && outfitView(person, shot);
+    if (shot.poses?.[name] || !view) return;
+    const posed = await draw(cwd, production.id, finish, await ratioOf(cwd, render), [render, view], signal, poseModel);
+    (shot.poses ??= {})[name] = posed;
+  })));
+  await save();
 }
 
 // ACT: A LoRA (about 1–2 units each) only pays off for a person or place seen in this many shots; fewer get by on

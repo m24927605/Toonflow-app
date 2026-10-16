@@ -6,7 +6,11 @@ import type { Production, ProductionAsset } from "./state";
  * One shot of the film as the clips need it: its time, shot-list row and character state, the place its row names and
  * the outfit each person wears in it, by name. Everyone has an outfit, as the previs may show anyone.
  */
-export type ProductionShot = { shot: number; time: string; state?: string; place?: string; row?: string; outfits: Record<string, string> };
+export type ProductionShot = {
+  shot: number; time: string; state?: string; place?: string; row?: string; outfits: Record<string, string>;
+  /** Each person of the opening drawn in their outfit and their pose in the previs, by name, once drawn. */
+  poses?: Record<string, string>;
+};
 
 const seconds = (value: number) => Number(value.toFixed(2));
 
@@ -61,10 +65,15 @@ export const maxLoras = 4;
 export function shotReferences(shot: ProductionShot, assets: NonNullable<Production["assets"]>, framed: { opening: string[]; shown: string[] }) {
   const names = [...new Set([...framed.opening, ...framed.shown])];
   const persons = names.flatMap(name => byName(assets.characters, name) ?? []).slice(0, maxPeople);
-  const outfitView = (person: ProductionAsset) => (person.outfits?.find(outfit => outfit.name === shot.outfits[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base;
   const place = byName(assets.places, shot.place);
-  return { people: persons.map(person => ({ person, image: outfitView(person) })), place: place ? { place, image: place.views?.[0] ?? place.base } : undefined };
+  // A person drawn in their opening pose shows the clip that pose rather than standing facing the camera.
+  const image = (person: ProductionAsset) => shot.poses?.[person.name] ?? outfitView(person, shot);
+  return { people: persons.map(person => ({ person, image: image(person) })), place: place ? { place, image: place.views?.[0] ?? place.base } : undefined };
 }
+
+/** A person's front view in the outfit they wear in a shot, or their base image before the views are drawn. */
+export const outfitView = (person: ProductionAsset, shot: ProductionShot) =>
+  (person.outfits?.find(outfit => outfit.name === shot.outfits[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base;
 
 /** The reference images in prompt order, once every one is drawn. */
 export function referenceImages(references: ReturnType<typeof shotReferences>) {

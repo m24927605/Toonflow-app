@@ -66,6 +66,8 @@ export function createMannequin(id: string, color = "#c7a77b", hiddenParts: read
   bodyPart(neck, [[-0.04, 0.048, 0.043], [0.045, 0.043, 0.04], [0.08, 0.052, 0.047]]);
   const head = joint(neck, "head", [0, 0.07, 0]);
   bodyPart(head, [[-0.045, 0.038, 0.043, 0.015], [-0.01, 0.072, 0.075, 0.008], [0.055, 0.092, 0.095], [0.125, 0.09, 0.09], [0.17, 0.075, 0.075], [0.198, 0.035, 0.036], [0.205, 0.002, 0.002]]);
+  // A nose, so a render shows which way the face looks: a featureless head reads the same from the front and the back.
+  bodyPart(head, [[0.025, 0.004, 0.004, 0.09], [0.035, 0.016, 0.022, 0.092], [0.075, 0.01, 0.014, 0.09], [0.09, 0.002, 0.002, 0.088]]);
 
   for (const side of ["left", "right"] as const) {
     const direction = side === "left" ? 1 : -1;
