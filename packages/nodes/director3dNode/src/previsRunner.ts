@@ -151,7 +151,7 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
  * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name, with where
  * each of them looks and, for the people of the opening, the way their head turns in their pose render.
  */
-export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }[] };
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; timeline: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }[] };
 
 /**
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,
@@ -188,9 +188,11 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
   const plans: SavedPlan[] = [];
   const blocking: string[] = [];
   const framed: PrevisPlan["framed"] = [];
+  const timeline: string[] = [];
   const small: string[] = [];
   for (const [index, staged] of stageShots(spec, options.shots).entries()) {
     const { shot, seconds, tracks, subjects, camera } = staged;
+    timeline.push(staged.timeline);
     options.signal.throwIfAborted();
     const size = options.shots[index]!.size;
     const base: DirectorPlan = { name: `Shot ${shot}`, duration: seconds, tracks, cameraFrames: [{ time: 0, easing: "smooth", view: emptyShotView(spec) }] };
@@ -212,7 +214,7 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
     blocking.push(await describeBlocking(scene, plan, options.aspect, true));
     framed.push(await framedPeople(scene, plan, options.aspect));
   }
-  return { plan: { spec, plans, blocking, framed } as PrevisPlan, small };
+  return { plan: { spec, plans, blocking, timeline, framed } as PrevisPlan, small };
 }
 
 /**

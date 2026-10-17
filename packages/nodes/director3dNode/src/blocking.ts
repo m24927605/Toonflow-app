@@ -314,22 +314,22 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
   }
 }
 
-// A video model draws a face from latent cells of about 32 by 32 pixels, so a face only a cell or two tall comes out
-// with smeared or doubled eyes. ACT: The share of the frame height a face needs, from one 720p MiniMax H3 film on
-// 2026-10-17 (eyes smeared at 37-46 px of 720, thin but whole at 56-62, clean from 93); measure it on more films.
-const minFaceShare = 0.08;
+// A video model draws a face from latent cells of about 32 by 32 pixels, so a face under about three cells tall comes
+// out with smeared or doubled eyes. ACT: The share of the frame height a face needs: about 95 px of 720, where one
+// MiniMax H3 film on 2026-10-17 drew clean eyes from 93 px and H3 users report the same; measure it on more films.
+const minFaceShare = 0.13;
 // Crown to chin in metres, an adult's.
 const headHeight = 0.23;
-// Wide shot sizes, where people are meant to be small in the place: "\u9060\u666f"/"\u8fdc\u666f" (long shot).
-const wideSizes = /extreme wide|establishing|\bwide|long shot|\u9060\u666f|\u8fdc\u666f/i;
 
 /**
  * Where a shot shows someone's face too small for the video model to draw their eyes: for each person of `cast` whose
- * head is in frame, the moment their face is smallest, when it is under minFaceShare of the frame height. A wide shot
- * size asks for small people and is not checked; nor is anyone lying down, whose face the camera may see from any side.
+ * head is in frame, the moment their face is smallest, when it is under minFaceShare of the frame height. Only the sizes
+ * that cut people off below are checked: one that frames them whole, such as a full or wide shot, keeps their faces
+ * small whatever the staging, and those faces are redrawn after the render instead. Nor is anyone lying down checked,
+ * whose face the camera may see from any side.
  */
 export async function smallFaces(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string) {
-  if (wideSizes.test(size)) return [];
+  if (!shotSizes.some(rule => rule.pattern.test(size))) return [];
   const stage = await framingStage(scene, plan, aspect);
   try {
     const motion = prepareMotion(plan.cameraFrames);

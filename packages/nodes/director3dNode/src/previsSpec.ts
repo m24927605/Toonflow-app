@@ -57,7 +57,7 @@ export const previsSpecSchema = z.strictObject({
   people: z.array(z.strictObject({ name, enters: z.number().int().min(1), at: place, posture: z.enum(postures), faces: name.optional() })).min(1).max(12),
   shots: z.array(z.strictObject({
     shot: z.number().int().min(1),
-    moves: z.array(z.strictObject({ name, to: place.optional(), posture: z.enum(postures).optional(), faces: name.optional() })).max(12).optional(),
+    moves: z.array(z.strictObject({ name, to: place.optional(), posture: z.enum(postures).optional(), faces: name.optional(), at: z.number().min(0).optional() })).max(24).optional(),
     camera: z.strictObject({
       side: z.enum(cameraSides), over: name.optional(),
       angle: z.enum(["eye", "low", "high"]).optional(), move: z.enum(["static", "pushIn", "pullOut", "follow"]).optional(),
@@ -85,13 +85,17 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\", \"faces\": the person or prop they look at}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
     "",
     "shots: one per shot, in order: {\"shot\": its number, \"moves\": [...], \"camera\": {...}}.",
-    "- \"moves\": each person who moves, changes posture or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end, \"faces\": the person or prop they look at by the end}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
+    "- \"moves\": each person who moves, changes posture or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end, \"faces\": the person or prop they look at by the end, \"at\": the second of the shot the move starts}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
+    "- Someone who does several things in one shot, as in a long take, has one move for each, in story order, each with its \"at\" later than the one before, such as walking to the door at 0, then to a cushion and sitting down at 6; each move gets at least a second, and a person's only move may leave \"at\" out to start at once.",
     "- \"faces\" names a person or a prop exactly as the plan does; leave it out to have someone look at the nearest other person.",
     "- \"camera\": {\"side\": where the camera stands, seen from the front: \"front\", \"frontLeft\", \"frontRight\", \"left\", \"right\" or \"back\"; or \"overShoulder\" with \"over\": the person whose shoulder it looks past at another person; \"angle\": \"eye\", \"low\" or \"high\"; \"move\": \"static\", \"pushIn\", \"pullOut\" or \"follow\"}. The shot size and who is in frame come from the shot list.",
     "",
     "Follow each row's action, camera and state cells and the script. Keep the staging continuous, and when a row's state cell gives someone a posture or place other than where the previous shot left them, give that shot a move taking them there: people may sit down or stand up between shots.",
   ].join("\n");
 }
+
+// The least time one move of a person gets in a shot.
+export const minMoveSeconds = 1;
 
 const isSeat = (kind: PropKind) => "seat" in propKinds[kind];
 const onWall = (kind: PropKind) => "wall" in propKinds[kind];
@@ -152,6 +156,16 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
       else if (person.enters > item.shot) problems.push(`Shot ${item.shot} moves ${move.name}, who enters only in shot ${person.enters}.`);
       if (move.to) checkPlace(move.to, `Shot ${item.shot}'s move of ${move.name}`);
       checkFaces(move.faces, `In shot ${item.shot}, ${move.name}`);
+    }
+    // Moves of one person run one after another, so each needs its own start, a second after the one before and a
+    // second before the shot ends, which leaves every move time to be seen.
+    const seconds = shots.find(other => other.shot === item.shot)?.seconds ?? Infinity;
+    for (const name of new Set((item.moves ?? []).map(move => move.name))) {
+      const starts = (item.moves ?? []).filter(move => move.name === name).map(move => move.at);
+      if (starts.length > 1 && starts.some(at => at === undefined)) problems.push(`Shot ${item.shot} moves ${name} ${starts.length} times; give each of these moves its "at", the second it starts.`);
+      else if (starts.some((at, index) => at !== undefined && (at > seconds - minMoveSeconds || (index && at < starts[index - 1]! + minMoveSeconds)))) {
+        problems.push(`Shot ${item.shot} moves ${name} at ${starts.join(", ")} s; each "at" must come at least ${minMoveSeconds} s after the one before and ${minMoveSeconds} s before the end of the shot's ${seconds} s.`);
+      }
     }
     const { over } = item.camera;
     if (item.camera.side === "overShoulder" && (!over || !people.has(over))) problems.push(`Shot ${item.shot} looks over a shoulder, but "over" does not name a person in "people".`);

@@ -1,7 +1,7 @@
 import { Euler, Matrix4, Vector3 } from "three";
 import type { SceneDocument } from "./scene";
 import type { DirectorPlan } from "./sceneAnimation";
-import { propKinds, type Place as SpecPlace, type Posture, type PrevisSpec, type PropKind, type SpecShot } from "./previsSpec";
+import { minMoveSeconds, propKinds, type Place as SpecPlace, type Posture, type PrevisSpec, type PropKind, type SpecShot } from "./previsSpec";
 
 /**
  * Builds the set of a previs plan and stages its shots, by computation only: the room and props at real scale, every
@@ -15,8 +15,9 @@ type Footprint = { name: string; kind: PropKind; centre: Point; facing: Point; w
 type Place = Point & { posture: Posture; seat?: { prop: string; height: number; alongX: boolean } };
 /** A person at a moment: where, in what posture, turned to `yaw` (radians from +Z), looking at `faces` or the nearest. */
 export type StagedBody = Place & { yaw: number; faces?: string };
+/** `timeline` says in words who moves when in the shot, for the texts written from the previs to keep its timing. */
 export type StagedShot = {
-  shot: number; seconds: number; tracks: DirectorPlan["tracks"]; subjects: string[]; opening: Map<string, StagedBody>;
+  shot: number; seconds: number; tracks: DirectorPlan["tracks"]; subjects: string[]; opening: Map<string, StagedBody>; timeline: string;
   camera: { direction: Point; angle: "eye" | "low" | "high"; move: "static" | "pushIn" | "pullOut" | "follow"; over?: string };
 };
 
@@ -304,20 +305,32 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
     const entering = spec.people.filter(item => item.enters === shot || (item.enters < shot && !bodies.has(item.name)));
     for (const person of entering) starts.set(person.name, { ...place(set, person.at, person.posture, [...starts.values()]), yaw: 0, faces: person.faces });
     for (const person of entering) starts.set(person.name, turn(starts.get(person.name)!, person.name, starts));
-    // Everyone who does not move keeps their place; the movers then end at free spots one by one, and everyone ends
-    // turned to what they look at.
+    // Everyone who does not move keeps their place; the movers then take free spots one by one. Someone may move several
+    // times, as in a long take: each move is a leg from where the one before ended, starting at its "at", or spread
+    // evenly over the shot without one. Everyone ends each leg turned to what they look at.
     const ends = new Map(starts);
     const moves = (plan?.moves ?? []).filter(move => starts.has(move.name));
-    for (const move of moves) ends.delete(move.name);
-    for (const move of moves) {
-      const start = starts.get(move.name)!;
-      const posture = move.posture ?? start.posture;
-      // Someone who gets up from a seat steps out in front of it; someone who stays on it takes the new posture there.
-      const target = move.to ?? (start.seat ? { prop: start.seat.prop, side: posture === "standing" ? "front" as const : "on" as const } : undefined);
-      const end = target ? place(set, target, posture, [...ends.values()]) : { ...start, posture };
-      ends.set(move.name, { ...end, yaw: start.yaw, faces: move.faces ?? start.faces });
+    const movers = [...new Set(moves.map(move => move.name))];
+    for (const name of movers) ends.delete(name);
+    const legs = new Map<string, { from: number; body: StagedBody }[]>();
+    for (const name of movers) {
+      const own = moves.filter(move => move.name === name);
+      // Starts the spec check would refuse, which a plan that was not checked may still hold, are spread evenly instead.
+      const evenly = own.some((move, index) => (move.at !== undefined && move.at > seconds - minMoveSeconds)
+        || (own.length > 1 && (move.at === undefined || (index > 0 && move.at < own[index - 1]!.at! + minMoveSeconds))));
+      let current = starts.get(name)!;
+      legs.set(name, own.map((move, index) => {
+        const posture = move.posture ?? current.posture;
+        // Someone who gets up from a seat steps out in front of it; someone who stays on it takes the new posture there.
+        const target = move.to ?? (current.seat ? { prop: current.seat.prop, side: posture === "standing" ? "front" as const : "on" as const } : undefined);
+        const end = target ? place(set, target, posture, [...ends.values()]) : { ...current, posture };
+        current = { ...end, yaw: current.yaw, faces: move.faces ?? current.faces };
+        return { from: evenly || move.at === undefined ? seconds * index / own.length : move.at, body: current };
+      }));
+      ends.set(name, current);
     }
     for (const [name, body] of ends) ends.set(name, turn(body, name, ends));
+    for (const [name, steps] of legs) legs.set(name, steps.map((step, index) => ({ ...step, body: index === steps.length - 1 ? ends.get(name)! : turn(step.body, name, ends) })));
     const tracks = spec.people.map((person, index) => {
       const objectId = `person${index + 1}`;
       const start = starts.get(person.name);
@@ -325,7 +338,14 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
         const hidden = { position: { x: 0, y: hiddenDepth, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } };
         return { objectId, frames: [{ time: 0, ...hidden }, { time: seconds, ...hidden }] };
       }
-      return { objectId, frames: walkFrames(set, start, ends.get(person.name)!, seconds) };
+      const steps = legs.get(person.name) ?? [{ from: 0, body: ends.get(person.name)! }];
+      // Each leg walks from the end of the one before over its own seconds; before the first, they hold where they start.
+      const frames = steps.flatMap((step, index) => {
+        const until = steps[index + 1]?.from ?? seconds;
+        const leg = walkFrames(set, index ? steps[index - 1]!.body : start, step.body, until - step.from).map(frame => ({ ...frame, time: frame.time + step.from }));
+        return index ? leg.slice(1) : step.from > 0 ? [{ ...leg[0]!, time: 0 }, ...leg] : leg;
+      });
+      return { objectId, frames };
     });
     for (const [name, body] of ends) bodies.set(name, body);
 
@@ -355,8 +375,15 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
         }
       }
     }
+    // Where a leg ends, from where it was staged: on a seat, beside a prop, or on part of the floor in plain words.
+    const where = (at: SpecPlace, body: StagedBody) => body.seat ? `on the ${body.seat.prop}`
+      : typeof at === "string" ? `the ${at.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)} of the place` : `the ${at.side && at.side !== "on" ? at.side : "front"} of the ${at.prop}`;
+    const timeline = movers.flatMap(name => moves.filter(move => move.name === name).map((move, index) => {
+      const { from, body } = legs.get(name)![index]!;
+      return { from, text: `from ${from.toFixed(1)} s ${name} ${[move.to && `goes to ${where(move.to, body)}`, move.posture, move.faces && `facing ${move.faces}`].filter(Boolean).join(", ") || "stays"}` };
+    })).sort((a, b) => a.from - b.from).map(item => item.text).join("; ");
     staged.push({
-      shot, seconds, tracks, subjects: subjects.length ? subjects : present, opening: starts,
+      shot, seconds, tracks, subjects: subjects.length ? subjects : present, opening: starts, timeline,
       camera: { direction, angle: camera.angle ?? "eye", move: camera.move ?? "static", over },
     });
   }
@@ -434,6 +461,7 @@ function walkFrames(set: SetLayout, start: StagedBody, end: StagedBody, seconds:
   if (settle) keys.push({ time: time += settle * scale, body: end });
   keys.push({ time: seconds, body: end });
   // Keyframe times must rise strictly; the action ends by actionShare of the shot, so the hold at its end always stays.
-  const frames = keys.filter((key, index) => index === 0 || key.time > keys[index - 1]!.time + 1e-3);
+  // The last key, where they end, is always kept, so even a leg cut very short ends on its target.
+  const frames = keys.filter((key, index) => index === 0 || (index === keys.length - 1 ? key.time > 0 : key.time > keys[index - 1]!.time + 1e-3));
   return frames.map(({ time, body }) => ({ time, ...transformOf(body) }));
 }

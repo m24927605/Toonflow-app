@@ -14,8 +14,9 @@ import { productionDirectory, type Production } from "./state";
  * and a depth map, its animation as the previs video, and each person of the opening alone as a full-body mannequin
  * render in their opening pose, by name, for pose transfer.
  */
+/** `timeline` says who moves when in the shot, which a long take's beats follow. */
 export type ProductionPrevis = {
-  shot: number; blocking: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }; layout?: string; depth?: string; video?: string;
+  shot: number; blocking: string; timeline?: string; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }; layout?: string; depth?: string; video?: string;
   poses?: Record<string, string>;
 }[];
 
@@ -95,9 +96,9 @@ async function runPage<T extends object>(job: object, signal: AbortSignal, progr
 export async function planPrevis(cwd: string, production: Production, script: string, shotList: string, model: { providerId: string; modelId: string }, signal: AbortSignal): Promise<ProductionPrevis> {
   const shots = previsShots(shotList);
   const job = { mode: "plan", directory: cwd, folder: previsFolder(production), ...model, aspect: aspectOf(production), script, shotList, shots };
-  const { blocking, framed } = await runPage<{ blocking: string[]; framed?: ProductionPrevis[number]["framed"][] }>(job, signal);
+  const { blocking, framed, timeline } = await runPage<{ blocking: string[]; framed?: ProductionPrevis[number]["framed"][]; timeline?: string[] }>(job, signal);
   if (blocking.length !== shots.length || framed?.length !== shots.length) throw new Error("Previs failed: the plan does not cover every shot");
-  return shots.map((item, index) => ({ shot: item.shot, blocking: blocking[index]!, framed: framed[index]! }));
+  return shots.map((item, index) => ({ shot: item.shot, blocking: blocking[index]!, timeline: timeline?.[index] || undefined, framed: framed[index]! }));
 }
 
 /**

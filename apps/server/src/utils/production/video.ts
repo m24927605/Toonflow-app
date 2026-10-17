@@ -7,7 +7,7 @@ import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { longTakeParts, stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
-import { correctionNote, lessonsOf, promptReview, readReview, ReplyCutError, reviewRounds, type ClipDiagnosis } from "./review";
+import { correctionNote, lessonsOf, promptReview, readReview, ReplyCutError, replyJson, reviewRounds, type ClipDiagnosis } from "./review";
 import { maxLoras, referenceImages, shotReferences } from "./shots";
 import type { ProductionDub } from "./dub";
 import { productionDirectory, writeProductionText, type Production } from "./state";
@@ -145,7 +145,7 @@ export async function writeClipPrompts(production: Production, script: string, s
       const lines = production.dub!.shots.find(item => item.shot === span.shot)!.lines;
       const dialogue = parseDialogue(span.dialogue);
       const seconds = (frames: number) => Number((frames / 24).toFixed(2));
-      const beats = await takeBeats(span.row ?? "", clip, lines, complete);
+      const beats = await takeBeats(span.row ?? "", clip, lines, previs.timeline, complete);
       // The parts are written side by side: each needs only its own seconds and beats, never another part's prompt.
       const written = await Promise.allSettled(Array.from({ length: plan.parts }, (_, part) => {
         const from = part * plan.step, to = from + plan.frames;
@@ -190,12 +190,14 @@ export async function writeClipPrompts(production: Production, script: string, s
  * shows its own beats and none twice, and opens where the beats before it leave everyone. A reply that cannot be read
  * gives none, and each part falls back to its seconds alone.
  */
-async function takeBeats(row: string, seconds: number, lines: ProductionDub["shots"][number]["lines"], complete: (prompt: string) => Promise<string>) {
+async function takeBeats(row: string, seconds: number, lines: ProductionDub["shots"][number]["lines"], timeline: string | undefined, complete: (prompt: string) => Promise<string>) {
   const reply = await complete([
     `A shot-list row is filmed as one continuous take of ${seconds} seconds without any cut. The row (shot size, camera, action, dialogue, cast, state):`,
     row,
+    // The previs video the clip is rendered from moves people at these times, so the beats keep to them.
+    ...timeline ? [`The take's previs moves the people at these seconds, and the beats follow the same moves at the same times: ${timeline}.`] : [],
     ...lines.length ? [`Its lines are recorded and fixed at these times of the take: ${lines.map(line => `${line.speaker} says "${line.words}" from ${(line.start ?? 0).toFixed(1)} to ${((line.start ?? 0) + (line.seconds ?? 0)).toFixed(1)} s`).join("; ")}.`] : [],
-    "Split the row's action into beats in story order, each one visible action of the people, and give each the second it starts and ends, so the beats fill the whole take at a natural pace: nothing happens twice, a beat lasts at least two seconds, walking across a room takes three or more, and each line falls in the beat that is going on at its time.",
+    "Split the row's action into beats in story order, each one visible action of the people, and give each the second it starts and ends, so the beats fill the whole take at a natural pace: nothing happens twice, a beat lasts at least two seconds, walking across a room takes three or more, opening or closing a door is a beat of its own in which someone's hand moves it, and each line falls in the beat that is going on at its time.",
     "Write each beat in English, naming people as the row does, and with it where everyone in the shot is when it ends: their posture, their place in the room and which way they face.",
     "Reply with JSON only: {\"beats\": [{\"from\": 0, \"to\": 3.5, \"what\": \"...\", \"after\": \"...\"}]}.",
   ].join("\n")).catch((error: unknown) => {
@@ -204,7 +206,7 @@ async function takeBeats(row: string, seconds: number, lines: ProductionDub["sho
     throw error;
   });
   try {
-    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { beats?: unknown };
+    const value = replyJson(reply, "beats") as { beats?: unknown };
     const beats = (Array.isArray(value.beats) ? value.beats : []).flatMap(item => {
       const { from, to, what, after } = (item ?? {}) as Record<string, unknown>;
       return typeof from === "number" && typeof to === "number" && typeof what === "string" && 0 <= from && from < to && to <= seconds + 0.5 && what.trim()
@@ -401,7 +403,7 @@ export function clipCheckPrompt(prompt: string, row: string, gazes: string, look
     `The clip was asked for: ${prompt}`,
     "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
     "Compare the camera, the framing and which side of the frame each person is on with the previs layout, and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right. Postures and actions come from the row: where the previs shows someone standing or seated differently from the row, the row is right.",
-    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the camera, the framing or the side of the frame people are on clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
+    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the camera, the framing or the side of the frame people are on clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a door, sliding door or window opens or closes by itself, with no one at it, behind it or reaching for it; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }
@@ -410,10 +412,10 @@ export function clipCheckPrompt(prompt: string, row: string, gazes: string, look
 export function readClipCheck(reply: string): ClipCheck {
   const unreadable = { issues: [{ problem: "The check's reply could not be read.", major: true }], passed: false, unreadable: true };
   try {
-    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { issues?: unknown };
-    if (!Array.isArray(value.issues)) return unreadable;
-    const issues = value.issues.flatMap(item => item && typeof item === "object" && typeof (item as { problem?: unknown }).problem === "string"
-      ? [{ problem: (item as { problem: string }).problem, major: (item as { major?: unknown }).major === true }] : []).slice(0, 10);
+    const value = replyJson(reply, "issues") as { issues?: unknown };
+    // A list holding anything but problems, such as bare sentences, is not read as no problems.
+    if (!Array.isArray(value.issues) || value.issues.some(item => !item || typeof item !== "object" || typeof (item as { problem?: unknown }).problem !== "string")) return unreadable;
+    const issues = (value.issues as { problem: string; major?: unknown }[]).map(item => ({ problem: item.problem, major: item.major === true })).slice(0, 10);
     return { issues, passed: !issues.some(item => item.major) };
   } catch {
     return unreadable;

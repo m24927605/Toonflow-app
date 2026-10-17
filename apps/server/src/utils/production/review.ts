@@ -11,6 +11,29 @@ export type ClipDiagnosis = {
   lesson?: string;
 };
 
+/**
+ * The JSON a model reply holds, inside a code fence or not. Asked for an object with a list, the model often replies
+ * with the list alone, which is read as that object; it throws when there is no JSON to read.
+ */
+export function replyJson(reply: string, list: string): Record<string, unknown> {
+  // Each code fence, then the whole reply; in each the outermost object, then a list, so brackets in the prose around
+  // the JSON do not spoil it.
+  for (const text of [...[...reply.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].map(match => match[1]!), reply]) {
+    for (const [open, close] of [["{", "}"], ["[", "]"]] as const) {
+      const [start, end] = [text.indexOf(open), text.lastIndexOf(close)];
+      if (start < 0 || end < start) continue;
+      try {
+        const value: unknown = JSON.parse(text.slice(start, end + 1));
+        if (Array.isArray(value)) return { [list]: value };
+        if (value && typeof value === "object") return value as Record<string, unknown>;
+      } catch {
+        // The next span may still be JSON.
+      }
+    }
+  }
+  throw new SyntaxError("The reply holds no readable JSON");
+}
+
 /** A text model reply cut off at its length limit on every try, such as one caught in a loop. */
 export class ReplyCutError extends Error {}
 
@@ -45,6 +68,7 @@ export function promptReview(production: Production, row: string, draft: string,
     // A later part that restarts the take contradicts the frames it continues from.
     ...later ? ["- The prompt opens on the row's opening state, or shows again an action an earlier part already showed, instead of the state this part starts in."] : [],
     "- A movement that is physically impossible, such as a sliding door pushed inward.",
+    "- A door, sliding door or window that opens or closes without the prompt saying whose hand takes hold of it and moves it.",
     "- Two different camera moves, shot sizes or views of the same person, such as a following camera that also holds static, or profile and three-quarter at once.",
     "- Words about anyone's face, hair, body or clothes beyond the picture they come from.",
     "- Distances or heights in metres or other numbers of the set.",
@@ -58,7 +82,7 @@ export function promptReview(production: Production, row: string, draft: string,
 /** The faults a review found; a reply that cannot be read finds none, as the prompt was already checked by rule. */
 export function readReview(reply: string) {
   try {
-    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { problems?: unknown };
+    const value = replyJson(reply, "problems") as { problems?: unknown };
     return Array.isArray(value.problems) ? value.problems.filter((item): item is string => typeof item === "string" && !!item.trim()).slice(0, 8) : [];
   } catch {
     return [];
@@ -94,7 +118,7 @@ export function diagnosisPrompt(production: Production, item: ProductionClip, ro
 /** Reads a diagnosis; one that cannot be read blames the prompt, so the clip is rewritten rather than passed. */
 export function readDiagnosis(reply: string): ClipDiagnosis {
   try {
-    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { causes?: unknown; fix?: unknown; lesson?: unknown };
+    const value = replyJson(reply, "causes") as { causes?: unknown; fix?: unknown; lesson?: unknown };
     const causes = (Array.isArray(value.causes) ? value.causes : []).flatMap(item => {
       const { problem, cause, why } = (item ?? {}) as Record<string, unknown>;
       return typeof problem === "string" && typeof cause === "string" && ["prompt", "reference", "model", "check"].includes(cause)
