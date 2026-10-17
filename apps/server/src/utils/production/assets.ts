@@ -164,9 +164,10 @@ export function appearances(shotList: string, assets: NonNullable<Production["as
 }
 
 // ACT: Measured per LoRA: one L4 hour of training per family and about ten A100 minutes of generated variants per
-// person or place, with the same 1.3 margin as the production estimate.
-const unitsPerFamily = 1.54 * 1.3;
-const unitsPerTopUp = 6.77 / 6 * 1.3;
+// person or place, with the same 1.3 margin as the production estimate; scaled since by the character recipe, about
+// 1500 steps instead of about 1200 and up to 25 drawn variants instead of 11.
+const unitsPerFamily = 1.54 * 1.3 * 1.25;
+const unitsPerTopUp = 6.77 / 6 * 1.3 * 25 / 11;
 
 /**
  * Which LoRAs each person and place gets: none when seen in too few shots, the workspace's own LoRA of the same name

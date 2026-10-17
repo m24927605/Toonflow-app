@@ -10,6 +10,7 @@ export function shotListInstructions(script: string, names: string[]): MessageDe
     msg`${script} is the script. Read the whole script first, then turn it into a shot list for AI video production, splitting it into time ranges by the pacing of the story. Output only one Markdown table with the columns Shot, Time, Shot size, Camera, Action, Dialogue, Cast and State.`,
     msg`Time is the range of the shot in seconds, such as 0–3.5; each shot starts where the previous one ends, with no gaps or overlaps.`,
     msg`Keep every shot at most 8 s and most shots at 3–4 s.`,
+    msg`Frame every shot with a line, a reaction or a meaningful look as a medium shot or closer; keep full and long shots for showing the place and the people moving through it, without lines, as faces that small come out blurred.`,
     msg`Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.`,
     msg`Cast lists the characters in frame by the names the script uses, separated by commas, including anyone only partly visible such as a hand or their back; leave it empty when nobody is in frame.`,
     msg`State gives each cast member's posture, what they wear (or that they are unclothed) and what they hold at the start of the shot.`,

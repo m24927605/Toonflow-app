@@ -314,10 +314,11 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
   }
 }
 
-// A video model draws a face from latent cells of about 32 by 32 pixels, so a face under about three cells tall comes
-// out with smeared or doubled eyes. ACT: The share of the frame height a face needs: about 95 px of 720, where one
-// MiniMax H3 film on 2026-10-17 drew clean eyes from 93 px and H3 users report the same; measure it on more films.
-const minFaceShare = 0.13;
+// A video model draws a face from latent cells of about 32 by 32 pixels, so a face only a few cells tall comes out
+// with smeared or doubled eyes. ACT: The share of the frame height a face needs, about 120 px of 720, the face of a
+// medium shot as frameShot frames it: H3 users find heads of 48-69 px unreadable and those of a waist-up medium shot
+// readable; no one has pinned it exactly.
+const minFaceShare = 0.17;
 // Crown to chin in metres, an adult's.
 const headHeight = 0.23;
 
@@ -325,7 +326,7 @@ const headHeight = 0.23;
  * Where a shot shows someone's face too small for the video model to draw their eyes: for each person of `cast` whose
  * head is in frame, the moment their face is smallest, when it is under minFaceShare of the frame height. Only the sizes
  * that cut people off below are checked: one that frames them whole, such as a full or wide shot, keeps their faces
- * small whatever the staging, and those faces are redrawn after the render instead. Nor is anyone lying down checked,
+ * small whatever the staging, which is why the shot list keeps lines out of them. Nor is anyone lying down checked,
  * whose face the camera may see from any side.
  */
 export async function smallFaces(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string) {

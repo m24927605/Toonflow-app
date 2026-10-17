@@ -1,7 +1,17 @@
 import { msg, type MessageDescriptor } from "@toonflow/i18n/vue";
+import { shotSpans } from "./shotList";
 
 // Short shots fail cheaply and keep generated motion stable; well-paced AI shorts keep most shots within 8 s.
 export const maxShotSeconds = 8;
+// Shot sizes that show people whole or smaller: "\u5168\u666f" (full shot), "\u9060\u666f"/"\u8fdc\u666f" (long shot) and
+// "\u5927\u5168\u666f" (extreme long shot). Video models draw faces from latent cells about 32 px wide, so a face this
+// small comes out with smeared eyes and mouth; H3 users and our own renders find a head needs about 140 px of a 720p
+// frame, a medium shot or closer.
+const wideSize = /full|wide|long shot|establishing|\u5168\u666f|\u9060\u666f|\u8fdc\u666f/i;
+const mediumSize = /medium|close|\u4e2d\u666f|\u8fd1\u666f|\u7279\u5beb|\u7279\u5199/i;
+// A dialogue cell that holds no line: empty, dashes or dots, "none", "no dialogue", "silence", or "\u7121"/"\u65e0"
+// (none) with or without "\u5c0d\u767d"/"\u53f0\u8a5e" (dialogue), or "\u6c89\u9ed8" (silence).
+const noLine = /^[\s\u3000]*[(\uff08]?\s*(?:none|n\/a|no dialogue|silen(?:t|ce)|[-\u2014\u2013\u2026.]+|[\u7121\u65e0](?:[\u5c0d\u5bf9]\u767d|\u53f0[\u8a5e\u8bcd])?|\u6c89\u9ed8)?\s*[.\u3002]?\s*[)\uff09]?[\s\u3000]*$/i;
 
 export type ScriptShot = { line: number; start?: number; duration: number };
 export type ScriptCheck = { shots: ScriptShot[]; total: number; median: number; issues: MessageDescriptor[] };
@@ -55,6 +65,11 @@ export function checkScript(markdown: string, target?: number): ScriptCheck {
     ? Math.max(...shots.map(shot => shot.start! + shot.duration)) - Math.min(...shots.map(shot => shot.start!))
     : lengths.reduce((sum, value) => sum + value, 0);
   if (median > 5) issues.push(msg`Median shot length is ${median.toFixed(2)} s; most shots of a well-paced short run 3–4 s`);
+  // A line is spoken by a face the viewer must read, which a full or long shot leaves too small to draw.
+  for (const span of shotSpans(shots, markdown)) {
+    if (!span.dialogue || noLine.test(span.dialogue) || !span.size || !wideSize.test(span.size) || mediumSize.test(span.size)) continue;
+    issues.push(msg`Shot ${span.shot} has a line in a ${span.size}, where faces are too small to draw: frame it as a medium shot or closer, or move the line to a shot that is`);
+  }
   if (target !== undefined && Math.abs(total - target) > Math.max(1, target * 0.05)) issues.push(msg`Total length is ${total.toFixed(2)} s, but the target is ${target} s`);
   return { shots, total, median, issues };
 }

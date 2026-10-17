@@ -157,7 +157,7 @@ for source in sorted(media.glob("item_*")):
         run(python, "-c", crop, media)
     # Captions describe everything except what the LoRA learns, so that one thing binds to the trigger word.
     asks = {
-        "character": "the framing (close-up, half-body or full-body), the person's clothing or lack of it, pose and expression, the background and the lighting. Start with 'a woman' or 'a man'. Do not describe the face, eyes, hair, skin or body features.",
+        "character": "the framing (close-up, half-body or full-body), the camera angle (front, three-quarter left or right, profile, from above or below, or back), the person's clothing or lack of it, pose and expression, the background and the lighting. Start with 'a woman' or 'a man'. Do not describe the face, eyes, hair, skin or body features.",
         "scene": "the people, their clothing and poses, the objects they hold and the lighting. Do not describe the room or place itself: its walls, doors, floor, windows, furniture or layout.",
         "costume": "the framing, the person (their face, hair and body), their pose and expression, the background and the lighting. Do not describe the clothing, accessories or fabric.",
         "style": "only the content: the subjects, what they do and the setting. Never describe colours, light quality, grain, grading, film stock or any visual style.",
@@ -212,11 +212,18 @@ cache_directory = "{data / 'cache'}"
     run(python, cache, "--family", fizgigFamily, "--stage", "text", "--dataset_config", data / "dataset.toml", "--model", paths["te"], cwd=repo, env=env)
     common = ["--dataset_config", data / "dataset.toml", "--dit", paths["dit"], "--vae", paths["vae"], "--text_encoder", paths["te"],
               "--output_dir", out, "--output_name", trigger, "--seed", "42", "--precision", "auto", "--blocks_to_swap", "-1",
-              "--ema_decay", "0.98", "--optimizer_type", "adamw8bit", "--training_adapter", paths["adapter"]]
+              "--ema_decay", "0.98", "--optimizer_type", "adamw" if family == "h3" and kind == "character" else "adamw8bit", "--training_adapter", paths["adapter"]]
     if family == "h3":
-        # Fizgig's documented default H3 recipe; motion reaches more of the model (blocks 6-49), as its guide advises.
+        # Fizgig's documented default H3 recipe; motion reaches more of the model (blocks 6-49), as its guide advises. A
+        # character trains as H3 users who compared settings do: rank 16, AdamW (not 8-bit) at 1e-4 and about 1500
+        # steps over the set, one image a step; the face takes many steps to settle and a higher rate overbakes it.
         blocks = "6-49" if kind == "motion" else "20-49"
-        recipe = ["--network_dim", "8", "--network_alpha", "8", "--learning_rate", "2e-4", "--max_train_epochs", "50", "--save_every_n_epochs", "50",
+        if kind == "character":
+            epochs = str(max(20, -(-1500 // max(1, len(list(media.glob("*.png")) + list(media.glob("*.jp*g")) + list(media.glob("*.webp")))))))
+            settings = ["--network_dim", "16", "--network_alpha", "16", "--learning_rate", "1e-4", "--max_train_epochs", epochs, "--save_every_n_epochs", epochs]
+        else:
+            settings = ["--network_dim", "8", "--network_alpha", "8", "--learning_rate", "2e-4", "--max_train_epochs", "50", "--save_every_n_epochs", "50"]
+        recipe = [*settings,
                   "--family_option", "lownoise_pct=60", "--family_option", "highnoise_lr_pct=100", "--family_option", f"photo_blocks={blocks}",
                   "--family_option", f"clip_blocks={blocks}", "--family_option", f"audio_blocks={blocks}", "--family_option", "caption_dropout=0.05",
                   *(["--family_option", f"audio_vae={paths['audioVae']}"] if "audioVae" in paths else [])]

@@ -21,9 +21,11 @@ export type LoraInput = {
 /** Stored beside each LoRA as `loras/<trigger>.json`, so nodes find the workspace's LoRAs and their trigger words. */
 export type LoraRecord = { name: string; kind: LoraKind; family: LoraFamily; trigger: string; path: string; createdAt: string };
 
-// A thin character or scene set is topped up to about this many images with generated variants of its first image.
-const minImages = 12;
-const topUpTo = 16;
+// A thin set is topped up to about this many images with generated variants of its first image, at most as many as
+// its kind has. A character set is brought towards 32, about half of them tight face close-ups from many angles: H3
+// users find a character LoRA learns the face from many clear, consistent face pictures, and pictures of one master
+// agree with each other.
+const setSizes: Partial<Record<LoraKind, { min: number; to: number }>> = { character: { min: 32, to: 32 }, scene: { min: 12, to: 16 } };
 const rules: Partial<Record<LoraKind, string>> = {
   character: "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body. Only the clothing and the place change.",
   scene: "The place is exactly the one shown in {{ref 1}}, seen from the same side: the same architecture, materials, furniture and layout, every object where it is in {{ref 1}}.",
@@ -33,6 +35,15 @@ const rules: Partial<Record<LoraKind, string>> = {
 // are invented and teach a different room.
 const variants: Partial<Record<LoraKind, [ratio: string, scene: string][]>> = {
   character: [
+    ["1:1", "Tight close-up of the person's face filling the frame, front view, neutral expression, even soft light, plain light grey background."],
+    ["1:1", "Tight close-up of the person's face filling the frame, front view, speaking with the mouth half open, soft daylight, plain beige background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the left, calm expression, soft window light, plain grey background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the right, slight smile, warm indoor light, dark background."],
+    ["1:1", "Tight close-up of the person's face seen from slightly above, looking down, quiet expression, soft lamp light, dark background."],
+    ["1:1", "Tight close-up of the person's face seen from slightly below, looking up, hopeful expression, overcast daylight, pale sky background."],
+    ["1:1", "Tight close-up of the person's face, eyes looking to the side, thoughtful expression, dim evening light, dark blue background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the left, laughing, bright daylight, blurred garden background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the right, speaking, soft lamp light, blurred room background."],
     ["1:1", "Tight close-up of the person's face filling the frame, gentle smile, wearing a plain white T-shirt, soft window light from the left, plain grey background."],
     ["1:1", "Tight close-up of the person's face filling the frame, serious expression, wearing a black turtleneck, warm lamp light, dark background."],
     ["1:1", "Tight close-up of the person's face filling the frame, laughing with an open mouth, wearing a denim jacket, bright daylight, blurred green background."],
@@ -45,6 +56,10 @@ const variants: Partial<Record<LoraKind, [ratio: string, scene: string][]>> = {
     ["2:3", "Full-body shot of the person standing on a beach, facing the camera, wearing a T-shirt and jeans, bright daylight."],
     ["2:3", "Full-body shot of the person walking on an office corridor, wearing a dark business suit, cool fluorescent light."],
     ["3:4", "Half-body shot of the person in a library between bookshelves, wearing a cardigan, soft lamp light."],
+    ["3:4", "Half-body shot of the person in three-quarter view turned to the left, seated on a cushion at a low table, wearing a simple sweater, warm night lamp light."],
+    ["3:4", "Half-body shot of the person in side profile facing right, standing by a window, wearing a plain shirt, soft daylight."],
+    ["3:4", "Medium shot of the person from the waist up, looking at someone off the left of the frame, wearing a plain blouse or shirt, dim warm indoor light."],
+    ["2:3", "Full-body shot of the person seated on the floor of a traditional room, three-quarter view, wearing casual home clothes, soft lamp light."],
   ],
   scene: [
     ["16:9", "The place exactly as framed in {{ref 1}}, empty, soft morning daylight."],
@@ -100,8 +115,8 @@ async function trainSet(cwd: string, input: LoraInput, signal?: AbortSignal) {
     extension: path.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png", caption,
     data: new Uint8Array(await readFile((await resolveWorkspacePath(cwd, path)).path, { signal })),
   })));
-  const extra = variants[input.kind] && sources.length && sources.length < minImages
-    ? await topUp(input.kind, sources[0]!.data, topUpTo - sources.length, signal) : [];
+  const size = setSizes[input.kind];
+  const extra = size && sources.length && sources.length < size.min ? await topUp(input.kind, sources[0]!.data, size.to - sources.length, signal) : [];
   const items = [...sources, ...extra.map(data => ({ extension: "png", caption: undefined, data }))];
   // A family that fails does not stop the other, whose LoRA is kept; the error names what failed.
   const results = await Promise.allSettled(input.families.map(family => trainFamily(cwd, input, family, items, signal)));
