@@ -38,9 +38,8 @@ export function estimateProduction(input: Pick<ProductionInput, "seconds" | "qua
   const people = Math.max(input.photos.length, 2);
   const trainedPeople = people - reusedPeople;
   const places = 1 + Math.floor(input.seconds / 60);
-  // Clips render on two A100s side by side, each paying its own start; the per-shot minutes were measured with four
-  // sampling steps and are doubled for the eight sampled now and the faces redrawn after.
-  const clipMinutes = { "480p": 20 + shots * 3, "720p": 20 + shots * 5.6, "1080p": 45 + shots * 12 }[input.quality];
+  // Clips render on two A100s side by side, each paying its own start.
+  const clipMinutes = { "480p": 20 + shots * 1.5, "720p": 20 + shots * 2.8, "1080p": 45 + shots * 6 }[input.quality];
   const steps = [
     { step: "text", units: l4 * hours(30) },
     { step: "assets", units: a100 * hours(5 + 0.5 * (people * 6 + places * 3)) },
