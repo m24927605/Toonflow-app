@@ -26,14 +26,13 @@ export function longTakeParts(duration: number) {
 
 /**
  * About how many minutes a set-up A100 takes to render a clip of `duration` seconds. ACT: measured at 720p on
- * 2026-10-17 with a 4-step turbo, where a 124-frame part took about 2.3 minutes and a 260-frame part about 10, close
- * to frames squared times 1.5e-4, and scaled by the 3.2 times longer the 20 steps sampled now took on a 124-frame
- * clip; 480p and 1080p are scaled by the pixels they sample and refine, unmeasured.
+ * 2026-10-17, where a 124-frame part took about 2.3 minutes and a 260-frame part about 10, close to frames squared
+ * times 1.5e-4; 480p and 1080p are scaled by the pixels they sample and refine, unmeasured.
  */
 export function renderMinutes(duration: number, resolution: string) {
   const plan = longTakeParts(duration);
   const scale = resolution === "480p" ? 0.4 : resolution === "1080p" ? 2.5 : 1;
-  return plan.parts * plan.frames ** 2 * 4.8e-4 * scale;
+  return plan.parts * plan.frames ** 2 * 1.5e-4 * scale;
 }
 
 // ACT: Minutes a cold A100 takes to start and set up before its first clip, measured on 2026-10-17 (about 4).
@@ -46,9 +45,9 @@ export const minimaxH3SetupMinutes = () => workers.some(worker => worker.live())
 // to the machine with the fewest waiting. ACT: The second machine pays its own start, about half a unit.
 const workers = [0, 1].map(() => createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000));
 const waiting = workers.map(() => 0);
-// Of the 20 sampling steps, the reference videos condition only the first five: Code Video Model found a previs used
-// beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
-const videoSteps = 5;
+// Of the four Turbo sampling steps, the reference videos condition only the first: Code Video Model found a previs
+// used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
+const videoSteps = 1;
 // LoRA files already on a session's machine.
 const sentLoras = new WeakMap<ColabSession, Set<string>>();
 

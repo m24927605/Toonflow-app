@@ -56,13 +56,10 @@ resolution = os.environ["H3_RESOLUTION"]
 duration = int(os.environ["H3_DURATION"])
 segments = int(os.environ.get("H3_SEGMENTS", "1"))
 audio = os.environ["H3_AUDIO"] == "1"
-# H3 samples its full 20-step schedule with res_multistep, without a turbo LoRA, as ComfyUI's H3 guide advises for shots
-# that follow reference pictures: a 4-step turbo applies the references barely, and on the same seed it aged a face and
-# softened it where 20 steps kept it close to its picture, at about three times the sampling time.
-# The reference videos condition only the first steps: a previs is flat Three.js footage, and attended to throughout, H3
+# Sampling steps that attend to the reference videos. A previs is flat Three.js footage: attended to throughout, H3
 # copies its look, so it is dropped once the early steps have set the layout, motion and camera (Code Video Model's
 # early-step conditioning, https://code-video-model.github.io).
-steps = 20
+steps = 4
 videoSteps = int(os.environ["H3_VIDEO_STEPS"])
 ratioWidth, ratioHeight = (int(part) for part in os.environ["H3_RATIO"].split(":"))
 shortSides = {"480p": 480, "720p": 720, "1080p": 1080}
@@ -178,6 +175,7 @@ cudaMajor = int((torch.version.cuda or "0").split(".")[0])
 variant = "int8_convrot" if cudaMajor >= 13 and capability >= (8, 0) else "fp8_scaled" if capability >= (8, 9) else "bf16"
 diffusion = f"minimax_h3_ref2va_pruned_{variant}.safetensors"
 videoVae = "minimax_h3_video_vae_int8_convrot.safetensors" if variant == "int8_convrot" else "minimax_h3_video_vae_fp16.safetensors"
+lora = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
 upscaler = "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
 controlPatch = f"minimax_h3_fun_controlnet_union_2.0_pruned_{'int8_convrot' if variant == 'int8_convrot' else 'bf16'}.safetensors"
 controlSource = next(inputs.glob(f"{prefix}control.*"), None)
@@ -185,6 +183,7 @@ print("Ref2VA variant:", variant)
 
 weights = [
     ("Comfy-Org/MiniMax-H3", f"diffusion_models/{diffusion}", "diffusion_models"),
+    ("Comfy-Org/MiniMax-H3", f"loras/{lora}", "loras"),
     ("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "text_encoders"),
     ("Comfy-Org/MiniMax-H3", f"vae/{videoVae}", "vae"),
     ("Comfy-Org/MiniMax-H3", "vae/minimax_h3_audio_vae_fp32.safetensors", "vae"),
@@ -283,6 +282,7 @@ def segmentGraph(segment, prompt, videos, audios):
     # The render of one segment (numbered from 1); the first is the whole clip of a single render.
     graph = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": diffusion, "weight_dtype": "default"}},
+        "2": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": lora, "strength_model": 1.0}},
         "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "type": "minimax", "device": "default"}},
         "4": {"class_type": "VAELoader", "inputs": {"vae_name": videoVae}},
         "5": {"class_type": "VAELoader", "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
@@ -293,8 +293,8 @@ def segmentGraph(segment, prompt, videos, audios):
             **{f"ref_videos.ref_video_{index}": [f"vid{index}", 0] for index in range(len(videos))},
             **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
         "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed + 1000 * (segment - 1)}},
-        "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "res_multistep"}},
-        "11": {"class_type": "BasicScheduler", "inputs": {"model": ["1", 0], "scheduler": "simple", "steps": steps, "denoise": 1.0}},
+        "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
         "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
     }
     # With a dubbed track, every sampler starts from a latent whose audio stream holds it, locked.
@@ -330,14 +330,14 @@ def segmentGraph(segment, prompt, videos, audios):
         graph[f"vidFile{index}"] = {"class_type": "LoadVideo", "inputs": {"file": name}}
         graph[f"vid{index}"] = {"class_type": "GetVideoComponents", "inputs": {"video": [f"vidFile{index}", 0]}}
     # Official Union 2.0 setting: strength 1.0 over the whole schedule; the patched model feeds both passes.
-    model = ["1", 0]
+    model = ["2", 0]
     if controlSource:
         graph.update({
             "cvFile": {"class_type": "LoadVideo", "inputs": {"file": f"h3control{job}.mp4"}},
             "cv": {"class_type": "GetVideoComponents", "inputs": {"video": ["cvFile", 0]}},
             "30": {"class_type": "ModelPatchLoader", "inputs": {"name": controlPatch}},
             "31": {"class_type": "MiniMaxH3FunControlNetApply", "inputs": {
-                "model": ["1", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
+                "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
         })
         model = ["31", 0]
         graph["11"]["inputs"]["model"] = model
@@ -401,15 +401,15 @@ def segmentGraph(segment, prompt, videos, audios):
         "15": {"class_type": "CreateVideo", "inputs": {"images": images, "audio": sound, "fps": 24}},
         "16": {"class_type": "SaveVideo", "inputs": {"video": ["15", 0], "filename_prefix": f"toonflow/h3_{job}_{segment}", **videoFormat}},
     })
-    # Every node that used the model takes the last character LoRA.
-    characterModel = ["1", 0]
+    # Every node that used the Turbo model takes the last character LoRA.
+    characterModel = ["2", 0]
     for index, entry in enumerate(characterLoras):
         graph[f"lora{index}"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": characterModel, "lora_name": entry["name"], "strength_model": float(entry["strength"])}}
         characterModel = [f"lora{index}", 0]
-    if characterModel != ["1", 0]:
+    if characterModel != ["2", 0]:
         for key, node in graph.items():
             if not key.startswith("lora"):
-                node["inputs"] = {name: characterModel if value == ["1", 0] else value for name, value in node["inputs"].items()}
+                node["inputs"] = {name: characterModel if value == ["2", 0] else value for name, value in node["inputs"].items()}
     return graph
 
 
