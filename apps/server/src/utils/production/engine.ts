@@ -10,7 +10,7 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
-import { applyDiagnosis, diagnosisPrompt, readDiagnosis } from "./review";
+import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis } from "./review";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, referenceImages, shotReferences } from "./shots";
@@ -288,6 +288,13 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     // ACT: The clips still to render take their share of the step's estimate; a clip rendered again after its check is
     // one share. The machine start in the estimate is shared out too, so a lone retry on a cold machine is undercounted.
     const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
+    // Corrections the budget can no longer pay for keep their best render, so the film is still finished; a clip never
+    // rendered waits for the budget.
+    if (videos.every(item => item.video || item.attempts?.length) && !await affordable(production, clipUnits * unrendered / videos.length, signal)) {
+      for (const item of videos.filter(item => !item.video)) keepBest(item);
+      await saveProduction(cwd, production);
+      return true;
+    }
     if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
     // Each clip is checked by the text model once rendered, so its L4 starts while they render.
     const releaseText = warmTextModel((10 + unrendered * 3) * 60_000, signal);
@@ -304,7 +311,11 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   // for a person to look at. Never the same prompt with a new seed, which fails the same way.
   const unchecked = videos.filter(item => !item.check);
   if (unchecked.length) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const textUnits = estimate.steps.find(item => item.step === "text")!.units;
+    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
+    // A correction costs a clip's share of the clip and text steps; one the budget cannot pay for is not started.
+    const correctionUnits = (estimate.steps.find(item => item.step === "clips")!.units + textUnits) / videos.length;
+    let corrections = 0;
     for (const item of unchecked) {
       const shot = production.shots!.find(other => other.shot === item.shot)!;
       const previs = production.previs!.find(other => other.shot === item.shot)!;
@@ -317,7 +328,11 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       // so a parsing failure neither passes a clip nor pays for a render.
       item.check = await ask();
       if (item.check.unreadable) item.check = await ask();
-      if (!item.check.passed && !item.check.unreadable) applyDiagnosis(production, item, readDiagnosis(await complete(checker, diagnosisPrompt(production, item, shot.row ?? "", gazes, looks), signal, frames)));
+      if (!item.check.passed && !item.check.unreadable) {
+        const diagnosis = readDiagnosis(await complete(checker, diagnosisPrompt(production, item, shot.row ?? "", gazes, looks), signal, frames));
+        applyDiagnosis(production, item, diagnosis, await affordable(production, correctionUnits * (corrections + 1), signal));
+        if (!item.check) corrections++;
+      }
       await saveProduction(cwd, production);
     }
     return true;

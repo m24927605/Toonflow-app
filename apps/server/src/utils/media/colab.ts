@@ -201,6 +201,8 @@ const tail = (text: string, length = 3000) => stripVTControlCharacters(text).rep
 const idempotent = new Set(["upload", "download", "sessions", "usage"]);
 // Includes the proxy's 502, 503 and 504, which it answers for a moment while the VM is busy or briefly unreachable.
 const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|50[234] Server Error/;
+// The CLI's answer for a session Colab no longer has: its VM was released or reclaimed.
+const sessionGone = /Session '[^']+' not found/;
 
 async function colab(command: string, args: string[], signal?: AbortSignal, timeout?: number) {
   for (let attempt = 1; ; attempt++) {
@@ -227,6 +229,7 @@ async function colab(command: string, args: string[], signal?: AbortSignal, time
       await scheduler.wait(attempt * 10_000, { signal });
       continue;
     }
+    if (sessionGone.test(stderr)) throw new ColabSessionGoneError(tail(stderr, 500));
     throw new Error(tail(`${stdout}\n${stderr}`, 2000) || `Colab CLI exited with code ${child.exitCode}`);
   }
 }
@@ -427,8 +430,21 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
       const stopWatching = watchHeartbeat(command, name, directory, execId, watcher);
       const result = await spawnExec(path, env, signal ? AbortSignal.any([signal, watcher.signal]) : watcher.signal).finally(stopWatching);
       signal?.throwIfAborted();
-      if (!watcher.signal.aborted) return checkOutput(result);
-      const lost = watcher.signal.reason as ExecLost;
+      let lost = watcher.signal.reason as ExecLost;
+      if (!watcher.signal.aborted) {
+        if (result.exitCode !== 0 && sessionGone.test(result.stderr)) throw new ColabSessionGoneError(`Colab session ${name} lost its VM`);
+        if (!(result.exitCode !== 0 && transient.test(result.stderr))) return checkOutput(result);
+        // The CLI lost its connection to the VM mid-exec, which tells nothing of the job: the kernel's heartbeat says
+        // whether it never started, is still running (followed until it ends) or finished.
+        const follow = new AbortController();
+        const stopFollowing = watchHeartbeat(command, name, directory, execId, follow);
+        await new Promise(resolve => {
+          follow.signal.addEventListener("abort", resolve, { once: true });
+          signal?.addEventListener("abort", resolve, { once: true });
+        }).finally(stopFollowing);
+        signal?.throwIfAborted();
+        lost = follow.signal.reason as ExecLost;
+      }
       // The job never reached the kernel, so running it again cannot run it twice.
       if (lost.reason === "notStarted" && attempt < 2) continue;
       if (lost.reason === "notStarted") throw new Error(`Colab could not start the job on session ${name}: ${tail(result.stderr, 1000)}`);

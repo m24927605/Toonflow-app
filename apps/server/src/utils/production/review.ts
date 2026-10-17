@@ -105,11 +105,12 @@ export function readDiagnosis(reply: string): ClipDiagnosis {
 
 /**
  * Acts on a failed clip's diagnosis. A clip whose every major problem was the check's own mistake passes as it is. Any
- * other is set to be written and rendered again, its prompt told what failed and why, while it has corrections left;
- * after the last one the render with the fewest major problems is kept, still failed, for a person to look at. A
- * lesson joins the film's lessons, which every later prompt, review and diagnosis reads.
+ * other is set to be written and rendered again, its prompt told what failed and why, while it has corrections left
+ * and the budget can pay for one (`affordable`); otherwise the render with the fewest major problems is kept, still
+ * failed, for a person to look at, so the film is still finished. A lesson joins the film's lessons, which every later
+ * prompt, review and diagnosis reads.
  */
-export function applyDiagnosis(production: Production, item: ProductionClip, diagnosis: ClipDiagnosis) {
+export function applyDiagnosis(production: Production, item: ProductionClip, diagnosis: ClipDiagnosis, affordable: boolean) {
   const check = item.check!;
   const majors = check.issues.filter(issue => issue.major).length;
   // Every major problem must be covered by the diagnosis before the check is overruled.
@@ -119,13 +120,18 @@ export function applyDiagnosis(production: Production, item: ProductionClip, dia
   }
   if (diagnosis.lesson && !production.lessons?.includes(diagnosis.lesson)) production.lessons = [...production.lessons ?? [], diagnosis.lesson].slice(-maxLessons);
   const attempts: NonNullable<ProductionClip["attempts"]> = [...item.attempts ?? [], { prompt: item.prompt!, parts: item.parts, video: item.video!, seed: item.seed, check, diagnosis }];
-  if (attempts.length <= maxCorrections) {
+  if (affordable && attempts.length <= maxCorrections) {
     Object.assign(item, { attempts, prompt: undefined, parts: undefined, video: undefined, seed: undefined, check: undefined });
     return;
   }
-  const count = (entry: (typeof attempts)[number]) => entry.check.issues.filter(issue => issue.major).length;
-  const best = attempts.reduce((kept, entry) => count(entry) < count(kept) ? entry : kept);
-  Object.assign(item, { attempts, prompt: best.prompt, parts: best.parts, video: best.video, seed: best.seed, check: best.check });
+  keepBest(Object.assign(item, { attempts }));
+}
+
+/** Gives a clip back the earlier render with the fewest major problems, its check still failed, for a person to see. */
+export function keepBest(item: ProductionClip) {
+  const count = (entry: NonNullable<ProductionClip["attempts"]>[number]) => entry.check.issues.filter(issue => issue.major).length;
+  const best = item.attempts!.reduce((kept, entry) => count(entry) < count(kept) ? entry : kept);
+  Object.assign(item, { prompt: best.prompt, parts: best.parts, video: best.video, seed: best.seed, check: best.check });
 }
 
 /** What the writer of a shot's prompt learns from its failed renders: what went wrong and what to change. */
