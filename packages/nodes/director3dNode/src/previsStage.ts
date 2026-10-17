@@ -380,7 +380,9 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
       : typeof at === "string" ? `the ${at.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)} of the place` : `the ${at.side && at.side !== "on" ? at.side : "front"} of the ${at.prop}`;
     const timeline = movers.flatMap(name => moves.filter(move => move.name === name).map((move, index) => {
       const { from, body } = legs.get(name)![index]!;
-      return { from, text: `from ${from.toFixed(1)} s ${name} ${[move.to && `goes to ${where(move.to, body)}`, move.posture, move.faces && `facing ${move.faces}`].filter(Boolean).join(", ") || "stays"}` };
+      const verb = { seated: "sits", kneeling: "kneels", lying: "lies", standing: "stands" }[body.posture];
+      const goes = move.to && (body.seat ? `${verb} ${where(move.to, body)}` : `goes to ${where(move.to, body)}`);
+      return { from, text: `from ${from.toFixed(1)} s ${name} ${[goes, move.posture, move.faces && `facing ${move.faces}`].filter(Boolean).join(", ") || "stays"}` };
     })).sort((a, b) => a.from - b.from).map(item => item.text).join("; ");
     staged.push({
       shot, seconds, tracks, subjects: subjects.length ? subjects : present, opening: starts, timeline,

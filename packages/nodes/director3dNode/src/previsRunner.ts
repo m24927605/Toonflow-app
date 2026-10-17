@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n/vue";
 import type { NodeAiRequest } from "@toonflow/nodes-scaffold/runtime";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
-import { describeBlocking, frameShot, framedPeople, framingIssues, smallFaces } from "./blocking";
+import { coveredPeople, describeBlocking, frameShot, framedPeople, framingIssues, smallFaces } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
 import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot } from "./previsSpec";
 import { buildSet, ceilingOf, emptyShotView, figureScene, renderSettings, stageShots } from "./previsStage";
@@ -157,8 +157,8 @@ export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: strin
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,
  * where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from where
  * the previous one ended, frames the camera from the shot size, checks the framing, describes the blocking and finds
- * who is in frame. A plan that shows someone's face too small for the video model to draw is sent back once with where;
- * the one with fewer such faces is kept, and what is left is logged. Nothing is rendered, so the texts written from the
+ * who is in frame. A plan that shows someone's face too small for the video model to draw, or someone covering another
+ * at any moment, is sent back once with where; the one with fewer such problems is kept, and what is left is logged. Nothing is rendered, so the texts written from the
  * blocking need not wait for the renders. `onStep` is called after each reply of the director model, for a caller that
  * watches for progress.
  */
@@ -167,21 +167,21 @@ export async function planPrevis(options: {
 }): Promise<PrevisPlan> {
   const first = await writeSpec(options, options.shots);
   const staged = await stagePlan(first.spec, options);
-  if (!staged.small.length) return staged.plan;
-  console.warn("The previs plan shows faces too small", staged.small);
-  const advice = "Bring the people of each such shot nearer to each other and to the camera's side for as long as they are in frame: someone far off can start nearer, or walk up before the moment the face matters. Shot sizes come from the shot list and stay as they are.";
-  const retried = await writeSpec(options, options.shots, { reply: first.reply, problems: [...staged.small, advice] })
+  if (!staged.problems.length) return staged.plan;
+  console.warn("The previs plan needs fixing", staged.problems);
+  const advice = "Where a face is too small, bring those people nearer to each other and to the camera's side for as long as they are in frame: someone far off can start nearer, or walk up before the moment the face matters. Where someone covers another, send them to a place beside the others, never between the camera and them. Shot sizes come from the shot list and stay as they are.";
+  const retried = await writeSpec(options, options.shots, { reply: first.reply, problems: [...staged.problems, advice] })
     .then(second => stagePlan(second.spec, options))
     .catch((error: unknown) => {
       options.signal.throwIfAborted();
       console.warn("The previs plan's fix could not be used; the first plan is kept", error);
       return staged;
     });
-  if (retried.small.length) console.warn("The previs plan still shows faces too small", retried.small);
-  return (retried.small.length <= staged.small.length ? retried : staged).plan;
+  if (retried.problems.length) console.warn("The previs plan still needs fixing", retried.problems);
+  return (retried.problems.length <= staged.problems.length ? retried : staged).plan;
 }
 
-/** Stages, frames and checks every shot of a previs spec; `small` lists the faces too small, by shot. */
+/** Stages, frames and checks every shot of a previs spec; `problems` lists the faces too small and the people covered, by shot. */
 async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size: string })[]; aspect: number; signal: AbortSignal }) {
   const scene = buildSet(spec);
   const ceiling = ceilingOf(spec);
@@ -189,7 +189,7 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
   const blocking: string[] = [];
   const framed: PrevisPlan["framed"] = [];
   const timeline: string[] = [];
-  const small: string[] = [];
+  const problems: string[] = [];
   for (const [index, staged] of stageShots(spec, options.shots).entries()) {
     const { shot, seconds, tracks, subjects, camera } = staged;
     timeline.push(staged.timeline);
@@ -209,12 +209,13 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
     }
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
     if (issues.overlap.length) console.warn(`Shot ${shot}: kept with people overlapping`, issues.overlap);
-    small.push(...(await smallFaces(scene, plan, options.aspect, checked, size)).map(problem => `Shot ${shot}: ${problem}`));
+    const found = [...await smallFaces(scene, plan, options.aspect, checked, size), ...await coveredPeople(scene, plan, options.aspect, checked)];
+    problems.push(...found.map(problem => `Shot ${shot}: ${problem}`));
     plans.push({ ...plan, id: crypto.randomUUID() });
     blocking.push(await describeBlocking(scene, plan, options.aspect, true));
     framed.push(await framedPeople(scene, plan, options.aspect));
   }
-  return { plan: { spec, plans, blocking, timeline, framed } as PrevisPlan, small };
+  return { plan: { spec, plans, blocking, timeline, framed } as PrevisPlan, problems };
 }
 
 /**

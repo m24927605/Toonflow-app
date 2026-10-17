@@ -354,6 +354,40 @@ export async function smallFaces(scene: SceneDocument, plan: DirectorPlan, aspec
   }
 }
 
+/**
+ * Where people of `cast` cover each other in frame at any moment of the shot, not only at its camera keyframes, as
+ * someone may walk in front of another or of the camera mid-shot: the first moment for each pair, and who is in front.
+ */
+export async function coveredPeople(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[]) {
+  const stage = await framingStage(scene, plan, aspect);
+  try {
+    const motion = prepareMotion(plan.cameraFrames);
+    const named = stage.roots.filter(({ object }) => object.name && cast.includes(object.name) && personTypes.has(object.objType));
+    const found = new Map<string, string>();
+    for (const time of [0, ...Array.from({ length: Math.floor(plan.duration / framedStep) }, (_, index) => (index + 1) * framedStep), plan.duration]) {
+      stage.pose(time, motion);
+      const seen = named.flatMap(person => {
+        const box = new Box3().setFromObject(person.root);
+        return box.max.y >= 0 && framedBy(box, stage.camera) ? [{ name: person.object.name!, box, rect: screenRect(box, stage.camera), distance: box.getCenter(new Vector3()).distanceTo(stage.camera.position) }] : [];
+      });
+      for (const [index, a] of seen.entries()) {
+        for (const b of seen.slice(index + 1)) {
+          const pair = [a.name, b.name].sort().join("|");
+          if (found.has(pair) || overlapShare(a.rect, b.rect) <= overlapLimit) continue;
+          const [front, back] = a.distance < b.distance ? [a, b] : [b, a];
+          // Only a head hidden counts: someone seated in front of a person standing behind leaves that face clear.
+          const head = headPoint(back.box, stage.camera);
+          if (!inFrame(head) || head.x < front.rect.left || head.x > front.rect.right || head.y < front.rect.bottom || head.y > front.rect.top) continue;
+          found.set(pair, `At ${time} s ${front.name} stands between the camera and ${back.name} and covers them in frame; place them, or where they go, so both are seen apart.`);
+        }
+      }
+    }
+    return [...found.values()];
+  } finally {
+    stage.dispose();
+  }
+}
+
 // Vertical fields of view by the share of a person a shot size leaves out: longer lenses for closer shots.
 const lensOf = (lowest: number) => lowest >= 0.6 ? 30 : lowest >= 0.4 ? 36 : 45;
 // How much further back a push in starts or a pull out ends.
@@ -416,12 +450,13 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
     const up = new Vector3(0, 1, 0);
     const side = new Vector3(shot.direction.x, 0, shot.direction.z).normalize();
     /** The camera that frames the people at all of `times`, from the first of `turns` that sees them clearly. */
-    const fit = (times: number[], turns = [0, 1, -1, 2, -2]) => {
+    const fit = (times: number[], turns = [0, 1, -1, 2, -2], faced = times) => {
       // Where each person stands and faces at each of the times, so no camera stands on anyone's line of sight.
       const facings: { centre: Vector3; facing: Vector3 }[] = [];
       const boxes = times.flatMap(time => {
         const posed = boxesAt(time);
-        people.forEach((person, index) => {
+        // Where people face is read at `faced` only: mid-walk they face where they go, not what they will look at.
+        if (faced.includes(time)) people.forEach((person, index) => {
           if (!lyingDown(person.root)) facings.push({ centre: posed[index]!.getCenter(new Vector3()), facing: level(person.root.getWorldDirection(new Vector3())) });
         });
         return posed;
@@ -485,7 +520,9 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
       const nearby = [first.turn, first.turn + 1, first.turn - 1].filter(turn => Math.abs(turn) <= 2);
       cameraFrames = [key(0, first), key(end, "offLens" in kept && !kept.offLens ? fit([end], nearby) : kept)];
     } else {
-      const held = fit(lowest >= 0.6 ? [0] : [0, end / 2, end]);
+      // A held camera frames everyone at the opening, the middle, the end and every place someone stops on the way.
+      const stops = plan.tracks.flatMap(track => track.frames.map(frame => frame.time)).filter(time => time > 0 && time < end);
+      const held = lowest >= 0.6 ? fit([0]) : fit([...new Set([0, end / 2, end, ...stops])].sort((a, b) => a - b), undefined, [0, end / 2, end]);
       cameraFrames = shot.move === "pushIn" ? [key(0, backed(held)), key(end, held)]
         : shot.move === "pullOut" ? [key(0, held), key(end, backed(held))]
           : [key(0, held)];
