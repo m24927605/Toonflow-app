@@ -49,9 +49,10 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * <Picture N>, the previs as <Video 1> and the dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
  * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, that never names
  * a person by their LoRA's trigger word, that gives one person's word to two, that writes a name from the script, or
- * that sends someone's eyes into the lens when the row does not ask for it, is rewritten once with the error. Every
- * prompt is then reviewed and rewritten for the faults that made clips fail before it costs GPU time; a shot rendered
- * before is written knowing what failed and why, and every prompt follows the lessons the film learned so far.
+ * that sends someone's eyes into the lens when the row does not ask for it, is rewritten with the error, twice at
+ * most. Every prompt is then reviewed and rewritten for the faults that made clips fail before it costs GPU time; a
+ * shot rendered before is written knowing what failed and why, and every prompt follows the lessons the film learned so
+ * far.
  */
 export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
@@ -86,7 +87,11 @@ export async function writeClipPrompts(production: Production, script: string, s
         const labels = names.filter(name => new RegExp(`(?<!\\p{L})${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\p{L})`, "u").test(draft));
         if (labels.length) throw new Error(`Never write the name ${labels.join(" or ")}: refer to people in frame by their trigger word or look, and to someone out of frame as "someone off the left (or right) edge of the frame"`);
         const lens = lensLook.exec(draft);
-        if (lens && !lensAsked) throw new Error(`"${lens[0]}" makes the person look into the lens: say where their eyes go instead, at a person or thing and the side of the frame it is on`);
+        if (lens && !lensAsked) {
+          throw new Error(/^lens/i.test(lens[0])
+            ? `Remove every use of the word "lens", even about the camera or the shot size: the word alone draws the video model's eyes into it`
+            : `"${lens[0]}" makes the person look into the lens: say where their eyes go instead, at a person or thing and the side of the frame it is on`);
+        }
         // A trigger word before both "woman" and "man" gives one person's LoRA to two people.
         const shared = loras.filter(lora => new Set([...draft.matchAll(new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "gi"))].map(match => match[1]!.toLowerCase())).size > 1);
         if (shared.length) throw new Error(`${shared.map(lora => `"${lora.trigger}" names ${lora.name} alone`).join(" and ")}: write it only for them, always followed by the same word, woman or man`);
@@ -100,15 +105,14 @@ export async function writeClipPrompts(production: Production, script: string, s
         }
         return fillDialogue(draft, parseDialogue(dialogue));
       };
-      // A draft that breaks a rule is rewritten once with the error.
-      const valid = async (draft: string) => {
+      // A draft that breaks a rule is rewritten with the error, at most twice.
+      const valid = async (draft: string, fixes = 2): Promise<string> => {
         try {
           finish(draft);
           return draft;
         } catch (error) {
-          const fixed = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`);
-          finish(fixed);
-          return fixed;
+          if (!fixes) throw error;
+          return valid(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`), fixes - 1);
         }
       };
       // Before any GPU time the prompt is reviewed for the faults that made earlier clips fail, and rewritten with them.
