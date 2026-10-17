@@ -131,11 +131,14 @@ export async function writeClipPrompts(production: Production, script: string, s
 /**
  * Renders each clip not rendered yet into `folder`, with no first frame: the people its previs shows and the place as
  * reference images, its previs as the blocking reference, its dubbed track, those people's H3 LoRAs and its own seed. All are requested at once
- * and run one after another on one Colab machine.
+ * and run one after another on one Colab machine. The first clip that fails cancels the ones still queued, so a broken
+ * render does not keep the A100 busy with clips that fail the same way.
  */
 export async function renderClips(cwd: string, production: Production, clips: ProductionClip[], resolution: "480p" | "720p" | "1080p", folder: string, signal: AbortSignal, save: () => Promise<void>) {
+  const failed = new AbortController();
+  const clipSignal = AbortSignal.any([signal, failed.signal]);
   try {
-    await Promise.all(clips.filter(item => !item.video).map(async item => {
+    const results = await Promise.allSettled(clips.filter(item => !item.video).map(async item => {
       const shot = production.shots!.find(other => other.shot === item.shot)!;
       const previs = production.previs!.find(other => other.shot === item.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
@@ -151,11 +154,18 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
         videos: previs.video ? [{ path: previs.video, mimeType: "video/mp4" }] : [],
         audios: track ? [{ path: track, mimeType: "audio/wav" }] : [],
         loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed, parts: item.parts,
-      }, signal);
+      }, clipSignal).catch((error: unknown) => {
+        failed.abort(error);
+        throw error;
+      });
       item.video = video!.path;
       item.seed = video!.seed;
       await save();
     }));
+    // The first failure is the cause; the clips it cancelled only report the cancel.
+    if (failed.signal.aborted) throw failed.signal.reason;
+    const rejected = results.find(result => result.status === "rejected");
+    if (rejected) throw rejected.reason;
   } finally {
     // These are all the clips the production has to render, so the A100 stops when they are done rather than idling on.
     stopMinimaxH3WhenIdle();
