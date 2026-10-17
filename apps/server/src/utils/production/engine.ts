@@ -5,12 +5,12 @@ import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
-import { warmMinimaxH3 } from "@/utils/media/minimaxH3";
+import { longTakeParts, minimaxH3SetupMinutes, renderMinutes, warmMinimaxH3 } from "@/utils/media/minimaxH3";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
-import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis } from "./review";
+import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis, ReplyCutError } from "./review";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, referenceImages, shotReferences } from "./shots";
@@ -32,24 +32,38 @@ function textModel() {
   return model;
 }
 
-/** Asks the text model, which also reads `images` after the prompt (PNG bytes as base64). */
-async function complete(systemPrompt: string, prompt: string, signal: AbortSignal, images: string[] = []) {
+/**
+ * Asks the text model, which also reads `images` after the prompt (PNG bytes as base64). A reply cut off at the length
+ * limit, such as one caught in a loop, is asked for once more; cut off again, it fails rather than pass as an answer.
+ */
+async function complete(systemPrompt: string, prompt: string, signal: AbortSignal, images: string[] = [], tries = 2): Promise<string> {
   const model = textModel();
   const content = images.length ? [{ type: "text" as const, text: prompt }, ...images.map(data => ({ type: "image" as const, data, mimeType: "image/png" }))] : prompt;
   const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content, timestamp: Date.now() }] }, signal);
   const message = await stream.result();
   if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
+  if (message.stopReason === "length") {
+    if (tries > 1) return complete(systemPrompt, prompt, signal, images, tries - 1);
+    throw new ReplyCutError("The text model's reply was cut off at its length limit twice");
+  }
   return message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
 }
 
 /**
- * Starts the text model's L4 and loads the model with a one-word request while other work runs, so the checks that
- * follow find it ready; it is held for at most `ms`, until `signal` aborts or the returned release is called.
+ * Starts the text model's L4 `delay` from now and loads the model with a one-word request while other work runs, so the
+ * checks that follow find it ready; it is held for at most `ms` from then, until `signal` aborts or the returned
+ * release is called, which also cancels a start not made yet.
  */
-function warmTextModel(ms: number, signal: AbortSignal) {
-  const release = holdColabFor(ms, signal);
-  void complete("Reply with one word.", "Ready?", signal).catch(() => {});
-  return release;
+function warmTextModel(delay: number, ms: number, signal: AbortSignal) {
+  let release = () => {};
+  const timer = setTimeout(() => {
+    release = holdColabFor(ms, signal);
+    void complete("Reply with one word.", "Ready?", signal).catch(() => {});
+  }, delay);
+  return () => {
+    clearTimeout(timer);
+    release();
+  };
 }
 
 const screenwriter = "You write screenplays for short films made with AI image and video models.";
@@ -146,8 +160,11 @@ async function withinBudget(cwd: string, production: Production, nextUnits: numb
   return true;
 }
 
+/** A machine hold one step leaves for the next, released when that step is done with it or the run ends. */
+type Carried = { qwen?: () => void };
+
 /** Runs the next step and returns whether there is more to do now. */
-async function step(cwd: string, id: string, signal: AbortSignal): Promise<boolean> {
+async function step(cwd: string, id: string, signal: AbortSignal, carried: Carried): Promise<boolean> {
   const production = await readProduction(cwd, id);
   if (production.status !== "running") return false;
   const estimate = estimateProduction(production.input, 0, await costRatio());
@@ -171,27 +188,31 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   }
   if (needs("script")) return wait(cwd, production, "reviewScript", { gate: "script" });
 
-  if (!production.shotList) {
+  // The shot list and the cast both need only the script, so the two text models write them side by side.
+  if (!production.shotList || !production.assets) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    const names = production.input.photos.map(photo => photo.name);
-    const prompt = shotListPrompt(await readProductionText(cwd, production.script), names, production.input);
-    let shotList = await complete(shotListWriter, prompt, signal);
-    // As "Generate shot list" does, a list failing the timing check (here also against the film's length) is
-    // rewritten once with the problems found.
-    const problems = checkScript(shotList, production.input.seconds).issues;
-    if (problems.length) shotList = await complete(shotListWriter, shotListFixPrompt(prompt, shotList, english(problems)), signal);
-    const check = checkScript(shotList, production.input.seconds);
-    const path = `${productionDirectory(id)}/shotList.md`;
-    await writeProductionText(cwd, path, `${shotList}\n`);
-    production.shotList = { path, shots: check.shots.length, issues: check.issues };
-    await saveProduction(cwd, production);
-    return true;
-  }
-
-  if (!production.assets) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
-    production.assets = parseCast(await complete(shotListWriter, castPrompt(await readProductionText(cwd, production.script)), signal), production.input.photos);
-    await saveProduction(cwd, production);
+    const script = await readProductionText(cwd, production.script);
+    const listed = production.shotList ? Promise.resolve() : (async () => {
+      const names = production.input.photos.map(photo => photo.name);
+      const prompt = shotListPrompt(script, names, production.input);
+      let shotList = await complete(shotListWriter, prompt, signal);
+      // As "Generate shot list" does, a list failing the timing check (here also against the film's length) is
+      // rewritten once with the problems found.
+      const problems = checkScript(shotList, production.input.seconds).issues;
+      if (problems.length) shotList = await complete(shotListWriter, shotListFixPrompt(prompt, shotList, english(problems)), signal);
+      const check = checkScript(shotList, production.input.seconds);
+      const path = `${productionDirectory(id)}/shotList.md`;
+      await writeProductionText(cwd, path, `${shotList}\n`);
+      production.shotList = { path, shots: check.shots.length, issues: check.issues };
+      await saveProduction(cwd, production);
+    })();
+    const cast = production.assets ? Promise.resolve() : (async () => {
+      production.assets = parseCast(await complete(shotListWriter, castPrompt(script), signal), production.input.photos);
+      await saveProduction(cwd, production);
+    })();
+    // Both are awaited before an error is passed on, so neither goes on writing unwatched.
+    const failure = (await Promise.allSettled([listed, cast])).find(result => result.status === "rejected");
+    if (failure) throw failure.reason;
     return true;
   }
   // The shots and the dub are planned from the shot list and the cast alone, before anything is drawn, so the texts
@@ -209,12 +230,24 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   // Every shot is blocked in previs before its clip, as Code Video Model renders its proxy first: the text model, still warm from the cast, plans the film's staging in one reply and the Director's Studio
   // code builds and frames every shot in a headless Chrome. The plan comes first because it says who each shot shows,
   // which decides who is seen often enough for a LoRA.
+  // The designs need only the cast, so Qwen-Image draws them on its A100 meanwhile; that machine is then held on for
+  // the poses the next step draws from them, so it never starts twice.
   if (!production.previs) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+    const designing = ![...production.assets.characters, ...production.assets.places].every(assetDrawn);
+    const units = estimate.steps.find(item => item.step === "text")!.units + (designing ? estimate.steps.find(item => item.step === "assets")!.units : 0);
+    if (!await withinBudget(cwd, production, units, signal)) return false;
     const model = textModel();
     const shotList = await readProductionText(cwd, production.shotList);
-    production.previs = await planPrevis(cwd, production, await readProductionText(cwd, production.script), shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
-    await saveProduction(cwd, production);
+    if (designing) carried.qwen ??= holdQwenImage(15 * 60_000, signal);
+    const save = () => saveProduction(cwd, production);
+    const results = await Promise.allSettled([
+      planPrevis(cwd, production, await readProductionText(cwd, production.script), shotList, { providerId: model.providerId, modelId: model.modelId }, signal)
+        .then(previs => { production.previs = previs; }),
+      designing ? drawAssets(cwd, production, production.input.ratio, signal, save) : undefined,
+    ]);
+    await save();
+    const failure = results.find(result => result.status === "rejected");
+    if (failure) throw failure.reason;
     return true;
   }
   // Designs and their LoRAs, the dub, the texts and the previs renders run side by side on separate machines, the
@@ -242,9 +275,18 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     const release = writing ? holdColab() : () => {};
     const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
     let releaseH3 = () => {};
+    const warming = new AbortController();
+    warming.signal.addEventListener("abort", () => releaseH3(), { once: true });
+    signal.addEventListener("abort", () => warming.abort(signal.reason), { once: true });
     // The Qwen-Image machine stays on from the designs to the poses drawn from them, so the poses never start their own;
-    // for 15 minutes at most, should the previs renders the poses wait for stall.
-    const releaseQwen = holdQwenImage(15 * 60_000, signal);
+    // for 15 minutes at most, should the previs renders the poses wait for stall. The hold the previs step took for the
+    // designs ends with this one.
+    const heldQwen = holdQwenImage(15 * 60_000, signal);
+    const releaseQwen = () => {
+      heldQwen();
+      carried.qwen?.();
+      carried.qwen = undefined;
+    };
     try {
       const dubbed = production.clips ? Promise.resolve() : recordDub(cwd, production, signal, save).then(clips => {
         production.clips = clips;
@@ -259,19 +301,28 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       })();
       // Each person's opening pose needs only their design and the previs figure, so it is drawn while the LoRAs train.
       const posing = Promise.all([drawing, blocked]).then(() => drawPoses(cwd, production, signal, save)).finally(releaseQwen);
-      // Once the designs, LoRAs, previs renders and poses are done, only texts are left before the clips, and Qwen-Image
-      // has freed its machine slot: the H3 A100s start and set up meanwhile, when the budget has room for the clips too.
-      const warmed = Promise.all([designed, blocked, posing]).then(async () => {
-        // Only the first pass warms them: a correction round rewrites a few prompts and renders those clips on one
-        // machine started on demand.
-        if (!production.videos && await affordable(production, (writing ? estimate.steps.find(item => item.step === "text")!.units : 0) + clipUnits, signal)) {
-          releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, 20 * 60_000, signal);
+      // The H3 A100s start and set up while the rest runs, as many as the clips can use side by side, when the budget
+      // has room for the clips too. Only before any clip is rendered: a correction round rewrites a few prompts and
+      // renders those clips on one machine started on demand. Colab runs three machines at once, so one A100 starts at
+      // once only when no other machine needs a slot: no designs or poses for Qwen-Image's A100, no LoRA training on an
+      // L4, and no long take whose parts the two text L4s write side by side; otherwise it waits until those are done.
+      const machines = Math.min(2, production.previs.length);
+      const firstPass = !production.videos?.some(item => item.video || item.attempts?.length);
+      const textL4s = writing && (!production.clips || production.clips.some(item => longTakeParts(item.clip).parts > 1)) ? 2 : 1;
+      const alone = machines === 1 && drawn && posed && !plan?.units && textL4s === 1;
+      const warmed = (alone ? Promise.resolve() : Promise.all([designed, blocked, posing])).then(async () => {
+        if (firstPass && await affordable(production, (writing ? estimate.steps.find(item => item.step === "text")!.units : 0) + clipUnits, signal)) {
+          releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, machines, 20 * 60_000, warming.signal);
         }
       });
       const results = await Promise.allSettled([designed, dubbed, writeTexts(cwd, production, dubbed, signal).finally(release), blocked, posing, warmed]);
-      // All are awaited before an error is passed on, so nothing keeps running unwatched.
+      // All are awaited before an error is passed on, so nothing keeps running unwatched. A failed step leaves no clip to
+      // render, so an A100 still setting up for one is stopped rather than left to finish and idle.
       const failure = results.find(result => result.status === "rejected");
-      if (failure) throw failure.reason;
+      if (failure) {
+        warming.abort(failure.reason);
+        throw failure.reason;
+      }
     } finally {
       release();
       releaseQwen();
@@ -296,8 +347,13 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       return true;
     }
     if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
-    // Each clip is checked by the text model once rendered, so its L4 starts while they render.
-    const releaseText = warmTextModel((10 + unrendered * 3) * 60_000, signal);
+    // Each clip is checked by the text model once rendered, so its L4 starts a few minutes before the clips are expected
+    // to be done, in time to load the model, and is held a while past that should they take longer; not for the whole
+    // render, which would bill it idle. The clips render two at a time, each part of a long take after the one before.
+    const minutes = videos.filter(item => !item.video).map(item => renderMinutes(production.clips!.find(clip => clip.shot === item.shot)!.clip, production.input.quality));
+    const expected = minimaxH3SetupMinutes() + Math.max(...minutes, minutes.reduce((sum, value) => sum + value, 0) / 2);
+    const textStart = 3;
+    const releaseText = warmTextModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
     try {
       await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
     } finally {
@@ -325,13 +381,18 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const frames = await clipFrames(cwd, production, item, [previs.layout!, ...referenceImages(references)], signal);
       const gazes = Object.entries(previs.framed.gaze).map(([name, gaze]) => `${name}: ${gaze}`).join(" | ");
       const looks = references.people.length + (references.place ? 1 : 0);
-      const ask = async () => readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, looks), signal, frames));
+      // A reply cut off on every try reads as no reply.
+      const reply = (prompt: string) => complete(checker, prompt, signal, frames).catch((error: unknown) => {
+        if (error instanceof ReplyCutError) return "";
+        throw error;
+      });
+      const ask = async () => readClipCheck(await reply(clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, looks)));
       // A reply that cannot be read is asked again once; one unreadable twice stays failed for a person, never diagnosed,
       // so a parsing failure neither passes a clip nor pays for a render.
       let check = await ask();
       if (check.unreadable) check = await ask();
       const diagnosis = !check.passed && !check.unreadable
-        ? readDiagnosis(await complete(checker, diagnosisPrompt(production, { ...item, check }, shot.row ?? "", gazes, looks), signal, frames)) : undefined;
+        ? readDiagnosis(await reply(diagnosisPrompt(production, { ...item, check }, shot.row ?? "", gazes, looks))) : undefined;
       return { item, check, diagnosis };
     }));
     const failure = verdicts.find(result => result.status === "rejected");
@@ -451,8 +512,9 @@ export function runProduction(cwd: string, id: string) {
   const controller = new AbortController();
   const finished = (async () => {
     await setRegistered(cwd, id, true);
+    const carried: Carried = {};
     try {
-      while (await step(cwd, id, controller.signal));
+      while (await step(cwd, id, controller.signal, carried));
     } catch (error) {
       if (!controller.signal.aborted) {
         const production = await readProduction(cwd, id);
@@ -460,6 +522,7 @@ export function runProduction(cwd: string, id: string) {
         await saveProduction(cwd, production);
       }
     } finally {
+      carried.qwen?.();
       runners.delete(key);
       await setRegistered(cwd, id, false).catch(() => {});
     }

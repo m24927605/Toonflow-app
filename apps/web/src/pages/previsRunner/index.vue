@@ -24,13 +24,15 @@ type PrevisJob = { directory: string; folder: string; aspect: number; shots: Sho
 type Director = {
   planPrevis?: (options: {
     generate: (request: Omit<NodeAiRequest, "onEvent">) => Promise<unknown>; providerId: string; modelId: string; shots: Shot[]; aspect: number; signal: AbortSignal;
+    onStep?: () => void;
   }) => Promise<PrevisPlan>;
   renderPrevis?: (options: {
     plan: PrevisPlan; shots: Shot[]; rendered: number[]; aspect: number; signal: AbortSignal;
     onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; poses: Record<string, Blob> }) => Promise<void>;
   }) => Promise<void>;
 };
-type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsResult?: Partial<Pick<PrevisPlan, "blocking" | "framed">> & { error?: string } };
+// previsSteps counts the plan's finished steps, which the server takes as progress while the plan has nothing to save.
+type RunnerWindow = typeof window & { previsJob?: PrevisJob; previsSteps?: number; previsResult?: Partial<Pick<PrevisPlan, "blocking" | "framed">> & { error?: string } };
 
 // A page without the workspace UI that the server opens in a headless browser for auto production's previs. It works
 // on the directory the job names and never opens a project, so the people's own pages keep their current project.
@@ -54,6 +56,7 @@ onMounted(async () => {
       const plan = await director.planPrevis({
         generate: request => ai.generate({ ...request, directory: job.directory, references: [...references, ...request.references ?? []] }),
         providerId: job.providerId, modelId: job.modelId, shots: job.shots, aspect: job.aspect, signal,
+        onStep: () => { runner.previsSteps = (runner.previsSteps ?? 0) + 1; },
       });
       await files.mkdir(job.folder).catch(() => undefined);
       await files.writeJson(planPath, plan);

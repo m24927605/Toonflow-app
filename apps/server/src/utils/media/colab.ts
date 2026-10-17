@@ -735,7 +735,10 @@ export function createColabWorker(provider: string, machine: ColabMachine, idleM
     return enqueue(() => close());
   }
 
-  return { run, hold, holdFor, stopWhenIdle, stop };
+  /** Whether a session is open, or a job or hold is starting one. */
+  const live = () => !!session || pending > 0;
+
+  return { run, hold, holdFor, stopWhenIdle, stop, live };
 }
 
 /** A random seed with 53 bits, so it stays exact as a JavaScript number. */

@@ -7,7 +7,7 @@ import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { longTakeParts, stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
-import { correctionNote, lessonsOf, promptReview, readReview, reviewRounds, type ClipDiagnosis } from "./review";
+import { correctionNote, lessonsOf, promptReview, readReview, ReplyCutError, reviewRounds, type ClipDiagnosis } from "./review";
 import { maxLoras, referenceImages, shotReferences } from "./shots";
 import type { ProductionDub } from "./dub";
 import { productionDirectory, writeProductionText, type Production } from "./state";
@@ -60,7 +60,7 @@ export async function writeClipPrompts(production: Production, script: string, s
   const ids = speakerIds(spans);
   const videos = production.videos ??= spans.map((span): ProductionClip => ({ shot: span.shot }));
   const names = production.assets!.characters.map(person => person.name);
-  // Shots are written side by side, as the text model answers two requests at once; a long take's parts stay in order.
+  // Shots are written side by side, as the text model answers two requests at once, and so are a long take's parts.
   // Every shot is awaited before an error is passed on, so none goes on writing unwatched.
   const results = await Promise.allSettled(spans.map(async span => {
     const video = videos.find(item => item.shot === span.shot)!;
@@ -81,7 +81,7 @@ export async function writeClipPrompts(production: Production, script: string, s
     // Has the text model write one prompt and fills in the lines of `dialogue`, rewritten once with the error. A person
     // the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in the mouth
     // of someone described otherwise is spoken by the wrong person.
-    const write = async (instructions: string, dialogue?: string, scope = "") => {
+    const write = async (instructions: string, dialogue?: string, scope = "", later = false) => {
       const finish = (draft: string) => {
         // A trigger word run into the next word ("siknsrman") is not the word the LoRA was trained on.
         const missing = loras.filter(lora => !new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "i").test(draft) || new RegExp(`${lora.trigger}(?!\\s+(woman|man)\\b)`, "i").test(draft));
@@ -118,13 +118,21 @@ export async function writeClipPrompts(production: Production, script: string, s
           return valid(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`), fixes - 1);
         }
       };
+      // A draft still breaking a rule after its fixes is set aside for a fresh one with fixes of its own, so one stubborn
+      // draft does not fail the production and stop its machines.
+      let draft = await complete(instructions).then(text => valid(text)).catch(async () => valid(await complete(instructions)));
       // Before any GPU time the prompt is reviewed for the faults that made earlier clips fail, and rewritten with them.
-      let draft = await valid(await complete(instructions));
       for (let round = 0; round < reviewRounds; round++) {
-        const problems = readReview(await complete(promptReview(production, span.row ?? "", draft, scope)));
+        // A review the model could not finish twice leaves the valid draft as it is, said in the log, not passed unread.
+        const problems = await complete(promptReview(production, span.row ?? "", draft, scope, later)).then(readReview, (error: unknown) => {
+          if (!(error instanceof ReplyCutError)) throw error;
+          console.warn(`[production] Shot ${span.shot}: the prompt review failed and the draft is kept unreviewed:`, error);
+          return [];
+        });
         if (!problems.length) break;
         // A rewrite that still breaks a rule after its fix is dropped and the valid draft kept: the review only improves.
-        const revised = await valid(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nA review found these faults; fix every one and output the whole prompt again:\n${problems.map(problem => `- ${problem}`).join("\n")}`)).catch(() => undefined);
+        const revised = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nA review found these faults; fix every one and output the whole prompt again:\n${problems.map(problem => `- ${problem}`).join("\n")}`)
+          .then(text => valid(text)).catch(() => undefined);
         if (!revised) break;
         draft = revised;
       }
@@ -138,8 +146,8 @@ export async function writeClipPrompts(production: Production, script: string, s
       const dialogue = parseDialogue(span.dialogue);
       const seconds = (frames: number) => Number((frames / 24).toFixed(2));
       const beats = await takeBeats(span.row ?? "", clip, lines, complete);
-      const parts: string[] = [];
-      for (let part = 0; part < plan.parts; part++) {
+      // The parts are written side by side: each needs only its own seconds and beats, never another part's prompt.
+      const written = await Promise.allSettled(Array.from({ length: plan.parts }, (_, part) => {
         const from = part * plan.step, to = from + plan.frames;
         // A part delivers its frames after the 22 it repeats; a line belongs to the part that delivers its start.
         const owns = (start: number) => start >= (part ? from + 22 : 0) && (part + 1 === plan.parts || start < (part + 1) * plan.step + 22);
@@ -147,16 +155,25 @@ export async function writeClipPrompts(production: Production, script: string, s
         const partSpan = { ...span, dialogue: own.map(line => line.speaker ? `${line.speaker}\uFF1A${line.words}` : line.words).join("\uFF1B") };
         const [start, end] = [seconds(from), seconds(Math.min(to, clip * 24))];
         const ownBeats = beats.filter(beat => beat.to > start && beat.from < end);
+        // Where the last beat that ends before this part's first frame leaves everyone, which its opening must show
+        // rather than the row's opening state; a beat still going then is one of this part's own.
+        const opening = part ? beats.filter(beat => beat.to <= start).at(-1)?.after || undefined : undefined;
         const note = [
           `\n\nThis shot is one continuous take of ${clip} seconds without any cut, rendered in ${plan.parts} parts of ${seconds(plan.frames)} seconds. This prompt is part ${part + 1} of ${plan.parts}: seconds ${start}\u2013${end} of the shot.`,
           ...ownBeats.length ? [`Of the take's action, exactly these beats fall in this part, in this order, at these seconds of the take: ${ownBeats.map(beat => `${beat.from}\u2013${beat.to} s: ${beat.what}`).join("; ")}. Show them and nothing else of the row, which the other parts show; a beat that runs past this part's end is left mid-way, and one that began before it is already under way. Each line is spoken in the beat that holds its time.`] : [],
           "Where each person looks, as given above, is for the whole take: the start is the start of part 1 and the end the end of the last part; this part goes from where the part before leaves their eyes towards that end only as far as its seconds allow.",
           "Describe only what happens in those seconds, in time order; the other parts describe the rest. <Video 1> and <Audio 1> cover only this part.",
           ...part ? [`Its first 0.92 seconds repeat the end of part ${part} exactly: open on the same picture, positions and motion that part ends on, and carry on with the same camera.`] : [],
+          ...opening ? [`Where everyone is as this part starts, after the beats before it: ${opening}`] : [],
+          ...part ? ["Open the detailed description on that state; never on the row's opening state, and never on an action an earlier part already showed."] : [],
           ...part + 1 < plan.parts ? ["End with the take still going, mid-action, not on a pause or a resolved moment."] : [],
         ].join(" ");
-        parts.push(await write(instructionsOf(partSpan, seconds(plan.frames), note), partSpan.dialogue, note));
-      }
+        return write(instructionsOf(partSpan, seconds(plan.frames), note), partSpan.dialogue, note, part > 0);
+      }));
+      // Every part is awaited before an error is passed on, so none goes on writing unwatched.
+      const failed = written.find(result => result.status === "rejected");
+      if (failed) throw failed.reason;
+      const parts = written.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
       Object.assign(video, { parts, prompt: parts.join("\n\n") });
     } else {
       video.prompt = await write(instructionsOf(span, clip, cut), span.dialogue);
@@ -168,9 +185,10 @@ export async function writeClipPrompts(production: Production, script: string, s
 }
 
 /**
- * The beats of a long take's row in story order, each with the seconds of the take it spans, spread over the whole take
- * at a natural pace and around the lines' recorded times, so each part of the take shows its own beats and none twice.
- * A reply that cannot be read gives none, and each part falls back to its seconds alone.
+ * The beats of a long take's row in story order, each with the seconds of the take it spans and where everyone is when
+ * it ends, spread over the whole take at a natural pace and around the lines' recorded times, so each part of the take
+ * shows its own beats and none twice, and opens where the beats before it leave everyone. A reply that cannot be read
+ * gives none, and each part falls back to its seconds alone.
  */
 async function takeBeats(row: string, seconds: number, lines: ProductionDub["shots"][number]["lines"], complete: (prompt: string) => Promise<string>) {
   const reply = await complete([
@@ -178,15 +196,19 @@ async function takeBeats(row: string, seconds: number, lines: ProductionDub["sho
     row,
     ...lines.length ? [`Its lines are recorded and fixed at these times of the take: ${lines.map(line => `${line.speaker} says "${line.words}" from ${(line.start ?? 0).toFixed(1)} to ${((line.start ?? 0) + (line.seconds ?? 0)).toFixed(1)} s`).join("; ")}.`] : [],
     "Split the row's action into beats in story order, each one visible action of the people, and give each the second it starts and ends, so the beats fill the whole take at a natural pace: nothing happens twice, a beat lasts at least two seconds, walking across a room takes three or more, and each line falls in the beat that is going on at its time.",
-    "Write each beat in English, naming people as the row does.",
-    "Reply with JSON only: {\"beats\": [{\"from\": 0, \"to\": 3.5, \"what\": \"...\"}]}.",
-  ].join("\n"));
+    "Write each beat in English, naming people as the row does, and with it where everyone in the shot is when it ends: their posture, their place in the room and which way they face.",
+    "Reply with JSON only: {\"beats\": [{\"from\": 0, \"to\": 3.5, \"what\": \"...\", \"after\": \"...\"}]}.",
+  ].join("\n")).catch((error: unknown) => {
+    // A reply cut off on every try gives no beats, as one that cannot be read does.
+    if (error instanceof ReplyCutError) return "";
+    throw error;
+  });
   try {
     const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { beats?: unknown };
     const beats = (Array.isArray(value.beats) ? value.beats : []).flatMap(item => {
-      const { from, to, what } = (item ?? {}) as Record<string, unknown>;
+      const { from, to, what, after } = (item ?? {}) as Record<string, unknown>;
       return typeof from === "number" && typeof to === "number" && typeof what === "string" && 0 <= from && from < to && to <= seconds + 0.5 && what.trim()
-        ? [{ from: Number(from.toFixed(1)), to: Number(Math.min(to, seconds).toFixed(1)), what: what.trim() }] : [];
+        ? [{ from: Number(from.toFixed(1)), to: Number(Math.min(to, seconds).toFixed(1)), what: what.trim(), after: typeof after === "string" ? after.trim() : "" }] : [];
     });
     // Beats out of order or overlapping by more than a moment are not a timeline the parts can share.
     return beats.every((beat, index) => !index || beat.from >= beats[index - 1]!.to - 0.5) ? beats : [];

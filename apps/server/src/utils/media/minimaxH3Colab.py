@@ -5,8 +5,8 @@
 # Output: /content/h3out/final.mp4, followed by a COLAB_DONE line on success.
 # A long take (H3_SEGMENTS above 1, longer than one 15-second render) is rendered as that many segments in a row, one
 # prompt each from h3in_<job>_prompts.json: every segment after the first continues the last 22 frames of the one before
-# through H3 Motion Context, then is resampled lightly and blended back in as H3-LongTakeNoCuts does, so faces keep their
-# detail along the chain; the segments are joined into one take without cuts.
+# through H3 Motion Context, sampled once under the same conditioning as the first; the segments are joined into one
+# take without cuts.
 # 480p samples just above the target size; 720p samples at the model's native ~768p and downscales;
 # 1080p upscales the 768p video latent with the LBH 3D latent upscaler and resamples it.
 import json
@@ -32,14 +32,12 @@ outputs = Path("/content/h3out")
 comfy = Path("/content/ComfyUI")
 upscalerNode = comfy / "custom_nodes" / "Comfyui_Minimax_h3_latent_Upscaler"
 motionContextNode = comfy / "custom_nodes" / "ComfyUI-H3-Motion-Context"
-longTakeNode = comfy / "custom_nodes" / "H3-LongTakeNoCuts"
 # Pinned to the revisions this pipeline was verified with, the weights' repos too, so a changed upload upstream never
 # reaches a render unnoticed.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
 upscalerCommit = "40316cf008b2fd8663263270669eb4da23f89d2c"
-# NikoDemon80/ComfyUI-H3-Motion-Context (GPL-3.0, fetched at run time, not distributed) and xyzDist/H3-LongTakeNoCuts (MIT).
+# NikoDemon80/ComfyUI-H3-Motion-Context (GPL-3.0, fetched at run time, not distributed).
 motionContextCommit = "5335715abe54c1a9bfbe3494da29aae3e8635ce3"
-longTakeCommit = "0cad00ab92e4ad8de3d54ddd5254142bccb702d9"
 weightRevisions = {
     "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
     "LBH-123-AI/Minimax_h3_latent_Upscaler": "3f941d5d182014dd5c0a5e16330420ee2d4aa0c6",
@@ -111,14 +109,10 @@ if not comfy.exists():
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(comfy / "requirements.txt"), "huggingface_hub", "hf_xet", "requests"], check=True)
 if refine and not upscalerNode.exists():
     fetch(upscalerNode, "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git", upscalerCommit)
-# The long-take nodes are installed with the machine, before ComfyUI starts, so a warm machine can render a long take too.
-# They need nothing beyond ComfyUI; the long-take repo's compiled caches and examples are not kept.
+# The motion context nodes are installed with the machine, before ComfyUI starts, so a warm machine can render a long
+# take too; they need nothing beyond ComfyUI.
 if not motionContextNode.exists():
     fetch(motionContextNode, "https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context.git", motionContextCommit)
-if not longTakeNode.exists():
-    fetch(longTakeNode, "https://github.com/xyzDist/H3-LongTakeNoCuts.git", longTakeCommit)
-    for extra in ("__pycache__", "example_workflow"):
-        shutil.rmtree(longTakeNode / extra, ignore_errors=True)
 
 import requests
 from huggingface_hub import hf_hub_download
@@ -314,21 +308,6 @@ def segmentGraph(segment, prompt, videos, audios):
     if early:
         graph["8b"] = {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": continued("motionB", guided("baseGuide", ["7", 1], "7b"), "7b")}}
     videoLatent = sampled
-    if segment > 1:
-        # H3-LongTakeNoCuts: the segment is resampled lightly with fresh noise and without the pinned head, and blended
-        # in from frame 22 to 44, so the tail the next segment carries on from is re-detailed rather than a copy of a
-        # copy; the sound stays from the first pass.
-        graph.update({
-            "refineNoise": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed + 1000 * (segment - 1) + 1}},
-            "refineGuider": {"class_type": "BasicGuider", "inputs": {"model": model, "conditioning": ["7b" if early else "7", 0]}},
-            "refineSigmas": {"class_type": "BasicScheduler", "inputs": {"model": model, "scheduler": "beta", "steps": steps, "denoise": 0.55}},
-            "refine": {"class_type": "SamplerCustomAdvanced", "inputs": {
-                "noise": ["refineNoise", 0], "guider": ["refineGuider", 0], "sampler": ["10", 0], "sigmas": ["refineSigmas", 0], "latent_image": sampled}},
-            "blend": {"class_type": "H3BlendLatentsByFrames", "inputs": {
-                "latent1": sampled, "latent2": ["refine", 0], "keyframes": f"0:0, {contextFrames}:0, {2 * contextFrames}:1", "duration": length / 24,
-                "fps": 24.0, "interpolation": "linear", "audio_source": "latent1", "blend_audio": False}},
-        })
-        videoLatent = ["blend", 0]
     if segments > 1:
         graph["save"] = {"class_type": "MiniMaxH3MotionContextSaveLatent", "inputs": {"latent": videoLatent, "filename_prefix": f"{contextFolder}/clip", "clip_index": segment}}
     if refine:

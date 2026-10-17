@@ -23,6 +23,22 @@ export function longTakeParts(duration: number) {
   const length = snapped(Math.ceil((frames - contextFrames) / parts) + contextFrames);
   return { parts, frames: length, step: length - contextFrames };
 }
+
+/**
+ * About how many minutes a set-up A100 takes to render a clip of `duration` seconds. ACT: measured at 720p on
+ * 2026-10-17, where a 124-frame part took about 2.3 minutes and a 260-frame part about 10, close to frames squared
+ * times 1.5e-4; 480p and 1080p are scaled by the pixels they sample and refine, unmeasured.
+ */
+export function renderMinutes(duration: number, resolution: string) {
+  const plan = longTakeParts(duration);
+  const scale = resolution === "480p" ? 0.4 : resolution === "1080p" ? 2.5 : 1;
+  return plan.parts * plan.frames ** 2 * 1.5e-4 * scale;
+}
+
+// ACT: Minutes a cold A100 takes to start and set up before its first clip, measured on 2026-10-17 (about 4).
+const setupMinutes = 4;
+/** The minutes before the A100s can render: none while one is open or starting, else a cold start's. */
+export const minimaxH3SetupMinutes = () => workers.some(worker => worker.live()) ? 0 : setupMinutes;
 // Clips share high-RAM A100s kept for five idle minutes, so a batch of shots pays the ComfyUI install and the 30+ GB
 // model download once a machine; the high-RAM shape is needed for those weights to pass through host memory. Two
 // machines render a batch side by side, leaving Colab's third for the text model that checks the clips; each clip goes
@@ -39,11 +55,12 @@ const sentLoras = new WeakMap<ColabSession, Set<string>>();
 const setup = `${pipeline.slice(0, pipeline.indexOf("# The machine is set up above this line"))}\nprint("COLAB_DONE")\n`;
 
 /**
- * Starts the A100s and sets them up for clips of this resolution while other work runs, so the first clips find them
- * ready; each is held for at most `ms`, until `signal` aborts or the returned release is called.
+ * Starts `machines` of the A100s, as many as the clips to come can use, and sets them up for clips of this resolution
+ * while other work runs, so the first clips find them ready; each is held for at most `ms`, until `signal` aborts or
+ * the returned release is called.
  */
-export function warmMinimaxH3(resolution: string, ratio: string, ms: number, signal: AbortSignal) {
-  const releases = workers.map(worker => {
+export function warmMinimaxH3(resolution: string, ratio: string, machines: number, ms: number, signal: AbortSignal) {
+  const releases = workers.slice(0, machines).map(worker => {
     const release = worker.holdFor(ms, signal);
     void worker.run(session => session.job({
       script: setup, uploads: [],

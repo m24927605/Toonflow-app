@@ -67,9 +67,13 @@ async function runPage<T extends object>(job: object, signal: AbortSignal, progr
     await page.addInitScript(value => { (globalThis as { previsJob?: unknown }).previsJob = value; }, job);
     await page.goto(`${origin}/#/previs-runner`);
     let result: (T & { error?: string }) | undefined;
+    // The page counts each step it finishes, such as a reply of the director model, which counts as progress too.
+    let steps = 0;
     while (!(result = await page.evaluate(() => (globalThis as { previsResult?: T & { error?: string } }).previsResult))) {
       await scheduler.wait(progressPoll, { signal });
-      if (await progressed()) arm();
+      const counted = await page.evaluate(() => (globalThis as { previsSteps?: number }).previsSteps ?? 0);
+      if (counted !== steps || await progressed()) arm();
+      steps = counted;
     }
     if (result.error) throw new Error(`Previs failed: ${result.error}`);
     return result;

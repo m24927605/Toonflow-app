@@ -314,6 +314,46 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
   }
 }
 
+// A video model draws a face from latent cells of about 32 by 32 pixels, so a face only a cell or two tall comes out
+// with smeared or doubled eyes. ACT: The share of the frame height a face needs, from one 720p MiniMax H3 film on
+// 2026-10-17 (eyes smeared at 37-46 px of 720, thin but whole at 56-62, clean from 93); measure it on more films.
+const minFaceShare = 0.08;
+// Crown to chin in metres, an adult's.
+const headHeight = 0.23;
+// Wide shot sizes, where people are meant to be small in the place: "\u9060\u666f"/"\u8fdc\u666f" (long shot).
+const wideSizes = /extreme wide|establishing|\bwide|long shot|\u9060\u666f|\u8fdc\u666f/i;
+
+/**
+ * Where a shot shows someone's face too small for the video model to draw their eyes: for each person of `cast` whose
+ * head is in frame, the moment their face is smallest, when it is under minFaceShare of the frame height. A wide shot
+ * size asks for small people and is not checked; nor is anyone lying down, whose face the camera may see from any side.
+ */
+export async function smallFaces(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string) {
+  if (wideSizes.test(size)) return [];
+  const stage = await framingStage(scene, plan, aspect);
+  try {
+    const motion = prepareMotion(plan.cameraFrames);
+    const smallest = new Map<string, { time: number; share: number }>();
+    for (const time of [0, ...Array.from({ length: Math.floor(plan.duration / framedStep) }, (_, index) => (index + 1) * framedStep), plan.duration]) {
+      stage.pose(time, motion);
+      for (const { object, root } of stage.roots) {
+        if (!object.name || !cast.includes(object.name) || !personTypes.has(object.objType) || lyingDown(root)) continue;
+        const box = new Box3().setFromObject(root);
+        // People who have not come in yet wait below the floor.
+        if (box.max.y < 0 || !inFrame(headPoint(box, stage.camera))) continue;
+        const centre = box.getCenter(new Vector3());
+        const [crown, chin] = [box.max.y, box.max.y - headHeight].map(y => new Vector3(centre.x, y, centre.z).project(stage.camera));
+        const share = Math.abs(crown!.y - chin!.y) / 2;
+        if (share < (smallest.get(object.name)?.share ?? Infinity)) smallest.set(object.name, { time, share });
+      }
+    }
+    return [...smallest].flatMap(([name, { time, share }]) => share < minFaceShare
+      ? [`At ${time} s ${name}'s face is ${(share * 100).toFixed(1)}% of the frame height, under the ${minFaceShare * 100}% the video model needs to draw the eyes.`] : []);
+  } finally {
+    stage.dispose();
+  }
+}
+
 // Vertical fields of view by the share of a person a shot size leaves out: longer lenses for closer shots.
 const lensOf = (lowest: number) => lowest >= 0.6 ? 30 : lowest >= 0.4 ? 36 : 45;
 // How much further back a push in starts or a pull out ends.

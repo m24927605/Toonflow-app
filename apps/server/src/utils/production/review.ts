@@ -11,6 +11,9 @@ export type ClipDiagnosis = {
   lesson?: string;
 };
 
+/** A text model reply cut off at its length limit on every try, such as one caught in a loop. */
+export class ReplyCutError extends Error {}
+
 // A clip is rendered again at most this many times, each from a prompt rewritten after its diagnosis; the best of the
 // renders is kept and flagged after that.
 export const maxCorrections = 2;
@@ -26,9 +29,9 @@ export const lessonsOf = (production: Production) => production.lessons?.length
 /**
  * The review of a written clip prompt before any GPU time: a checklist of the faults that made earlier clips fail, each
  * of them something the prompt says, so a text model can find them in the words alone. `scope` says which seconds a
- * part of a long take covers.
+ * part of a long take covers, and `later` marks a part after the first.
  */
-export function promptReview(production: Production, row: string, draft: string, scope = "") {
+export function promptReview(production: Production, row: string, draft: string, scope = "", later = false) {
   return [
     "You review a prompt written for the MiniMax H3 video model against the shot-list row it renders. The row (shot size, camera, action, dialogue, cast, state):",
     row,
@@ -39,6 +42,8 @@ export function promptReview(production: Production, row: string, draft: string,
     "Find every one of these faults in the prompt:",
     "- The opening already shows the state the row's action leads to, so the action cannot happen: someone who comes in is already inside, someone who stands up is already standing, someone who sits down is already seated.",
     "- Part of the row's action is missing, out of order, or undone by a later sentence.",
+    // A later part that restarts the take contradicts the frames it continues from.
+    ...later ? ["- The prompt opens on the row's opening state, or shows again an action an earlier part already showed, instead of the state this part starts in."] : [],
     "- A movement that is physically impossible, such as a sliding door pushed inward.",
     "- Two different camera moves, shot sizes or views of the same person, such as a following camera that also holds static, or profile and three-quarter at once.",
     "- Words about anyone's face, hair, body or clothes beyond the picture they come from.",
