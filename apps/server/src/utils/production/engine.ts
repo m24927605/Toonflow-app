@@ -315,8 +315,10 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     if (!await withinBudget(cwd, production, textUnits, signal)) return false;
     // A correction costs a clip's share of the clip and text steps; one the budget cannot pay for is not started.
     const correctionUnits = (estimate.steps.find(item => item.step === "clips")!.units + textUnits) / videos.length;
-    let corrections = 0;
-    for (const item of unchecked) {
+    // The clips are checked and diagnosed side by side, as the text model answers two requests at once; the verdicts
+    // are kept until all are in and then applied in shot order, as each correction draws on the budget the ones before
+    // it left. Every clip is awaited before an error is passed on, so none goes on unwatched.
+    const verdicts = await Promise.allSettled(unchecked.map(async item => {
       const shot = production.shots!.find(other => other.shot === item.shot)!;
       const previs = production.previs!.find(other => other.shot === item.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
@@ -326,15 +328,23 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const ask = async () => readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, looks), signal, frames));
       // A reply that cannot be read is asked again once; one unreadable twice stays failed for a person, never diagnosed,
       // so a parsing failure neither passes a clip nor pays for a render.
-      item.check = await ask();
-      if (item.check.unreadable) item.check = await ask();
-      if (!item.check.passed && !item.check.unreadable) {
-        const diagnosis = readDiagnosis(await complete(checker, diagnosisPrompt(production, item, shot.row ?? "", gazes, looks), signal, frames));
+      let check = await ask();
+      if (check.unreadable) check = await ask();
+      const diagnosis = !check.passed && !check.unreadable
+        ? readDiagnosis(await complete(checker, diagnosisPrompt(production, { ...item, check }, shot.row ?? "", gazes, looks), signal, frames)) : undefined;
+      return { item, check, diagnosis };
+    }));
+    const failure = verdicts.find(result => result.status === "rejected");
+    if (failure) throw failure.reason;
+    let corrections = 0;
+    for (const { item, check, diagnosis } of verdicts.flatMap(result => result.status === "fulfilled" ? [result.value] : [])) {
+      item.check = check;
+      if (diagnosis) {
         applyDiagnosis(production, item, diagnosis, await affordable(production, correctionUnits * (corrections + 1), signal));
         if (!item.check) corrections++;
       }
-      await saveProduction(cwd, production);
     }
+    await saveProduction(cwd, production);
     return true;
   }
   if (!production.roughCut) {

@@ -59,9 +59,11 @@ export async function writeClipPrompts(production: Production, script: string, s
   const ids = speakerIds(spans);
   const videos = production.videos ??= spans.map((span): ProductionClip => ({ shot: span.shot }));
   const names = production.assets!.characters.map(person => person.name);
-  for (const span of spans) {
+  // Shots are written side by side, as the text model answers two requests at once; a long take's parts stay in order.
+  // Every shot is awaited before an error is passed on, so none goes on writing unwatched.
+  const results = await Promise.allSettled(spans.map(async span => {
     const video = videos.find(item => item.shot === span.shot)!;
-    if (video.prompt) continue;
+    if (video.prompt) return;
     const clip = production.clips!.find(item => item.shot === span.shot)!.clip;
     const dubbed = !!production.dub!.shots.find(item => item.shot === span.shot)?.track;
     const shot = production.shots!.find(item => item.shot === span.shot)!;
@@ -155,7 +157,9 @@ export async function writeClipPrompts(production: Production, script: string, s
       video.prompt = await write(instructionsOf(span, clip, cut), span.dialogue);
     }
     await save();
-  }
+  }));
+  const failure = results.find(result => result.status === "rejected");
+  if (failure) throw failure.reason;
 }
 
 /**

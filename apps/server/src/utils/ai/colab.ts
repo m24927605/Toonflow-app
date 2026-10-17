@@ -32,21 +32,25 @@ const weights: Record<string, { revision: string; gguf?: { file: string; thinkin
     gguf: { file: "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-IQ3_M.gguf", thinking: true },
   },
 };
-// The loaded model stays on one L4 between requests and the session stops after two idle minutes.
-const worker = createColabWorker(provider.id, { gpu: "L4" }, 120_000);
+// Two L4s answer requests side by side, each loading the model once and keeping it between requests, and each stops
+// after two idle minutes; a request goes to the one with the fewest waiting, so the clip prompts and checks of a film
+// are answered two at a time. A hold keeps only the first one warm. ACT: Colab allows an account about three machines
+// at once, so while the two A100s render clips the second L4 waits for a slot; three would need a larger quota.
+const workers = [0, 1].map(() => createColabWorker(provider.id, { gpu: "L4" }, 120_000));
+const waiting = workers.map(() => 0);
 const resultSchema = z.object({
   text: z.string(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative(),
   reasoning: z.string().optional(), stopReason: z.enum(["stop", "length", "toolUse"]),
   toolCalls: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), arguments: z.string() })).optional(), loadSeconds: z.number().nonnegative(), generateSeconds: z.number().nonnegative(),
 });
 
-/** Stops the text session now, cancelling the running request and every queued one. */
-export const stopColab = () => worker.stop();
+/** Stops the text sessions now, cancelling the running requests and every queued one. */
+export const stopColab = () => Promise.all(workers.map(worker => worker.stop()));
 
-/** Keeps the text session open between requests until the returned release is called. */
-export const holdColab = () => worker.hold();
-/** Keeps the text model's L4 for at most `ms`, for requests known to follow, until `signal` aborts or the release. */
-export const holdColabFor = (ms: number, signal?: AbortSignal) => worker.holdFor(ms, signal);
+/** Keeps the first text session open between requests until the returned release is called. */
+export const holdColab = () => workers[0]!.hold();
+/** Keeps the first text model's L4 for at most `ms`, for requests known to follow, until `signal` aborts or the release. */
+export const holdColabFor = (ms: number, signal?: AbortSignal) => workers[0]!.holdFor(ms, signal);
 
 export function streamColab(providerId: string, modelId: string, context: Context, signal: AbortSignal, references: Awaited<ReturnType<typeof readAiReferences>>) {
   const model = provider.models.find(item => item.id === modelId);
@@ -102,14 +106,16 @@ export function streamColab(providerId: string, modelId: string, context: Contex
   // ACT: The CLI job downloads the complete reply; token streaming needs an incremental CLI transport.
   void (async () => {
     const ask = async (extra: typeof messages, toolChoice?: "required") => {
-      const [data] = await worker.run((session, jobSignal) => session.job({
+      const index = waiting.indexOf(Math.min(...waiting));
+      waiting[index]!++;
+      const [data] = await workers[index]!.run((session, jobSignal) => session.job({
         script: weight.gguf ? ggufPipeline : pipeline,
         uploads: [{ name: "colabInput.json", data: JSON.stringify({
           modelId, revision: weight.revision, ...weight.gguf, messages: [...messages, ...extra], ...tools?.length ? { tools } : {}, ...toolChoice ? { toolChoice } : {},
           contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens,
         }) }],
         env: {}, outputs: ["/content/colabOutput.json"],
-      }, jobSignal), signal);
+      }, jobSignal), signal).finally(() => waiting[index]!--);
       const reply = resultSchema.parse(JSON.parse(new TextDecoder().decode(data)));
       console.log(`[colab] ${modelId}: load ${reply.loadSeconds} s, ${reply.outputTokens} tokens in ${reply.generateSeconds} s`);
       return reply;
