@@ -262,7 +262,7 @@ def segmentGraph(segment, prompt, videos, audios):
             "18": {"class_type": "DisableNoise", "inputs": {}},
             "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": ["12", 0]}},
         })
-        graph["11"]["inputs"]["sigmas"] = ["17", 0]
+        graph["12"]["inputs"]["sigmas"] = ["17", 0]
         sampled = ["19", 0]
     for index, ref in enumerate(refs):
         graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": ref.name}}
@@ -384,7 +384,11 @@ for segment, (prompt, videos, audios) in enumerate(zip(prompts, segmentVideos, s
         time.sleep(15)
     if history["status"].get("status_str") != "success":
         raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
-    rendered.append(sorted((comfy / "output" / "toonflow").glob(f"h3_{job}_{segment}_*.mp4"))[-1])
+    saved = sorted((comfy / "output" / "toonflow").glob(f"h3_{job}_{segment}_*.mp4"))
+    # ComfyUI reports success for a graph whose save node it skipped, such as one with a loop in it.
+    if not saved:
+        raise RuntimeError(f"Segment {segment} saved no video: " + json.dumps(history.get("outputs", {}))[-2000:] + "\n" + log.read_text()[-3000:])
+    rendered.append(saved[-1])
 
 outputs.mkdir(exist_ok=True)
 produced = rendered[0]
