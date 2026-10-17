@@ -75,14 +75,19 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
   for (const shot of dub.shots.filter(item => item.lines.length && !item.track)) {
     const track = `${folder}/shot${shot.shot}.wav`;
     const inputs = shot.lines.map(line => line.path!);
-    // Each line is delayed to its place after the lead and the lines before it, then all are mixed into one track.
-    let at = lead;
+    // Each line is delayed to its place after the lines before it, then all are mixed into one track. A shot opens on
+    // its lines after the lead; a long take, whose row plays its action first and its lines after it, ends on them, the
+    // last one finished a lead before the take ends. ACT: Lines spoken in the middle of a long take would need their
+    // times written in the shot list.
+    const spoken = shot.lines.reduce((sum, line) => sum + line.seconds! + gap, -gap);
+    let at = clipSeconds(shot.seconds, production.input.quality) > 15 ? Math.max(lead, shot.seconds - lead - spoken) : lead;
     const delays = shot.lines.map(line => {
       line.start = at;
       at += line.seconds! + gap;
       return line.start;
     });
-    shot.seconds = Math.max(shot.seconds, at + lead);
+    // The shot lasts until a lead after its last line.
+    shot.seconds = Math.max(shot.seconds, at - gap + lead);
     // The track runs the whole clip, silence after the last line, since H3 takes it as the clip's complete soundtrack.
     const filters = [
       ...delays.map((start, index) => `[${index}:a]aresample=48000,adelay=${Math.round(start * 1000)}:all=1[l${index}]`),
