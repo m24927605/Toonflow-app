@@ -66,14 +66,21 @@ export function shotReferences(shot: ProductionShot, assets: NonNullable<Product
   const names = [...new Set([...framed.opening, ...framed.shown])];
   const persons = names.flatMap(name => byName(assets.characters, name) ?? []).slice(0, maxPeople);
   const place = byName(assets.places, shot.place);
-  // A person drawn in their opening pose shows the clip that pose rather than standing facing the camera.
-  const image = (person: ProductionAsset) => shot.poses?.[person.name] ?? outfitView(person, shot);
+  // A person drawn in their opening pose shows the clip that pose rather than standing facing the camera; one without a
+  // pose, such as someone who comes in later, is shown in three-quarter view, as a view facing the camera makes the clip
+  // look into the lens.
+  const image = (person: ProductionAsset) => shot.poses?.[person.name] ?? outfitView(person, shot, 1);
   return { people: persons.map(person => ({ person, image: image(person) })), place: place ? { place, image: place.views?.[0] ?? place.base } : undefined };
 }
 
-/** A person's front view in the outfit they wear in a shot, or their base image before the views are drawn. */
-export const outfitView = (person: ProductionAsset, shot: ProductionShot) =>
-  (person.outfits?.find(outfit => outfit.name === shot.outfits[person.name]) ?? person.outfits?.[0])?.views?.[0] ?? person.base;
+/**
+ * A person's view in the outfit they wear in a shot, the front view unless `view` picks another of the outfit's views,
+ * or their base image before the views are drawn.
+ */
+export const outfitView = (person: ProductionAsset, shot: ProductionShot, view = 0) => {
+  const views = (person.outfits?.find(outfit => outfit.name === shot.outfits[person.name]) ?? person.outfits?.[0])?.views;
+  return views?.[view] ?? views?.[0] ?? person.base;
+};
 
 /** The reference images in prompt order, once every one is drawn. */
 export function referenceImages(references: ReturnType<typeof shotReferences>) {

@@ -7,18 +7,25 @@ import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { longTakeParts, stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
+import { correctionNote, lessonsOf, promptReview, readReview, reviewRounds, type ClipDiagnosis } from "./review";
 import { maxLoras, referenceImages, shotReferences } from "./shots";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 
 /**
+ * The model's verdict on a clip's frames; `overruled` says why a diagnosis passed a clip whose every major problem was
+ * the check's own mistake, and `unreadable` marks a reply that could not be read.
+ */
+export type ClipCheck = { issues: { problem: string; major: boolean }[]; passed: boolean; overruled?: string; unreadable?: boolean };
+
+/**
  * `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest; `check` is the model's
- * verdict on its frames, `retried` marks a clip rendered again with a new seed after it failed, and `rejected` keeps the
- * verdict that sent it back. A shot longer than one render is a long take: `parts` holds the prompt of each part, and
- * `prompt` all of them, for the clip check.
+ * verdict on its frames; `attempts` keeps every earlier render that failed, with its prompt and diagnosis, which the
+ * prompt written next learns from. A shot longer than one render is a long take: `parts` holds the prompt of each
+ * part, and `prompt` all of them, for the clip check.
  */
 export type ProductionClip = {
-  shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number;
-  check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean; rejected?: ProductionClip["check"];
+  shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number; check?: ClipCheck;
+  attempts?: { prompt: string; parts?: string[]; video: string; seed?: number; check: ClipCheck; diagnosis: ClipDiagnosis }[];
 };
 
 const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
@@ -27,11 +34,12 @@ const h3 = { providerId: "minimaxH3", modelId: "minimax_h3_ref2va" };
  * seconds of at least four, so the film cuts each clip to this.
  */
 const shotSeconds = (production: Production, shot: number) => production.dub!.shots.find(item => item.shot === shot)!.seconds;
-// Wording that sends someone's eyes into the lens, which the video model then draws; allowed only when the row asks
+// Wording that sends someone's eyes into the lens, which the video model then draws, or names the lens at all, which
+// draws them there too; allowed only when the row asks
 // for that look ("\u770b"/"\u76ef"/"\u6ce8\u8996"/"\u76f4\u8996" "\u93e1\u982d"/"\u30ab\u30e1\u30e9" is "looks at the
 // camera"). "Camera left" and "the camera's" are sides and things of the frame, not the lens.
 const lensAt = /\b(?:looks?|looking|gaz(?:e|es|ed|ing)|stares?|stared|staring|glanc(?:e|es|ed|ing)|eyes)\b(?![-\s]level)[^.;:,|]{0,15}?\b(?:into|at|on|to|toward|towards)\s+(?:the\s+)?(?:camera|lens|viewer)\b(?!['\u2019]s\b|\s+(?:left|right)\b)/i;
-const lensLook = new RegExp(`${lensAt.source}|\\b(?:looks?|looking|gaz(?:e|es|ed|ing)|eyes|stares?|staring)\\s+(?:\\w+\\s+)?(?:forward|ahead)\\b`, "i");
+const lensLook = new RegExp(`${lensAt.source}|\\b(?:looks?|looking|gaz(?:e|es|ed|ing)|eyes|stares?|staring)\\s+(?:\\w+\\s+)?(?:forward|ahead)\\b|\\blens(?:es)?\\b`, "i");
 const lensRow = new RegExp(`${lensAt.source}|\\bbreak\\w*\\s+the\\s+fourth\\s+wall\\b|(?:\u770b|\u76ef|\u6ce8\u8996|\u6ce8\u89c6|\u76f4\u8996|\u76f4\u89c6)[\u5411\u7740\u8457]?(?:\u93e1\u982d|\u955c\u5934|\u30ab\u30e1\u30e9)|\u30ab\u30e1\u30e9\u76ee\u7dda`, "i");
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 
@@ -41,7 +49,9 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * <Picture N>, the previs as <Video 1> and the dubbed track as <Audio 1>; the lines go in by fillDialogue. People are named by the trigger words their H3 LoRAs are
  * planned with, so the prompts need not wait for the training. A prompt whose line markers are wrong, that never names
  * a person by their LoRA's trigger word, that gives one person's word to two, that writes a name from the script, or
- * that sends someone's eyes into the lens when the row does not ask for it, is rewritten once with the error.
+ * that sends someone's eyes into the lens when the row does not ask for it, is rewritten once with the error. Every
+ * prompt is then reviewed and rewritten for the faults that made clips fail before it costs GPU time; a shot rendered
+ * before is written knowing what failed and why, and every prompt follows the lessons the film learned so far.
  */
 export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
   const spans = shotSpans(checkScript(shotList).shots, shotList);
@@ -61,13 +71,13 @@ export async function writeClipPrompts(production: Production, script: string, s
     const people = references.people.map(({ person }) => ({ name: person.name, trigger: loras.find(lora => lora.name === person.name)?.trigger, gaze: previs.framed.gaze[person.name] }));
     const lensAsked = lensRow.test(span.row ?? "");
     const kept = shotSeconds(production, span.shot);
-    const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards the people hold still.` : "";
+    const cut = kept < clip ? `\n\nThe film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards everyone carries on calmly, their eyes still where the shot ends them looking.` : "";
     const instructionsOf = (part: typeof span, duration: number, note: string) =>
-      `${referenceVideoPromptInstructions(part, 1, { duration, dubbed, people, place: references.place?.place.look, blocking: previs.blocking }, ids)}${note}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+      `${referenceVideoPromptInstructions(part, 1, { duration, dubbed, people, place: references.place?.place.look, blocking: previs.blocking }, ids)}${note}${correctionNote(video)}${lessonsOf(production)}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // Has the text model write one prompt and fills in the lines of `dialogue`, rewritten once with the error. A person
     // the prompt never names by their trigger word is drawn without their LoRA, as anyone, and a line put in the mouth
     // of someone described otherwise is spoken by the wrong person.
-    const write = async (instructions: string, dialogue?: string) => {
+    const write = async (instructions: string, dialogue?: string, scope = "") => {
       const finish = (draft: string) => {
         // A trigger word run into the next word ("siknsrman") is not the word the LoRA was trained on.
         const missing = loras.filter(lora => !new RegExp(`\\b${lora.trigger}\\s+(woman|man)\\b`, "i").test(draft) || new RegExp(`${lora.trigger}(?!\\s+(woman|man)\\b)`, "i").test(draft));
@@ -90,12 +100,28 @@ export async function writeClipPrompts(production: Production, script: string, s
         }
         return fillDialogue(draft, parseDialogue(dialogue));
       };
-      const draft = await complete(instructions);
-      try {
-        return finish(draft);
-      } catch (error) {
-        return finish(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`));
+      // A draft that breaks a rule is rewritten once with the error.
+      const valid = async (draft: string) => {
+        try {
+          finish(draft);
+          return draft;
+        } catch (error) {
+          const fixed = await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`);
+          finish(fixed);
+          return fixed;
+        }
+      };
+      // Before any GPU time the prompt is reviewed for the faults that made earlier clips fail, and rewritten with them.
+      let draft = await valid(await complete(instructions));
+      for (let round = 0; round < reviewRounds; round++) {
+        const problems = readReview(await complete(promptReview(production, span.row ?? "", draft, scope)));
+        if (!problems.length) break;
+        // A rewrite that still breaks a rule after its fix is dropped and the valid draft kept: the review only improves.
+        const revised = await valid(await complete(`${instructions}\n\nYour prompt:\n${draft}\n\nA review found these faults; fix every one and output the whole prompt again:\n${problems.map(problem => `- ${problem}`).join("\n")}`)).catch(() => undefined);
+        if (!revised) break;
+        draft = revised;
       }
+      return finish(draft);
     };
     const plan = longTakeParts(clip);
     if (plan.parts > 1) {
@@ -118,7 +144,7 @@ export async function writeClipPrompts(production: Production, script: string, s
           ...part ? [`Its first 0.92 seconds repeat the end of part ${part} exactly: open on the same picture, positions and motion that part ends on, and carry on with the same camera.`] : [],
           ...part + 1 < plan.parts ? ["End with the take still going, mid-action, not on a pause or a resolved moment."] : [],
         ].join(" ");
-        parts.push(await write(instructionsOf(partSpan, seconds(plan.frames), note), partSpan.dialogue));
+        parts.push(await write(instructionsOf(partSpan, seconds(plan.frames), note), partSpan.dialogue, note));
       }
       Object.assign(video, { parts, prompt: parts.join("\n\n") });
     } else {
@@ -278,9 +304,11 @@ export async function clipFrames(cwd: string, production: Production, clip: Prod
   const length = Math.min(probed, shotSeconds(production, clip.shot));
   const folder = await checksFolder(cwd, production);
   const frames = references.map((_, index) => `${folder}/shot${clip.shot}Reference${index + 1}.png`);
+  // Each render of a shot keeps its own frames, so the one kept after its corrections can still be looked at.
+  const take = (clip.attempts?.length ?? 0) + 1;
   await Promise.all(references.map((image, index) => finished(ffmpeg(image).frames(1).outputOptions(["-vf scale=640:-2"]).output(frames[index]!))));
   for (const [index, share] of checkTimes.entries()) {
-    const frame = `${folder}/shot${clip.shot}Frame${index + 1}.png`;
+    const frame = `${folder}/shot${clip.shot}Take${take}Frame${index + 1}.png`;
     await finished(ffmpeg(clip.video!).seekInput(length * share).frames(1).outputOptions(["-vf scale=640:-2"]).output(frame));
     frames.push(frame);
   }
@@ -309,15 +337,15 @@ export function clipCheckPrompt(prompt: string, row: string, gazes: string, look
     ...gazes ? [`Where each person should look: ${gazes}.`] : [],
     `The clip was asked for: ${prompt}`,
     "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
-    "Compare the framing and positions with the previs layout and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right.",
-    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the framing or the people's positions clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
+    "Compare the camera, the framing and which side of the frame each person is on with the previs layout, and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right. Postures and actions come from the row: where the previs shows someone standing or seated differently from the row, the row is right.",
+    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the camera, the framing or the side of the frame people are on clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }
 
 /** Reads the check's JSON: a clip passes without major problems; a reply that cannot be read fails rather than trusted. */
-export function readClipCheck(reply: string): NonNullable<ProductionClip["check"]> {
-  const unreadable = { issues: [{ problem: "The check's reply could not be read.", major: true }], passed: false };
+export function readClipCheck(reply: string): ClipCheck {
+  const unreadable = { issues: [{ problem: "The check's reply could not be read.", major: true }], passed: false, unreadable: true };
   try {
     const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { issues?: unknown };
     if (!Array.isArray(value.issues)) return unreadable;

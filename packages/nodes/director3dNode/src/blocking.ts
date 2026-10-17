@@ -174,9 +174,10 @@ const eyeHeightStep = 0.3;
  * How the camera sees each person `framed` at the posed moment and where they look, in English for video prompts and
  * the clip check: their view (towards the camera, three-quarter, profile, from behind), and the person they are most
  * turned to (within 60 degrees), or else the named prop they face (within 30), with the side of the frame the look
- * goes to, how far off the lens and whether up or down. Someone out of frame is not named, as a prompt can only point
- * at them. `look` is the same as an image direction without names, for drawing the person's pose. Video and image
- * models draw people looking into the lens unless told otherwise, so every look is given a side of the frame. ACT:
+ * goes to and whether up or down, never naming the lens, as the word pulls a video model's eyes to it. Someone out of
+ * frame is not named, as a prompt can only point at them. `look` is the same as an image direction without names, for
+ * drawing the person's pose. Video and image models draw people looking into the lens unless told otherwise, so every
+ * look is given a side of the frame. ACT:
  * People are read as turned the way they look, as planPrevis stages them; a look into the lens cannot be planned.
  */
 function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: string }; root: Object3D }[], framed: string[], camera: PerspectiveCamera) {
@@ -208,12 +209,11 @@ function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: 
     const view = fromLens < lensMargin ? "turned towards the camera" : fromLens < 75 ? "seen in three-quarter view" : fromLens < 120 ? "seen in profile" : "seen from behind";
     const height = other ? other.head - person.head : 0;
     const tilt = height > eyeHeightStep ? "up " : height < -eyeHeightStep ? "down " : "";
-    const past = fromLens < 45 ? ", just past the lens" : "";
     const target = !aim ? `${fromLens < 120 ? "looks" : "faces away from the camera, looking"} towards the ${side} of the frame`
       : prop ? `looks at the ${prop.name.replace(/\d+$/, "").replace(/([A-Z])/g, " $1").toLowerCase()}, towards the ${side} of the frame`
         : framed.includes(other!.name) ? `looks ${tilt}at ${other!.name}, towards the ${side} of the frame`
-          : `looks ${tilt}off the ${side} edge of the frame${past}, at someone out of frame`;
-    const gaze = `${view}, ${target}${fromLens < lensMargin ? `, the eyes off the lens to the ${side}` : ""}`;
+          : `looks ${tilt}off the ${side} edge of the frame, at someone out of frame`;
+    const gaze = `${view}, ${target}${fromLens < lensMargin ? `, the eyes on someone just beside the camera to the ${side}` : ""}`;
     const look = fromLens < lensMargin ? `shown with the body facing the viewer, the head turned slightly to the ${turn} of the image, the eyes looking past the viewer to the ${turn}`
       : fromLens < 75 ? `seen in three-quarter view, the face turned to the ${turn} of the image, the eyes looking off to the ${turn}, not at the viewer`
         : fromLens < 120 ? `seen in profile, facing the ${turn} of the image, the eyes looking ahead to the ${turn}, not at the viewer`

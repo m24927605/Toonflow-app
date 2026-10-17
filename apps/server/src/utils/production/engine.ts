@@ -10,6 +10,7 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
+import { applyDiagnosis, diagnosisPrompt, readDiagnosis } from "./review";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, referenceImages, shotReferences } from "./shots";
@@ -261,7 +262,9 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       // Once the designs, LoRAs, previs renders and poses are done, only texts are left before the clips, and Qwen-Image
       // has freed its machine slot: the H3 A100s start and set up meanwhile, when the budget has room for the clips too.
       const warmed = Promise.all([designed, blocked, posing]).then(async () => {
-        if (await affordable(production, (writing ? estimate.steps.find(item => item.step === "text")!.units : 0) + clipUnits, signal)) {
+        // Only the first pass warms them: a correction round rewrites a few prompts and renders those clips on one
+        // machine started on demand.
+        if (!production.videos && await affordable(production, (writing ? estimate.steps.find(item => item.step === "text")!.units : 0) + clipUnits, signal)) {
           releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, 20 * 60_000, signal);
         }
       });
@@ -295,8 +298,10 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     }
     return true;
   }
-  // Each clip is checked against its row, previs and references by the model reading frames of it: a clip that fails is rendered once more
-  // with a new seed, and one that fails again stays, flagged for a person to look at.
+  // Each clip is checked against its row, previs and references by the model reading frames of it. A clip that fails is
+  // diagnosed from the same frames: one the check judged wrongly passes, any other is written again knowing what failed
+  // and why, and rendered from the new prompt, up to maxCorrections times, after which the best render stays, flagged
+  // for a person to look at. Never the same prompt with a new seed, which fails the same way.
   const unchecked = videos.filter(item => !item.check);
   if (unchecked.length) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
@@ -306,8 +311,13 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const references = shotReferences(shot, production.assets!, previs.framed);
       const frames = await clipFrames(cwd, production, item, [previs.layout!, ...referenceImages(references)], signal);
       const gazes = Object.entries(previs.framed.gaze).map(([name, gaze]) => `${name}: ${gaze}`).join(" | ");
-      item.check = readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, references.people.length + (references.place ? 1 : 0)), signal, frames));
-      if (!item.check.passed && !item.retried) Object.assign(item, { retried: true, rejected: item.check, video: undefined, seed: undefined, check: undefined });
+      const looks = references.people.length + (references.place ? 1 : 0);
+      const ask = async () => readClipCheck(await complete(checker, clipCheckPrompt(item.prompt ?? "", shot.row ?? "", gazes, looks), signal, frames));
+      // A reply that cannot be read is asked again once; one unreadable twice stays failed for a person, never diagnosed,
+      // so a parsing failure neither passes a clip nor pays for a render.
+      item.check = await ask();
+      if (item.check.unreadable) item.check = await ask();
+      if (!item.check.passed && !item.check.unreadable) applyDiagnosis(production, item, readDiagnosis(await complete(checker, diagnosisPrompt(production, item, shot.row ?? "", gazes, looks), signal, frames)));
       await saveProduction(cwd, production);
     }
     return true;

@@ -101,7 +101,7 @@ type Production = {
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
   dub?: unknown; clips?: unknown; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
-  videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean }; retried?: boolean }[];
+  videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean } }[];
   music?: string; film?: string; report?: string;
 };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
@@ -158,7 +158,8 @@ watch(photos, list => {
 }, { immediate: true });
 
 const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
-const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed && clip.retried ? [{ shot: clip.shot, check: clip.check }] : []));
+// A failed check is kept only once its corrections are used up, so every one left needs a person to look at it.
+const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed ? [{ shot: clip.shot, check: clip.check }] : []));
 const headline = computed(() => {
   const production = state.value!.production;
   if (production.status === "running") {

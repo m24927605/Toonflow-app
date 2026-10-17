@@ -66,6 +66,8 @@ export type Production = {
   dub?: ProductionDub;
   previs?: ProductionPrevis;
   videos?: ProductionClip[];
+  /** General rules the diagnoses of failed clips found, which every later clip prompt, review and diagnosis follows. */
+  lessons?: string[];
   roughCut?: string;
   /** Each shot's clip length in whole seconds, set by its dubbed lines. */
   clips?: { shot: number; clip: number }[];

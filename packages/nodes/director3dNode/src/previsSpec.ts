@@ -89,7 +89,7 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "- \"faces\" names a person or a prop exactly as the plan does; leave it out to have someone look at the nearest other person.",
     "- \"camera\": {\"side\": where the camera stands, seen from the front: \"front\", \"frontLeft\", \"frontRight\", \"left\", \"right\" or \"back\"; or \"overShoulder\" with \"over\": the person whose shoulder it looks past at another person; \"angle\": \"eye\", \"low\" or \"high\"; \"move\": \"static\", \"pushIn\", \"pullOut\" or \"follow\"}. The shot size and who is in frame come from the shot list.",
     "",
-    "Follow each row's action, camera and state cells and the script. Keep the staging continuous: when a row's state disagrees with what the previous shots showed, keep the earlier staging unless the row's action changes it.",
+    "Follow each row's action, camera and state cells and the script. Keep the staging continuous, and when a row's state cell gives someone a posture or place other than where the previous shot left them, give that shot a move taking them there: people may sit down or stand up between shots.",
   ].join("\n");
 }
 
