@@ -121,6 +121,51 @@ if refine and not upscalerNode.exists():
 # take too; they need nothing beyond ComfyUI.
 if not motionContextNode.exists():
     fetch(motionContextNode, "https://github.com/NikoDemon80/ComfyUI-H3-Motion-Context.git", motionContextCommit)
+# The dubbed track is locked into the sampled audio stream: given only as a reference audio, H3 regenerates the sound
+# and says a line again in the silence after it, late or early. The lock encodes the track into the audio latent and
+# holds it with a zero noise mask, so the model draws the picture, mouths included, to that exact sound, as the H3
+# audio-lock nodes do (badgids/ComfyUI-H3-ExactAudioLock, MIT, which this follows: silence padding, 32 kHz stereo, the
+# audio latent's 40 steps a second).
+(comfy / "custom_nodes" / "toonflow_audio_lock.py").write_text("""
+import torch
+import comfy.audio
+import comfy.nested_tensor
+
+
+class ToonflowH3AudioLock:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"av_latent": ("LATENT",), "audio_vae": ("VAE",), "audio": ("AUDIO",)}}
+
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "lock"
+    CATEGORY = "toonflow"
+
+    def lock(self, av_latent, audio_vae, audio):
+        video, template = av_latent["samples"].unbind()
+        rate = int(getattr(audio_vae, "audio_sample_rate", 32000))
+        wave = audio["waveform"][:1].float()
+        if audio["sample_rate"] != rate:
+            wave = comfy.audio.resample(wave, audio["sample_rate"], rate)
+        wave = (wave.repeat(1, 2, 1) if wave.shape[1] == 1 else wave)[:, :2]
+        samples = round(template.shape[-1] / 40 * rate)
+        wave = torch.nn.functional.pad(wave, (0, max(0, samples - wave.shape[-1])))[..., :samples]
+        encoded = audio_vae.encode(wave.movedim(1, -1)).to(device=template.device, dtype=template.dtype)
+        if encoded.shape[:-1] != template.shape[:-1]:
+            raise ValueError(f"The audio VAE gave a latent of {tuple(encoded.shape)} for an audio stream of {tuple(template.shape)}")
+        if encoded.shape[-1] < template.shape[-1]:
+            encoded = torch.cat((encoded, encoded[..., -1:].repeat_interleave(template.shape[-1] - encoded.shape[-1], dim=-1)), dim=-1)
+        encoded = encoded[..., :template.shape[-1]]
+        mask = av_latent.get("noise_mask")
+        videoMask = mask.unbind()[0] if mask is not None and getattr(mask, "is_nested", False) else torch.ones_like(video)
+        locked = dict(av_latent)
+        locked["samples"] = comfy.nested_tensor.NestedTensor((video, encoded))
+        locked["noise_mask"] = comfy.nested_tensor.NestedTensor((videoMask, torch.zeros_like(encoded)))
+        return (locked,)
+
+
+NODE_CLASS_MAPPINGS = {"ToonflowH3AudioLock": ToonflowH3AudioLock}
+""")
 
 import requests
 from huggingface_hub import hf_hub_download
@@ -252,6 +297,16 @@ def segmentGraph(segment, prompt, videos, audios):
         "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
         "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
     }
+    # With a dubbed track, every sampler starts from a latent whose audio stream holds it, locked.
+    locked = bool(audios) and audio
+
+    def lockAudio(key, latent):
+        if not locked:
+            return latent
+        graph[key] = {"class_type": "ToonflowH3AudioLock", "inputs": {"av_latent": latent, "audio_vae": ["5", 0], "audio": ["aud0", 0]}}
+        return [key, 0]
+
+    graph["12"]["inputs"]["latent_image"] = lockAudio("lock", ["7", 1])
     sampled = ["12", 0]
     early = bool(videos) and videoSteps < steps
     if early:
@@ -263,7 +318,7 @@ def segmentGraph(segment, prompt, videos, audios):
             "7b": withoutVideos,
             "17": {"class_type": "SplitSigmas", "inputs": {"sigmas": ["11", 0], "step": videoSteps}},
             "18": {"class_type": "DisableNoise", "inputs": {}},
-            "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": ["12", 0]}},
+            "19": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["18", 0], "guider": ["8b", 0], "sampler": ["10", 0], "sigmas": ["17", 1], "latent_image": lockAudio("lockB", ["12", 0])}},
         })
         graph["12"]["inputs"]["sigmas"] = ["17", 0]
         sampled = ["19", 0]
@@ -330,7 +385,7 @@ def segmentGraph(segment, prompt, videos, audios):
             "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
             "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0], "7b" if early else "7")}},
             "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
-            "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": ["22", 0]}},
+            "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": lockAudio("lockRefine", ["22", 0])}},
         })
         videoLatent = ["26", 0]
     images, sound = ["13", 0], ["14", 0]
@@ -388,7 +443,11 @@ if segments > 1:
     produced = Path(f"/content/h3joined_{job}.mp4")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(joined), "-c", "copy", str(produced)], check=True)
 finish = f"scale={outputWidth}:{outputHeight}:force_original_aspect_ratio=increase:flags=lanczos,crop={outputWidth}:{outputHeight}"
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), "-t", str(duration), "-vf", finish,
+# A locked dub is muxed as the file it came in, not as the audio VAE's decode of it, which is not exact; silence pads it
+# to the clip's length.
+dub = next(iter(sorted(inputs.glob(f"{prefix}aud_*"))), None) if audio else None
+sound = ["-i", str(dub), "-map", "0:v", "-map", "1:a", "-af", "apad"] if dub else []
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), *sound, "-t", str(duration), "-vf", finish,
                 "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
                 *(["-c:a", "aac", "-b:a", "192k"] if audio else ["-an"]),
                 "-movflags", "+faststart", str(outputs / "final.mp4")], check=True)
