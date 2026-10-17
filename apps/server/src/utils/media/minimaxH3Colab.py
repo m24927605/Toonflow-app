@@ -22,6 +22,14 @@ from pathlib import Path
 
 import torch
 
+# Seconds since the job started at the end of each phase, written to timings.json beside the video.
+jobStarted = time.time()
+timings = {}
+
+
+def mark(phase):
+    timings[phase] = round(time.time() - jobStarted, 1)
+
 # Weights are public: download anonymously, without telemetry and without probing Colab secrets for an HF token.
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
 
@@ -181,6 +189,7 @@ except requests.RequestException:
         raise TimeoutError("ComfyUI did not start")
 
 # The machine is set up above this line; warmMinimaxH3 runs only that part, ahead of the first clip.
+mark("setup")
 refs = sorted(inputs.glob(f"{prefix}ref_*"))
 firstFrame = next(inputs.glob(f"{prefix}first.*"), None)
 lastFrame = next(inputs.glob(f"{prefix}last.*"), None)
@@ -391,6 +400,7 @@ def runGraph(graph, name):
 rendered = []
 for segment, (prompt, videos, audios) in enumerate(zip(prompts, segmentVideos, segmentAudios), start=1):
     rendered.append(runGraph(segmentGraph(segment, prompt, videos, audios), f"h3_{job}_{segment}"))
+    mark(f"segment{segment}")
 
 outputs.mkdir(exist_ok=True)
 produced = rendered[0]
@@ -611,11 +621,15 @@ try:
     produced = redrawFaces(produced) or produced
 except Exception as error:
     print("FACE_REDRAW_FAILED", repr(error)[-2000:], log.read_text()[-2000:])
+    timings["faceRedrawFailed"] = repr(error)[-500:]
+mark("faces")
 finish = f"scale={outputWidth}:{outputHeight}:force_original_aspect_ratio=increase:flags=lanczos,crop={outputWidth}:{outputHeight}"
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(produced), "-t", str(duration), "-vf", finish,
                 "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
                 *(["-c:a", "aac", "-b:a", "192k"] if audio else ["-an"]),
                 "-movflags", "+faststart", str(outputs / "final.mp4")], check=True)
+mark("encode")
+(outputs / "timings.json").write_text(json.dumps(timings))
 # The job's inputs and saved latents are deleted so a long session does not fill the disk.
 for leftover in [*inputs.glob(f"{prefix}*"), *(comfy / "input").glob(f"*{job}*"), *(comfy / "output" / "toonflow").glob(f"*{job}*"),
                  *inputs.glob(f"h3joined_{job}*"), *inputs.glob(f"h3faces_{job}*")]:

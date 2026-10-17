@@ -102,7 +102,7 @@ export async function runMinimaxH3({ prompt, parts, images = [], videos = [], au
   const video = await workers[index]!.run(async (session, sessionSignal) => {
     const sent = sentLoras.get(session) ?? new Set<string>();
     const loraUploads = [...new Map(characterLoras.filter(lora => !sent.has(lora.name)).map(lora => [lora.name, { name: lora.name, data: lora.data }])).values()];
-    const [output] = await session.job({
+    const [output, timings] = await session.job({
     script: pipeline,
     uploads: [
       { name: name("prompt.txt"), data: prompt },
@@ -120,10 +120,12 @@ export async function runMinimaxH3({ prompt, parts, images = [], videos = [], au
       H3_JOB: job, H3_SEED: seed, H3_RESOLUTION: resolution, H3_RATIO: ratio, H3_DURATION: duration, H3_AUDIO: audio ? 1 : 0, H3_VIDEO_STEPS: videoSteps,
       H3_SEGMENTS: parts?.length ?? 1, H3_SEGMENT_LENGTH: plan.frames,
     },
-    outputs: ["/content/h3out/final.mp4"],
+    outputs: ["/content/h3out/final.mp4", "/content/h3out/timings.json"],
     }, sessionSignal);
     for (const { name } of loraUploads) sent.add(name);
     sentLoras.set(session, sent);
+    // The seconds each phase of the job took on the machine, for finding the slow ones.
+    console.log(`[minimaxH3] Job ${job} timings: ${new TextDecoder().decode(timings)}`);
     return output!;
   }, signal).finally(() => waiting[index]!--);
   return { data: video, mimeType: "video/mp4" as const, seed };

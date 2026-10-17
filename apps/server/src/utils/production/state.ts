@@ -68,6 +68,8 @@ export type Production = {
   videos?: ProductionClip[];
   /** General rules the diagnoses of failed clips found, which every later clip prompt, review and diagnosis follows. */
   lessons?: string[];
+  /** How long each step took, in the order they finished, for the report and for finding the slow ones. */
+  timings?: { step: string; start: string; seconds: number }[];
   roughCut?: string;
   /** Each shot's clip length in whole seconds, set by its dubbed lines. */
   clips?: { shot: number; clip: number }[];

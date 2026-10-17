@@ -160,6 +160,25 @@ async function withinBudget(cwd: string, production: Production, nextUnits: numb
   return true;
 }
 
+/**
+ * Runs `work` and keeps how long it took among the production's timings, failed or not; a failed step's timing is
+ * saved before its error goes on, as the run that fails reads the production afresh.
+ */
+async function timed<T>(cwd: string, production: Production, step: string, work: () => Promise<T>) {
+  const start = Date.now();
+  const record = () => (production.timings ??= []).push({ step, start: new Date(start).toISOString(), seconds: Math.round((Date.now() - start) / 100) / 10 });
+  try {
+    const result = await work();
+    record();
+    return result;
+  } catch (error) {
+    record();
+    // Only the timing is lost when this save fails too; the step's own error is the one passed on.
+    await saveProduction(cwd, production).catch(() => {});
+    throw error;
+  }
+}
+
 /** A machine hold one step leaves for the next, released when that step is done with it or the run ends. */
 type Carried = { qwen?: () => void };
 
@@ -173,7 +192,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
   if (!production.script) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const path = `${productionDirectory(id)}/script.md`;
-    await writeProductionText(cwd, path, `${await complete(screenwriter, scriptPrompt(production.input), signal)}\n`);
+    await writeProductionText(cwd, path, `${await timed(cwd, production, "script", () => complete(screenwriter, scriptPrompt(production.input), signal))}\n`);
     production.script = { path };
     await saveProduction(cwd, production);
     return true;
@@ -192,7 +211,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
   if (!production.shotList || !production.assets) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const script = await readProductionText(cwd, production.script);
-    const listed = production.shotList ? Promise.resolve() : (async () => {
+    const listed = production.shotList ? Promise.resolve() : timed(cwd, production, "shotList", async () => {
       const names = production.input.photos.map(photo => photo.name);
       const prompt = shotListPrompt(script, names, production.input);
       let shotList = await complete(shotListWriter, prompt, signal);
@@ -205,13 +224,14 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       await writeProductionText(cwd, path, `${shotList}\n`);
       production.shotList = { path, shots: check.shots.length, issues: check.issues };
       await saveProduction(cwd, production);
-    })();
-    const cast = production.assets ? Promise.resolve() : (async () => {
+    });
+    const cast = production.assets ? Promise.resolve() : timed(cwd, production, "cast", async () => {
       production.assets = parseCast(await complete(shotListWriter, castPrompt(script), signal), production.input.photos);
       await saveProduction(cwd, production);
-    })();
+    });
     // Both are awaited before an error is passed on, so neither goes on writing unwatched.
     const failure = (await Promise.allSettled([listed, cast])).find(result => result.status === "rejected");
+    await saveProduction(cwd, production);
     if (failure) throw failure.reason;
     return true;
   }
@@ -237,13 +257,14 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     const units = estimate.steps.find(item => item.step === "text")!.units + (designing ? estimate.steps.find(item => item.step === "assets")!.units : 0);
     if (!await withinBudget(cwd, production, units, signal)) return false;
     const model = textModel();
-    const shotList = await readProductionText(cwd, production.shotList);
+    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
     if (designing) carried.qwen ??= holdQwenImage(15 * 60_000, signal);
     const save = () => saveProduction(cwd, production);
     const results = await Promise.allSettled([
-      planPrevis(cwd, production, await readProductionText(cwd, production.script), shotList, { providerId: model.providerId, modelId: model.modelId }, signal)
-        .then(previs => { production.previs = previs; }),
-      designing ? drawAssets(cwd, production, production.input.ratio, signal, save) : undefined,
+      timed(cwd, production, "previsPlan", async () => {
+        production.previs = await planPrevis(cwd, production, script, shotList, { providerId: model.providerId, modelId: model.modelId }, signal);
+      }),
+      designing ? timed(cwd, production, "designs", () => drawAssets(cwd, production, production.input.ratio, signal, save)) : undefined,
     ]);
     await save();
     const failure = results.find(result => result.status === "rejected");
@@ -288,19 +309,18 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       carried.qwen = undefined;
     };
     try {
-      const dubbed = production.clips ? Promise.resolve() : recordDub(cwd, production, signal, save).then(clips => {
-        production.clips = clips;
-        return save();
+      const dubbed = production.clips ? Promise.resolve() : timed(cwd, production, "dub", async () => {
+        production.clips = await recordDub(cwd, production, signal, save);
+        await save();
       });
-      const drawing = drawn ? Promise.resolve() : drawAssets(cwd, production, production.input.ratio, signal, save);
-      const designed = drawing.then(() => plan && trainAssetLoras(cwd, plan, signal, save));
-      const blocked = (async () => {
-        if (rendered) return;
+      const drawing = drawn ? Promise.resolve() : timed(cwd, production, "designs", () => drawAssets(cwd, production, production.input.ratio, signal, save));
+      const designed = drawing.then(() => plan?.units ? timed(cwd, production, "loras", () => trainAssetLoras(cwd, plan, signal, save)) : plan && trainAssetLoras(cwd, plan, signal, save));
+      const blocked = rendered ? Promise.resolve() : timed(cwd, production, "previsRender", async () => {
         await renderPrevis(cwd, production, shotList, signal);
         await save();
-      })();
+      });
       // Each person's opening pose needs only their design and the previs figure, so it is drawn while the LoRAs train.
-      const posing = Promise.all([drawing, blocked]).then(() => drawPoses(cwd, production, signal, save)).finally(releaseQwen);
+      const posing = Promise.all([drawing, blocked]).then(() => timed(cwd, production, "poses", () => drawPoses(cwd, production, signal, save))).finally(releaseQwen);
       // The H3 A100s start and set up while the rest runs, as many as the clips can use side by side, when the budget
       // has room for the clips too. Only before any clip is rendered: a correction round rewrites a few prompts and
       // renders those clips on one machine started on demand. Colab runs three machines at once, so one A100 starts at
@@ -315,7 +335,9 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
           releaseH3 = warmMinimaxH3(production.input.quality, production.input.ratio, machines, 20 * 60_000, warming.signal);
         }
       });
-      const results = await Promise.allSettled([designed, dubbed, writeTexts(cwd, production, dubbed, signal).finally(release), blocked, posing, warmed]);
+      const texts = writing ? timed(cwd, production, "texts", () => writeTexts(cwd, production, dubbed, signal)) : Promise.resolve();
+      const results = await Promise.allSettled([designed, dubbed, texts.finally(release), blocked, posing, warmed]);
+      await save();
       // All are awaited before an error is passed on, so nothing keeps running unwatched. A failed step leaves no clip to
       // render, so an A100 still setting up for one is stopped rather than left to finish and idle.
       const failure = results.find(result => result.status === "rejected");
@@ -355,10 +377,11 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     const textStart = 3;
     const releaseText = warmTextModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
     try {
-      await renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production));
+      await timed(cwd, production, "render", () => renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production)));
     } finally {
       releaseText();
     }
+    await saveProduction(cwd, production);
     return true;
   }
   // Each clip is checked against its row, previs and references by the model reading frames of it. A clip that fails is
@@ -374,7 +397,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     // The clips are checked and diagnosed side by side, as the text model answers two requests at once; the verdicts
     // are kept until all are in and then applied in shot order, as each correction draws on the budget the ones before
     // it left. Every clip is awaited before an error is passed on, so none goes on unwatched.
-    const verdicts = await Promise.allSettled(unchecked.map(async item => {
+    const verdicts = await timed(cwd, production, "check", () => Promise.allSettled(unchecked.map(async item => {
       const shot = production.shots!.find(other => other.shot === item.shot)!;
       const previs = production.previs!.find(other => other.shot === item.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
@@ -394,7 +417,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       const diagnosis = !check.passed && !check.unreadable
         ? readDiagnosis(await reply(diagnosisPrompt(production, { ...item, check }, shot.row ?? "", gazes, looks))) : undefined;
       return { item, check, diagnosis };
-    }));
+    })));
     const failure = verdicts.find(result => result.status === "rejected");
     if (failure) throw failure.reason;
     let corrections = 0;
@@ -409,7 +432,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     return true;
   }
   if (!production.roughCut) {
-    production.roughCut = await joinRoughCut(cwd, production, signal);
+    production.roughCut = await timed(cwd, production, "roughCut", () => joinRoughCut(cwd, production, signal));
     await saveProduction(cwd, production);
     return true;
   }
@@ -417,12 +440,12 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
   // Suno bills the sunoapi.org account, so the score is made only once every clip is rendered; its style was written
   // with the other texts.
   if (production.input.music && !production.music) {
-    production.music = await scoreFilm(cwd, production, production.musicStyle!, production.clips!.reduce((sum, item) => sum + item.clip, 0), signal);
+    production.music = await timed(cwd, production, "music", () => scoreFilm(cwd, production, production.musicStyle!, production.clips!.reduce((sum, item) => sum + item.clip, 0), signal));
     await saveProduction(cwd, production);
     return true;
   }
   if (!production.film) {
-    production.film = await finishFilm(cwd, production, signal);
+    production.film = await timed(cwd, production, "film", () => finishFilm(cwd, production, signal));
     await saveProduction(cwd, production);
     return true;
   }
@@ -493,6 +516,14 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `## ${t`LoRAs`}`,
     "",
     ...loras.length ? [`| ${t`Name`} | ${t`Model`} | ${t`Trigger word`} | ${t`File`} |`, "| --- | --- | --- | --- |", ...loras] : [t`None.`],
+    "",
+    `## ${t`Timings`}`,
+    "",
+    t`${((Date.now() - Date.parse(production.createdAt)) / 60_000).toFixed(1)} minutes from start to report.`,
+    "",
+    `| ${t`Step`} | ${t`Started`} | ${t`Minutes`} |`,
+    "| --- | --- | --- |",
+    ...(production.timings ?? []).map(item => `| ${item.step} | ${new Date(item.start).toLocaleTimeString()} | ${(item.seconds / 60).toFixed(1)} |`),
     "",
     `## ${t`Models`}`,
     "",
