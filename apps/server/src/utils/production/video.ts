@@ -9,6 +9,7 @@ import { generateMedia } from "@/utils/media/generation";
 import { longTakeParts, stopMinimaxH3WhenIdle } from "@/utils/media/minimaxH3";
 import { correctionNote, lessonsOf, promptReview, readReview, reviewRounds, type ClipDiagnosis } from "./review";
 import { maxLoras, referenceImages, shotReferences } from "./shots";
+import type { ProductionDub } from "./dub";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 
 /**
@@ -136,6 +137,7 @@ export async function writeClipPrompts(production: Production, script: string, s
       const lines = production.dub!.shots.find(item => item.shot === span.shot)!.lines;
       const dialogue = parseDialogue(span.dialogue);
       const seconds = (frames: number) => Number((frames / 24).toFixed(2));
+      const beats = await takeBeats(span.row ?? "", clip, lines, complete);
       const parts: string[] = [];
       for (let part = 0; part < plan.parts; part++) {
         const from = part * plan.step, to = from + plan.frames;
@@ -143,8 +145,11 @@ export async function writeClipPrompts(production: Production, script: string, s
         const owns = (start: number) => start >= (part ? from + 22 : 0) && (part + 1 === plan.parts || start < (part + 1) * plan.step + 22);
         const own = dialogue.filter((_, index) => owns(Math.round((lines[index]?.start ?? 0) * 24)));
         const partSpan = { ...span, dialogue: own.map(line => line.speaker ? `${line.speaker}\uFF1A${line.words}` : line.words).join("\uFF1B") };
+        const [start, end] = [seconds(from), seconds(Math.min(to, clip * 24))];
+        const ownBeats = beats.filter(beat => beat.to > start && beat.from < end);
         const note = [
-          `\n\nThis shot is one continuous take of ${clip} seconds without any cut, rendered in ${plan.parts} parts of ${seconds(plan.frames)} seconds. This prompt is part ${part + 1} of ${plan.parts}: seconds ${seconds(from)}\u2013${seconds(Math.min(to, clip * 24))} of the shot.`,
+          `\n\nThis shot is one continuous take of ${clip} seconds without any cut, rendered in ${plan.parts} parts of ${seconds(plan.frames)} seconds. This prompt is part ${part + 1} of ${plan.parts}: seconds ${start}\u2013${end} of the shot.`,
+          ...ownBeats.length ? [`Of the take's action, exactly these beats fall in this part, in this order, at these seconds of the take: ${ownBeats.map(beat => `${beat.from}\u2013${beat.to} s: ${beat.what}`).join("; ")}. Show them and nothing else of the row, which the other parts show; a beat that runs past this part's end is left mid-way, and one that began before it is already under way. Each line is spoken in the beat that holds its time.`] : [],
           "Where each person looks, as given above, is for the whole take: the start is the start of part 1 and the end the end of the last part; this part goes from where the part before leaves their eyes towards that end only as far as its seconds allow.",
           "Describe only what happens in those seconds, in time order; the other parts describe the rest. <Video 1> and <Audio 1> cover only this part.",
           ...part ? [`Its first 0.92 seconds repeat the end of part ${part} exactly: open on the same picture, positions and motion that part ends on, and carry on with the same camera.`] : [],
@@ -160,6 +165,34 @@ export async function writeClipPrompts(production: Production, script: string, s
   }));
   const failure = results.find(result => result.status === "rejected");
   if (failure) throw failure.reason;
+}
+
+/**
+ * The beats of a long take's row in story order, each with the seconds of the take it spans, spread over the whole take
+ * at a natural pace and around the lines' recorded times, so each part of the take shows its own beats and none twice.
+ * A reply that cannot be read gives none, and each part falls back to its seconds alone.
+ */
+async function takeBeats(row: string, seconds: number, lines: ProductionDub["shots"][number]["lines"], complete: (prompt: string) => Promise<string>) {
+  const reply = await complete([
+    `A shot-list row is filmed as one continuous take of ${seconds} seconds without any cut. The row (shot size, camera, action, dialogue, cast, state):`,
+    row,
+    ...lines.length ? [`Its lines are recorded and fixed at these times of the take: ${lines.map(line => `${line.speaker} says "${line.words}" from ${(line.start ?? 0).toFixed(1)} to ${((line.start ?? 0) + (line.seconds ?? 0)).toFixed(1)} s`).join("; ")}.`] : [],
+    "Split the row's action into beats in story order, each one visible action of the people, and give each the second it starts and ends, so the beats fill the whole take at a natural pace: nothing happens twice, a beat lasts at least two seconds, walking across a room takes three or more, and each line falls in the beat that is going on at its time.",
+    "Write each beat in English, naming people as the row does.",
+    "Reply with JSON only: {\"beats\": [{\"from\": 0, \"to\": 3.5, \"what\": \"...\"}]}.",
+  ].join("\n"));
+  try {
+    const value = JSON.parse(/\{[\s\S]*\}/.exec(reply)?.[0] ?? "") as { beats?: unknown };
+    const beats = (Array.isArray(value.beats) ? value.beats : []).flatMap(item => {
+      const { from, to, what } = (item ?? {}) as Record<string, unknown>;
+      return typeof from === "number" && typeof to === "number" && typeof what === "string" && 0 <= from && from < to && to <= seconds + 0.5 && what.trim()
+        ? [{ from: Number(from.toFixed(1)), to: Number(Math.min(to, seconds).toFixed(1)), what: what.trim() }] : [];
+    });
+    // Beats out of order or overlapping by more than a moment are not a timeline the parts can share.
+    return beats.every((beat, index) => !index || beat.from >= beats[index - 1]!.to - 0.5) ? beats : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
