@@ -95,11 +95,11 @@ if globals().get("loadedModel") != (modelId, revision, weightFile, mmproj) or se
     loadedModel = (modelId, revision, weightFile, mmproj)
     loadSeconds = time.monotonic() - started
 
-# Qwen's model card settings for non-thinking replies, at a lower temperature. At 0.15 without a presence penalty the
-# 4-bit Qwen3.6 fell into loops that ran to the token limit, 7 of a film's 101 replies, each costing 105 s and a retry;
-# the card's 0.7 then broke a strict JSON previs plan twice running, which 0.15 never had. ACT: 0.3 keeps the card's
-# penalty against loops and stays near the old temperature for the JSON replies the films depend on.
-sampling = {"temperature": 0.15, "top_p": 0.9} if thinking else {"temperature": 0.3, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.5}
+# ACT: A low temperature without penalties. Qwen's card settings (0.7, presence_penalty 1.5) stopped the 4-bit model's
+# loops to the token limit (7 of a film's 101 replies), but the presence penalty punishes the values a JSON plan must
+# repeat, such as "front" for every shot, and broke every previs plan, at 0.3 too. Loops cost a retry; a broken plan
+# stops the film. Fix the looping prompts one by one instead.
+sampling = {"temperature": 0.15, "top_p": 0.9}
 started = time.monotonic()
 try:
     reply = json.loads(urllib.request.urlopen(urllib.request.Request(
