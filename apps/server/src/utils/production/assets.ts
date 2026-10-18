@@ -124,6 +124,7 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
 }
 
 const poseModel = "qwen_image_2_1_pose";
+const grounded = "The person rests on a plain floor: feet, knees, shins or seat on the ground with a soft contact shadow under them, never floating.";
 const poseRatios = [[1, 1], [3, 4], [2, 3], [9, 16], [4, 3], [3, 2], [16, 9]] as const;
 
 /** The supported ratio closest to a PNG's own, read from its header. */
@@ -150,7 +151,9 @@ export async function drawPoses(cwd: string, production: Production, signal: Abo
     const view = person && outfitView(person, shot);
     if (shot.poses?.[name] || !view) return;
     const look = previs.framed.looks[name];
-    const posed = await draw(cwd, production.id, `${look ? `The person is ${look}. ` : ""}${finish}`, await ratioOf(cwd, render), [render, view], signal, poseModel);
+    // The previs figure is drawn alone without a floor, and the pose kept it hanging in the air; H3 then floated people
+    // kneeling or seated over the tatami, so the drawing is told what the body rests on.
+    const posed = await draw(cwd, production.id, `${look ? `The person is ${look}. ` : ""}${grounded} ${finish}`, await ratioOf(cwd, render), [render, view], signal, poseModel);
     (shot.poses ??= {})[name] = posed;
   })));
   await save();
