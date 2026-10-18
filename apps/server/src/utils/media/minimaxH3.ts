@@ -45,9 +45,9 @@ export const minimaxH3SetupMinutes = () => workers.some(worker => worker.live())
 // to the machine with the fewest waiting. ACT: The second machine pays its own start, about half a unit.
 const workers = [0, 1].map(() => createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000));
 const waiting = workers.map(() => 0);
-// Of the four Turbo sampling steps, the reference videos condition only the first: Code Video Model found a previs
+// Of the eight Turbo sampling steps, the reference videos condition only the first two: Code Video Model found a previs
 // used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).
-const videoSteps = 1;
+const videoSteps = 2;
 // LoRA files already on a session's machine.
 const sentLoras = new WeakMap<ColabSession, Set<string>>();
 

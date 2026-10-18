@@ -49,6 +49,7 @@ motionContextCommit = "5335715abe54c1a9bfbe3494da29aae3e8635ce3"
 weightRevisions = {
     "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
     "LBH-123-AI/Minimax_h3_latent_Upscaler": "3f941d5d182014dd5c0a5e16330420ee2d4aa0c6",
+    "lightx2v/Minimax-h3-Turbo": "a29e57d195f80ead07c89f89e55ecf2911e893c5",
 }
 
 seed = int(os.environ["H3_SEED"])
@@ -59,7 +60,7 @@ audio = os.environ["H3_AUDIO"] == "1"
 # Sampling steps that attend to the reference videos. A previs is flat Three.js footage: attended to throughout, H3
 # copies its look, so it is dropped once the early steps have set the layout, motion and camera (Code Video Model's
 # early-step conditioning, https://code-video-model.github.io).
-steps = 4
+steps = 8
 videoSteps = int(os.environ["H3_VIDEO_STEPS"])
 ratioWidth, ratioHeight = (int(part) for part in os.environ["H3_RATIO"].split(":"))
 shortSides = {"480p": 480, "720p": 720, "1080p": 1080}
@@ -175,7 +176,9 @@ cudaMajor = int((torch.version.cuda or "0").split(".")[0])
 variant = "int8_convrot" if cudaMajor >= 13 and capability >= (8, 0) else "fp8_scaled" if capability >= (8, 9) else "bf16"
 diffusion = f"minimax_h3_ref2va_pruned_{variant}.safetensors"
 videoVae = "minimax_h3_video_vae_int8_convrot.safetensors" if variant == "int8_convrot" else "minimax_h3_video_vae_fp16.safetensors"
-lora = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
+# lightx2v's v1.0 8-step Turbo LoRA, trained at 768p: on the same shot and seed it drew the woman closer to her
+# references than the 4-step v0.1 for about a quarter more render time.
+lora = "minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors"
 upscaler = "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
 controlPatch = f"minimax_h3_fun_controlnet_union_2.0_pruned_{'int8_convrot' if variant == 'int8_convrot' else 'bf16'}.safetensors"
 controlSource = next(inputs.glob(f"{prefix}control.*"), None)
@@ -183,7 +186,7 @@ print("Ref2VA variant:", variant)
 
 weights = [
     ("Comfy-Org/MiniMax-H3", f"diffusion_models/{diffusion}", "diffusion_models"),
-    ("Comfy-Org/MiniMax-H3", f"loras/{lora}", "loras"),
+    ("lightx2v/Minimax-h3-Turbo", lora, "loras"),
     ("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "text_encoders"),
     ("Comfy-Org/MiniMax-H3", f"vae/{videoVae}", "vae"),
     ("Comfy-Org/MiniMax-H3", "vae/minimax_h3_audio_vae_fp32.safetensors", "vae"),
@@ -294,7 +297,7 @@ def segmentGraph(segment, prompt, videos, audios):
             **{f"ref_audios.ref_audio_{index}": [f"aud{index}", 0] for index in range(len(audios))}}},
         "9": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed + 1000 * (segment - 1)}},
         "10": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
-        "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": steps, "denoise": 1.0}},
+        "11": {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "simple", "steps": steps, "denoise": 1.0}},
         "12": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["8", 0], "sampler": ["10", 0], "sigmas": ["11", 0], "latent_image": ["7", 1]}},
     }
     # With a dubbed track, every sampler starts from a latent whose audio stream holds it, locked.
@@ -340,7 +343,11 @@ def segmentGraph(segment, prompt, videos, audios):
                 "model": ["2", 0], "model_patch": ["30", 0], "vae": ["4", 0], "strength": 1.0, "start_percent": 0.0, "end_percent": 1.0, "control_video": ["cv", 0]}},
         })
         model = ["31", 0]
-        graph["11"]["inputs"]["model"] = model
+    # The v1.0 Turbo LoRA samples with its authors' video and audio sigma shifts; the 1080p refine keeps its own.
+    unshifted = model
+    graph["2s"] = {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 6.0, "shift_audio": 3.0}}
+    model = ["2s", 0]
+    graph["11"]["inputs"]["model"] = model
     for name, image in (("first", firstFrame), ("last", lastFrame)):
         if image:
             graph[f"{name}Frame"] = {"class_type": "LoadImage", "inputs": {"image": image.name}}
@@ -382,7 +389,7 @@ def segmentGraph(segment, prompt, videos, audios):
                 "latent": ["20", 0], "model_name": upscaler, "mode": "target dimensions", "mode.width": upscaleWidth, "mode.height": upscaleHeight,
                 "align": 32, "enable_temporal_chunking": True, "force_unload": True, "device": "cuda", "precision": "fp16"}},
             "22": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["21", 0], "audio_latent": ["20", 1]}},
-            "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": model, "shift_video": 12.0, "shift_audio": 3.0}},
+            "23": {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": unshifted, "shift_video": 12.0, "shift_audio": 3.0}},
             "24": {"class_type": "BasicGuider", "inputs": {"model": ["23", 0], "conditioning": guided("refineGuide", ["22", 0], "7b" if early else "7")}},
             "25": {"class_type": "ManualSigmas", "inputs": {"sigmas": "0.9035, 0.6316, 0.3158, 0.0000"}},
             "26": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["9", 0], "guider": ["24", 0], "sampler": ["10", 0], "sigmas": ["25", 0], "latent_image": lockAudio("lockRefine", ["22", 0])}},
