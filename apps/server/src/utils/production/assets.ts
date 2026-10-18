@@ -26,7 +26,7 @@ export function castPrompt(script: string, shotList: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
     "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\",\"adult\":false}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too; adult: true for an outfit that leaves the person nude or partly nude, or that the screenplay uses in a sexual scene, else false. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too; adult: true for an outfit that leaves the person nude or partly nude, or that the screenplay uses in a sexual scene, else false. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of its architecture, materials, furniture and light, and of the props the people handle there, set where the story first finds them, such as a tea set on a table. Do not use quotation marks inside the sentences.",
     "Output only the JSON.",
     "",
     "Screenplay:",
@@ -69,10 +69,11 @@ const outfitViews: [ratio: string, view: string][] = [
   ["2:3", `Full-body shot in three-quarter view facing left, standing, ${studio}.`],
   ["2:3", `Full-body back view, standing, ${studio}.`],
 ];
-// Places keep the base image's side: views it does not show would be invented and teach a different room.
+// Places keep the base image's side: views it does not show would be invented and teach a different room. Its props
+// stay in every view, so each clip finds the same teapot rather than inventing its own.
 const placeViews = [
-  "The same place seen a little closer from the same side, empty.",
-  "The left part of the same place seen closer from the same side, empty.",
+  "The same place seen a little closer from the same side, with the same furniture and props, no people.",
+  "The left part of the same place seen closer from the same side, with the same furniture and props, no people.",
 ];
 
 async function draw(cwd: string, id: string, prompt: string, ratio: string, references: string[], signal: AbortSignal, modelId = qwen.modelId) {
@@ -98,7 +99,7 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
         item.base = item.photo ?? await draw(cwd, production.id, `Full-body photograph of ${item.look}, wearing ${outfit.look}, standing facing the camera, ${studio}. ${finish}`, "2:3", [], signal, outfit.adult ? photo : undefined);
       }),
       ...assets.places.filter(item => !item.base).map(async item => {
-        item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, empty, no people. ${finish}`, ratio, [], signal);
+        item.base = await draw(cwd, production.id, `Wide shot of ${item.look}, no people. ${finish}`, ratio, [], signal);
       }),
     ]);
     await save();
@@ -112,7 +113,7 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
         outfit.views = await Promise.all(outfitViews.map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal, outfit.adult ? photo : undefined)));
       })),
       ...assets.places.filter(item => !item.views).map(async item => {
-        const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, layout and light.";
+        const rule = "The place is exactly the one shown in {{ref 1}}: the same architecture, materials, furniture, props, layout and light.";
         item.views = [item.base!, ...await Promise.all(placeViews.map(view => draw(cwd, production.id, `${view} ${rule} ${finish}`, ratio, [item.base!], signal)))];
       }),
     ]);
