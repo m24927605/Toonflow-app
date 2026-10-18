@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
-import { readdir, readFile } from "@toonflow/file";
+import { access, readdir, readFile } from "@toonflow/file";
 import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
@@ -219,12 +219,20 @@ export async function peopleWithLoras(cwd: string, names: string[]) {
   return [...new Set(names.filter(Boolean))].filter(ready).length;
 }
 
-/** The workspace's LoRA records, newest first. */
+/**
+ * The workspace's LoRA records whose weights are still there, newest first: a record left after its file was deleted
+ * is no LoRA, so its person is trained again rather than every clip failing on the missing file.
+ */
 async function workspaceLoras(cwd: string) {
   const folder = (await resolveWorkspacePath(cwd, "loras", true)).path;
   const names = (await readdir(folder).catch(() => [] as string[])).filter(name => name.endsWith(".json"));
-  const records = await Promise.all(names.map(name => readFile(`${folder}/${name}`, "utf8").then(text => JSON.parse(text) as LoraRecord, () => undefined)));
-  return records.filter((record): record is LoraRecord => !!record?.trigger && !!record.path).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const records = await Promise.all(names.map(async name => {
+    const record = await readFile(`${folder}/${name}`, "utf8").then(text => JSON.parse(text) as LoraRecord, () => undefined);
+    if (!record?.trigger || !record.path) return undefined;
+    // A path outside the workspace is refused like a missing file.
+    return await resolveWorkspacePath(cwd, record.path, true).then(({ path }) => access(path)).then(() => record, () => undefined);
+  }));
+  return records.filter((record): record is LoraRecord => !!record).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** Every reference image of a person or place, across outfits, as a LoRA learns them. */
