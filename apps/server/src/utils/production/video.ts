@@ -16,7 +16,7 @@ import { productionDirectory, writeProductionText, type Production } from "./sta
  * The model's verdict on a clip's frames; `overruled` says why a diagnosis passed a clip whose every major problem was
  * the check's own mistake, and `unreadable` marks a reply that could not be read.
  */
-export type ClipCheck = { issues: { problem: string; major: boolean }[]; passed: boolean; overruled?: string; unreadable?: boolean };
+export type ClipCheck = { issues: { problem: string; kind?: string; major: boolean }[]; passed: boolean; overruled?: string; unreadable?: boolean };
 
 /**
  * `seed` is the seed the clip was rendered with, kept so a rerun after one change keeps the rest; `check` is the model's
@@ -432,14 +432,15 @@ async function checksFolder(cwd: string, production: Production) {
 }
 
 /**
- * Asks for every problem in a clip, each marked major or minor, as JSON. ACT: The model names problems well but scored
+ * Asks for every problem in a clip, each sorted into one of `checkKinds`, as JSON. ACT: The model names problems well but scored
  * clips 85/92 whatever it found, a changed set and clothes included, so the verdict follows the problems it marks major.
  * Looks are judged against the reference images only: given a written description of the picture as well, the model
  * took the words for the picture and failed every clip of the first production, natural movement included. The action and
  * the gaze are judged against the shot-list row: judging looks alone, the check passed a jacket put on instead of taken
  * off and five people staring into the lens, while most "melted faces" it failed were one motion-blurred frame. Judging
  * the row word by word, it then failed all six clips of a film twice over a look's side of the frame or an action still
- * under way, while missing what viewers saw, so a problem is major only when a viewer would notice it.
+ * under way, while missing what viewers saw, and told to weigh problems as a viewer it still failed clips over details,
+ * so code weighs them by their kind.
  */
 export function clipCheckPrompt(prompt: string, row: string, gazes: string, looks: number) {
   return [
@@ -449,10 +450,33 @@ export function clipCheckPrompt(prompt: string, row: string, gazes: string, look
     `The clip was asked for: ${prompt}`,
     "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
     "Compare the camera, the framing and which side of the frame each person is on with the previs layout, and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right. Postures and actions come from the row: where the previs shows someone standing or seated differently from the row, the row is right.",
-    "List every problem you see, then judge each as a viewer of the finished film would, watching it once at normal speed: a problem is major only when a viewer would notice it or misread the story. It is major when the row's action does not happen, so the viewer cannot tell what happens, or happens the wrong way; someone looks at another person or thing than the row says, or into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; someone the row's cast names is missing, or another person stands in for them; the shot is clearly wider or tighter than the row's shot size, or the people stand on the other sides of the frame from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a door, sliding door or window opens or closes by itself, with no one at it, behind it or reaching for it; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything a viewer would not notice is minor: a look at the right person that leans a little to another side of the frame, an action still under way as the clip ends, a small drift of the framing or of the camera from the previs.",
-    "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
+    `List every problem you see and give each the one kind that fits it best: ${Object.entries(checkKinds).map(([kind, meaning]) => `"${kind}" ${meaning}`).join("; ")}. One soft or smeared frame during a fast movement is motion blur, not a problem.`,
+    `Reply with JSON only: {"issues": [{"problem": "what you saw, with the frame", "kind": one of ${Object.keys(checkKinds).map(kind => `"${kind}"`).join(", ")}}]}, with an empty list when there is nothing wrong.`,
   ].join("\n");
 }
+
+/**
+ * The kinds of problem the check sorts what it sees into. The first ten are what a viewer watching the film once notices
+ * or misreads the story by, and fail the clip; the rest do not. The check names problems well but judged their weight
+ * badly, failing whole films over a hand not in a pocket or a first frame's glance, so code weighs them by kind.
+ */
+const checkKinds = {
+  missingPerson: "someone the row's cast names is not in the clip, or another person stands in for them",
+  extraPerson: "someone shows up who is not in the references, such as a stranger or a second copy of someone",
+  identity: "someone's face, hair or clothes, or the place, differ from the reference images, or change between frames",
+  deformed: "a face, hand or body is deformed or melted in two or more frames in a row",
+  physics: "something physically impossible: someone floats, passes through furniture or another person, or moves in a way a body cannot",
+  actionMissing: "the row's main action does not happen or goes the wrong way, so a viewer cannot tell what happens (taking a jacket off is not putting it on)",
+  lensLook: "someone looks straight into the camera lens though the row does not ask for it",
+  popping: "someone or something appears from nowhere, vanishes or jumps to another place",
+  selfMoving: "a door, sliding door or window opens or closes by itself, with no one at it or reaching for it",
+  framing: "the shot is clearly wider or tighter than the row's shot size, or the people stand on the other sides of the frame from the previs layout",
+  gaze: "someone looks at another person, thing or side than the row says, but not into the lens",
+  detail: "a small difference from the row's wording, such as which hand holds something, hands in pockets or not, or a slightly different pose",
+  timing: "an action still under way as the clip ends, or a beat a little early or late",
+  other: "anything else a viewer would not notice",
+};
+const failingKinds = new Set(Object.keys(checkKinds).slice(0, 10));
 
 /** Reads the check's JSON: a clip passes without major problems; a reply that cannot be read fails rather than trusted. */
 export function readClipCheck(reply: string): ClipCheck {
@@ -461,7 +485,10 @@ export function readClipCheck(reply: string): ClipCheck {
     const value = replyJson(reply, "issues") as { issues?: unknown };
     // A list holding anything but problems, such as bare sentences, is not read as no problems.
     if (!Array.isArray(value.issues) || value.issues.some(item => !item || typeof item !== "object" || typeof (item as { problem?: unknown }).problem !== "string")) return unreadable;
-    const issues = (value.issues as { problem: string; major?: unknown }[]).map(item => ({ problem: item.problem, major: item.major === true })).slice(0, 10);
+    // A problem of no known kind counts as major, so a reply that leaves the kind out cannot pass a broken clip.
+    const issues = (value.issues as { problem: string; kind?: unknown }[]).map(item => ({
+      problem: item.problem, kind: String(item.kind ?? ""), major: !Object.hasOwn(checkKinds, String(item.kind)) || failingKinds.has(String(item.kind)),
+    })).slice(0, 10);
     return { issues, passed: !issues.some(item => item.major) };
   } catch {
     return unreadable;
