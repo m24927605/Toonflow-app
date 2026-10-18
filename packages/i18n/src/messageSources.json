@@ -10129,7 +10129,7 @@
   "Median shot length is {0} s; most shots of a well-paced short run 3–4 s": [
     "packages/nodeShared/src/scriptCheck.ts"
   ],
-  "Shot {0} has a line in a {1}, where faces are too small to draw: frame it as a medium shot or closer, or move the line to a shot that is": [
+  "Shot {0} has a line in a {1}, where the speaker''s face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener''s shoulder, or move the line to a shot that is": [
     "packages/nodeShared/src/scriptCheck.ts"
   ],
   "Total length is {0} s, but the target is {1} s": [
@@ -10156,7 +10156,7 @@
   "Keep every shot at most 8 s and most shots at 3–4 s.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
-  "Frame every shot with a line, a reaction or a meaningful look as a medium shot or closer; keep full and long shots for showing the place and the people moving through it, without lines, as faces that small come out blurred.": [
+  "Frame every shot with a line as a medium close-up or closer on the speaker, alone or over the listener's shoulder, and every reaction or meaningful look as a medium shot or closer; keep two-person medium shots, full shots and long shots for showing the place and the people moving through it, without lines, as faces that small come out blurred.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
   "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": [

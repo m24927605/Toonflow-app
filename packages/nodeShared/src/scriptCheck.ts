@@ -3,12 +3,12 @@ import { shotSpans } from "./shotList";
 
 // Short shots fail cheaply and keep generated motion stable; well-paced AI shorts keep most shots within 8 s.
 export const maxShotSeconds = 8;
-// Shot sizes that show people whole or smaller: "\u5168\u666f" (full shot), "\u9060\u666f"/"\u8fdc\u666f" (long shot) and
-// "\u5927\u5168\u666f" (extreme long shot). Video models draw faces from latent cells about 32 px wide, so a face this
-// small comes out with smeared eyes and mouth; H3 users and our own renders find a head needs about 140 px of a 720p
-// frame, a medium shot or closer.
-const wideSize = /full|wide|long shot|establishing|\u5168\u666f|\u9060\u666f|\u8fdc\u666f/i;
-const mediumSize = /medium|close|\u4e2d\u666f|\u8fd1\u666f|\u7279\u5beb|\u7279\u5199/i;
+// Shot sizes that frame a speaker's face large enough to draw: medium close-up ("\u4e2d\u8fd1\u666f"), close-up
+// ("\u8fd1\u666f", "\u7279\u5beb"/"\u7279\u5199") or over the shoulder ("\u904e\u80a9"/"\u8fc7\u80a9"). Video
+// models draw faces from latent cells about 32 px wide: in a two-person medium shot at 720p a face is about 100 px, three
+// cells, and comes out soft; framed as the speaker's medium close-up over the listener's shoulder it measured 137 px, with
+// clearly better identity and about 2.4 times the sharpness on the same seed.
+const closeSize = /close|over[- ]the[- ]shoulder|\bOTS\b|\u8fd1\u666f|\u7279\u5beb|\u7279\u5199|\u904e\u80a9|\u8fc7\u80a9/i;
 // A dialogue cell that holds no line: empty, dashes or dots, "none", "no dialogue", "silence", or "\u7121"/"\u65e0"
 // (none) with or without "\u5c0d\u767d"/"\u53f0\u8a5e" (dialogue), or "\u6c89\u9ed8" (silence).
 const noLine = /^[\s\u3000]*[(\uff08]?\s*(?:none|n\/a|no dialogue|silen(?:t|ce)|[-\u2014\u2013\u2026.]+|[\u7121\u65e0](?:[\u5c0d\u5bf9]\u767d|\u53f0[\u8a5e\u8bcd])?|\u6c89\u9ed8)?\s*[.\u3002]?\s*[)\uff09]?[\s\u3000]*$/i;
@@ -65,10 +65,10 @@ export function checkScript(markdown: string, target?: number): ScriptCheck {
     ? Math.max(...shots.map(shot => shot.start! + shot.duration)) - Math.min(...shots.map(shot => shot.start!))
     : lengths.reduce((sum, value) => sum + value, 0);
   if (median > 5) issues.push(msg`Median shot length is ${median.toFixed(2)} s; most shots of a well-paced short run 3–4 s`);
-  // A line is spoken by a face the viewer must read, which a full or long shot leaves too small to draw.
+  // A line is spoken by a face the viewer must read, which a medium shot or wider leaves too small to draw.
   for (const span of shotSpans(shots, markdown)) {
-    if (!span.dialogue || noLine.test(span.dialogue) || !span.size || !wideSize.test(span.size) || mediumSize.test(span.size)) continue;
-    issues.push(msg`Shot ${span.shot} has a line in a ${span.size}, where faces are too small to draw: frame it as a medium shot or closer, or move the line to a shot that is`);
+    if (!span.dialogue || noLine.test(span.dialogue) || !span.size || closeSize.test(span.size)) continue;
+    issues.push(msg`Shot ${span.shot} has a line in a ${span.size}, where the speaker's face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener's shoulder, or move the line to a shot that is`);
   }
   if (target !== undefined && Math.abs(total - target) > Math.max(1, target * 0.05)) issues.push(msg`Total length is ${total.toFixed(2)} s, but the target is ${target} s`);
   return { shots, total, median, issues };
