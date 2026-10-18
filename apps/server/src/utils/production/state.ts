@@ -2,6 +2,7 @@ import { dirname, join } from "node:path";
 import { mkdir, readFile, writeAtomic } from "@toonflow/file";
 import type { MessageDescriptor } from "@toonflow/i18n";
 import conf from "@/utils/conf";
+import type { ProductionAmbience } from "./ambience";
 import type { ProductionDub } from "./dub";
 import type { ProductionPrevis } from "./previs";
 import type { ProductionClip } from "./video";
@@ -76,6 +77,8 @@ export type Production = {
   /** The style prompt of the Suno score, written with the other texts, and the score under the whole film, when the production asked for music. */
   musicStyle?: string;
   music?: string;
+  /** Each place's ambience search, written with the other texts, and the recording laid under its shots. */
+  ambience?: ProductionAmbience[];
   /** The finished film and its delivery report. */
   film?: string;
   report?: string;

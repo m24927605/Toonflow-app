@@ -5209,6 +5209,9 @@
   "Music: Suno V6, billed by the sunoapi.org account.": [
     "apps/server/src/utils/production/engine.ts"
   ],
+  "Ambience of {0}: \"{1}\", {2} ({3})": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "Shots": [
     "apps/server/src/utils/production/engine.ts"
   ],
@@ -5278,6 +5281,9 @@
   ],
   "Shot {0}, line {1} ({2}) could not be voiced: {3}": [
     "apps/server/src/utils/production/dub.ts"
+  ],
+  "Could not measure the ambience recording's loudness": [
+    "apps/server/src/utils/production/ambience.ts"
   ],
   "A clip's reference images are not drawn yet": [
     "apps/server/src/utils/production/shots.ts"
@@ -10130,6 +10136,9 @@
     "packages/nodeShared/src/scriptCheck.ts"
   ],
   "Shot {0} has a line in a {1}, where the speaker''s face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener''s shoulder, or move the line to a shot that is": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
+  "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": [
     "packages/nodeShared/src/scriptCheck.ts"
   ],
   "Total length is {0} s, but the target is {1} s": [

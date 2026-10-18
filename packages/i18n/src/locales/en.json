@@ -3206,7 +3206,7 @@
   "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.",
   "Blocking shot {0} of {1}; the first request also starts Colab and loads the model, about 1–2 minutes": "Blocking shot {0} of {1}; the first request also starts Colab and loads the model, about 1–2 minutes",
   "Shot {0} failed: {1}": "Shot {0} failed: {1}",
-  "Shot {0} has a line in a {1}, where the speaker's face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener's shoulder, or move the line to a shot that is": "Shot {0} has a line in a {1}, where the speaker's face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener's shoulder, or move the line to a shot that is",
+  "Shot {0} has a line in a {1}, where the speaker''s face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener''s shoulder, or move the line to a shot that is": "Shot {0} has a line in a {1}, where the speaker''s face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener''s shoulder, or move the line to a shot that is",
   "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.": "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.",
   "Shot {0} previs": "Shot {0} previs",
   "The prompt does not name <Video 1> as a blocking-only previs.": "The prompt does not name <Video 1> as a blocking-only previs.",
@@ -3362,5 +3362,8 @@
   "The film and its delivery report are ready on the canvas.": "The film and its delivery report are ready on the canvas.",
   "Trigger word": "Trigger word",
   "Writing the delivery report…": "Writing the delivery report…",
-  "The server address is not known yet; try again in a moment": "The server address is not known yet; try again in a moment"
+  "The server address is not known yet; try again in a moment": "The server address is not known yet; try again in a moment",
+  "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen",
+  "Ambience of {0}: \"{1}\", {2} ({3})": "Ambience of {0}: \"{1}\", {2} ({3})",
+  "Could not measure the ambience recording's loudness": "Could not measure the ambience recording's loudness"
 }

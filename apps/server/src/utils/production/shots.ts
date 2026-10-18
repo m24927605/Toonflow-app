@@ -27,12 +27,12 @@ export function planShots(shotList: string, assets: NonNullable<Production["asse
   return spans.map((span): ProductionShot => {
     const cast = castNames(span).filter(name => people.has(name));
     const outfits = Object.fromEntries(assets.characters.map(({ name, outfits: options = [] }) => {
-      // Within the person's part of the state ("Name: ...;"), the outfit named first is the one worn, as in "white shirt
-      // (suit jacket off)".
+      // Within the person's part of the state ("Name: ...;"), the outfit named first is the one worn; of outfits named at
+      // the same place the longest wins, so "suit (jacket off)" is not read as "suit".
       // A whole cell is one person's only when the cast cell names them alone.
       const size = cast.includes(name) ? cast.length : 0;
       const named = [segmentOf(span.state ?? "", name, size), segmentOf(span.row ?? "", name, size)]
-        .map(text => options.filter(outfit => text.includes(outfit.name)).sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name))[0])
+        .map(text => options.filter(outfit => text.includes(outfit.name)).sort((a, b) => text.indexOf(a.name) - text.indexOf(b.name) || b.name.length - a.name.length)[0])
         .find(Boolean);
       const outfit = named?.name ?? worn.get(name) ?? options[0]?.name ?? "";
       worn.set(name, outfit);

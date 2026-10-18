@@ -298,6 +298,15 @@ export async function scoreFilm(cwd: string, production: Production, style: stri
 const dialogueLoudness = "loudnorm=I=-16:TP=-1.5:LRA=11";
 const musicVolume = 0.35;
 
+/**
+ * How long a subtitle takes to read: about 9 characters a second for Chinese, Japanese or Korean and 17 for other
+ * languages, and never under 5/6 s, as broadcasters' subtitle guides set.
+ */
+function readingSeconds(words: string) {
+  const characters = [...words.replace(/\s+/g, " ").trim()].length;
+  return Math.max(5 / 6, characters / (/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/.test(words) ? 9 : 17));
+}
+
 /** One SRT time stamp, such as 00:01:02,345. */
 function srtTime(seconds: number) {
   const milliseconds = Math.round(seconds * 1000);
@@ -307,8 +316,10 @@ function srtTime(seconds: number) {
 
 /**
  * Finishes the film from the final clips, or the rough cut's at 480p: joins them in shot order, each cut to its shot's
- * length, with each clip's sound at one loudness, lays the music under the dialogue and ducks it while people speak, as
- * the soundtrack mix node does, and burns in each dubbed line as a subtitle for as long as it is spoken.
+ * length, with each clip's sound at one loudness, lays the music and each place's ambience bed under the dialogue and
+ * ducks them while people speak, as the soundtrack mix node does, and burns in each dubbed line as a subtitle while it
+ * is spoken and long enough to read. A bed runs on from shot to shot of its place, so a cut inside a scene does not
+ * restart it.
  */
 export async function finishFilm(cwd: string, production: Production, signal: AbortSignal) {
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
@@ -323,15 +334,44 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     const entries = clips.flatMap((clip, index) => {
       const start = offset;
       offset += lengths[index]!;
-      return (production.dub!.shots.find(shot => shot.shot === clip.shot)?.lines ?? []).flatMap(line => line.start === undefined || !line.seconds ? []
-        : [{ from: start + line.start, to: Math.min(start + line.start + line.seconds, offset), words: line.words }]);
+      return (production.dub!.shots.find(shot => shot.shot === clip.shot)?.lines ?? []).flatMap(line => line.start === undefined || !line.seconds || line.start >= lengths[index]! ? []
+        : [{ from: start + line.start, to: start + line.start + line.seconds, words: line.words }]);
     });
+    // A subtitle stays up at least as long as it takes to read, until the next one or the end of the film.
+    entries.forEach((entry, index) => entry.to = Math.min(Math.max(entry.to, entry.from + readingSeconds(entry.words)), entries[index + 1]?.from ?? total, total));
     if (entries.length) {
       subtitles = `${folder}/subtitles.srt`;
       const text = entries.map((entry, index) => `${index + 1}\n${srtTime(entry.from)} --> ${srtTime(entry.to)}\n${entry.words}\n`).join("\n");
       await writeProductionText(cwd, subtitles, text);
     }
   }
+  // Each bed is one looped input, split into the stretches its place's shots take in order; a shot of a place with no
+  // bed lays silence there.
+  const beds = [...new Map((production.ambience ?? []).flatMap(item => item.bed ? [[item.place, item.bed.path] as const] : [])).entries()];
+  const bedInput = (place: string) => beds.findIndex(([name]) => name === place);
+  const firstBed = clips.length + (production.music ? 1 : 0);
+  const played = new Map<string, number>();
+  const stretches = clips.map((clip, index) => {
+    const place = production.shots!.find(shot => shot.shot === clip.shot)?.place ?? "";
+    const start = played.get(place) ?? 0;
+    played.set(place, start + lengths[index]!);
+    return { input: bedInput(place), start, length: lengths[index]! };
+  });
+  const ambience = beds.length ? [
+    ...beds.map((_, input) => {
+      const uses = stretches.filter(stretch => stretch.input === input).length;
+      return `[${firstBed + input}:a]asplit=${uses}${Array.from({ length: uses }, (_, use) => `[bed${input}u${use}]`).join("")}`;
+    }).filter((_, input) => stretches.some(stretch => stretch.input === input)),
+    ...stretches.map((stretch, index) => {
+      const use = stretches.slice(0, index).filter(other => other.input === stretch.input).length;
+      return stretch.input < 0
+        ? `anullsrc=r=48000:cl=stereo,atrim=duration=${stretch.length}[ambience${index}]`
+        // Fades only where the place changes, so a cut inside a scene leaves no dip in its bed.
+        : `[bed${stretch.input}u${use}]atrim=start=${stretch.start}:duration=${stretch.length},asetpts=PTS-STARTPTS${stretches[index - 1]?.input === stretch.input ? "" : ",afade=t=in:d=0.05"}${stretches[index + 1]?.input === stretch.input ? "" : `,afade=t=out:st=${Math.max(0, stretch.length - 0.05)}:d=0.05`}[ambience${index}]`;
+    }),
+    `${stretches.map((_, index) => `[ambience${index}]`).join("")}concat=n=${stretches.length}:v=0:a=1[ambience]`,
+  ] : [];
+  const underneath = [...production.music ? ["[music]"] : [], ...beds.length ? ["[ambience]"] : []];
   const filters = [
     ...clips.map((clip, index) => {
       const spoken = !!production.dub!.shots.find(shot => shot.shot === clip.shot)?.lines.length;
@@ -340,8 +380,10 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     `${clips.map((_, index) => `[${index}:v][a${index}]`).join("")}concat=n=${clips.length}:v=1:a=1[v][dialogue]`,
     // The subtitle file sits in the production folder, a path of plain characters relative to the workspace FFmpeg runs in.
     subtitles ? `[v]subtitles=filename=${subtitles}:force_style='FontSize=24,Outline=2,Shadow=1,MarginV=24'[picture]` : "[v]null[picture]",
-    production.music
-      ? `[${clips.length}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=duration=${total},asetpts=PTS-STARTPTS,volume=${musicVolume},afade=t=in:d=2,afade=t=out:st=${Math.max(0, total - 3)}:d=3[bed];`
+    ...production.music ? [`[${clips.length}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=duration=${total},asetpts=PTS-STARTPTS,volume=${musicVolume},afade=t=in:d=2,afade=t=out:st=${Math.max(0, total - 3)}:d=3[music]`] : [],
+    ...ambience,
+    underneath.length
+      ? `${underneath.join("")}${underneath.length > 1 ? `amix=inputs=${underneath.length}:normalize=0:duration=first` : "anull"}[bed];`
         + "[dialogue]asplit=2[voice][key];[bed][key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=500[ducked];[voice][ducked]amix=inputs=2:normalize=0,alimiter=limit=0.95[sound]"
       : "[dialogue]alimiter=limit=0.95[sound]",
   ];
@@ -349,6 +391,8 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
   const command = cutClips(ffmpeg(), production, clips);
   // The score repeats if it is shorter than the film; atrim cuts it to the film's length.
   if (production.music) command.input(production.music).inputOptions("-stream_loop", "-1");
+  // A bed shorter than its scene loops.
+  for (const [, path] of beds) command.input(path).inputOptions("-stream_loop", "-1");
   command.complexFilter(filters, ["picture", "sound"])
     .outputOptions(["-c:v libx264", "-crf 18", "-pix_fmt yuv420p", "-c:a aac", "-b:a 192k", "-movflags +faststart"]).output(output);
   await finished(command);
@@ -393,7 +437,9 @@ async function checksFolder(cwd: string, production: Production) {
  * Looks are judged against the reference images only: given a written description of the picture as well, the model
  * took the words for the picture and failed every clip of the first production, natural movement included. The action and
  * the gaze are judged against the shot-list row: judging looks alone, the check passed a jacket put on instead of taken
- * off and five people staring into the lens, while most "melted faces" it failed were one motion-blurred frame.
+ * off and five people staring into the lens, while most "melted faces" it failed were one motion-blurred frame. Judging
+ * the row word by word, it then failed all six clips of a film twice over a look's side of the frame or an action still
+ * under way, while missing what viewers saw, so a problem is major only when a viewer would notice it.
  */
 export function clipCheckPrompt(prompt: string, row: string, gazes: string, looks: number) {
   return [
@@ -403,7 +449,7 @@ export function clipCheckPrompt(prompt: string, row: string, gazes: string, look
     `The clip was asked for: ${prompt}`,
     "Judge what happens across the frames against the row: the action must happen as the row says, in the right direction (taking a jacket off is not putting it on, coming in is not standing inside), and no one looks into the camera lens unless the row asks for it.",
     "Compare the camera, the framing and which side of the frame each person is on with the previs layout, and the looks with the reference images, never with the words: where the words describe the picture differently, the images are right. Postures and actions come from the row: where the previs shows someone standing or seated differently from the row, the row is right.",
-    "List every problem you see. A problem is major when the row's action does not happen or happens the wrong way; someone looks into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; the camera, the framing or the side of the frame people are on clearly differ from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a door, sliding door or window opens or closes by itself, with no one at it, behind it or reaching for it; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything smaller is minor, such as a small drift of the framing.",
+    "List every problem you see, then judge each as a viewer of the finished film would, watching it once at normal speed: a problem is major only when a viewer would notice it or misread the story. It is major when the row's action does not happen, so the viewer cannot tell what happens, or happens the wrong way; someone looks at another person or thing than the row says, or into the lens though the row does not ask for it; someone's face, hair or clothes, or the place, differ from the reference images; someone the row's cast names is missing, or another person stands in for them; the shot is clearly wider or tighter than the row's shot size, or the people stand on the other sides of the frame from the previs layout; someone shows up who is not in the references; someone appears from nowhere, vanishes or jumps to another place; a door, sliding door or window opens or closes by itself, with no one at it, behind it or reaching for it; a face, hand or body is deformed in two or more frames in a row; or someone passes through furniture or another person. One soft or smeared frame during a fast movement is motion blur, not a problem. Anything a viewer would not notice is minor: a look at the right person that leans a little to another side of the frame, an action still under way as the clip ends, a small drift of the framing or of the camera from the previs.",
     "Reply with JSON only: {\"issues\": [{\"problem\": \"what you saw, with the frame\", \"major\": true or false}]}, with an empty list when there is nothing wrong.",
   ].join("\n");
 }

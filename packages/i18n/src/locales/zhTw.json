@@ -3205,7 +3205,7 @@
   "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": "每一格都寫在同一行：同一格有多段內容（例如兩個人的台詞或狀態）時，用全形分號（；）分隔，不要用 <br> 或換行。",
   "Retry shot {0}": "重試第 {0} 鏡",
   "Shot {0} failed: {1}": "第 {0} 鏡失敗：{1}",
-  "Shot {0} has a line in a {1}, where the speaker's face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener's shoulder, or move the line to a shot that is": "第 {0} 鏡在{1}裡有台詞，說話者的臉太小畫不清楚：請把說話者改成中近景或更近，單人入鏡或越過聽者的肩膀拍，或把台詞移到這樣的鏡頭",
+  "Shot {0} has a line in a {1}, where the speaker''s face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener''s shoulder, or move the line to a shot that is": "第 {0} 鏡在{1}裡有台詞，說話者的臉太小畫不清楚：請把說話者改成中近景或更近，單人入鏡或越過聽者的肩膀拍，或把台詞移到這樣的鏡頭",
   "Shot {0} of {1} is ready: check it, then confirm": "第 {0} 鏡／共 {1} 鏡已完成：請檢查後再確認",
   "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.": "{0} 是本鏡的灰模粗模試演：只用來參考每個人站在哪裡、怎麼移動、彼此的相對位置、時機與運鏡；不要取用它的形狀、材質、顏色、陳設或標記。人物和場景的外觀與 {1} 完全一致。",
   "Shot {0} previs": "第 {0} 鏡 粗模試演",
@@ -3362,5 +3362,8 @@
   "The film and its delivery report are ready on the canvas.": "成片與交付報告已放在畫布上。",
   "Trigger word": "觸發詞",
   "Writing the delivery report…": "正在撰寫交付報告…",
-  "The server address is not known yet; try again in a moment": "伺服器位址還未就緒，請稍後再試"
+  "The server address is not known yet; try again in a moment": "伺服器位址還未就緒，請稍後再試",
+  "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": "第 {0} 鏡的動作提到 {1}，但演員欄沒有列出：請把畫面裡看得到的人都列進演員欄，越肩鏡頭的聽者也算；若對方在畫面外，請在動作裡寫明畫外",
+  "Ambience of {0}: \"{1}\", {2} ({3})": "{0}的環境音：「{1}」，{2}（{3}）",
+  "Could not measure the ambience recording's loudness": "無法測量環境音錄音的音量"
 }

@@ -17,16 +17,23 @@ const castSchema = z.object({
   places: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })),
 });
 
-/** Asks the screenplay for its cast and places as JSON, each with a fixed name and an English description of its look. */
-export function castPrompt(script: string) {
+/**
+ * Asks the screenplay for its cast and places as JSON, each with a fixed name and an English description of its look.
+ * Outfits are named as the shot list's state cells name the clothes, so every shot finds the picture of what is worn
+ * there, a garment taken off included.
+ */
+export function castPrompt(script: string, shotList: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
     "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\",\"adult\":false}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too; adult: true for an outfit that leaves the person nude or partly nude, or that the screenplay uses in a sexual scene, else false. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too; adult: true for an outfit that leaves the person nude or partly nude, or that the screenplay uses in a sexual scene, else false. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of its architecture, materials, furniture and light. Do not use quotation marks inside the sentences.",
     "Output only the JSON.",
     "",
     "Screenplay:",
     script,
+    "",
+    "Shot list:",
+    shotList,
   ].join("\n");
 }
 

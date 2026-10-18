@@ -10,7 +10,8 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
-import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis, ReplyCutError } from "./review";
+import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis, ReplyCutError, replyJson } from "./review";
+import { ambiencePrompt, fetchAmbience } from "./ambience";
 import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, referenceImages, shotReferences } from "./shots";
@@ -207,7 +208,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
   }
   if (needs("script")) return wait(cwd, production, "reviewScript", { gate: "script" });
 
-  // The shot list and the cast both need only the script, so the two text models write them side by side.
+  // The cast follows the shot list, whose state cells name the outfits each shot needs.
   if (!production.shotList || !production.assets) {
     if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const script = await readProductionText(cwd, production.script);
@@ -225,10 +226,11 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       production.shotList = { path, shots: check.shots.length, issues: check.issues };
       await saveProduction(cwd, production);
     });
-    const cast = production.assets ? Promise.resolve() : timed(cwd, production, "cast", async () => {
-      production.assets = parseCast(await complete(shotListWriter, castPrompt(script), signal), production.input.photos);
+    const cast = production.assets ? Promise.resolve() : listed.then(() => timed(cwd, production, "cast", async () => {
+      const shotList = await readProductionText(cwd, production.shotList!);
+      production.assets = parseCast(await complete(shotListWriter, castPrompt(script, shotList), signal), production.input.photos);
       await saveProduction(cwd, production);
-    });
+    }));
     // Both are awaited before an error is passed on, so neither goes on writing unwatched.
     const failure = (await Promise.allSettled([listed, cast])).find(result => result.status === "rejected");
     await saveProduction(cwd, production);
@@ -444,6 +446,12 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     await saveProduction(cwd, production);
     return true;
   }
+  // The beds come from Openverse, which costs no compute units, once every clip is final.
+  if (production.ambience?.some(item => item.bed === undefined)) {
+    await timed(cwd, production, "ambience", () => fetchAmbience(cwd, production, signal));
+    await saveProduction(cwd, production);
+    return true;
+  }
   if (!production.film) {
     production.film = await timed(cwd, production, "film", () => finishFilm(cwd, production, signal));
     await saveProduction(cwd, production);
@@ -461,13 +469,14 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
 
 const videoWriter = "You write prompts for the MiniMax H3 video model.";
 const composer = "You describe film scores for a music generation model.";
+const soundEditor = "You choose ambience recordings for a film's sound editor.";
 const checker = "You check AI-generated video clips for a film editor.";
-/** Whether a text written from the previs plan is missing: a clip prompt or the music's style. */
-const textsMissing = (production: Production) => !production.videos || production.videos.some(item => !item.prompt) || (production.input.music && !production.musicStyle);
+/** Whether a text written from the previs plan is missing: a clip prompt, the music's style or the places' ambience searches. */
+const textsMissing = (production: Production) => !production.videos || production.videos.some(item => !item.prompt) || (production.input.music && !production.musicStyle) || !production.ambience;
 
 /**
  * Writes the texts the previs plan allows that the production still lacks: once the dub has set each shot's length, the
- * clip prompts from the previs blocking, and the style of the music.
+ * clip prompts from the previs blocking, the style of the music and each place's ambience search.
  */
 async function writeTexts(cwd: string, production: Production, dubbed: Promise<unknown>, signal: AbortSignal) {
   const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
@@ -478,6 +487,17 @@ async function writeTexts(cwd: string, production: Production, dubbed: Promise<u
   await writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, signal), save);
   if (production.input.music && !production.musicStyle) {
     production.musicStyle = await complete(composer, musicPrompt(script, production.clips!.reduce((sum, item) => sum + item.clip, 0)), signal);
+    await save();
+  }
+  if (!production.ambience) {
+    // Each place is searched with the sounds its shots' prompts describe, which the text model shortens to a query.
+    const places = production.assets!.places.map(place => ({
+      name: place.name, look: place.look,
+      sounds: production.shots!.filter(shot => shot.place === place.name)
+        .flatMap(shot => /overall_soundscape:\s*(.+)/.exec(production.videos!.find(item => item.shot === shot.shot)?.prompt ?? "")?.[1] ?? []),
+    }));
+    const queries = places.length ? replyJson(await complete(soundEditor, ambiencePrompt(places), signal), "queries") : {};
+    production.ambience = places.flatMap(place => typeof queries[place.name] === "string" && queries[place.name] ? [{ place: place.name, query: String(queries[place.name]).slice(0, 80) }] : []);
     await save();
   }
 }
@@ -506,6 +526,7 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     t`Colab compute units: ${spent} spent of a ${production.input.budget} budget (estimate ${production.estimate}).`,
     t`Dialogue: Gemini TTS, billed by the Google account.`,
     ...production.music ? [t`Music: Suno V6, billed by the sunoapi.org account.`] : [],
+    ...production.ambience?.flatMap(item => item.bed ? [t`Ambience of ${item.place}: "${item.bed.title}", ${item.bed.attribution} (${item.bed.url})`] : []) ?? [],
     "",
     `## ${t`Shots`}`,
     "",

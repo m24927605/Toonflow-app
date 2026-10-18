@@ -2,20 +2,37 @@ import type { ShotSpan } from "./shotList";
 
 export type DialogueLine = { speaker?: string; words: string };
 
-// An empty cell marker such as "none", "-" or the Chinese "無" / "无", optionally in brackets.
-const noDialogue = /^[\s(（[]*(?:none|n\/a|-+|—+|無|无)?[\s)）\]]*$/i;
+// An empty cell marker, optionally in brackets: "none", "no dialogue", "silence" or "silent", dashes or dots, or the
+// Chinese "\u7121" / "\u65e0" (none) alone or with "\u5c0d\u767d" / "\u53f0\u8a5e" (dialogue), or "\u6c89\u9ed8"
+// (silence).
+const noDialogue = /^[\s(\uff08[]*(?:none|n\/a|no dialogue|silen(?:t|ce)|[-\u2014\u2013\u2026.\u3002]+|[\u7121\u65e0](?:[\u5c0d\u5bf9]\u767d|\u53f0[\u8a5e\u8bcd])?|\u6c89\u9ed8)?[.\u3002]?[\s)\uff09\]]*$/i;
 // "Speaker: words" with an ASCII or full-width colon; the words may sit in quotation marks or corner brackets.
-const speakerLine = /^\s*([^:：「"“]{1,20}?)\s*[:：]\s*(.+)$/;
+const speakerLine = /^\s*([^:：「"“]{1,20}?)\s*[:：]\s*(.*)$/;
 const quoted = /^[「『"“](.*)[」』"”]$/;
+// A screenplay parenthetical in round or square brackets, ASCII or full-width, such as "(smiles)" or "(silent)": how a
+// line is acted, never words anyone says. One pass removes the innermost brackets, so nested ones take several.
+// ACT: a turn written wholly in brackets is read as acting, as the shot-list writer puts "(smiles)" there; a spoken inner
+// voice in brackets is dropped with it. Telling the two apart would need the writer to mark voice-overs.
+const parenthetical = /[(\uff08[\uff3b][^()\uff08\uff09[\]\uff3b\uff3d]*[)\uff09\]\uff3d]/g;
 
-/** The lines of a shot list's dialogue cell, one per speaker turn; an empty marker yields none. */
+function withoutParentheticals(text: string) {
+  for (let previous = ""; previous !== text;) [previous, text] = [text, text.replace(parenthetical, "")];
+  return text;
+}
+
+/**
+ * The lines of a shot list's dialogue cell, one per speaker turn. Parentheticals are dropped, so an empty marker or a
+ * turn that holds only one, such as "Ren: (silent)", yields no line: nothing is dubbed, subtitled or lip-synced for it.
+ */
 export function parseDialogue(cell = ""): DialogueLine[] {
-  return cell.split(/<br\s*\/?>|[;；]/i).flatMap(part => {
+  if (noDialogue.test(cell)) return [];
+  // Brackets go before the cell is split into turns, so a semicolon inside one does not split it.
+  return withoutParentheticals(cell).split(/<br\s*\/?>|[;；]/i).flatMap(part => {
     if (noDialogue.test(part)) return [];
     const match = speakerLine.exec(part);
-    const words = (match ? match[2]! : part).trim();
+    const words = (match ? match[2]! : part).replace(/\s{2,}/g, " ").trim();
     const text = quoted.exec(words)?.[1]?.trim() ?? words;
-    return text ? [{ ...match ? { speaker: match[1]!.trim() } : {}, words: text }] : [];
+    return text && !noDialogue.test(text) ? [{ ...match ? { speaker: match[1]!.trim() } : {}, words: text }] : [];
   });
 }
 

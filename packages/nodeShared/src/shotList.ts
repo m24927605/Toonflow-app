@@ -2,10 +2,11 @@ import type { ScriptShot } from "./scriptCheck";
 
 /**
  * Every field is plain text: cells are cleaned of table markup such as <br>, and `row` and `header` are rebuilt from
- * the cleaned cells. `cast`, `state` and `size` are the shot's cells in the cast, character-state and shot-size columns, when it has them;
+ * the cleaned cells. `cast`, `state`, `size`, `dialogue` and `action` are the shot's cells in the cast, character-state,
+ * shot-size, dialogue and action columns, when it has them;
  * `row` is the shot's whole line and `header` the table's header line, when the shot list is a table.
  */
-export type ShotSpan = { shot: number; start: number; end: number; cast?: string; state?: string; size?: string; dialogue?: string; row?: string; header?: string };
+export type ShotSpan = { shot: number; start: number; end: number; cast?: string; state?: string; size?: string; dialogue?: string; action?: string; row?: string; header?: string };
 
 // A cast column header: "Cast", "Characters", or the Chinese "\u4eba\u7269" (people), "\u89d2\u8272" (characters) or
 // "\u51fa\u5834" / "\u51fa\u573a" (on screen).
@@ -18,13 +19,15 @@ const sizeHeader = /size|\u666f[\u5225\u522b]/i;
 // A dialogue column header: "Dialogue", "Lines", or the Chinese "\u5c0d\u767d" / "\u5bf9\u767d" (dialogue) or
 // "\u53f0\u8a5e" / "\u53f0\u8bcd" (lines).
 const dialogueHeader = /dialogue|lines|[\u5c0d\u5bf9]\u767d|\u53f0[\u8a5e\u8bcd]/i;
+// An action column header: "Action", or the Chinese "\u52d5\u4f5c" / "\u52a8\u4f5c" (action).
+const actionHeader = /action|[\u52d5\u52a8]\u4f5c/i;
 // Models break lines inside a table cell with <br>; prompts are plain text, so the parts are joined with a full-width
 // semicolon instead, which parseDialogue and the cast split already treat as a separator.
 const cells = (row: string) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|")
   .map(cell => cell.split(/<br\s*\/?>/i).map(part => part.trim()).filter(Boolean).map((part, index, parts) => index < parts.length - 1 ? part.replace(/[。.]$/, "") : part).join("；"));
 
 /**
- * Shot times in seconds, and each shot's cast, character-state and shot-size cells when the table has those columns; a shot list
+ * Shot times in seconds, and each shot's cast, character-state, shot-size, dialogue and action cells when the table has those columns; a shot list
  * without time ranges runs its shots back to back.
  */
 export function shotSpans(shots: ScriptShot[], markdown: string): ShotSpan[] {
@@ -39,6 +42,7 @@ export function shotSpans(shots: ScriptShot[], markdown: string): ShotSpan[] {
   const castIndex = header.findIndex((cell, index) => index !== stateIndex && castHeader.test(cell));
   const sizeIndex = header.findIndex(cell => sizeHeader.test(cell));
   const dialogueIndex = header.findIndex(cell => dialogueHeader.test(cell));
+  const actionIndex = header.findIndex(cell => actionHeader.test(cell));
   let cursor = 0;
   return shots.map((item, index) => {
     const start = item.start ?? cursor;
@@ -50,9 +54,11 @@ export function shotSpans(shots: ScriptShot[], markdown: string): ShotSpan[] {
     const state = stateIndex >= 0 ? row[stateIndex]?.trim() || undefined : undefined;
     const size = sizeIndex >= 0 ? row[sizeIndex]?.trim() || undefined : undefined;
     const dialogue = dialogueIndex >= 0 ? row[dialogueIndex]?.trim() || undefined : undefined;
+    const action = actionIndex >= 0 ? row[actionIndex]?.trim() || undefined : undefined;
     return {
       shot: index + 1, start, end: cursor, ...(rowText ? { row: rowText } : {}), ...(header.length ? { header: `| ${header.join(" | ")} |` } : {}),
       ...(cast === undefined ? {} : { cast }), ...(state === undefined ? {} : { state }), ...(size === undefined ? {} : { size }), ...(dialogue === undefined ? {} : { dialogue }),
+      ...(action === undefined ? {} : { action }),
     };
   });
 }

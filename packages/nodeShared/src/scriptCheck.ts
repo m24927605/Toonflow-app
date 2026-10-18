@@ -1,5 +1,6 @@
 import { msg, type MessageDescriptor } from "@toonflow/i18n/vue";
-import { shotSpans } from "./shotList";
+import { castNames, shotSpans } from "./shotList";
+import { parseDialogue } from "./videoPrompt";
 
 // Short shots fail cheaply and keep generated motion stable; well-paced AI shorts keep most shots within 8 s.
 export const maxShotSeconds = 8;
@@ -9,9 +10,15 @@ export const maxShotSeconds = 8;
 // cells, and comes out soft; framed as the speaker's medium close-up over the listener's shoulder it measured 137 px, with
 // clearly better identity and about 2.4 times the sharpness on the same seed.
 const closeSize = /close|over[- ]the[- ]shoulder|\bOTS\b|\u8fd1\u666f|\u7279\u5beb|\u7279\u5199|\u904e\u80a9|\u8fc7\u80a9/i;
-// A dialogue cell that holds no line: empty, dashes or dots, "none", "no dialogue", "silence", or "\u7121"/"\u65e0"
-// (none) with or without "\u5c0d\u767d"/"\u53f0\u8a5e" (dialogue), or "\u6c89\u9ed8" (silence).
-const noLine = /^[\s\u3000]*[(\uff08]?\s*(?:none|n\/a|no dialogue|silen(?:t|ce)|[-\u2014\u2013\u2026.]+|[\u7121\u65e0](?:[\u5c0d\u5bf9]\u767d|\u53f0[\u8a5e\u8bcd])?|\u6c89\u9ed8)?\s*[.\u3002]?\s*[)\uff09]?[\s\u3000]*$/i;
+// An action that puts someone out of frame on purpose: "off-screen", "out of frame", a voice-over ("V.O.", "O.S."), or
+// the Chinese "\u756b\u5916" / "\u753b\u5916" (off-screen), "\u756b\u9762\u5916" / "\u753b\u9762\u5916" (outside
+// the frame) and "\u65c1\u767d" (narration).
+const offScreen = /off[- ]?screen|out of (?:the )?frame|\bV\.?O\.?(?![\p{L}])|\bO\.?S\.?(?![\p{L}])|voice[- ]?over|[\u756b\u753b](?:\u9762)?\u5916|\u65c1\u767d/iu;
+// Whether an action names someone: a name in Latin letters as a whole word, so "Ann" is not found in "Anna"; any other
+// name as written, since Chinese and Japanese have no spaces between words.
+const names = (action: string, name: string) => /^[\p{Script=Latin}\d\s'.-]+$/u.test(name)
+  ? new RegExp(`(?<![\\p{L}\\d])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\d])`, "u").test(action)
+  : action.includes(name);
 
 export type ScriptShot = { line: number; start?: number; duration: number };
 export type ScriptCheck = { shots: ScriptShot[]; total: number; median: number; issues: MessageDescriptor[] };
@@ -65,10 +72,23 @@ export function checkScript(markdown: string, target?: number): ScriptCheck {
     ? Math.max(...shots.map(shot => shot.start! + shot.duration)) - Math.min(...shots.map(shot => shot.start!))
     : lengths.reduce((sum, value) => sum + value, 0);
   if (median > 5) issues.push(msg`Median shot length is ${median.toFixed(2)} s; most shots of a well-paced short run 3–4 s`);
+  const spans = shotSpans(shots, markdown);
   // A line is spoken by a face the viewer must read, which a medium shot or wider leaves too small to draw.
-  for (const span of shotSpans(shots, markdown)) {
-    if (!span.dialogue || noLine.test(span.dialogue) || !span.size || closeSize.test(span.size)) continue;
+  for (const span of spans) {
+    if (!parseDialogue(span.dialogue).length || !span.size || closeSize.test(span.size)) continue;
     issues.push(msg`Shot ${span.shot} has a line in a ${span.size}, where the speaker's face is too small to draw: frame the speaker in a medium close-up or closer, alone or over the listener's shoulder, or move the line to a shot that is`);
+  }
+  // The video model draws only the people of the cast: someone the action names but the cast leaves out, such as the
+  // man whose drinking she watches over his shoulder, is drawn as a stranger or as a copy of someone else.
+  // ACT: names are the ones some cast cell uses, found in the action as words; an action that only mentions someone out
+  // of frame must say so ("off-screen"). A Chinese name inside a longer word, or a group such as "crowd", can still
+  // match: a false issue costs one rewrite of the shot list.
+  const people = [...new Set(spans.flatMap(span => castNames(span)))];
+  for (const span of spans) {
+    if (!span.action || offScreen.test(span.action)) continue;
+    const cast = castNames(span);
+    const missing = people.filter(name => names(span.action!, name) && !cast.includes(name));
+    if (missing.length) issues.push(msg`Shot ${span.shot}'s action names ${missing.join(", ")}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen`);
   }
   if (target !== undefined && Math.abs(total - target) > Math.max(1, target * 0.05)) issues.push(msg`Total length is ${total.toFixed(2)} s, but the target is ${target} s`);
   return { shots, total, median, issues };
