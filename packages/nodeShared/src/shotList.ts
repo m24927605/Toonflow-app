@@ -109,11 +109,12 @@ export function suggestMasterShot(markdown: string, spans: ShotSpan[]): MasterSh
   return best && { shot: best.shot, size: best.size, cast: castNames(best) };
 }
 /**
- * The people a shot's cast cell names, split on commas, slashes and semicolons (also their full-width forms); an empty
- * marker such as "none" or "\u7121" / "\u65e0" counts as nobody.
+ * The people a shot's cast cell names, split on commas, slashes and semicolons (also their full-width forms), each
+ * without a note in brackets after it, such as "(back view)": that is how the shot shows them, not part of the name.
+ * An empty marker such as "none" or "\u7121" / "\u65e0" counts as nobody.
  */
 export function castNames(span: Pick<ShotSpan, "cast">) {
   return (span.cast ?? "").split(/[,\uff0c\u3001;\uff1b/]+/)
-    .map(name => name.replace(/^[\s(\uff08[]+|[\s)\uff09\]]+$/g, ""))
+    .map(name => name.replace(/(?<=\S)\s*[(\uff08][^()\uff08\uff09]*[)\uff09]?\s*$/, "").replace(/^[\s(\uff08[]+|[\s)\uff09\]]+$/g, ""))
     .filter(name => name && !/^(?:\u7121|\u65e0|none|n\/a|-+|\u2014+)$/i.test(name));
 }
