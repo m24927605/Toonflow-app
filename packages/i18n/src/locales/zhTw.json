@@ -3366,5 +3366,6 @@
   "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": "第 {0} 鏡的動作提到 {1}，但演員欄沒有列出：請把畫面裡看得到的人都列進演員欄，越肩鏡頭的聽者也算；若對方在畫面外，請在動作裡寫明畫外",
   "Ambience of {0}: \"{1}\", {2} ({3})": "{0}的環境音：「{1}」，{2}（{3}）",
   "Could not measure the ambience recording's loudness": "無法測量環境音錄音的音量",
-  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": "第 {0} 鏡的動作是兩個人一起，但演員欄只列了 {1}：請把兩人都列進演員欄，越肩鏡頭的聽者也算；若另一人在畫面外，請在動作裡寫明畫外"
+  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": "第 {0} 鏡的動作是兩個人一起，但演員欄只列了 {1}：請把兩人都列進演員欄，越肩鏡頭的聽者也算；若另一人在畫面外，請在動作裡寫明畫外",
+  "Clip checks: {0} on Colab": "審片：Colab 上的 {0}"
 }

@@ -12,7 +12,7 @@ import { streamClaudeCode } from "@/utils/ai/claudeCode";
 import { streamColab } from "@/utils/ai/colab";
 
 export { claudeCodeToolsRouter } from "@/utils/ai/claudeCode";
-export { holdColab, holdColabFor, stopColab } from "@/utils/ai/colab";
+export { holdColab, holdColabA100For, holdColabFor, stopColab } from "@/utils/ai/colab";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 export { startCodexLogin, submitCodexCode, getCodexStatus, logoutCodex } from "@/utils/ai/codex";

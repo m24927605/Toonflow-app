@@ -2387,6 +2387,7 @@
   "Claude Code is only used for node generation. Choose another model for the Agent.": "Claude Code 仅用于节点生成，请为 Agent 选择其他模型",
   "Claude Code tool calls need a session ID.": "Claude Code 工具调用需要会话 ID",
   "Clip": "片段",
+  "Clip checks: {0} on Colab": "审片：Colab 上的 {0}",
   "Clip seed": "片段种子",
   "Colab CLI is only used for text node generation. Choose another model for the Agent.": "Colab CLI 仅用于文本节点生成，请为 Agent 选择其他模型。",
   "Colab CLI requires a non-empty text prompt.": "Colab CLI 需要非空的文本提示词。",

@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
 import { t } from "@/lib/i18n";
-import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
+import { getConfiguredModel, holdColab, holdColabA100For, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
 import { h3Machines, longTakeParts, minimaxH3SetupMinutes, renderMinutes, warmMinimaxH3 } from "@/utils/media/minimaxH3";
@@ -23,22 +23,26 @@ import {
 // Every text of a production is written by the uncensored Colab model "Generate shot list" uses, so no scene of a
 // story is refused; it stays loaded on one L4 between requests.
 const textModelId = "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive";
+// The clips are checked and diagnosed from their frames by a dense vision model on an A100, which the text model read
+// badly: it took a dark jacket for a white shirt and judged one clip two ways.
+const checkModelId = "mradermacher/Huihui-Qwen3-VL-32B-Instruct-abliterated-GGUF";
 
 const runners = new Map<string, { controller: AbortController; finished: Promise<void> }>();
 const runnerKey = (cwd: string, id: string) => JSON.stringify([cwd, id]);
 
-function textModel() {
-  const model = listAiModels().find(item => item.modelId === textModelId);
-  if (!model) throw new Error(`Add the Colab CLI provider with ${textModelId} in Settings first`);
+function configuredModel(modelId: string) {
+  const model = listAiModels().find(item => item.modelId === modelId);
+  if (!model) throw new Error(`Add the Colab CLI provider with ${modelId} in Settings first`);
   return model;
 }
 
 /**
- * Asks the text model, which also reads `images` after the prompt (PNG bytes as base64). A reply cut off at the length
- * limit, such as one caught in a loop, is asked for once more; cut off again, it fails rather than pass as an answer.
+ * Asks the text model, or the check model when given `images` (PNG bytes as base64), which it reads after the prompt. A
+ * reply cut off at the length limit, such as one caught in a loop, is asked for once more; cut off again, it fails
+ * rather than pass as an answer.
  */
 async function complete(systemPrompt: string, prompt: string, signal: AbortSignal, images: string[] = [], tries = 2): Promise<string> {
-  const model = textModel();
+  const model = configuredModel(images.length ? checkModelId : textModelId);
   const content = images.length ? [{ type: "text" as const, text: prompt }, ...images.map(data => ({ type: "image" as const, data, mimeType: "image/png" }))] : prompt;
   const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content, timestamp: Date.now() }] }, signal);
   const message = await stream.result();
@@ -51,15 +55,18 @@ async function complete(systemPrompt: string, prompt: string, signal: AbortSigna
 }
 
 /**
- * Starts the text model's L4 `delay` from now and loads the model with a one-word request while other work runs, so the
- * checks that follow find it ready; it is held for at most `ms` from then, until `signal` aborts or the returned
+ * Starts the check model's A100 `delay` from now and loads the model with a one-word request while other work runs, so
+ * the checks that follow find it ready; it is held for at most `ms` from then, until `signal` aborts or the returned
  * release is called, which also cancels a start not made yet.
  */
-function warmTextModel(delay: number, ms: number, signal: AbortSignal) {
+// A blank 1×1 PNG: the one-word request that loads the check model routes to it as a request with an image.
+const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==";
+
+function warmCheckModel(delay: number, ms: number, signal: AbortSignal) {
   let release = () => {};
   const timer = setTimeout(() => {
-    release = holdColabFor(ms, signal);
-    void complete("Reply with one word.", "Ready?", signal).catch(() => {});
+    release = holdColabA100For(ms, signal);
+    void complete("Reply with one word.", "Ready?", signal, [pixel]).catch(() => {});
   }, delay);
   return () => {
     clearTimeout(timer);
@@ -258,7 +265,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     const designing = ![...production.assets.characters, ...production.assets.places].every(assetDrawn);
     const units = estimate.steps.find(item => item.step === "text")!.units + (designing ? estimate.steps.find(item => item.step === "assets")!.units : 0);
     if (!await withinBudget(cwd, production, units, signal)) return false;
-    const model = textModel();
+    const model = configuredModel(textModelId);
     const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
     if (designing) carried.qwen ??= holdQwenImage(15 * 60_000, signal);
     const save = () => saveProduction(cwd, production);
@@ -371,13 +378,14 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       return true;
     }
     if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
-    // Each clip is checked by the text model once rendered, so its L4 starts a few minutes before the clips are expected
-    // to be done, in time to load the model, and is held a while past that should they take longer; not for the whole
-    // render, which would bill it idle. The clips render two at a time, each part of a long take after the one before.
+    // Each clip is checked by the check model once rendered, so its A100 starts a few minutes before the clips are
+    // expected to be done, in time to download and load the model, and is held a while past that should they take
+    // longer; not for the whole render, which would bill it idle. The clips render on the H3 machines side by side, each
+    // part of a long take after the one before.
     const minutes = videos.filter(item => !item.video).map(item => renderMinutes(production.clips!.find(clip => clip.shot === item.shot)!.clip, production.input.quality));
     const expected = minimaxH3SetupMinutes() + Math.max(...minutes, minutes.reduce((sum, value) => sum + value, 0) / h3Machines);
-    const textStart = 3;
-    const releaseText = warmTextModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
+    const textStart = 6;
+    const releaseText = warmCheckModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
     try {
       await timed(cwd, production, "render", () => renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production)));
     } finally {
@@ -548,7 +556,8 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     "",
     `## ${t`Models`}`,
     "",
-    `- ${t`Script, shot list and prompts: ${textModel().modelId} on Colab`}`,
+    `- ${t`Script, shot list and prompts: ${textModelId} on Colab`}`,
+    `- ${t`Clip checks: ${checkModelId} on Colab`}`,
     `- ${t`Designs: Qwen-Image 2.1 Turbo on Colab`}`,
     `- ${t`Video: MiniMax H3 on Colab from the previs and the designs as references, lip-synced to the dubbed lines`}`,
   ];

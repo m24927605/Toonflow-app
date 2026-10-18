@@ -52,7 +52,9 @@ llamaRoot = Path("/content/llama")
 llamaUrl = "http://127.0.0.1:18080"
 if not (llamaRoot / "ready").exists():
     llamaRoot.mkdir(exist_ok=True)
-    for name in (f"llama-{llamaBuild}-bin-ubuntu-cuda-13.4-x64.tar.gz", f"cudart-llama-{llamaBuild}-bin-ubuntu-cuda-13.4-x64.tar.gz"):
+    # The CUDA 12.8 build: the A100 machines' driver is older than the 13.4 build's PTX needs ("unsupported toolchain"),
+    # and 12.8 runs on the L4's newer driver as well.
+    for name in (f"llama-{llamaBuild}-bin-ubuntu-cuda-12.8-x64.tar.gz", f"cudart-llama-{llamaBuild}-bin-ubuntu-cuda-12.8-x64.tar.gz"):
         archive = Path("/content") / name
         subprocess.run(["curl", "-sSfL", "-o", str(archive), f"https://github.com/ggml-org/llama.cpp/releases/download/{llamaBuild}/{name}"], check=True)
         subprocess.run(["tar", "-xzf", str(archive), "-C", str(llamaRoot)], check=True)
@@ -68,9 +70,9 @@ if globals().get("loadedModel") != (modelId, revision, weightFile, mmproj) or se
     started = time.monotonic()
     from huggingface_hub import hf_hub_download
     weightPath = hf_hub_download(modelId, weightFile, revision=revision, local_dir="/content/gguf")
-    # ACT: The projector runs on the CPU: the quantized weights and the 32K context nearly fill the L4, so text work
-    # never risks running out of GPU memory; drop --no-mmproj-offload once a run shows the headroom, for faster images.
-    vision = ["--mmproj", hf_hub_download(modelId, mmproj, revision=revision, local_dir="/content/gguf"), "--no-mmproj-offload"] if mmproj else []
+    # ACT: On the L4 the projector runs on the CPU: the quantized weights and the 32K context nearly fill it, so text work
+    # never risks running out of GPU memory. A model on an A100 (`visionOnGpu`) has the headroom and reads images faster.
+    vision = ["--mmproj", hf_hub_download(modelId, mmproj, revision=revision, local_dir="/content/gguf"), *([] if request.get("visionOnGpu") else ["--no-mmproj-offload"])] if mmproj else []
     binary = next(llamaRoot.rglob("llama-server"))
     libraries = sorted({str(path.parent) for path in llamaRoot.rglob("*.so*")})
     serverLog = open("/content/llamaServer.log", "w")

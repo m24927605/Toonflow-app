@@ -3366,5 +3366,6 @@
   "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen",
   "Ambience of {0}: \"{1}\", {2} ({3})": "Ambience of {0}: \"{1}\", {2} ({3})",
   "Could not measure the ambience recording's loudness": "Could not measure the ambience recording's loudness",
-  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen"
+  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen",
+  "Clip checks: {0} on Colab": "Clip checks: {0} on Colab"
 }

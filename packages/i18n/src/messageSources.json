@@ -5267,6 +5267,9 @@
   "Script, shot list and prompts: {0} on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
+  "Clip checks: {0} on Colab": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "Designs: Qwen-Image 2.1 Turbo on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],

@@ -10,6 +10,7 @@ export default {
     { id: "dphn/Dolphin-Mistral-24B-Venice-Edition", label: "Venice Uncensored 1.2", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
     { id: "huihui-ai/Huihui-Qwen3.8-27B-abliterated", label: "Huihui-Qwen3.8-27B-abliterated", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
     { id: "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive", label: "Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
+    { id: "mradermacher/Huihui-Qwen3-VL-32B-Instruct-abliterated-GGUF", label: "Qwen3-VL-32B-Instruct-abliterated", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
     { id: "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive", label: "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
     { id: "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF", label: "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking", type: "text", contextWindow: 32768, maxOutputTokens: 8192 },
   ],

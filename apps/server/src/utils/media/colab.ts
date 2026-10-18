@@ -9,7 +9,9 @@ import { checkColabBudget, meterColab, recordColabUnits } from "@/utils/media/us
 
 // Compute units per hour of each machine as Toonflow opens it, the A100 with high RAM (colab usage, 2026-10-15), for a
 // session whose own rate the account's cannot show.
-const machineRates = { A100: 6.77, L4: 1.54 };
+// ACT: The H100's rate is a guess, twice the A100's, until a session measures it: the meter takes each session's own
+// rate from the account's usage rate before and after it starts.
+const machineRates = { H100: 13.5, A100: 6.77, L4: 1.54 };
 // How long a refused or unavailable session start keeps retrying.
 const allocationWait = 60 * 60_000;
 // The Colab CLI uploads through the Jupyter contents API as base64, whose request limit (about 100 MiB) refuses files
@@ -579,28 +581,45 @@ for _name, _count in ${JSON.stringify(split)}:
     // Colab refuses a new session while the account's GPU sessions are taken (four, fewer of one kind) and
     // answers 503 while it is short of machines, so such a start waits and retries instead of failing a job that may
     // follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
-    for (const waitStart = Date.now(); ; ) {
-      try {
-        startingSessions.add(name);
-        // Never cancelled midway: a killed `new` can leave an assigned machine the CLI never recorded, which nothing can
-        // stop; a cancelled start is stopped once `new` returns.
-        await colab(command, ["new", "--session", name, "--gpu", gpu, ...highMem ? ["--high-mem"] : []]).finally(() => startingSessions.delete(name));
-        break;
-      } catch (error) {
-        if (!/Allocation refused|Service Unavailable/.test(String(error)) || Date.now() - waitStart > allocationWait) throw error;
-        // Logged so a film that rendered on fewer machines than planned shows why: Colab was out of this GPU or slots.
-        console.warn(`[colab] ${gpu} start for ${provider} refused (${/Allocation refused/.test(String(error)) ? "allocation refused" : "service unavailable"}), retrying in a minute`);
-        await colab(command, ["stop", "--session", name]).catch(() => undefined);
-        await scheduler.wait(60_000, { signal });
+    // An A100 job is offered an H100 first, the faster card the account may get; Colab hands those out only now and
+    // then, so a refused H100 falls back to the A100 at once, and a start where both are refused waits as before.
+    const choices = gpu === "A100" ? ["H100", "A100"] as const : [gpu];
+    const rateBefore = Number(/Usage rate:\s*([\d.]+)/.exec(await colab(command, ["usage"]).catch(() => ""))?.[1]);
+    let assigned: (typeof choices)[number] | undefined;
+    for (const waitStart = Date.now(); !assigned; ) {
+      let refusal: unknown;
+      for (const choice of choices) {
+        try {
+          startingSessions.add(name);
+          // Never cancelled midway: a killed `new` can leave an assigned machine the CLI never recorded, which nothing
+          // can stop; a cancelled start is stopped once `new` returns.
+          await colab(command, ["new", "--session", name, "--gpu", choice, ...highMem ? ["--high-mem"] : []]).finally(() => startingSessions.delete(name));
+          assigned = choice;
+          break;
+        } catch (error) {
+          // An H100 the account is not entitled to at the moment ("rejected accelerator") falls back like a busy one.
+          const fallback = choice !== choices.at(-1) && /rejected accelerator/i.test(String(error));
+          if (!fallback && !/Allocation refused|Service Unavailable/.test(String(error))) throw error;
+          refusal = error;
+          // Logged so a film that rendered on fewer or slower machines than planned shows why.
+          console.warn(`[colab] ${choice} start for ${provider} refused (${fallback ? "not entitled now" : /Allocation refused/.test(String(error)) ? "allocation refused" : "service unavailable"})`);
+          await colab(command, ["stop", "--session", name]).catch(() => undefined);
+        }
       }
+      if (assigned) break;
+      if (Date.now() - waitStart > allocationWait) throw refusal;
+      await scheduler.wait(60_000, { signal });
     }
     startedAt = Date.now();
     signal?.throwIfAborted();
-    // The account's rate is this session's own only while it is the account's one assignment; otherwise, or when the
-    // usage cannot be read, its machine's measured rate stands for it.
+    hourlyRate = machineRates[assigned];
+    if (assigned !== gpu) console.log(`[colab] ${provider} runs on an ${assigned}`);
+    // The account's usage rate rises by this session's own when it starts; when the usage cannot be read, or other
+    // sessions started or stopped meanwhile and the difference makes no sense, the machine's listed rate stands for it.
     const usage = await colab(command, ["usage"]).catch(() => "");
     const accountRate = Number(/Usage rate:\s*([\d.]+)/.exec(usage)?.[1]);
-    if (/Active assignments:\s*1\b/.test(usage) && accountRate > 0) hourlyRate = accountRate;
+    const ownRate = accountRate - rateBefore;
+    if (ownRate > 0.5 && ownRate < 40) hourlyRate = ownRate;
     sessionRates.set(name, hourlyRate);
     meterSessions();
     await startHeartbeat(signal);

@@ -12,14 +12,22 @@ const provider = languageProviders.find(item => item.protocol === "colab-cli")!;
 // file, the largest quant measured to fit the L4 together with the 32K context.
 // `tools` marks the models whose tool calls were checked to work through llama-server, such as the Director's Studio
 // tool loop; every other model still rejects tools. `mmproj` is a GGUF model's vision projector, which lets it read
-// images in user messages and image references; models without one read text only.
-const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean; mmproj?: string }; tools?: boolean }> = {
+// images in user messages and image references; models without one read text only. `a100` marks a model too large for
+// the L4 with its context and images, which runs on the A100 kept for it, its projector on the GPU too.
+const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean; mmproj?: string }; tools?: boolean; a100?: boolean }> = {
   "dphn/Dolphin-Mistral-24B-Venice-Edition": { revision: "b23ff40b4a25e4f93de432bd896d4464479a9f79" },
   "huihui-ai/Huihui-Qwen3.8-27B-abliterated": { revision: "739e3c5b89849f6c238ce1e5b70008612ae42cdd" },
   "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive": {
     revision: "f12a584fecbeb5f20001130d8ecd66c9327ae685",
     gguf: { file: "Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf", thinking: false, mmproj: "mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf" },
     tools: true,
+  },
+  // The film's clip check: a dense 32B vision model, abliterated so no scene's frames are refused. The 35B-A3B text model
+  // misread frames (a dark jacket taken for a white shirt) and judged the same clip differently on a second look.
+  "mradermacher/Huihui-Qwen3-VL-32B-Instruct-abliterated-GGUF": {
+    revision: "ec6d9b0c05e344d158202891ed911ba9fea20227",
+    gguf: { file: "Huihui-Qwen3-VL-32B-Instruct-abliterated.Q6_K.gguf", thinking: false, mmproj: "Huihui-Qwen3-VL-32B-Instruct-abliterated.mmproj-f16.gguf" },
+    a100: true,
   },
   "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive": {
     revision: "0a41c68809d375475f954be12ba7c40efa56c2a9",
@@ -38,6 +46,8 @@ const weights: Record<string, { revision: string; gguf?: { file: string; thinkin
 // once, so while three A100s render clips the second L4 waits for a slot; five would need a larger quota.
 const workers = [0, 1].map(() => createColabWorker(provider.id, { gpu: "L4" }, 120_000));
 const waiting = workers.map(() => 0);
+// The A100 for the models marked `a100`, one at a time, stopped after two idle minutes like the L4s.
+const a100Worker = createColabWorker(provider.id, { gpu: "A100", highMem: true }, 120_000);
 const resultSchema = z.object({
   text: z.string(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative(),
   reasoning: z.string().optional(), stopReason: z.enum(["stop", "length", "toolUse"]),
@@ -45,12 +55,14 @@ const resultSchema = z.object({
 });
 
 /** Stops the text sessions now, cancelling the running requests and every queued one. */
-export const stopColab = () => Promise.all(workers.map(worker => worker.stop()));
+export const stopColab = () => Promise.all([...workers, a100Worker].map(worker => worker.stop()));
 
 /** Keeps the first text session open between requests until the returned release is called. */
 export const holdColab = () => workers[0]!.hold();
 /** Keeps the first text model's L4 for at most `ms`, for requests known to follow, until `signal` aborts or the release. */
 export const holdColabFor = (ms: number, signal?: AbortSignal) => workers[0]!.holdFor(ms, signal);
+/** Keeps the A100 of the `a100` models for at most `ms`, as holdColabFor does the first L4. */
+export const holdColabA100For = (ms: number, signal?: AbortSignal) => a100Worker.holdFor(ms, signal);
 
 export function streamColab(providerId: string, modelId: string, context: Context, signal: AbortSignal, references: Awaited<ReturnType<typeof readAiReferences>>) {
   const model = provider.models.find(item => item.id === modelId);
@@ -106,16 +118,16 @@ export function streamColab(providerId: string, modelId: string, context: Contex
   // ACT: The CLI job downloads the complete reply; token streaming needs an incremental CLI transport.
   void (async () => {
     const ask = async (extra: typeof messages, toolChoice?: "required") => {
-      const index = waiting.indexOf(Math.min(...waiting));
-      waiting[index]!++;
-      const [data] = await workers[index]!.run((session, jobSignal) => session.job({
+      const index = weight.a100 ? -1 : waiting.indexOf(Math.min(...waiting));
+      if (index >= 0) waiting[index]!++;
+      const [data] = await (index >= 0 ? workers[index]! : a100Worker).run((session, jobSignal) => session.job({
         script: weight.gguf ? ggufPipeline : pipeline,
         uploads: [{ name: "colabInput.json", data: JSON.stringify({
           modelId, revision: weight.revision, ...weight.gguf, messages: [...messages, ...extra], ...tools?.length ? { tools } : {}, ...toolChoice ? { toolChoice } : {},
-          contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens,
+          contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens, ...weight.a100 ? { visionOnGpu: true } : {},
         }) }],
         env: {}, outputs: ["/content/colabOutput.json"],
-      }, jobSignal), signal).finally(() => waiting[index]!--);
+      }, jobSignal), signal).finally(() => index >= 0 && waiting[index]!--);
       const reply = resultSchema.parse(JSON.parse(new TextDecoder().decode(data)));
       console.log(`[colab] ${modelId}: load ${reply.loadSeconds} s, ${reply.outputTokens} tokens in ${reply.generateSeconds} s`);
       return reply;
