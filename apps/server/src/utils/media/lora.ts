@@ -134,7 +134,9 @@ async function trainFamily(cwd: string, input: LoraInput, family: LoraFamily, it
     return [{ name: `${name}.${extension}`, data }, ...caption ? [{ name: `${name}.txt`, data: caption.replaceAll("{trigger}", trigger) }] : []];
   });
   const job = { trigger, family, kind: input.kind, ...input.slider ? { slider: input.slider } : {} };
-  const session = await openColabSession("loraTraining", { gpu: "L4" }, signal);
+  // An A100 rather than an L4: Fizgig's automatic block swapping keeps far more of the model on the larger card, and the
+  // account's three A100s train a film's people side by side, where its two L4s are shared with the text model.
+  const session = await openColabSession("loraTraining", { gpu: "A100", highMem: true }, signal);
   let lora: Uint8Array;
   try {
     // Training runs for hours, so it runs detached and survives the host's network dropping for a while.

@@ -173,8 +173,9 @@ export function appearances(shotList: string, assets: NonNullable<Production["as
 
 // ACT: Measured per LoRA: one L4 hour of training per family and about ten A100 minutes of generated variants per
 // person or place, with the same 1.3 margin as the production estimate; scaled since by the character recipe, about
-// 1500 steps instead of about 1200 and up to 25 drawn variants instead of 11.
-const unitsPerFamily = 1.54 * 1.3 * 1.25;
+// 1500 steps instead of about 1200 and up to 25 drawn variants instead of 11. Training now runs on an A100, assumed
+// to take half the L4's time until a run is measured.
+const unitsPerFamily = 6.77 * 1.3 * 1.25 / 2;
 const unitsPerTopUp = 6.77 / 6 * 1.3 * 25 / 11;
 
 /**

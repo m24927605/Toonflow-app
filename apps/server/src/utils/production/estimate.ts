@@ -44,7 +44,8 @@ export function estimateProduction(input: Pick<ProductionInput, "seconds" | "qua
     { step: "text", units: l4 * hours(30) },
     { step: "assets", units: a100 * hours(5 + 0.5 * (people * 6 + places * 3)) },
     // One H3 LoRA a person; places take none.
-    { step: "loras", units: l4 * trainedPeople + a100 * hours(trainedPeople * (5 + 0.5 * 12)) },
+    // ACT: An A100 trains a LoRA in about half an L4's hour, assumed until measured.
+    { step: "loras", units: a100 * 0.5 * trainedPeople + a100 * hours(trainedPeople * (5 + 0.5 * 12)) },
     { step: "clips", units: a100 * hours(clipMinutes) },
   ].map(item => ({ ...item, units: Number((item.units * 1.3 * ratio).toFixed(2)) }));
   return { shots, steps, total: Number(steps.reduce((sum, item) => sum + item.units, 0).toFixed(2)) };
