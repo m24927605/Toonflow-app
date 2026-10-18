@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, holdColabFor, listAiModels, streamAi } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
 import { meteredColabUnits } from "@/utils/media/usage";
-import { longTakeParts, minimaxH3SetupMinutes, renderMinutes, warmMinimaxH3 } from "@/utils/media/minimaxH3";
+import { h3Machines, longTakeParts, minimaxH3SetupMinutes, renderMinutes, warmMinimaxH3 } from "@/utils/media/minimaxH3";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
@@ -325,10 +325,10 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       const posing = Promise.all([drawing, blocked]).then(() => timed(cwd, production, "poses", () => drawPoses(cwd, production, signal, save))).finally(releaseQwen);
       // The H3 A100s start and set up while the rest runs, as many as the clips can use side by side, when the budget
       // has room for the clips too. Only before any clip is rendered: a correction round rewrites a few prompts and
-      // renders those clips on one machine started on demand. Colab runs three machines at once, so one A100 starts at
-      // once only when no other machine needs a slot: no designs or poses for Qwen-Image's A100, no LoRA training on an
-      // L4, and no long take whose parts the two text L4s write side by side; otherwise it waits until those are done.
-      const machines = Math.min(2, production.previs.length);
+      // renders those clips on the machines started on demand. Colab runs four machines at once, three of them A100s, so
+      // a lone A100 starts at once only when no other machine needs a slot: no designs or poses for Qwen-Image's A100, no
+      // LoRA training on an L4, and no long take whose parts the two text L4s write side by side; otherwise it waits.
+      const machines = Math.min(h3Machines, production.previs.length);
       const firstPass = !production.videos?.some(item => item.video || item.attempts?.length);
       const textL4s = writing && (!production.clips || production.clips.some(item => longTakeParts(item.clip).parts > 1)) ? 2 : 1;
       const alone = machines === 1 && drawn && posed && !plan?.units && textL4s === 1;
@@ -375,7 +375,7 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
     // to be done, in time to load the model, and is held a while past that should they take longer; not for the whole
     // render, which would bill it idle. The clips render two at a time, each part of a long take after the one before.
     const minutes = videos.filter(item => !item.video).map(item => renderMinutes(production.clips!.find(clip => clip.shot === item.shot)!.clip, production.input.quality));
-    const expected = minimaxH3SetupMinutes() + Math.max(...minutes, minutes.reduce((sum, value) => sum + value, 0) / 2);
+    const expected = minimaxH3SetupMinutes() + Math.max(...minutes, minutes.reduce((sum, value) => sum + value, 0) / h3Machines);
     const textStart = 3;
     const releaseText = warmTextModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
     try {

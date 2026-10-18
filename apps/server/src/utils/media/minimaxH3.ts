@@ -40,10 +40,12 @@ const setupMinutes = 4;
 /** The minutes before the A100s can render: none while one is open or starting, else a cold start's. */
 export const minimaxH3SetupMinutes = () => workers.some(worker => worker.live()) ? 0 : setupMinutes;
 // Clips share high-RAM A100s kept for five idle minutes, so a batch of shots pays the ComfyUI install and the 30+ GB
-// model download once a machine; the high-RAM shape is needed for those weights to pass through host memory. Two
-// machines render a batch side by side, leaving Colab's third for the text model that checks the clips; each clip goes
-// to the machine with the fewest waiting. ACT: The second machine pays its own start, about half a unit.
-const workers = [0, 1].map(() => createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000));
+// model download once a machine; the high-RAM shape is needed for those weights to pass through host memory. Three
+// machines, the account's A100s, render a batch side by side, leaving its fourth slot for the text model that checks
+// the clips; each clip goes to the machine with the fewest waiting. ACT: Each machine pays its own start, about half a
+// unit.
+export const h3Machines = 3;
+const workers = Array.from({ length: h3Machines }, () => createColabWorker("minimaxH3", { gpu: "A100", highMem: true }, 5 * 60_000));
 const waiting = workers.map(() => 0);
 // Of the eight Turbo sampling steps, the reference videos condition only the first two: Code Video Model found a previs
 // used beyond the first quarter of the steps passes its flat look into the clip (https://code-video-model.github.io).

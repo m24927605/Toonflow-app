@@ -34,8 +34,8 @@ const weights: Record<string, { revision: string; gguf?: { file: string; thinkin
 };
 // Two L4s answer requests side by side, each loading the model once and keeping it between requests, and each stops
 // after two idle minutes; a request goes to the one with the fewest waiting, so the clip prompts and checks of a film
-// are answered two at a time. A hold keeps only the first one warm. ACT: Colab allows an account about three machines
-// at once, so while the two A100s render clips the second L4 waits for a slot; three would need a larger quota.
+// are answered two at a time. A hold keeps only the first one warm. ACT: Colab allows the account four machines at
+// once, so while three A100s render clips the second L4 waits for a slot; five would need a larger quota.
 const workers = [0, 1].map(() => createColabWorker(provider.id, { gpu: "L4" }, 120_000));
 const waiting = workers.map(() => 0);
 const resultSchema = z.object({

@@ -97,16 +97,17 @@ function meterSessions() {
   }
 }
 
-// Colab gives an account about three GPU sessions at once, at most two of them L4s; a start beyond that waits here for
-// one of this process's sessions to stop rather than being refused. ACT: Only this process's sessions count; another
-// app on the same account still meets the refusal, which the start retries.
-const machineLimits = { total: 3, L4: 2 };
+// Colab gives the Google AI Ultra account four GPU sessions at once, at most three of them A100s (measured 2026-10-19:
+// a fourth A100 was refused while an L4 still started) and two L4s; a start beyond that waits here for one of this
+// process's sessions to stop rather than being refused. ACT: Only this process's sessions count; another app on the
+// same account still meets the refusal, which the start retries. A smaller plan gets fewer and its starts wait there.
+const machineLimits: { total: number } & Partial<Record<ColabMachine["gpu"], number>> = { total: 4, A100: 3, L4: 2 };
 const runningMachines: { gpu: ColabMachine["gpu"] }[] = [];
 const machineWaiters = new Set<() => void>();
 
 /** Waits for a free machine of this kind and returns its release. */
 async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
-  const free = () => runningMachines.length < machineLimits.total && (gpu !== "L4" || runningMachines.filter(item => item.gpu === "L4").length < machineLimits.L4);
+  const free = () => runningMachines.length < machineLimits.total && runningMachines.filter(item => item.gpu === gpu).length < (machineLimits[gpu] ?? machineLimits.total);
   while (!free()) {
     await new Promise<void>((resolve, reject) => {
       const wake = () => {
@@ -575,7 +576,7 @@ for _name, _count in ${JSON.stringify(split)}:
   // Tracked before `new` returns, because an interrupted `new` can still leave the session running.
   activeSessions.set(name, command);
   try {
-    // Colab refuses a new session while the account's GPU sessions are taken (about three, fewer of one kind) and
+    // Colab refuses a new session while the account's GPU sessions are taken (four, fewer of one kind) and
     // answers 503 while it is short of machines, so such a start waits and retries instead of failing a job that may
     // follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
     for (const waitStart = Date.now(); ; ) {
