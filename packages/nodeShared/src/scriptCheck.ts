@@ -14,6 +14,10 @@ const closeSize = /close|over[- ]the[- ]shoulder|\bOTS\b|\u8fd1\u666f|\u7279\u5b
 // the Chinese "\u756b\u5916" / "\u753b\u5916" (off-screen), "\u756b\u9762\u5916" / "\u753b\u9762\u5916" (outside
 // the frame) and "\u65c1\u767d" (narration).
 const offScreen = /off[- ]?screen|out of (?:the )?frame|\bV\.?O\.?(?![\p{L}])|\bO\.?S\.?(?![\p{L}])|voice[- ]?over|[\u756b\u753b](?:\u9762)?\u5916|\u65c1\u767d/iu;
+// An action about two or more people together: "both", "each other", "the two", "together", or the Chinese
+// "\u5169\u4eba" / "\u4e24\u4eba" / "\u4e8c\u4eba" (the two), "\u5f7c\u6b64" (each other), "\u5c0d\u671b" /
+// "\u5bf9\u671b" (look at each other), "\u76f8\u8996" / "\u76f8\u89c6" (gaze at each other).
+const together = /\bboth\b|each other|\bthe two\b|\btogether\b|[\u5169\u4e24\u4e8c]\u4eba|\u5f7c\u6b64|[\u5c0d\u5bf9]\u671b|\u76f8[\u8996\u89c6]/i;
 // Whether an action names someone: a name in Latin letters as a whole word, so "Ann" is not found in "Anna"; any other
 // name as written, since Chinese and Japanese have no spaces between words.
 const names = (action: string, name: string) => /^[\p{Script=Latin}\d\s'.-]+$/u.test(name)
@@ -89,6 +93,8 @@ export function checkScript(markdown: string, target?: number): ScriptCheck {
     const cast = castNames(span);
     const missing = people.filter(name => names(span.action!, name) && !cast.includes(name));
     if (missing.length) issues.push(msg`Shot ${span.shot}'s action names ${missing.join(", ")}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen`);
+    // "The two look at each other" with one person cast draws the other as a stranger, as names alone do not show.
+    else if (cast.length === 1 && together.test(span.action)) issues.push(msg`Shot ${span.shot}'s action is about two people together, but its cast lists only ${cast[0]}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen`);
   }
   if (target !== undefined && Math.abs(total - target) > Math.max(1, target * 0.05)) issues.push(msg`Total length is ${total.toFixed(2)} s, but the target is ${target} s`);
   return { shots, total, median, issues };

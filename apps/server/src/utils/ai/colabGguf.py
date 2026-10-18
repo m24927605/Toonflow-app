@@ -95,12 +95,15 @@ if globals().get("loadedModel") != (modelId, revision, weightFile, mmproj) or se
     loadedModel = (modelId, revision, weightFile, mmproj)
     loadSeconds = time.monotonic() - started
 
+# Qwen's model card settings for non-thinking replies. At temperature 0.15 without a presence penalty the 4-bit
+# Qwen3.6 fell into loops that ran to the token limit, 7 of a film's 101 replies, each costing 105 s and a retry.
+sampling = {"temperature": 0.15, "top_p": 0.9} if thinking else {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.5}
 started = time.monotonic()
 try:
     reply = json.loads(urllib.request.urlopen(urllib.request.Request(
         f"{llamaUrl}/v1/chat/completions",
         json.dumps({
-            "messages": messages, "max_tokens": maxOutputTokens, "temperature": 0.15, "top_p": 0.9,
+            "messages": messages, "max_tokens": maxOutputTokens, **sampling,
             "chat_template_kwargs": {"enable_thinking": thinking},
             **({"tools": tools} if tools else {}),
             # Set only when a reply wrote its tool call as text and is asked again.

@@ -316,8 +316,8 @@ function srtTime(seconds: number) {
 
 /**
  * Finishes the film from the final clips, or the rough cut's at 480p: joins them in shot order, each cut to its shot's
- * length, with each clip's sound at one loudness, lays the music and each place's ambience bed under the dialogue and
- * ducks them while people speak, as the soundtrack mix node does, and burns in each dubbed line as a subtitle while it
+ * length, with each clip's sound at one loudness, lays the music and each place's ambience bed under the dialogue,
+ * ducks the music while people speak as the soundtrack mix node does, and burns in each dubbed line as a subtitle while it
  * is spoken and long enough to read. A bed runs on from shot to shot of its place, so a cut inside a scene does not
  * restart it.
  */
@@ -371,7 +371,9 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     }),
     `${stretches.map((_, index) => `[ambience${index}]`).join("")}concat=n=${stretches.length}:v=0:a=1[ambience]`,
   ] : [];
-  const underneath = [...production.music ? ["[music]"] : [], ...beds.length ? ["[ambience]"] : []];
+  // Only the music ducks under the lines: a room tone that dips while people speak and swells back after each line
+  // sounds pumped, while a real room keeps its sound under them.
+  const layers = ["[voice]", ...production.music ? ["[ducked]"] : [], ...beds.length ? ["[ambience]"] : []];
   const filters = [
     ...clips.map((clip, index) => {
       const spoken = !!production.dub!.shots.find(shot => shot.shot === clip.shot)?.lines.length;
@@ -382,10 +384,8 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
     subtitles ? `[v]subtitles=filename=${subtitles}:force_style='FontSize=24,Outline=2,Shadow=1,MarginV=24'[picture]` : "[v]null[picture]",
     ...production.music ? [`[${clips.length}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=duration=${total},asetpts=PTS-STARTPTS,volume=${musicVolume},afade=t=in:d=2,afade=t=out:st=${Math.max(0, total - 3)}:d=3[music]`] : [],
     ...ambience,
-    underneath.length
-      ? `${underneath.join("")}${underneath.length > 1 ? `amix=inputs=${underneath.length}:normalize=0:duration=first` : "anull"}[bed];`
-        + "[dialogue]asplit=2[voice][key];[bed][key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=500[ducked];[voice][ducked]amix=inputs=2:normalize=0,alimiter=limit=0.95[sound]"
-      : "[dialogue]alimiter=limit=0.95[sound]",
+    production.music ? "[dialogue]asplit=2[voice][key];[music][key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=500[ducked]" : "[dialogue]anull[voice]",
+    `${layers.join("")}${layers.length > 1 ? `amix=inputs=${layers.length}:normalize=0:duration=first,` : ""}alimiter=limit=0.95[sound]`,
   ];
   const output = `${folder}/film.mp4`;
   const command = cutClips(ffmpeg(), production, clips);

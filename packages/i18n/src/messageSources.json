@@ -10141,6 +10141,9 @@
   "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": [
     "packages/nodeShared/src/scriptCheck.ts"
   ],
+  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": [
+    "packages/nodeShared/src/scriptCheck.ts"
+  ],
   "Total length is {0} s, but the target is {1} s": [
     "packages/nodeShared/src/scriptCheck.ts"
   ],

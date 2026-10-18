@@ -2924,6 +2924,7 @@
   "Shot {0}, line {1} ({2}) could not be voiced: {3}": "第 {0} 镜第 {1} 句台词（{2}）无法配音：{3}",
   "Shot {0}: needs attention, {1}/100": "第 {0} 镜：需要注意，{1}/100",
   "Shot {0}: passed, {1}/100": "第 {0} 镜：通过，{1}/100",
+  "Shot {0}''s action is about two people together, but its cast lists only {1}: list both in Cast, the listener of an over-the-shoulder shot included, or say in the action that the other is off-screen": "第 {0} 镜的动作是两个人一起，但演员栏只列了 {1}：请把两人都列进演员栏，越肩镜头的听者也算；若另一人在画面外，请在动作里写明画外",
   "Shot {0}''s action names {1}, who is not in its cast: list everyone the shot shows in Cast, the listener of an over-the-shoulder shot included, or say in the action that they are off-screen": "第 {0} 镜的动作提到 {1}，但演员栏没有列出：请把画面里看得到的人都列进演员栏，越肩镜头的听者也算；若对方在画面外，请在动作里写明画外",
   "Shot list": "分镜表",
   "Shot list check": "分镜表检查",

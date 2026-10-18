@@ -587,6 +587,8 @@ for _name, _count in ${JSON.stringify(split)}:
         break;
       } catch (error) {
         if (!/Allocation refused|Service Unavailable/.test(String(error)) || Date.now() - waitStart > allocationWait) throw error;
+        // Logged so a film that rendered on fewer machines than planned shows why: Colab was out of this GPU or slots.
+        console.warn(`[colab] ${gpu} start for ${provider} refused (${/Allocation refused/.test(String(error)) ? "allocation refused" : "service unavailable"}), retrying in a minute`);
         await colab(command, ["stop", "--session", name]).catch(() => undefined);
         await scheduler.wait(60_000, { signal });
       }
