@@ -135,12 +135,13 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
     props.set(prop.name, prop.kind);
   }
   const people = new Map(spec.people.map(person => [person.name, person]));
-  const checkFaces = (faces: string | undefined, who: string) => {
-    if (faces && !people.has(faces) && !props.has(faces)) problems.push(`${who} looks at "${faces}", which is neither a person nor a prop of the plan.`);
-  };
+  // A look at something the plan does not have, such as "centre", is dropped, and the person looks at the nearest other
+  // person as when it is left out: it changes no one's place, and failing the plan for it stopped a film even after
+  // the fix request.
+  const knownFaces = (faces: string | undefined) => faces && (people.has(faces) || props.has(faces)) ? faces : undefined;
   for (const person of spec.people) {
     checkPlace(person.at, `${person.name}'s entrance`);
-    checkFaces(person.faces, person.name);
+    person.faces = knownFaces(person.faces);
   }
   for (const { shot, cast } of shots) {
     for (const name of cast) {
@@ -155,7 +156,7 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
       if (!person) problems.push(`Shot ${item.shot} moves ${move.name}, who is not in "people".`);
       else if (person.enters > item.shot) problems.push(`Shot ${item.shot} moves ${move.name}, who enters only in shot ${person.enters}.`);
       if (move.to) checkPlace(move.to, `Shot ${item.shot}'s move of ${move.name}`);
-      checkFaces(move.faces, `In shot ${item.shot}, ${move.name}`);
+      move.faces = knownFaces(move.faces);
     }
     // Moves of one person run one after another, so each needs its own start, a second after the one before and a
     // second before the shot ends, which leaves every move time to be seen.

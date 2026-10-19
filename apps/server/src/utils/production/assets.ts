@@ -44,7 +44,12 @@ export function parseCast(text: string, photos: Production["input"]["photos"]) {
   const cast = castSchema.parse(JSON.parse(json));
   // Models add readings or translations in brackets, such as 日女 (Nichi-onna); the shot list's cast uses the bare name.
   const bare = <T extends { name: string }>(item: T) => ({ ...item, name: item.name.replace(/\s*[(（][^)）]*[)）]\s*$/, "").trim() || item.name });
-  const characters: ProductionAsset[] = cast.characters.map(bare).map(item => ({ ...item, photo: photos.find(photo => photo.name === item.name)?.path }));
+  // An outfit named twice is one set of clothes: the model lists it again for every shot that names it, which drew the
+  // same clothes six times over.
+  const characters: ProductionAsset[] = cast.characters.map(bare).map(item => ({
+    ...item, outfits: item.outfits.filter((outfit, index) => item.outfits.findIndex(other => other.name === outfit.name) === index),
+    photo: photos.find(photo => photo.name === item.name)?.path,
+  }));
   // Someone with a photo but no part in the script keeps the clothes of the photo.
   for (const photo of photos) {
     if (!characters.some(item => item.name === photo.name)) characters.push({ name: photo.name, look: "the person in the photo", photo: photo.path, outfits: [{ name: "photo", look: "exactly the clothes shown in the photo" }] });
