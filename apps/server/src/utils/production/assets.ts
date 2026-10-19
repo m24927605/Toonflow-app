@@ -7,7 +7,7 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { holdQwenImage } from "@/utils/media/qwenImage";
 import { outfitView } from "./shots";
-import { productionDirectory, type Production, type ProductionAsset } from "./state";
+import { productionDirectory, readProduction, type Production, type ProductionAsset } from "./state";
 
 const castSchema = z.object({
   characters: z.array(z.object({
@@ -85,12 +85,46 @@ async function draw(cwd: string, id: string, prompt: string, ratio: string, refe
 }
 
 /**
+ * Takes the designs the workspace's latest earlier production drew for the same person, outfit or place, so a new film
+ * of the same people neither waits for them nor draws them differently: a person by name and photo (and look, when
+ * drawn without a photo), an outfit of theirs by name, a place by name and look. Only designs whose files are all
+ * still there are taken. ACT: An outfit is matched by name alone, so a script that dresses someone differently under
+ * the same outfit name keeps the earlier clothes.
+ */
+async function reuseDesigns(cwd: string, production: Production) {
+  const folder = (await resolveWorkspacePath(cwd, productionDirectory(""), true)).path;
+  const ids = (await readdir(folder).catch(() => [] as string[])).filter(id => id !== production.id);
+  const earlier = (await Promise.all(ids.map(id => readProduction(cwd, id).catch(() => undefined))))
+    .flatMap(item => item?.assets ? [item] : []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const present = async (paths: string[]) => (await Promise.all(paths.map(path =>
+    resolveWorkspacePath(cwd, path).then(({ path }) => access(path)).then(() => true, () => false)))).every(Boolean);
+  for (const item of production.assets!.characters) {
+    for (const other of earlier) {
+      const match = other.assets!.characters.find(person => person.name === item.name && person.photo === item.photo && (item.photo || person.look === item.look));
+      if (!match) continue;
+      if (!item.base && match.base && match.views && await present([match.base, ...match.views])) Object.assign(item, { base: match.base, views: match.views });
+      for (const outfit of item.outfits ?? []) {
+        const views = match.outfits?.find(other => other.name === outfit.name)?.views;
+        if (!outfit.views && views && await present(views)) outfit.views = views;
+      }
+    }
+  }
+  for (const item of production.assets!.places) {
+    const match = earlier.flatMap(other => other.assets!.places).find(place => place.name === item.name && place.look === item.look && place.base && place.views);
+    if (!item.base && match && await present([match.base!, ...match.views!])) Object.assign(item, { base: match.base, views: match.views });
+  }
+}
+
+/**
  * Draws the base image of every character without a photo and of every place in one batch, then every view in a
  * second batch: Qwen-Image draws requests that arrive together in one Colab session, and the session is held between
- * the two batches so they share one machine.
+ * the two batches so they share one machine. Designs an earlier production drew for the same people and places are
+ * taken first.
  */
 export async function drawAssets(cwd: string, production: Production, ratio: string, signal: AbortSignal, save: () => Promise<void>) {
   const assets = production.assets!;
+  await reuseDesigns(cwd, production);
+  await save();
   const release = holdQwenImage();
   try {
     await Promise.all([
