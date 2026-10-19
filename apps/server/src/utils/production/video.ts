@@ -53,12 +53,12 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * that sends someone's eyes into the lens when the row does not ask for it, is rewritten with the error, twice at
  * most. Every prompt is then reviewed and rewritten for the faults that made clips fail before it costs GPU time; a
  * shot rendered before is written knowing what failed and why, and every prompt follows the lessons the film learned so
- * far.
+ * far. `only` limits the writing to those shots, for one clip's correction while the others render.
  */
-export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>) {
-  const spans = shotSpans(checkScript(shotList).shots, shotList);
+export async function writeClipPrompts(production: Production, script: string, shotList: string, complete: (prompt: string) => Promise<string>, save: () => Promise<void>, only?: number[]) {
+  const spans = shotSpans(checkScript(shotList).shots, shotList).filter(span => !only || only.includes(span.shot));
   const ids = speakerIds(spans);
-  const videos = production.videos ??= spans.map((span): ProductionClip => ({ shot: span.shot }));
+  const videos = production.videos ??= shotSpans(checkScript(shotList).shots, shotList).map((span): ProductionClip => ({ shot: span.shot }));
   const names = production.assets!.characters.map(person => person.name);
   // Shots are written side by side, as the text model answers two requests at once, and so are a long take's parts.
   // Every shot is awaited before an error is passed on, so none goes on writing unwatched.

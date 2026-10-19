@@ -10,9 +10,9 @@ import { holdQwenImage } from "@/utils/media/qwenImage";
 import { assetDrawn, castPrompt, drawAssets, drawPoses, parseCast, peopleWithLoras, planAssetLoras, trainAssetLoras } from "./assets";
 import { planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis } from "./previs";
-import { applyDiagnosis, diagnosisPrompt, keepBest, readDiagnosis, ReplyCutError, replyJson } from "./review";
+import { applyDiagnosis, diagnosisPrompt, readDiagnosis, ReplyCutError, replyJson } from "./review";
 import { ambiencePrompt, fetchAmbience } from "./ambience";
-import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts } from "./video";
+import { clipCheckPrompt, clipFrames, finishFilm, joinRoughCut, readClipCheck, renderClips, scoreFilm, writeClipPrompts, type ProductionClip } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, referenceImages, shotReferences } from "./shots";
 import {
@@ -363,51 +363,31 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
   }
 
   // The clips render once, at the chosen quality: no one reviews a cheaper pass before the film, and rendering every clip
-  // twice doubled the longest step.
+  // twice doubled the longest step. Each clip goes on its own way, side by side with the others: rendered, checked
+  // against its row, previs and references by the model reading frames of it, and, if it fails, diagnosed from the same
+  // frames, written again knowing what failed and why, and rendered again, up to maxCorrections times, after which the
+  // best render stays, flagged for a person to look at; one the check judged wrongly passes. A clip waits for no other:
+  // rounds of every clip at once left the machines idle while the slowest clip of each step finished. Never the same
+  // prompt with a new seed, which fails the same way.
   const videos = production.videos!;
-  const unrendered = videos.filter(item => !item.video).length;
-  if (unrendered) {
+  const open = videos.filter(item => !item.video || !item.check);
+  if (open.length) {
     // ACT: The clips still to render take their share of the step's estimate; a clip rendered again after its check is
     // one share. The machine start in the estimate is shared out too, so a lone retry on a cold machine is undercounted.
-    const clipUnits = estimate.steps.find(item => item.step === "clips")!.units;
-    // Corrections the budget can no longer pay for keep their best render, so the film is still finished; a clip never
-    // rendered waits for the budget.
-    if (videos.every(item => item.video || item.attempts?.length) && !await affordable(production, clipUnits * unrendered / videos.length, signal)) {
-      for (const item of videos.filter(item => !item.video)) keepBest(item);
-      await saveProduction(cwd, production);
-      return true;
-    }
-    if (!await withinBudget(cwd, production, clipUnits * unrendered / videos.length, signal)) return false;
-    // Each clip is checked by the check model once rendered, so its A100 starts a few minutes before the clips are
-    // expected to be done, in time to download and load the model, and is held a while past that should they take
-    // longer; not for the whole render, which would bill it idle. The clips render on the H3 machines side by side, each
-    // part of a long take after the one before.
-    const minutes = videos.filter(item => !item.video).map(item => renderMinutes(production.clips!.find(clip => clip.shot === item.shot)!.clip, production.input.quality));
-    const expected = minimaxH3SetupMinutes() + Math.max(...minutes, minutes.reduce((sum, value) => sum + value, 0) / h3Machines);
-    const textStart = 6;
-    const releaseText = warmCheckModel(Math.max(0, expected - textStart) * 60_000, (textStart + Math.max(5, expected / 4)) * 60_000, signal);
-    try {
-      await timed(cwd, production, "render", () => renderClips(cwd, production, videos, production.input.quality, "clips", signal, () => saveProduction(cwd, production)));
-    } finally {
-      releaseText();
-    }
-    await saveProduction(cwd, production);
-    return true;
-  }
-  // Each clip is checked against its row, previs and references by the model reading frames of it. A clip that fails is
-  // diagnosed from the same frames: one the check judged wrongly passes, any other is written again knowing what failed
-  // and why, and rendered from the new prompt, up to maxCorrections times, after which the best render stays, flagged
-  // for a person to look at. Never the same prompt with a new seed, which fails the same way.
-  const unchecked = videos.filter(item => !item.check);
-  if (unchecked.length) {
-    const textUnits = estimate.steps.find(item => item.step === "text")!.units;
-    if (!await withinBudget(cwd, production, textUnits, signal)) return false;
-    // A correction costs a clip's share of the clip and text steps; one the budget cannot pay for is not started.
-    const correctionUnits = (estimate.steps.find(item => item.step === "clips")!.units + textUnits) / videos.length;
-    // The clips are checked and diagnosed side by side, as the text model answers two requests at once; the verdicts
-    // are kept until all are in and then applied in shot order, as each correction draws on the budget the ones before
-    // it left. Every clip is awaited before an error is passed on, so none goes on unwatched.
-    const verdicts = await timed(cwd, production, "check", () => Promise.allSettled(unchecked.map(async item => {
+    const clipUnits = estimate.steps.find(item => item.step === "clips")!.units / videos.length;
+    const correctionUnits = clipUnits + estimate.steps.find(item => item.step === "text")!.units / videos.length;
+    if (!await withinBudget(cwd, production, clipUnits * videos.filter(item => !item.video).length, signal)) return false;
+    const [script, shotList] = await Promise.all([readProductionText(cwd, production.script), readProductionText(cwd, production.shotList)]);
+    const save = () => saveProduction(cwd, production);
+    // The check model's A100 starts a few minutes before the first clip is expected, in time to download and load the
+    // model, and is held until every clip is final. ACT: Held between checks, as a stop would download the 25 GB model
+    // again for the next clip; it bills the A100 idle while clips render, and takes one of the account's three A100s.
+    const minutes = open.filter(item => !item.video).map(item => renderMinutes(production.clips!.find(clip => clip.shot === item.shot)!.clip, production.input.quality));
+    const first = minimaxH3SetupMinutes() + (minutes.length ? Math.min(...minutes) : 0);
+    const checkStart = 6;
+    const releaseCheck = warmCheckModel(Math.max(0, first - checkStart) * 60_000, 6 * 3_600_000, signal);
+    // The check and, when it fails, the diagnosis of one clip, from the same frames.
+    const checkClip = async (item: ProductionClip) => {
       const shot = production.shots!.find(other => other.shot === item.shot)!;
       const previs = production.previs!.find(other => other.shot === item.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
@@ -426,19 +406,33 @@ async function step(cwd: string, id: string, signal: AbortSignal, carried: Carri
       if (check.unreadable) check = await ask();
       const diagnosis = !check.passed && !check.unreadable
         ? readDiagnosis(await reply(diagnosisPrompt(production, { ...item, check }, shot.row ?? "", gazes, looks))) : undefined;
-      return { item, check, diagnosis };
-    })));
-    const failure = verdicts.find(result => result.status === "rejected");
-    if (failure) throw failure.reason;
-    let corrections = 0;
-    for (const { item, check, diagnosis } of verdicts.flatMap(result => result.status === "fulfilled" ? [result.value] : [])) {
-      item.check = check;
-      if (diagnosis) {
-        applyDiagnosis(production, item, diagnosis, await affordable(production, correctionUnits * (corrections + 1), signal));
-        if (!item.check) corrections++;
+      return { check, diagnosis };
+    };
+    const finish = async (item: ProductionClip) => {
+      for (;;) {
+        if (!item.prompt) await writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, signal), save, [item.shot]);
+        if (!item.video) {
+          await renderClips(cwd, production, [item], production.input.quality, "clips", signal, save);
+          await save();
+        }
+        if (item.check) return;
+        const { check, diagnosis } = await checkClip(item);
+        item.check = check;
+        // A correction the budget can no longer pay for keeps the best render, so the film is still finished.
+        if (diagnosis) applyDiagnosis(production, item, diagnosis, await affordable(production, correctionUnits, signal));
+        await save();
+        if (item.check) return;
       }
+    };
+    try {
+      const results = await timed(cwd, production, "clips", () => Promise.allSettled(open.map(finish)));
+      // Every clip is awaited before an error is passed on, so none goes on unwatched.
+      const failure = results.find(result => result.status === "rejected");
+      if (failure) throw failure.reason;
+    } finally {
+      releaseCheck();
     }
-    await saveProduction(cwd, production);
+    await save();
     return true;
   }
   if (!production.roughCut) {
