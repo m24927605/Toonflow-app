@@ -124,8 +124,8 @@ async function renderPoses(still: SceneDocument, plan: DirectorPlan, aspect: num
 }
 
 /**
- * Asks the director model for the previs plan of the whole film in one reply, and once more, with what is wrong, when
- * the reply cannot be used. With `earlier`, a plan that could be used and what its staging got wrong, the model is
+ * Asks the director model for the previs plan of the whole film in one reply, and up to twice more, with what is wrong,
+ * when the reply cannot be used. With `earlier`, a plan that could be used and what its staging got wrong, the model is
  * asked to fix those instead.
  */
 async function writeSpec(options: { generate: Generate; providerId: string; modelId: string; signal: AbortSignal; onStep?: () => void }, shots: SpecShot[], earlier?: { reply: string; problems: string[] }) {
@@ -136,14 +136,15 @@ async function writeSpec(options: { generate: Generate; providerId: string; mode
     return reply;
   };
   const fixing = (reply: string, problems: string[]) => `${prompt}\n\nYour plan:\n${reply}\n\nIt cannot be used yet. Output the whole JSON again with these fixed:\n${problems.map(problem => `- ${problem}`).join("\n")}`;
-  const reply = await ask(earlier ? fixing(earlier.reply, earlier.problems) : prompt);
-  const first = readPrevisSpec(reply, shots);
-  if (first.spec) return { spec: first.spec, reply };
-  console.warn("The previs plan needs fixing", first.problems);
-  const second = await ask(fixing(reply, first.problems));
-  const fixed = readPrevisSpec(second, shots);
-  if (fixed.spec) return { spec: fixed.spec, reply: second };
-  throw new Error(`The previs plan cannot be used: ${fixed.problems.join(" ")}`);
+  // Twice asked to fix, as a fix request now and then breaks what the first reply had right.
+  let reply = await ask(earlier ? fixing(earlier.reply, earlier.problems) : prompt);
+  for (let fixes = 2; ; fixes--) {
+    const read = readPrevisSpec(reply, shots);
+    if (read.spec) return { spec: read.spec, reply };
+    if (!fixes) throw new Error(`The previs plan cannot be used: ${read.problems.join(" ")}`);
+    console.warn("The previs plan needs fixing", read.problems);
+    reply = await ask(fixing(reply, read.problems));
+  }
 }
 
 /**

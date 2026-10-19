@@ -39,7 +39,11 @@ export type Posture = (typeof postures)[number];
 export const cameraSides = ["front", "frontLeft", "frontRight", "left", "right", "back", "overShoulder"] as const;
 
 const name = z.string().trim().min(1).max(60);
-const place = z.union([z.enum(roomPlaces), z.strictObject({ prop: name, side: z.enum(["front", "back", "left", "right", "on"]).optional() })]);
+// A place written as a prop's bare name, such as "cushion1", means that prop, as the model sometimes shortens it.
+const place = z.preprocess(
+  value => typeof value === "string" && !(roomPlaces as readonly string[]).includes(value) ? { prop: value } : value,
+  z.union([z.enum(roomPlaces), z.strictObject({ prop: name, side: z.enum(["front", "back", "left", "right", "on"]).optional() })]),
+);
 export type Place = z.infer<typeof place>;
 const metres = z.number().min(0.05).max(50);
 
