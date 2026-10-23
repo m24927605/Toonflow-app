@@ -8,6 +8,40 @@ type CanvasFile = { toonflowCanvas: true; nodes: Node[]; edges: Edge[]; viewport
 export type DocumentNode = { canvasPath: string; nodeId: string; label: string; nodeType?: string };
 export type DocumentNodeOptions = { canvasPath?: string; signal?: AbortSignal; onError?: (path: string, error: unknown) => void };
 
+/** Remaps persisted references; a copied production never owns the original runner. */
+export function remapCopiedNodeData(node: Pick<Node, "type" | "data">, ids: Map<string, string>) {
+  const data = node.data;
+  if (!data) return data;
+  const reference = (value: string) => {
+    try {
+      const parts = JSON.parse(decodeURIComponent(value));
+      if (Array.isArray(parts) && parts.length === 2 && ids.has(parts[0])) return encodeURIComponent(JSON.stringify([ids.get(parts[0]), parts[1]]));
+    } catch { /* Non-reference text is unchanged. */ }
+    return value;
+  };
+  if (data.referenceOrder && typeof data.referenceOrder === "object") {
+    for (const [handle, order] of Object.entries(data.referenceOrder)) {
+      if (Array.isArray(order)) data.referenceOrder[handle] = order.map(value => typeof value === "string" ? reference(value) : value);
+    }
+  }
+  for (const model of [data.promptModel, data.inpaintPromptModel]) {
+    if (!Array.isArray(model)) continue;
+    for (const line of model) {
+      if (!Array.isArray(line)) continue;
+      for (const tag of line) if (tag?.type === "Custom" && typeof tag.html === "string") {
+        tag.html = tag.html.replace(/(data-reference-id=["'])([^"']+)(["'])/g, (_match: string, before: string, value: string, after: string) => before + reference(value) + after);
+      }
+    }
+  }
+  if (typeof data.masterShotId === "string") data.masterShotId = ids.get(data.masterShotId) ?? data.masterShotId;
+  if (node.type === "remote-productionNode") {
+    for (const key of ["started", "texts", "images", "top", "roughCut", "film"]) Reflect.deleteProperty(data, key);
+    data.outputs = {};
+  }
+  if (data.form?.names) data.form.names = Object.fromEntries(Object.entries(data.form.names).map(([id, name]) => [ids.get(id) ?? id, name]));
+  return data;
+}
+
 export async function readCanvasFiles(files: Files, path = "", options: Omit<DocumentNodeOptions, "canvasPath"> = {}) {
   const { signal, onError } = options;
   signal?.throwIfAborted();
@@ -73,13 +107,6 @@ export async function copyCanvasFiles(files: Files, path: string, target: string
         for (const [source, destination] of paths) if (normalized === source || normalized.startsWith(`${source}/`)) return destination + normalized.slice(source.length);
         return value;
       };
-      const remapReference = (value: string) => {
-        try {
-          const reference = JSON.parse(decodeURIComponent(value));
-          if (Array.isArray(reference) && reference.length === 2 && ids.has(reference[0])) return encodeURIComponent(JSON.stringify([ids.get(reference[0]), reference[1]]));
-        } catch { /* Plain text isn't a node reference identifier. */ }
-        return value;
-      };
       const remapData = (value: unknown): unknown => {
         if (typeof value === "string") return remapPath(value);
         if (Array.isArray(value)) return value.map(remapData);
@@ -112,17 +139,7 @@ export async function copyCanvasFiles(files: Files, path: string, target: string
           }
           node.data.textPath = destination;
         }
-        if (node.data?.referenceOrder && typeof node.data.referenceOrder === "object") {
-          for (const [handle, order] of Object.entries(node.data.referenceOrder)) {
-            if (Array.isArray(order)) node.data.referenceOrder[handle] = order.map(value => typeof value === "string" ? remapReference(value) : value);
-          }
-        }
-        if (Array.isArray(node.data?.promptModel)) for (const line of node.data.promptModel) {
-          if (!Array.isArray(line)) continue;
-          for (const tag of line) if (tag?.type === "Custom" && typeof tag.html === "string") {
-            tag.html = tag.html.replace(/(data-reference-id=["'])([^"']+)(["'])/g, (_match: string, before: string, value: string, after: string) => before + remapReference(value) + after);
-          }
-        }
+        remapCopiedNodeData(node, ids);
       }
       for (const edge of canvas.data.edges) Object.assign(edge, { id: crypto.randomUUID(), source: ids.get(edge.source)!, target: ids.get(edge.target)!, selected: false });
       const suffix = canvas.id.slice(path.length);

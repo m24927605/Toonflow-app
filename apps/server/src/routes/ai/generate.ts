@@ -58,6 +58,8 @@ const inputSchema = z.object({
   references: z.array(u.ai.aiReferenceSchema).max(32).optional(),
   // A tool loop keeps one session ID so providers such as Claude Code can continue the same model process.
   session: z.uuid().optional(),
+  // A JSON Schema the reply must fit, enforced by the Colab models' grammar sampling.
+  responseSchema: z.record(z.string(), z.json()).refine(value => value.type === "object" && JSON.stringify(value).length <= 100000, "The response schema must be a JSON object structure and no larger than 100 KB").optional(),
 });
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
@@ -74,7 +76,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
     const directory = input.references?.some(item => item.dataType !== "STRING")
       ? await u.workspace.resolveWorkspace(req, input.directory ?? "") : undefined;
     const references = await u.ai.readAiReferences(directory, input.references ?? [], controller.signal);
-    const stream = await u.ai.streamAi(configured, input.context, controller.signal, references, input.session);
+    const stream = await u.ai.streamAi(configured, input.context, controller.signal, references, input.session, input.responseSchema);
     res.set({ "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
     res.flushHeaders();
     heartbeat = setInterval(() => {

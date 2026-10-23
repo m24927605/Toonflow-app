@@ -19,11 +19,11 @@ First determine this run's deliverable, the existing material and the user's exp
 |---|---|
 | An idea or a one-liner | Fill in the character's goal, obstacle and outcome to form a reviewable story and this run's complete script |
 | A novel, story or source excerpt | Confirm the adaptation scope, keep the original text, track events, characters, dialogue and unknowns, and turn it into an audiovisual script |
-| Finalized script / timeline + the current goal is to produce, generate, continue or revise video | **Whether or not the user mentions "Seedance", "prompt" or a specific model, immediately determine the video model and take its route (see "Video model route" below): Seedance 2.0/2.5 → execute the embedded "SEEDANCE EPISODE DIRECTOR · PART A" in this file; MiniMax H3 → the "MiniMax H3 route" below.** If the user has not named a model, confirm with one short question only: "Seedance 2.0, Seedance 2.5 or MiniMax H3?". Asking about the model must not divert into canvas configuration, the asset flow or any other prompt method. |
+| Finalized script / timeline + the current goal is to produce, generate, continue or revise video | **Whether or not the user mentions "Seedance", "prompt" or a specific model, immediately determine the video model and take its route (see "Video model route" below): Seedance 2.0/2.5 → execute the embedded "SEEDANCE EPISODE DIRECTOR · PART A" in this file; Sulphur 2 → the "Sulphur 2 route" below.** If the user has not named a model, confirm with one short question only: "Seedance 2.0, Seedance 2.5 or Sulphur 2?". Asking about the model must not divert into canvas configuration, the asset flow or any other prompt method. |
 | Finalized script / timeline + only assets, script reading, diagnosis or a non-video task is requested | Only handle the non-video scope the user explicitly asked for; do not automatically generate video prompts just because a finalized script exists. |
-| Video task where the user has not specified a model | **The target model must be confirmed first.** Ask "Seedance 2.0, Seedance 2.5 or MiniMax H3?" once only (or "Seedance 2.0 or 2.5?" when the user already chose Seedance); for Seedance this step is part of PART A's A0 input assessment, not an ordinary configuration question. After the user answers, continue in that model's route; execution settings such as aspect ratio, resolution, reference mode and native audio cannot replace, bypass or interrupt it. |
+| Video task where the user has not specified a model | **The target model must be confirmed first.** Ask "Seedance 2.0, Seedance 2.5 or Sulphur 2?" once only (or "Seedance 2.0 or 2.5?" when the user already chose Seedance); for Seedance this step is part of PART A's A0 input assessment, not an ordinary configuration question. After the user answers, continue in that model's route; execution settings such as aspect ratio, resolution, reference mode and native audio cannot replace, bypass or interrupt it. |
 | Seedance task where the user has specified 2.0/2.5 | Execute PART A directly; 2.0 uses A9.1, 2.5 uses A9.2. |
-| MiniMax H3 task | Follow the "MiniMax H3 route" below; PART A does not apply. |
+| Sulphur 2 task | Follow the "Sulphur 2 route" below; PART A does not apply. |
 | A sequel or existing production | Read the specified history, current nodes and adoption records, confirm this run's scope, and continue from actual progress |
 | A specific clip, asset or change | Handle only that scope and the dependencies it actually affects; do not rerun the whole chain |
 
@@ -31,12 +31,12 @@ First determine this run's deliverable, the existing material and the user's exp
 
 ### Video model route (highest-priority entry rule)
 
-When both of the following hold, **treat it automatically as a video task and route it by its model**; the user does not have to say trigger words such as "Seedance", "H3", "2.0/2.5" or "generate prompts":
+When both of the following hold, **treat it automatically as a video task and route it by its model**; the user does not have to say trigger words such as "Seedance", "Sulphur", "2.0/2.5" or "generate prompts":
 
 1. There is already an executable finalized script, timeline, shot-level story section or confirmed clip text, or the user explicitly asks to continue an existing video production;
 2. The current intent is to produce video, generate video, continue video, revise video, prepare video generation, turn the story into video, or configure a video that is about to be generated.
 
-Once matched, the model is the one the user named; when they named none, ask once: "Seedance 2.0, Seedance 2.5 or MiniMax H3?". A MiniMax H3 task takes the "MiniMax H3 route" below, and the rest of this section, the hard isolation and PART A do not apply to it. A Seedance task immediately latches into the **Seedance execution state** and follows these rules:
+Once matched, the model is the one the user named; when they named none, ask once: "Seedance 2.0, Seedance 2.5 or Sulphur 2?". A Sulphur 2 task takes the "Sulphur 2 route" below, and the rest of this section, the hard isolation and PART A do not apply to it. A Seedance task immediately latches into the **Seedance execution state** and follows these rules:
 
 - **Enter PART A first, then handle canvas execution settings.** The target model itself is a required A0 input, not a canvas setting; do not first call the canvas read tools (`getCanvas/findCanvasNodes/getCanvasNodes/getCanvasEdges/getNodeTools`) or a node's `node:getConfig`, first ask about provider/resolution/ratio/mode, first do generic storyboarding, or first enter another prompt method and only then decide whether to use Seedance.
 - When the user chose Seedance but not 2.0/2.5, **after the Seedance route is latched you must confirm with one short question: "Seedance 2.0 or 2.5?"**. After asking, stay in the Seedance execution state; do not exit or switch to the ordinary workflow. Once the user answers with a model, immediately continue PART A from A0.
@@ -47,7 +47,7 @@ Once matched, the model is the one the user named; when they named none, ask onc
 - Only release the Seedance route latch when the user explicitly changes the task to "don't generate/revise video prompts; only do assets, script writing, consultation or other non-video work".
 - If, in the actual media-generation stage, the live node does not support the model selected in A0, only report the real capability conflict and return to the affected items in PART A; **do not silently replace the Seedance route with the configuration layer's default model.**
 
-**Core point: the route of the task's video model (PART A for Seedance, the platform's shot flow for MiniMax H3) is the directing execution core of the video production stage, not an optional plug-in that triggers only when the user says a particular keyword.**
+**Core point: the route of the task's video model (PART A for Seedance, the platform's shot flow for Sulphur 2) is the directing execution core of the video production stage, not an optional plug-in that triggers only when the user says a particular keyword.**
 
 ### Seedance stage hard isolation (mandatory)
 
@@ -65,9 +65,11 @@ Once the "Seedance route latch" above is hit (that is, executable story input ex
 
 
 
-## MiniMax H3 route
+## Sulphur 2 route
 
-MiniMax H3 runs on the user's own Colab and is driven by the platform's shot flow, which writes and preflights each H3 prompt in H3's own format and wires each shot's keyframe, previs video and LoRAs. Do not write H3 video prompts yourself and do not apply PART A (its segmentation, templates or A11/A12 checks) to an H3 task. Every H3 video needs a previs first. When the user wants a whole film from an outline in one go, offer the Auto production node instead; this route builds it on the canvas step by step.
+Sulphur 2 is an uncensored fine-tune of LTX-2.3. The prompt rules come from the bundled `sulphur-prompt-writing` skill: one English paragraph in Sulphur's caption format, opening with the style and camera, then each person, then every movement, line and sound in the order it happens, grown out of the clip's first frame. Do not layer Seedance rules or another format over them. The State cell describes the opening state; the action determines the ending state.
+
+Sulphur 2 runs on the user's own Colab and is driven by the platform's shot flow, which writes and preflights each prompt and wires each shot's keyframe as the first frame, its previs depth video as the control video, its dubbed track as the locked soundtrack and its LoRAs. Sulphur 2 takes no reference images: whatever the keyframe does not show must be in the words. Do not write Sulphur 2 video prompts yourself and do not apply PART A (its segmentation, templates or A11/A12 checks) to a Sulphur 2 task. Every Sulphur 2 video needs a previs first. When the user wants a whole film from an outline in one go, offer the Auto production node instead; this route builds it on the canvas step by step.
 
 Find nodes with `findCanvasNodes` and `getCanvasNodes`, read a node's functions with `getNodeTools`, and call them through `nodeTools`. Colab work spends the user's compute units: before each paid step, say what runs (model and count) and wait for the user's approval.
 
@@ -76,7 +78,7 @@ Find nodes with `findCanvasNodes` and `getCanvasNodes`, read a node's functions 
 3. **Shot list.** `node:createShotList` on the script node adds a shot list node that is written in the background. Once its text is written (`getCanvasNodes` with `outputs`), run `node:checkScript` on it and fix shots over 8 s, gaps or overlaps with `node:setText`.
 4. **Previs (required).** `node:createPrevis` on the shot list adds a Director's Studio node. On it, call `node:stepPrevis` with the film's ratio to block the next shot, poll `node:getPrevisStatus` until that shot is ready to confirm, have the user check it in the Director's Studio unless they told you to go on, then call `node:stepPrevis` again to confirm it and block the next, until every shot is confirmed. People stay cylinders unless the user allows mannequins on that node.
 5. **Keyframes.** `node:buildShotNodes` on the shot list creates each shot's keyframe node, connected to the scenes, the cast's views, the shot's previs layout and the master shot, plus a text node per shot whose prompt holds the instructions for that shot's still-frame description. Write each description by those instructions and put it in place of `{{shot}}` in the keyframe node's prompt with `node:setPrompt`. Generate the master shot's keyframe first with `node:generateImage`, then the others, and show the keyframes to the user.
-6. **Videos.** `node:prepareVideos` on the shot list, with the resolution and ratio the user chose, creates each shot's MiniMax H3 video node from its generated keyframe (or fills one `node:buildShotNodes` made) and writes and preflights its prompt, dialogue included; poll `node:getPrepareStatus` and report each shot's score and findings. After the user approves the spend, start each video node with `node:generateVideo` and follow it until it finishes.
+6. **Videos.** `node:prepareVideos` on the shot list, with the resolution and ratio the user chose, creates each shot's Sulphur 2 video node from its generated keyframe, with the shot's previs depth video as its control video, (or fills one `node:buildShotNodes` made) and writes and preflights its prompt, dialogue included; poll `node:getPrepareStatus` and report each shot's score and findings. After the user approves the spend, start each video node with `node:generateVideo` and follow it until it finishes.
 
 ## Embedded execution core for Seedance prompt generation
 
@@ -1392,7 +1394,7 @@ Execution rules determine how to save, generate and continue in Toonflow; the me
 | Appearance, space, prop structure and persistent states | [Visual Design](references/methods/visualDesign.md) | Asset anchors, spatial masters and variants |
 | Style, inherent material color, how light falls, and grading | [Color and Light](references/methods/colorAndLight.md) | Shared visual basis, scene lighting and clip constraints |
 | Story writing/adaptation before finalization | Use only the story development and screen adaptation methods above | Produce a script that can be confirmed; once it is finalized and Seedance begins, stop using these methods immediately |
-| Keeping people, places, outfits or a look the same across shots with trained LoRAs (MiniMax H3 video, Qwen-Image keyframes): what to train, attaching, prompts | [LoRA](references/lora.md) | Asset plan, node LoRAs and generation records; never the finalized prompt text |
+| Keeping people, places, outfits or a look the same across shots with trained LoRAs (Sulphur 2 video, Qwen-Image keyframes): what to train, attaching, prompts | [LoRA](references/lora.md) | Asset plan, node LoRAs and generation records; never the finalized prompt text |
 | Media execution and acceptance after the finished Seedance prompts | [Canvas Execution](references/canvasExecution.md), [State and Delivery](references/stateAndDelivery.md) | Only execute the finalized prompts, connect real references and verify real results; do not write separate prompt rules |
 
 The conclusions of these methods go only into script/asset design results **before Seedance**; once Seedance prompt hard isolation is entered, no method conclusion may be written into or rewrite the final prompts directly, and PART A must reprocess them from the confirmed inputs. Method examples, genre rhythms and style candidates do not automatically become facts of this project.

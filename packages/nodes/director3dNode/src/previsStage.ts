@@ -223,7 +223,8 @@ export const renderSettings = (spec: PrevisSpec) => ({ gridVisible: false, skyVi
 /** The height of a person's hip joint in a sitting or kneeling posture: on a chair, or kneeling on the floor or a seat. */
 function hipOf(body: Place) {
   const seat = body.seat?.height ?? 0;
-  return body.posture === "seated" && seat >= chairSeat ? seat + chairHip : seat + kneelHip;
+  if (body.posture === "seated" && seat < chairSeat) throw new Error("Seated posture requires a raised seat; floor sitting must use kneeling");
+  return body.posture === "seated" ? seat + chairHip : seat + kneelHip;
 }
 
 /** A person's column for a body: as tall as the figure in that posture and turned their way, or laid along their bed. */
@@ -254,7 +255,7 @@ function figureOf(body: StagedBody) {
     return { position: { x: feet.x, y: feet.y, z: feet.z }, rotation: { rotationX: rotation.x, rotationY: rotation.y, rotationZ: rotation.z }, pose: {} };
   }
   const y = body.posture === "standing" ? 0 : hipOf(body) - figureHip * figureScale;
-  const pose = body.posture === "standing" ? {} : body.posture === "seated" && seat >= chairSeat ? chairPose : kneelPose;
+  const pose = body.posture === "standing" ? {} : body.posture === "seated" ? chairPose : kneelPose;
   return { position: { x: body.x, y, z: body.z }, rotation: { rotationX: 0, rotationY: body.yaw, rotationZ: 0 }, pose };
 }
 
@@ -334,7 +335,7 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
     const tracks = spec.people.map((person, index) => {
       const objectId = `person${index + 1}`;
       const start = starts.get(person.name);
-      if (!start) {
+      if (!start || !cast.includes(person.name)) {
         const hidden = { position: { x: 0, y: hiddenDepth, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } };
         return { objectId, frames: [{ time: 0, ...hidden }, { time: seconds, ...hidden }] };
       }
@@ -352,7 +353,7 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
     const present = [...starts.keys()];
     const subjects = cast.filter(name => starts.has(name));
     const camera = plan?.camera ?? { side: "front" as const };
-    const over = camera.side === "overShoulder" && camera.over && starts.has(camera.over) ? camera.over : undefined;
+    const over = camera.side === "overShoulder" && camera.over && cast.includes(camera.over) && starts.has(camera.over) ? camera.over : undefined;
     let direction = sideDirections[camera.side] ?? sideDirections.front!;
     if (present.length === 2) {
       const [a, b] = [...present].sort().map(name => starts.get(name)!) as [StagedBody, StagedBody];
@@ -378,14 +379,15 @@ export function stageShots(spec: PrevisSpec, shots: SpecShot[]): StagedShot[] {
     // Where a leg ends, from where it was staged: on a seat, beside a prop, or on part of the floor in plain words.
     const where = (at: SpecPlace, body: StagedBody) => body.seat ? `on the ${body.seat.prop}`
       : typeof at === "string" ? `the ${at.replace(/[A-Z]/g, letter => ` ${letter.toLowerCase()}`)} of the place` : `the ${at.side && at.side !== "on" ? at.side : "front"} of the ${at.prop}`;
-    const timeline = movers.flatMap(name => moves.filter(move => move.name === name).map((move, index) => {
+    const timeline = movers.filter(name => cast.includes(name)).flatMap(name => moves.filter(move => move.name === name).map((move, index) => {
       const { from, body } = legs.get(name)![index]!;
       const verb = { seated: "sits", kneeling: "kneels", lying: "lies", standing: "stands" }[body.posture];
       const goes = move.to && (body.seat ? `${verb} ${where(move.to, body)}` : `goes to ${where(move.to, body)}`);
       return { from, text: `from ${from.toFixed(1)} s ${name} ${[goes, move.posture, move.faces && `facing ${move.faces}`].filter(Boolean).join(", ") || "stays"}` };
     })).sort((a, b) => a.from - b.from).map(item => item.text).join("; ");
     staged.push({
-      shot, seconds, tracks, subjects: subjects.length ? subjects : present, opening: starts, timeline,
+      shot, seconds, tracks, subjects, opening: new Map([...starts].filter(([name]) => cast.includes(name))),
+      timeline: timeline || `0.0–${seconds.toFixed(1)} s: keep the opening body positions and postures; no body-root motion is scheduled. This coarse proxy does not animate speech or lips.`,
       camera: { direction, angle: camera.angle ?? "eye", move: camera.move ?? "static", over },
     });
   }

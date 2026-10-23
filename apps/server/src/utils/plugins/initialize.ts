@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, readFile, readdir, rename, rm, unlink, writeAtomic, writeFile } from "@toonflow/file";
+import { copyFile, cp, lstat, mkdir, readFile, readdir, rename, rm, unlink, writeAtomic, writeFile } from "@toonflow/file";
 import { createHash } from "node:crypto";
 import { relative, resolve } from "node:path";
 
@@ -67,6 +67,16 @@ async function treeRevision(root: string, names: string[]) {
  * kept as it is. Folders that are not built in are never touched.
  */
 export async function syncEditablePlugins(targetDirectory: string, sourceDirectory: string) {
+  const previous = `${targetDirectory}Previous`;
+  const exists = async (path: string) => lstat(path).then(() => true, (error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+    return false;
+  });
+  // Recover an interrupted directory swap before examining its revision marker.
+  if (await exists(previous)) {
+    if (!await exists(targetDirectory)) await rename(previous, targetDirectory);
+    else await rm(previous, { recursive: true });
+  }
   const names = (await readdir(sourceDirectory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
     throw error;
@@ -83,10 +93,28 @@ export async function syncEditablePlugins(targetDirectory: string, sourceDirecto
     console.warn(`[plugins] ${targetDirectory} was edited, so it keeps those edits instead of the built-in update`);
     return;
   }
-  await mkdir(targetDirectory, { recursive: true });
-  for (const name of names) {
-    await rm(resolve(targetDirectory, name), { recursive: true, force: true });
-    await cp(resolve(sourceDirectory, name), resolve(targetDirectory, name), { recursive: true });
+  const staged = `${targetDirectory}Staged${crypto.randomUUID()}`;
+  let backedUp = false;
+  try {
+    if (await exists(targetDirectory)) await cp(targetDirectory, staged, { recursive: true });
+    else await mkdir(staged, { recursive: true });
+    for (const name of names) {
+      await rm(resolve(staged, name), { recursive: true, force: true });
+      await cp(resolve(sourceDirectory, name), resolve(staged, name), { recursive: true });
+    }
+    if (await treeRevision(staged, names) !== latest) throw new Error("Built-in skill content changed while staging the update");
+    await writeAtomic(resolve(staged, "initialized"), latest, { mode: 0o600 });
+    if (await exists(targetDirectory)) {
+      await rename(targetDirectory, previous);
+      backedUp = true;
+    }
+    try { await rename(staged, targetDirectory); }
+    catch (error) {
+      if (backedUp) await rename(previous, targetDirectory);
+      throw error;
+    }
+  } finally {
+    await rm(staged, { recursive: true, force: true });
   }
-  await writeAtomic(marker, latest, { mode: 0o666 });
+  if (backedUp) await rm(previous, { recursive: true });
 }

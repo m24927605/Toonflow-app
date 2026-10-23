@@ -1,9 +1,9 @@
 # Qwen-Image 2.1 Turbo pipeline executed on a Colab GPU session by qwenImage.ts.
 # Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control, init, denoise, recipe}) and the
 # files it names; control is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch, and
-# init an optional picture redrawn from the noise level denoise instead of drawing from pure noise. recipe "pose" and
-# "photo" draw with the base model instead of Turbo (see build).
-# Output: /content/qwout/image_<n>.png for every item, followed by a COLAB_DONE line on success.
+# init an optional picture redrawn from the noise level denoise instead of drawing from pure noise. Only recipe "pose"
+# draws with the base model instead of Turbo (see build).
+# Output: /content/qwout/<QWEN_JOB>/image_<n>.png, atomically published as each image finishes.
 # The model loads once and the items are drawn one by one, always at the requested ratio and size; references reach
 # the model through the text encoder's conditioning, so the output canvas does not have to share their aspect.
 import json
@@ -15,14 +15,14 @@ import sys
 import time
 from pathlib import Path
 
-import torch
-
 # Weights are public: download anonymously, without telemetry and without probing Colab secrets for an HF token.
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
 
 inputs = Path("/content")
-outputs = Path("/content/qwout")
-comfy = Path("/content/ComfyUI")
+job = os.environ["QWEN_JOB"]
+assert len(job) == 36 and all(char in "0123456789abcdef-" for char in job)
+outputs = Path("/content/qwout") / job
+comfy = Path("/content/qwenImageRuntime/ComfyUI")
 # Pinned to the revisions this pipeline was verified with, the weights' repo too, so a changed upload upstream never
 # reaches a render unnoticed.
 comfyCommit = "7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217"
@@ -30,11 +30,12 @@ weightRevision = "a8342359c61979b06a8dafb1a47991fe1f30e994"
 
 items = json.loads((inputs / "qwin_job.json").read_text())
 assert 1 <= len(items) <= 32
+if any(item.get("recipe") not in (None, "pose") for item in items):
+    raise ValueError("This production uses the B3 image recipes only")
 
 
 def dimensions(item):
-    # The photo recipe draws at about 1152x1728 whatever the size, the area its recipe was verified at.
-    side = 1408 if item.get("recipe") == "photo" else {"1K": 1024, "2K": 2048}[item["size"]]
+    side = {"1K": 1024, "2K": 2048}[item["size"]]
     ratioWidth, ratioHeight = (int(part) for part in item["ratio"].split(":"))
     assert ratioWidth > 0 and ratioHeight > 0
     return side, round(math.sqrt(side * side * ratioWidth / ratioHeight) / 32) * 32, round(math.sqrt(side * side * ratioHeight / ratioWidth) / 32) * 32
@@ -43,17 +44,6 @@ def dimensions(item):
 # The checkpoint's own Turbo schedule (8 steps at CFG 1, scheduler shift 1.0, so the values are used as they are).
 turboSigmas = "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0"
 turboSteps = [float(value) for value in turboSigmas.split(",")]
-
-print("GPU:", torch.cuda.get_device_name(0), round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1), "GiB")
-
-if not comfy.exists():
-    subprocess.run(["git", "init", "-q", str(comfy)], check=True)
-    subprocess.run(["git", "-C", str(comfy), "fetch", "-q", "--depth", "1", "https://github.com/Comfy-Org/ComfyUI.git", comfyCommit], check=True)
-    subprocess.run(["git", "-C", str(comfy), "checkout", "-q", "FETCH_HEAD"], check=True)
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(comfy / "requirements.txt"), "huggingface_hub", "hf_xet", "requests"], check=True)
-
-import requests
-from huggingface_hub import hf_hub_download
 
 diffusion = "qwen_image_2.1_turbo_bf16.safetensors"
 encoder = "qwen3vl_8b_bf16.safetensors"
@@ -72,19 +62,27 @@ if any(item.get("control") for item in items):
 baseModel = "qwen_image_2.1_int8_convrot.safetensors"
 if any(item.get("recipe") for item in items):
     weights.append((f"diffusion_models/{baseModel}", "diffusion_models"))
-for remote, folder in weights:
-    target = comfy / "models" / folder / Path(remote).name
-    if target.exists():
-        continue
-    downloaded = Path(hf_hub_download(repo_id="Comfy-Org/Qwen-Image-2.1", filename=remote, revision=weightRevision, local_dir="/content/hf"))
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(downloaded, target)
-# The VNCCS PoseStudio LoRA makes the base model take the pose of a textureless mannequin render, pinned like the weights.
+from modelPreparation import downloadWeights, installComfy, installationIdentity
 poseLora = "VNCCS_QI2_PoseStudioV1.1.safetensors"
-if any(item.get("recipe") == "pose" for item in items) and not (comfy / "models" / "loras" / poseLora).exists():
-    downloaded = Path(hf_hub_download(repo_id="MIUProject/VNCCS_PoseStudio_QI2.1", filename=poseLora, revision="9857b8a256655da446772a3f1f2b033e33181a6d", local_dir="/content/hf"))
-    (comfy / "models" / "loras").mkdir(parents=True, exist_ok=True)
-    shutil.move(downloaded, comfy / "models" / "loras" / poseLora)
+entries = [("Comfy-Org/Qwen-Image-2.1", weightRevision, remote, str(comfy / "models" / folder / Path(remote).name)) for remote, folder in weights]
+if any(item.get("recipe") == "pose" for item in items):
+    entries.append(("MIUProject/VNCCS_PoseStudio_QI2.1", "9857b8a256655da446772a3f1f2b033e33181a6d", poseLora, str(comfy / "models/loras" / poseLora)))
+if os.environ.get("TOONFLOW_PREFETCH_ONLY") == "1":
+    downloadWeights(entries)
+    print("COLAB_DONE")
+    raise SystemExit(0)
+installation = installationIdentity("comfy", comfyCommit)
+if not (comfy / "toonflowReady").exists() or (comfy / "toonflowReady").read_text() != installation:
+    installComfy(comfy, comfyCommit)
+    (comfy / "toonflowReady").write_text(installation)
+import torch
+import requests
+print("GPU:", torch.cuda.get_device_name(0), round(torch.cuda.get_device_properties(0).total_memory / 2**30, 1), "GiB")
+downloadWeights(entries)
+
+if os.environ.get("TOONFLOW_DOWNLOAD_ONLY") == "1":
+    print("COLAB_DONE")
+    raise SystemExit(0)
 
 (comfy / "input").mkdir(exist_ok=True)
 for item in items:
@@ -154,11 +152,6 @@ def build(item):
         # 25 steps at CFG 1, euler/simple, as the skill's verified recipe.
         graph["11"]["inputs"]["latent_image"] = ["5", 2]
         graph["10"] = {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "simple", "steps": 25, "denoise": 1.0}}
-    if item.get("recipe") == "photo":
-        # The skill's text-to-image recipe without its Civitai LoRA: er_sde/beta, CFG 2.5, 50 steps.
-        graph["8"] = {"class_type": "CFGGuider", "inputs": {"model": ["2", 0], "positive": ["5", 0], "negative": ["5", 1], "cfg": 2.5}}
-        graph["9"]["inputs"]["sampler_name"] = "er_sde"
-        graph["10"] = {"class_type": "BasicScheduler", "inputs": {"model": ["2", 0], "scheduler": "beta", "steps": 50, "denoise": 1.0}}
     if item.get("control"):
         # The depth map is scaled to the output canvas so the structure lines up with the latent.
         graph["ctrl"] = {"class_type": "LoadImage", "inputs": {"image": item["control"]}}
@@ -182,7 +175,8 @@ def build(item):
 
 # Items are queued one by one instead of as one batch, so 2K images never need several at once in VRAM;
 # ComfyUI keeps the loaded models cached between them.
-outputs.mkdir(exist_ok=True)
+shutil.rmtree(outputs.parent, ignore_errors=True)
+outputs.mkdir(parents=True)
 for index, item in enumerate(items):
     graph = build(item)
     graph["13"] = {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": f"toonflow/qwen{index}"}}
@@ -199,5 +193,7 @@ for index, item in enumerate(items):
         raise RuntimeError(str(history["status"].get("messages"))[-3000:] + "\n" + log.read_text()[-3000:])
     # The file this prompt saved, as ComfyUI reports it: a session that draws several batches keeps the earlier ones.
     saved = history["outputs"]["13"]["images"][0]
-    shutil.copy(comfy / "output" / saved["subfolder"] / saved["filename"], outputs / f"image_{index}.png")
+    staging = outputs / f"image_{index}.partial"
+    shutil.copy(comfy / "output" / saved["subfolder"] / saved["filename"], staging)
+    staging.replace(outputs / f"image_{index}.png")
 print("COLAB_DONE", len(items))

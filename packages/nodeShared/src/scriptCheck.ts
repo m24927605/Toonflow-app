@@ -40,6 +40,23 @@ function toSeconds(value: string) {
   return value.split(":").reduce((total, part) => total * 60 + Number(part), 0);
 }
 
+/** Changes only shot timing, preserving every other screenplay cell. */
+export function retimeScript(markdown: string, durations: number[]) {
+  const { shots } = checkScript(markdown);
+  if (durations.length !== shots.length || durations.some(seconds => !Number.isFinite(seconds) || seconds <= 0)) throw new Error("Invalid shot durations");
+  const lines = markdown.split("\n");
+  let cursor = 0;
+  for (const [index, shot] of shots.entries()) {
+    const end = Number((cursor + durations[index]!).toFixed(6));
+    const row = lines[shot.line - 1]!;
+    lines[shot.line - 1] = rangeCell.test(row)
+      ? row.replace(rangeCell, `| ${cursor}–${end} `)
+      : row.replace(shotLine, match => match.replace(/\d+(?:\.\d+)?\s*s\s*\|$/i, `${durations[index]}s |`));
+    cursor = end;
+  }
+  return lines.join("\n");
+}
+
 /**
  * Reads the shot list of a script and checks its timing. Shots come from table rows with a time range cell, or
  * from "Shot_NNN | ... | 3s | ..." lines; `target` is the intended total length in seconds.

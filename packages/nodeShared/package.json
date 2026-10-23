@@ -60,7 +60,8 @@
     "@tabler/icons-vue": "^3.46.0",
     "vue-draggable-plus": "^0.6.1",
     "x-sender": "1.4.6",
-    "@toonflow/tools-scaffold": "workspace:*"
+    "@toonflow/tools-scaffold": "workspace:*",
+    "@toonflow/skills": "workspace:*"
   },
   "devDependencies": {
     "@toonflow/i18n": "workspace:*",

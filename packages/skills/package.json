@@ -1,0 +1,16 @@
+{
+  "name": "@toonflow/skills",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sulphurSkill": {
+      "types": "./text.d.ts",
+      "default": "./sulphurPromptWriting/SKILL.md"
+    },
+    "./sulphurSkill?raw": {
+      "types": "./text.d.ts",
+      "default": "./sulphurPromptWriting/SKILL.md"
+    }
+  }
+}

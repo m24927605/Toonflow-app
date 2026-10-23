@@ -1,5 +1,5 @@
 import { dirname, join } from "node:path";
-import { t } from "@/lib/i18n";
+import { getLocale, t } from "@/lib/i18n";
 import { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AgentSession, CreateAgentSessionOptions, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
@@ -200,7 +200,7 @@ export async function run(options: {
     active.controller.signal.throwIfAborted();
     const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } });
     const agentDir = join(state.cwd, ".agent");
-    const systemPrompt = [...new Set([state.systemPrompt || "Complete the current task as the user requested, using the provided tools as needed.", ...tools.flatMap(tool => tool.promptGuidelines ?? [])])].filter(Boolean).join("\n\n");
+    const systemPrompt = [...new Set([state.systemPrompt || "Complete the current task as the user requested, using the provided tools as needed.", ...tools.flatMap(tool => tool.promptGuidelines ?? []), `Communicate with the user, including questions and progress updates, in the selected Toonflow interface language: ${getLocale()}. Use Traditional Chinese for zh-TW, Simplified Chinese for zh-CN, and English for en. Keep the language of requested creative artifacts separate.`])].filter(Boolean).join("\n\n");
     const resourceLoader = new DefaultResourceLoader({
       cwd: state.cwd, agentDir, settingsManager,
       noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,

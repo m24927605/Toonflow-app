@@ -1,6 +1,6 @@
 # LoRA
 
-Use this file whenever the workspace has trained LoRAs or the user wants people, places, costumes or a look to stay the same across many shots. A LoRA is a small add-on trained on Colab from the project's own images; it keeps **what something looks like** in every generation. It does not decide composition, where people stand, or the state carried from shot to shot: keyframes and previs still do that. Only two model families load LoRAs: **MiniMax H3** video (family `h3`) and **Qwen-Image** images (family `qwen`). Seedance and the other cloud models load none, so for them this file only applies to their keyframes made with Qwen-Image.
+Use this file whenever the workspace has trained LoRAs or the user wants people, places, costumes or a look to stay the same across many shots. A LoRA is a small add-on trained on Colab from the project's own images; it keeps **what something looks like** in every generation. It does not decide composition, where people stand, or the state carried from shot to shot: keyframes and previs still do that. Only two model families load LoRAs: **Sulphur 2** video (LTX-2.3, family `ltx`) and **Qwen-Image** images (family `qwen`). Seedance and the other cloud models load none, so for them this file only applies to their keyframes made with Qwen-Image.
 
 LoRA work belongs to the asset stage and the execution layer. It never rewrites a finalized prompt's segmentation, blocking, performance, camera or continuity; the node adds trigger words on its own.
 
@@ -20,14 +20,14 @@ Build keyframe and video nodes after the LoRAs finish, so the new nodes load the
 
 | Kind | When it pays off | What it is trained from |
 |---|---|---|
-| Character | A person appears in several shots, especially with head turns or changing angles | Images with the Character role and the same character name, ideally in different outfits, backgrounds and framings; under 12 images, variants in other clothes and places are generated. Trains `qwen` for keyframes and `h3` for videos together |
+| Character | A person appears in several shots, especially with head turns or changing angles | Images with the Character role and the same character name, ideally in different outfits, backgrounds and framings; under 12 images, variants in other clothes and places are generated. Trains `qwen` for keyframes and `ltx` for videos together |
 | Scene | A place recurs across shots | Images with the Scene role and the same scene name; the LoRA takes that name. It learns the look (materials, light, furnishing), not the exact layout, so keyframes still fix the room |
 | Costume | A signature outfit worn by several people or in many shots | Images of the outfit on different people |
 | Style | A consistent film look across the project | Varied subjects in that look |
 | Slider | Dialing one quality up or down, such as expression intensity | A base prompt and its two ends; use strength between −1 and 1, beyond that it changes identity |
 | Motion | A movement the video model cannot make from text alone | Short clips of that movement. Try the text-only prompt first: common actions such as rising from seiza need no LoRA |
 
-Voice LoRAs are not needed when lines are dubbed with TTS and lip-synced as `<Audio N>` references.
+Voice LoRAs are not needed when lines are dubbed with TTS and the dubbed track is locked as the clip's soundtrack.
 
 ## Check before relying on one
 
@@ -36,7 +36,7 @@ After a LoRA is trained, ask the user to judge one test generation with it again
 ## Attach
 
 - **Keyframes (Qwen-Image image nodes):** the `qwen` character LoRAs of the people in the shot and the `qwen` scene LoRA of its place.
-- **Videos (MiniMax H3 video nodes):** the `h3` character LoRAs of the people in the shot.
+- **Videos (Sulphur 2 video nodes):** the `ltx` character LoRAs of the people in the shot.
 - **Build shot nodes** on a shot list attaches these by itself when the character and scene names on the role-tagged images match the LoRA names. For other nodes, call `node:setLoras` with paths from `loras.available`; an empty list removes them.
 - A generation loads at most 4 LoRAs. In a crowded shot, keep the people's LoRAs and drop the scene LoRA.
 - Attach a style or costume LoRA only where the user chose it, and keep the same set across the shots of one sequence.
@@ -44,8 +44,8 @@ After a LoRA is trained, ask the user to judge one test generation with it again
 ## Write prompts with LoRAs
 
 - The node adds each attached LoRA's trigger word to the prompt when generating; do not paste trigger words into finalized prompts by hand.
-- Keep the keyframe's framing consistent with the video prompt. MiniMax H3 treats the first frame as guidance: a character LoRA trained mostly on close-ups pulls toward a close-up and overrides a full-body first frame that the prompt does not also describe.
-- Keep connecting the reference images the shot needs; a LoRA adds to them and does not know a new outfit, an injury or anything else that was not in its training images.
+- Keep the keyframe's framing consistent with the video prompt. A character LoRA trained mostly on close-ups pulls the video toward a close-up, so describe the first frame's framing in the prompt as well.
+- A LoRA does not know a new outfit, an injury or anything else that was not in its training images: the first frame and the prompt carry those.
 
 ## Record
 

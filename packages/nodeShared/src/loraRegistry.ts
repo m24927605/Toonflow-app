@@ -8,9 +8,9 @@ type WorkspaceFiles = {
 /** A LoRA attached to a generation node: the record fields the request and the prompt need, and its strength. */
 export type AttachedLora = Pick<NodeLoraRecord, "path" | "trigger" | "name" | "kind" | "family"> & { strength: number };
 
-/** The LoRA family a media provider loads: MiniMax H3 for video, Qwen-Image for images; none for other providers. */
+/** The LoRA family a media provider loads: LTX-2.3 for Sulphur 2 video, Qwen-Image for images; none for other providers. */
 export const loraFamilyOf = (providerId?: string): NodeLoraFamily | undefined =>
-  providerId === "minimaxH3" ? "h3" : providerId === "qwenImage" ? "qwen" : undefined;
+  providerId === "sulphur" ? "ltx" : providerId === "qwenImage" ? "qwen" : undefined;
 
 /** The workspace's trained LoRAs, read from the records beside them in `loras/`; none when the folder is missing. */
 export async function listLoras(files: WorkspaceFiles) {

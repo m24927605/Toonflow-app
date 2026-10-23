@@ -21,7 +21,7 @@ export async function concatVideos(ffmpeg: BrowserFfmpegFactory, sources: string
   // H.264 needs even dimensions.
   const width = Math.ceil(clips[0]!.width / 2) * 2;
   const height = Math.ceil(clips[0]!.height / 2) * 2;
-  // Keeping the source rate avoids repeated frames, such as 24 fps H3 clips forced to 30; 30 only when it is unknown.
+  // Keeping the source rate avoids repeated frames, such as 24 fps Sulphur 2 clips forced to 30; 30 only when it is unknown.
   const frameRate = /^[1-9]\d*\/[1-9]\d*$/.test(clips[0]!.frameRate ?? "") ? clips[0]!.frameRate! : "30";
   const fade = (duration: number) => smoothCuts ? `,afade=t=in:d=0.05,afade=t=out:st=${Math.max(0, duration - 0.05)}:d=0.05` : "";
   const filters = clips.flatMap((clip, index) => [

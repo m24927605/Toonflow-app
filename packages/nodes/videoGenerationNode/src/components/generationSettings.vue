@@ -62,7 +62,8 @@ const modeLabels: Record<string, string> = {
 };
 const modes = computed(() => (props.model?.mode ?? []).map(item => ({
   value: JSON.stringify(item),
-  label: Array.isArray(item) ? "混合参考" : modeLabels[item] ?? item,
+  // A mode that takes only audio locks it as the soundtrack of a text-to-video clip.
+  label: Array.isArray(item) ? item.every(entry => entry.startsWith("audioReference:")) ? translate("Text with a locked soundtrack") : "混合参考" : modeLabels[item] ?? item,
 })));
 const mappings = computed(() => props.model?.durationResolutionMap ?? []);
 const durations = computed(() => [...new Set(mappings.value.flatMap(item => item.duration))].sort((a, b) => a - b));

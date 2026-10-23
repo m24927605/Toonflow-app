@@ -1,6 +1,5 @@
 import logger from "morgan";
 import express from "express";
-import cors from "cors";
 import { createHash } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { readFile, readdir } from "@toonflow/file";
@@ -11,7 +10,7 @@ import initializePlugins, { syncEditablePlugins } from "@/utils/plugins/initiali
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 
-const autoInstallProviders = ["openai.ts", "higgsfield.ts", "gemini.ts", "metaso.ts", "minimaxH3.ts", "qwenImage.ts", "suno.ts"];
+const autoInstallProviders = ["openai.ts", "higgsfield.ts", "gemini.ts", "drama3.ts", "metaso.ts", "sulphur.ts", "qwenImage.ts", "suno.ts"];
 
 /** Hashes the given files so built-in plugins sync once per build, including upgrades that keep the data directory. */
 async function contentRevision(files: string[]) {
@@ -85,7 +84,11 @@ export async function createApp({
     await buildRoute();
     app.use(logger("dev"));
   }
-  app.use(cors());
+  const { getAppOrigin } = await import("@/utils/mcp/control");
+  app.use("/api", (req, _res, next) => {
+    if (req.get("origin") || req.get("referer") || !["GET", "HEAD"].includes(req.method)) getAppOrigin(req);
+    next();
+  });
   app.use(languageRequest);
   app.use("/a2a", express.json({ limit: "2mb" }));
   app.use(["/api/workspaces/files/write", "/api/assets/save"], express.raw({ type: "application/octet-stream", limit: "100mb" }));

@@ -24,12 +24,8 @@
           </el-select>
         </div>
         <div class="settingField">
-          <span class="fieldLabel">语气</span>
-          <el-input v-model="emotion" :disabled="disabled" :maxlength="500" clearable aria-label="音频语气" />
-        </div>
-        <div class="settingField">
-          <span class="fieldLabel">时长（秒）</span>
-          <el-input-number v-model="duration" :disabled="disabled" :min="1" :max="600" :step="1" :valueOnClear="null" placeholder="默认" controlsPosition="right" aria-label="音乐或音效时长" />
+          <span class="fieldLabel">聲線與表演</span>
+          <el-input v-model="emotion" :disabled="disabled" :maxlength="500" clearable aria-label="聲線與表演描述" placeholder="描述性別、音色、口音與表演方式" />
         </div>
         <div class="settingField">
           <span class="fieldLabel">采样率</span>
@@ -47,12 +43,11 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ElButton, ElInput, ElInputNumber, ElOption, ElPopover, ElSegmented, ElSelect } from "element-plus";
+import { ElButton, ElInput, ElOption, ElPopover, ElSegmented, ElSelect } from "element-plus";
 import { IconAdjustmentsHorizontal, IconChevronUp } from "@tabler/icons-vue";
 import { languageOptions, sampleRateOptions, formatOptions } from "../audioSettings";
 
 const { voices } = defineProps<{ disabled?: boolean; voices: { title: string; voice: string }[] }>();
-const duration = defineModel<number | undefined>("duration");
 const language = defineModel<string>("language", { required: true });
 const voice = defineModel<string>("voice", { required: true });
 const emotion = defineModel<string>("emotion", { required: true });

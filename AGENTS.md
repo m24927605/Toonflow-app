@@ -1,5 +1,11 @@
 These conventions apply to the entire repository.
 
+# Model Preference
+
+- When an uncensored text model is requested without another explicit choice, use `ttindall/Qwen3.8-27B-Defiance-Uncensored-MTP-GGUF` (https://huggingface.co/ttindall/Qwen3.8-27B-Defiance-Uncensored-MTP-GGUF). This is the default for workflow scripts, shot lists and generation prompts.
+- This model is text-only. Do not substitute it for visual inspection or claim that a model change alone resolves video quality defects.
+- Workflow TTS uses `fishaudio/drama-3` on Colab. Generate new character voices rather than reusing the former Gemini voices; retain each new voice as the reference for that character's later lines.
+
 # Development Conventions
 
 ## Code Style Requirements

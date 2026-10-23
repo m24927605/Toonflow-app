@@ -83,7 +83,7 @@ Changes to visual assets do not automatically change voice identity. Record pers
 
 ## LoRAs for recurring assets
 
-When a character, place, outfit or look recurs across many shots and the production uses MiniMax H3 video or Qwen-Image keyframes, propose training LoRAs as part of the asset plan and prepare the role-tagged, consistently named images they train from, as [LoRA](lora.md) describes. Training is the user's decision because it consumes compute.
+When a character, place, outfit or look recurs across many shots and the production uses Sulphur 2 video or Qwen-Image keyframes, propose training LoRAs as part of the asset plan and prepare the role-tagged, consistently named images they train from, as [LoRA](lora.md) describes. Training is the user's decision because it consumes compute.
 
 ## Preparing generation and review
 

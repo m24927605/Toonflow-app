@@ -19,7 +19,7 @@ type PrevisPlan = { spec: unknown; plans: unknown[]; blocking: string[]; timelin
  */
 type PrevisJob = { directory: string; folder: string; aspect: number; shots: Shot[] } & (
   | { mode: "plan"; providerId: string; modelId: string; script: string; shotList: string }
-  | { mode: "render"; render: { shot: number; layout: string; depth: string; video: string; poses: Record<string, string> }[] }
+  | { mode: "render"; render: { shot: number; layout: string; depth: string; video: string; depthVideo: string; poses: Record<string, string> }[] }
 );
 type Director = {
   planPrevis?: (options: {
@@ -28,7 +28,7 @@ type Director = {
   }) => Promise<PrevisPlan>;
   renderPrevis?: (options: {
     plan: PrevisPlan; shots: Shot[]; rendered: number[]; aspect: number; signal: AbortSignal;
-    onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; poses: Record<string, Blob> }) => Promise<void>;
+    onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; depthVideo: Blob; poses: Record<string, Blob> }) => Promise<void>;
   }) => Promise<void>;
 };
 // previsSteps counts the plan's finished steps, which the server takes as progress while the plan has nothing to save.
@@ -67,11 +67,12 @@ onMounted(async () => {
     await director.renderPrevis({
       plan: await files.readJson<PrevisPlan>(planPath), shots: job.shots, aspect: job.aspect, signal,
       rendered: job.shots.flatMap(({ shot }) => render.has(shot) ? [] : [shot]),
-      async onShot({ shot, layout, depth, video, poses }) {
+      async onShot({ shot, layout, depth, video, depthVideo, poses }) {
         status.value = `shot ${shot}`;
         const paths = render.get(shot)!;
         await files.write(paths.layout, layout);
         await files.write(paths.depth, depth);
+        await files.write(paths.depthVideo, depthVideo);
         for (const [name, path] of Object.entries(paths.poses)) if (poses[name]) await files.write(path, poses[name]);
         // Written last, so a shot counts as rendered only once all its files are saved; a stopped run resumes after it.
         await files.write(paths.video, video);

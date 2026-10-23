@@ -36,7 +36,7 @@
           </div>
         </el-popover>
       </div>
-      <el-dropdown class="captureMenu" trigger="click" placement="top-end" :disabled="!ready || capturing" @visibleChange="captureMenuVisible = $event" @command="captureFrame">
+      <el-dropdown v-if="!readOnly" class="captureMenu" trigger="click" placement="top-end" :disabled="!ready || capturing" @visibleChange="captureMenuVisible = $event" @command="captureFrame">
         <el-button class="playerButton" text circle :icon="IconPhotoScan" :loading="capturing" :disabled="!ready || capturing" :aria-expanded="captureMenuVisible" aria-label="截取视频帧" title="截取视频帧" />
         <template #dropdown>
           <el-dropdown-menu>
@@ -58,7 +58,7 @@ import { ElButton, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage, ElPopo
 import { IconPlayerPlay, IconPlayerPause, IconVolume, IconVolumeOff, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { useNodeFiles } from "@toonflow/nodes-scaffold/runtime";
 
-const { src, label = "节点视频" } = defineProps<{ src: string; label?: string }>();
+const { src, label = "节点视频", readOnly = false } = defineProps<{ src: string; label?: string; readOnly?: boolean }>();
 const emit = defineEmits<{ loadedmetadata: [event: Event] }>();
 const video = ref<HTMLVideoElement>();
 const fullscreen = ref(false);
@@ -72,9 +72,9 @@ const currentTime = ref(0);
 const duration = ref(0);
 const capturing = ref(false);
 const captureMenuVisible = ref(false);
-const { node } = useNode();
-const { addNodes, findNode, getNodes, nodeTypes } = useVueFlow();
-const files = useNodeFiles();
+const node = readOnly ? undefined : useNode().node;
+const flow = readOnly ? undefined : useVueFlow();
+const files = readOnly ? undefined : useNodeFiles();
 const getCanvas = inject<(() => { id: string } | undefined) | undefined>("canvas", undefined);
 let captureController: AbortController | undefined;
 
@@ -202,6 +202,8 @@ function loadFrame(source: HTMLVideoElement, time: number, signal: AbortSignal) 
 }
 
 async function captureFrame(command: "current" | "first" | "last") {
+  if (!node || !flow || !files) return;
+  const { addNodes, findNode, getNodes, nodeTypes } = flow;
   if (!video.value || !ready.value || capturing.value) return;
   if (!nodeTypes?.value?.["remote-imageNode"]) return void ElMessage.error("请先启用图片节点插件");
   capturing.value = true;

@@ -15,7 +15,7 @@
       <el-button v-if="data.role === 'prompt'" text size="small" :icon="IconArrowsSplit" :disabled="!outputs.text.value.trim()" :title="translate('Fill each generation node that belongs to a shot with the matching ### section of this text, such as ### Shot 3')" @click="distributePrompts">{{ translate("Distribute prompts") }}</el-button>
       <el-button v-if="data.role === 'shotList'" text size="small" :icon="IconCube3dSphere" :title="translate('Create a Director\'s Studio node that blocks this shot list in previs one shot at a time; each confirmed shot is exported as its layout for the keyframe')" @click="notify(createPrevis)">{{ translate("Create previs") }}</el-button>
       <el-button v-if="data.role === 'shotList'" text size="small" :icon="IconLayoutGridAdd" :title="translate('Create a keyframe node for each shot of this shot list, connected to the scene and character images, and a video node for each shot whose keyframe is generated')" @click="notify(openShotNodes)">{{ translate("Build shot nodes") }}</el-button>
-      <el-button v-if="data.role === 'shotList'" text size="small" :icon="IconMovie" :loading="preparing" :disabled="generating" :title="translate('For every shot whose keyframe is generated, create its MiniMax H3 video node and have an uncensored model write its prompt; generation itself is not started')" @click="notify(prepareVideos)">{{ translate("Prepare videos") }}</el-button>
+      <el-button v-if="data.role === 'shotList'" text size="small" :icon="IconMovie" :loading="preparing" :disabled="generating" :title="translate('For every shot whose keyframe is generated, create its Sulphur 2 video node and have an uncensored model write its prompt; generation itself is not started')" @click="notify(prepareVideos)">{{ translate("Prepare videos") }}</el-button>
     </template>
     <div class="textContent" :class="{ empty: !outputs.text.value.trim() }">
       <el-alert v-if="documentState.error" :title="documentState.error" type="error" :closable="false" showIcon>
@@ -87,7 +87,7 @@
 import { t, translate } from "@toonflow/i18n/vue";
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
-import { shotListFixPrompt, shotListInstructions } from "@toonflow/node-shared/shotListPrompt";
+import { shotListFixPrompt, shotListInstructions, uncensoredTextModelId, visualTextModelId } from "@toonflow/node-shared/shotListPrompt";
 import { previsInstructions } from "@toonflow/node-shared/previsInstructions";
 import { keyframeDescriptionInstructions, layoutLine, masterLine, stateLine, withoutFullStop } from "@toonflow/node-shared/keyframePrompt";
 import { useVueFlow } from "@vue-flow/core";
@@ -95,12 +95,12 @@ import { flashNode } from "@toonflow/nodes-scaffold/flashNode";
 import { planPromptDistribution } from "./distributePrompts";
 import { defaultShotNodesChoice, planShotNodes, type ShotNodesChoice, type ShotNodesPlan } from "./shotNodes";
 import { castNames, shotSpans, templateForCast, type ShotSpan } from "@toonflow/node-shared/shotList";
-import { fillDialogue, parseDialogue, speakerIds, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
+import { finishPrompt, shotDialogue, validateVideoPrompt, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
 import { checkVideoPrompt, parseReview, passingScore, reviewInstructions, type VideoPreflight } from "./videoPreflight";
 import shotNodesDialog, { type LoraRow } from "./shotNodesDialog.vue";
 import { ElAlert, ElButton, ElCard, ElSelect, ElDialog, ElOption, ElOptionGroup, ElMessage, ElMessageBox, ElRadioButton, ElRadioGroup } from "element-plus";
 import { IconEdit, IconFileText, IconSparkles, IconArrowUp, IconArrowsSplit, IconLayoutGridAdd, IconTable, IconMovie, IconCube3dSphere } from "@tabler/icons-vue";
-import { nodeSkeleton, nodeTools, useNode, z, type NodeAiModel, type NodeHandle, type NodeLoraRecord } from "@toonflow/nodes-scaffold/runtime";
+import { nodeSkeleton, nodeTools, useNode, z, isNodeOutput, type NodeAiModel, type NodeHandle, type NodeLoraRecord } from "@toonflow/nodes-scaffold/runtime";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { useNodeReferences } from "@toonflow/node-shared/useNodeReferences";
 import markdownEditor from "./markdownEditor.vue";
@@ -336,10 +336,6 @@ watch(() => textReady.value && !!selectedModel.value, ready => {
   void generateText();
 }, { immediate: true });
 
-// ACT: Shot lists are written by this uncensored Colab model, the fastest one measured on the L4, so no scene of the
-// script is refused or skipped. The whole script must fit its 32K context; longer scripts fail with the server's error.
-const shotListModelId = "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive";
-
 /** Runs a flow action from its button and shows why it could not run. */
 async function notify(action: () => unknown) {
   try {
@@ -353,8 +349,8 @@ async function notify(action: () => unknown) {
 async function createShotList() {
   if (!outputs.value.text.value.trim()) throw new Error(translate("The script is empty"));
   if (!models.value.length) await loadModels();
-  const shotListModel = models.value.find(item => item.modelId === shotListModelId);
-  if (!shotListModel) throw new Error(t`Add the Colab CLI provider with ${shotListModelId} in Settings first`);
+  const shotListModel = models.value.find(item => item.modelId === uncensoredTextModelId);
+  if (!shotListModel) throw new Error(t`Add the Colab CLI provider with ${uncensoredTextModelId} in Settings first`);
   const script = "{{ref 1}}";
   // The cast column must use the names "Build shot nodes" matches against, the characters found on the canvas.
   // People, not outfits: what they wear or not goes in the State column.
@@ -385,8 +381,8 @@ async function createPrevis() {
   const existing = flow.getEdges.value.some(edge => edge.source === node.id && flow.findNode(edge.target)?.type === "remote-director3dNode");
   if (existing) throw new Error(translate("This shot list already has a previs node; continue the shots there"));
   if (!models.value.length) await loadModels();
-  const writer = models.value.find(item => item.modelId === shotListModelId);
-  if (!writer) throw new Error(t`Add the Colab CLI provider with ${shotListModelId} in Settings first`);
+  const writer = models.value.find(item => item.modelId === uncensoredTextModelId);
+  if (!writer) throw new Error(t`Add the Colab CLI provider with ${uncensoredTextModelId} in Settings first`);
   const spans = shotSpans(shots, text);
   const scripts = planShotNodes(node.id, text, spans, flow.getNodes.value, flow.getEdges.value, new Set()).scripts.map(item => item.nodeId);
   const sources = [...scripts, node.id];
@@ -467,9 +463,10 @@ const preparing = ref(false);
 const generationStatus = computed(() => generating.value || preparing.value ? "running" : generationFailed.value ? "failed" : outputs.value.text.value.trim() ? "succeeded" : "idle");
 const shotNodesPlan = ref<ShotNodesPlan>();
 
-// ACT: Videos are prepared for MiniMax H3 on Colab, the video model of this pipeline; its first-frame mode is stored as
-// "endFrameOptional" (the end frame is optional). Another video model would need its own prompt format.
-const h3Model = JSON.stringify(["minimaxH3", "minimax_h3_ref2va"]);
+// ACT: Videos are prepared for Sulphur 2 on Colab, the video model of this pipeline; a node starts in the first-frame
+// mode "endFrameOptional" (the end frame is optional) and moves to the video control mode once the shot's previs depth
+// video is connected. Another video model would need its own prompt format.
+const sulphurModel = JSON.stringify(["sulphur", "sulphur_2_q8"]);
 const videoResolutions = ["480p", "720p", "1080p"];
 // The resolution chosen for this shot list's videos; 1080p unless the user picked another one before.
 const videoResolution = computed({ get: () => data.value.videoResolution ?? "1080p", set: (value: string) => { data.value.videoResolution = value; } });
@@ -492,8 +489,9 @@ function answerPrepare(choice?: { resolution: string; ratio: string }) {
 }
 
 /**
- * Takes every shot whose keyframe is generated to a ready-to-run video node: creates its MiniMax H3 node starting from
- * that keyframe when missing, then has the shot list model write the H3 prompt from the whole script and shot list.
+ * Takes every shot whose keyframe is generated to a ready-to-run video node: creates its Sulphur 2 node starting from
+ * that keyframe when missing, with the shot's previs depth video as its control video, then has the shot list model
+ * write the prompt from the whole script and shot list.
  * Video nodes that already hold a written prompt keep it and only take the chosen quality and ratio; no video
  * generation is started.
  */
@@ -502,28 +500,33 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
   const text = outputs.value.text.value;
   const spans = shotSpans(checkScript(text).shots, text);
   const plan = planShotNodes(node.id, text, spans, flow.getNodes.value, flow.getEdges.value, new Set());
+  const audioPathsOf = (target: string) => flow.getEdges.value.filter(edge => edge.target === target).flatMap(edge => {
+    const output = flow.findNode(edge.source)?.data?.outputs?.[edge.sourceHandle ?? ""];
+    return isNodeOutput(output) && output.dataType === "AUDIO" ? [output.value.url] : [];
+  }).sort();
   if (!models.value.length) await loadModels();
-  const writer = models.value.find(item => item.modelId === shotListModelId);
-  if (!writer) throw new Error(t`Add the Colab CLI provider with ${shotListModelId} in Settings first`);
-  if (!(await ai.getMediaModels()).some(item => JSON.stringify([item.providerId, item.modelId]) === h3Model)) {
-    throw new Error(translate("Add the MiniMax H3 (Colab) media provider in Settings first"));
+  const writer = models.value.find(item => item.modelId === uncensoredTextModelId);
+  if (!writer) throw new Error(t`Add the Colab CLI provider with ${uncensoredTextModelId} in Settings first`);
+  if (!(await ai.getMediaModels()).some(item => JSON.stringify([item.providerId, item.modelId]) === sulphurModel)) {
+    throw new Error(translate("Add the Sulphur 2 (Colab) media provider in Settings first"));
   }
   const unwritten = (shot: number) => {
-    const prompt = String(flow.findNode(plan.videos.get(shot)!)?.data?.prompt ?? "");
-    return !prompt.trim() || prompt.includes("{{shot}}");
+    const target = flow.findNode(plan.videos.get(shot)!);
+    const prompt = String(target?.data?.prompt ?? "");
+    return !prompt.trim() || prompt.includes("{{shot}}") || target?.data?.workflow?.shotList !== text || target?.data?.preflight?.prompt !== prompt.trim() || JSON.stringify(target?.data?.workflow?.audioPaths) !== JSON.stringify(audioPathsOf(target?.id ?? ""));
   };
   const create = spans.filter(span => plan.generatedKeyframes.has(span.shot) && !plan.videos.has(span.shot));
   const fill = spans.filter(span => plan.generatedKeyframes.has(span.shot) && plan.videos.has(span.shot) && unwritten(span.shot));
   const waiting = spans.filter(span => !plan.generatedKeyframes.has(span.shot)).map(span => span.shot);
   const existing = spans.filter(span => plan.videos.has(span.shot));
   const shots = (list: { shot: number }[]) => list.map(item => item.shot).join(", ");
-  // Trained MiniMax H3 LoRAs of the people named in a shot's cast cell.
+  // Trained Sulphur 2 (LTX) LoRAs of the people named in a shot's cast cell.
   loraRecords.value = await listLoras(files.getWorkspaceFiles()).catch(() => []);
-  const lorasOf = (span: ShotSpan) => characterLoras(castNames(span), "h3");
+  const lorasOf = (span: ShotSpan) => characterLoras(castNames(span), "ltx");
   const notes = [
     !create.length && !fill.length ? translate("Every shot with a generated keyframe already has a video node with a written prompt.") : "",
     existing.length ? t`The chosen quality and ratio also apply to the existing video nodes of shots ${shots(existing)}.` : "",
-    create.length ? t`Create MiniMax H3 video nodes for shots ${shots(create)}, each starting from its keyframe.` : "",
+    create.length ? t`Create Sulphur 2 video nodes for shots ${shots(create)}, each starting from its keyframe.` : "",
     create.length + fill.length ? t`Write and preflight the video prompts of shots ${shots([...create, ...fill].sort((a, b) => a.shot - b.shot))} with ${writer.label}, one after another; a prompt scoring under ${passingScore} is rewritten once.` : "",
     waiting.length ? t`Shots ${waiting.join(", ")} wait for their keyframes.` : "",
   ].filter(Boolean);
@@ -540,10 +543,12 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
     return void ElMessage.success(t`Set shots ${shots(existing)} to ${resolution}`);
   }
 
+  const observer = models.value.find(item => item.modelId === visualTextModelId);
+  if (!observer) throw new Error(`Add the Colab CLI vision model ${visualTextModelId} in Settings first`);
   preparing.value = true;
   prepareReport.value = undefined;
   try {
-    // New video nodes sit to the right of their keyframes and start from them in H3's first-frame mode.
+    // New video nodes sit to the right of their keyframes and start from them in the first-frame mode.
     flow.addNodes(create.map(span => {
       const keyframe = flow.findNode(plan.keyframes.get(span.shot)!)!;
       const time = `${Number(span.start.toFixed(2))}–${Number(span.end.toFixed(2))}s`;
@@ -551,7 +556,7 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
         x: keyframe.computedPosition.x + (keyframe.dimensions.width || 320) + 80, y: keyframe.computedPosition.y,
       }, data: {
         label: t`Shot ${span.shot} video (${time})`, outputs: {}, shot: span.shot, prompt: "", promptModel: [],
-        model: h3Model, mode: JSON.stringify("endFrameOptional"), duration: Math.max(4, Math.ceil(span.end - span.start)), resolution,
+        model: sulphurModel, mode: JSON.stringify("endFrameOptional"), duration: Math.max(1, Math.ceil(span.end - span.start)), resolution,
         ratio: choice.ratio || String(keyframe.data?.ratio ?? "16:9"), referenceOrder: { in: [encodeURIComponent(JSON.stringify([keyframe.id, "image"]))] },
       } };
     }));
@@ -559,7 +564,7 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
     flow.addEdges(create.map(span => ({
       id: crypto.randomUUID(), source: plan.keyframes.get(span.shot)!, sourceHandle: "image", target: created.get(span.shot)!, targetHandle: "in",
     })));
-    // Each shot's previs video joins its video node after the keyframe, so the prompt names it <Video 1>.
+    // Each shot's previs depth video joins its video node after the keyframe as its control video.
     for (const span of [...create, ...fill]) {
       const previs = plan.previsVideos.get(span.shot);
       const target = flow.findNode(created.get(span.shot)!);
@@ -570,7 +575,6 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
     }
     const scripts = plan.scripts.map(item => ({ dataType: "STRING" as const, value: String(flow.findNode(item.nodeId)?.data?.outputs?.text?.value ?? "") }));
     const references = [...scripts, { dataType: "STRING" as const, value: text }];
-    const ids = speakerIds(spans);
     const reports: string[] = [];
     let failed = false;
     for (const span of [...create, ...fill].sort((a, b) => a.shot - b.shot)) {
@@ -578,23 +582,34 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
       if (!target) continue;
       const duration = Number(target.data?.duration ?? Math.ceil(span.end - span.start));
       const order = spans.indexOf(span);
+      const frame = flow.findNode(plan.keyframes.get(span.shot)!)?.data?.outputs?.image;
+      if (!isNodeOutput(frame) || frame.dataType !== "IMAGE") throw new Error(`Shot ${span.shot}: the actual first-frame image is missing`);
+      const keyframe = (await ai.generate({
+        providerId: observer.providerId, modelId: observer.modelId,
+        prompt: "Describe only this actual first-frame image in English: its visual style (such as a photograph, 2D anime or a 3D render), the visible people, their distinguishing appearance, clothing, posture, held objects, frame positions, set, doors and windows, lighting and colour. State uncertainty instead of inventing hidden details. This observation will anchor a video prompt.",
+        references: [frame],
+      })).text.trim();
+      if (!keyframe) throw new Error(`Shot ${span.shot}: the vision model returned no first-frame observation`);
       const ask = async (prompt: string) => (await ai.generate({ providerId: writer.providerId, modelId: writer.modelId, prompt, references })).text.trim();
       // Writes a prompt and preflights it: the checks that need no model first, then the Gate 1 review by the writer.
+      const people = castNames(span).map(name => ({ name, trigger: lorasOf(span).find(lora => lora.name === name)?.trigger }));
+      const names = new Map(people.map(person => [person.name, [person.name, ...person.trigger ? [person.trigger] : []]]));
       const attempt = async (feedback?: { draft: string; issues: string[] }) => {
-        const instructions = videoPromptInstructions(span, scripts.length, { duration, previs: plan.previsVideos.has(span.shot), loras: lorasOf(span) }, ids);
+        const instructions = videoPromptInstructions(span, scripts.length, { duration, opening: keyframe, people, control: plan.previsVideos.has(span.shot) });
         const draft = await ask(feedback
           ? `${instructions}\n\nYour previous draft, with dialogue markers:\n${feedback.draft}\n\nFix these problems and output the whole prompt again:\n${feedback.issues.map(issue => `- ${issue}`).join("\n")}`
           : instructions);
         let prompt = draft;
         try {
-          prompt = fillDialogue(draft, parseDialogue(span.dialogue));
+          prompt = finishPrompt(draft, shotDialogue(span), names);
+          validateVideoPrompt(prompt);
         } catch (error) {
-          return { draft, prompt, score: 0, issues: [t`Dialogue markers are misplaced (${error instanceof Error ? error.message : ""}).`] };
+          return { draft, prompt, score: 0, issues: [t`The draft breaks the prompt format (${error instanceof Error ? error.message : ""}).`] };
         }
-        const issues = checkVideoPrompt(prompt, span, duration, plan.previsVideos.has(span.shot), lorasOf(span).map(lora => lora.trigger));
+        const issues = checkVideoPrompt(prompt, span, duration, lorasOf(span).map(lora => lora.trigger));
         if (issues.length) return { draft, prompt, score: 0, issues };
         try {
-          const review = parseReview(await ask(reviewInstructions(span, scripts.length, duration, prompt, spans[order - 1], spans[order + 1], plan.previsVideos.has(span.shot))));
+          const review = parseReview(await ask(reviewInstructions(span, scripts.length, duration, prompt, spans[order - 1], spans[order + 1], plan.previsVideos.has(span.shot), keyframe)));
           return { draft, prompt, ...review };
         } catch {
           return { draft, prompt, score: 0, issues: [translate("The review did not return a valid score.")] };
@@ -605,7 +620,7 @@ async function prepareVideos(given?: { resolution: string; ratio: string }) {
       if (result.score < passingScore) result = await attempt({ draft: result.draft, issues: result.issues });
       const preflight: VideoPreflight = { prompt: result.prompt, score: result.score, issues: result.issues, passed: result.score >= passingScore };
       // The video node loads the trained LoRAs of the shot's cast; the prompt names each by its trigger word.
-      target.data = { ...target.data, loras: lorasOf(span), prompt: result.prompt, promptModel: result.prompt.split("\n").map(line => [{ type: "Write", text: line }]), preflight };
+      target.data = { ...target.data, workflow: { source: node.id, shotList: text, shot: span.shot, audioPaths: audioPathsOf(target.id) }, loras: lorasOf(span), prompt: result.prompt, promptModel: result.prompt.split("\n").map(line => [{ type: "Write", text: line }]), preflight };
       failed ||= result.score < passingScore;
       flashNode(target.data, result.score >= passingScore ? translate("Prompt filled and preflighted") : translate("Preflight failed"));
       reports.push([
@@ -652,7 +667,7 @@ const loraRows = computed<LoraRow[]>(() => {
   const plan = shotNodesPlan.value;
   if (!plan) return [];
   const people = [...new Set(plan.characters.map(item => item.person))]
-    .map(person => ({ label: person, video: hasLora("character", "h3", person), keyframe: hasLora("character", "qwen", person) }));
+    .map(person => ({ label: person, video: hasLora("character", "ltx", person), keyframe: hasLora("character", "qwen", person) }));
   const places = plan.scenes.map(item => {
     const name = String(flow.findNode(item.nodeId)?.data?.scene ?? "").trim();
     return { label: name || item.label, unnamed: !name, keyframe: !!name && hasLora("scene", "qwen", name) };
@@ -728,17 +743,16 @@ function buildShotNodes(choice: ShotNodesChoice, plan = shotNodesPlan.value) {
     const master = !video && masterId && masterId !== id ? masterId : undefined;
     if (master) sources.push(master);
     const masterText = master ? translate(masterLine(`{{ref ${sources.length}}}`)) : "";
-    // A video node also takes the shot's previs video, after its keyframe, for blocking only.
+    // A video node also takes the shot's previs depth video, after its keyframe, as its control video.
     const previsVideo = video ? plan.previsVideos.get(span.shot) : undefined;
-    const previsLine = previsVideo ? t`${`{{ref ${sources.length + 1}}}`} is this shot's grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like ${"{{ref 1}}"}.` : "";
-    const fixedLines = [stateText, blockingLine, layoutText, masterText, previsLine].filter(Boolean).join("\n");
+    const fixedLines = [stateText, blockingLine, layoutText, masterText].filter(Boolean).join("\n");
     const prompt = fixedLines && castTemplate.includes("{{shot}}") ? castTemplate.replace("{{shot}}", `${fixedLines}\n{{shot}}`) : castTemplate;
     newNodes.push({ id, type, position: { x: choice.textNodes ? x + 460 : x, y }, data: {
       label: video ? t`Shot ${span.shot} video (${time})` : t`Shot ${span.shot} keyframe (${time})`, outputs: {}, shot: span.shot,
       // Trained LoRAs of the shot's cast, and for keyframes of its scenes, load with the generation; the node adds their
       // trigger words to the prompt. ACT: A generation loads at most 4, so a crowded shot keeps the people and drops the
       // scene LoRA; raise the runners' limit if casts of four with a scene LoRA become common.
-      ...(video ? { loras: characterLoras([...new Set(cast.map(item => item.person))], "h3") } : { role: "keyframe", loras: [...characterLoras([...new Set(cast.map(item => item.person))], "qwen"), ...sceneLoras(choice.scenes)].slice(0, 4) }),
+      ...(video ? { loras: characterLoras([...new Set(cast.map(item => item.person))], "ltx") } : { role: "keyframe", loras: [...characterLoras([...new Set(cast.map(item => item.person))], "qwen"), ...sceneLoras(choice.scenes)].slice(0, 4) }),
       prompt, promptModel: lines(prompt), ratio: "16:9",
       referenceOrder: { in: [...sources.map(referenceKey), ...previsVideo ? [encodeURIComponent(JSON.stringify([previsVideo, "video"]))] : []] },
       ...(generationModel ? { model: generationModel } : {}), ...(video ? { duration: Math.ceil(span.end - span.start) } : {}),
@@ -816,7 +830,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "prepareVideos",
-  description: "For a shot list node: for every shot whose keyframe is generated, create its MiniMax H3 video node starting from the keyframe, with the shot's previs video and its cast's H3 LoRAs, and have the shot list model write and preflight the H3 prompt; existing video nodes take the resolution and ratio (an empty ratio keeps each keyframe's). Runs in the background and never starts video generation; poll node:getPrepareStatus.",
+  description: "For a shot list node: for every shot whose keyframe is generated, create its Sulphur 2 video node starting from the keyframe, with the shot's previs depth video as its control video and its cast's LTX LoRAs, and have the shot list model write and preflight the prompt; existing video nodes take the resolution and ratio (an empty ratio keeps each keyframe's). Runs in the background and never starts video generation; poll node:getPrepareStatus.",
   parameters: z.strictObject({ resolution: z.enum(videoResolutions as [string, ...string[]]), ratio: z.enum(["", ...videoRatios] as [string, ...string[]]) }),
   execute(choice) {
     if (preparing.value || generating.value) throw new Error(translate("This node is busy; try again when it is done"));

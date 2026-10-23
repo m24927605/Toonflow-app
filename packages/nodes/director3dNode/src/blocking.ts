@@ -4,6 +4,7 @@ import { t } from "@toonflow/i18n/vue";
 import { createStage, disposeStage, type SceneDocument } from "./scene";
 import { prepareSceneAnimation, type DirectorPlan } from "./sceneAnimation";
 import { prepareMotion, sampleMotion } from "./motion";
+import { personPoints } from "./framingGeometry";
 
 // People are blocked as cylinders, or as mannequins when the user allows them.
 const personTypes = new Set(["cylinder", "capsule", "mannequin"]);
@@ -11,14 +12,14 @@ const level = (vector: Vector3) => vector.setY(0).normalize();
 // A person whose column no longer stands upright lies down, and has no facing on the floor.
 const lyingDown = (root: Object3D) => new Vector3(0, 1, 0).applyQuaternion(root.getWorldQuaternion(new Quaternion())).y < 0.5;
 // The head decides where a person is in frame: a close-up leaves the middle of the body out.
-const headPoint = (box: Box3, camera: PerspectiveCamera) => new Vector3((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * 0.9, (box.min.z + box.max.z) / 2).project(camera);
+const headPoint = (root: Object3D, camera: PerspectiveCamera) => personPoints(root, [0.9])[0]!.project(camera);
 const inFrame = (point: Vector3) => point.z <= 1 && Math.abs(point.x) <= 1 && Math.abs(point.y) <= 1;
 /**
  * Whether any of a person is in frame: their head, or else part of their body in front of the camera, such as the
  * shoulder an over-the-shoulder shot looks past, whose head the frame cuts off.
  */
-function framedBy(box: Box3, camera: PerspectiveCamera) {
-  if (inFrame(headPoint(box, camera))) return true;
+function framedBy(root: Object3D, box: Box3, camera: PerspectiveCamera) {
+  if (inFrame(headPoint(root, camera))) return true;
   const corners = [0, 1].flatMap(x => [0, 1].flatMap(y => [0, 1].map(z => new Vector3(x ? box.max.x : box.min.x, y ? box.max.y : box.min.y, z ? box.max.z : box.min.z).project(camera))))
     .filter(point => Math.abs(point.z) <= 1);
   if (!corners.length) return false;
@@ -50,8 +51,8 @@ export async function describeBlocking(scene: SceneDocument, plan: DirectorPlan,
       const box = new Box3().setFromObject(root);
       // People who have not come in yet wait below the floor.
       if (box.max.y < 0) return [];
-      const point = headPoint(box, camera);
-      return [{ name: object.name, centre: box.getCenter(new Vector3()), facing: root.getWorldDirection(new Vector3()), point, framed: framedBy(box, camera) }];
+      const point = headPoint(root, camera);
+      return [{ name: object.name, centre: box.getCenter(new Vector3()), facing: root.getWorldDirection(new Vector3()), point, framed: framedBy(root, box, camera) }];
     });
     const lines = people.map(({ name, centre, point, framed }) => {
       const distance = metres(camera.position.distanceTo(centre));
@@ -136,10 +137,7 @@ async function framingStage(scene: SceneDocument, plan: DirectorPlan, aspect: nu
   const raycaster = new Raycaster();
   /** The object in front of a person from a camera position, when every sight line to them is blocked. */
   const blockerOf = (from: Vector3, person: (typeof roots)[number]) => {
-    const box = new Box3().setFromObject(person.root);
-    const centre = box.getCenter(new Vector3());
-    const blockers = sightHeights.map(fraction => {
-      const target = new Vector3(centre.x, box.min.y + (box.max.y - box.min.y) * fraction, centre.z);
+    const blockers = personPoints(person.root, sightHeights).map(target => {
       raycaster.set(from, target.clone().sub(from).normalize());
       raycaster.far = from.distanceTo(target);
       const first = raycaster.intersectObjects(roots.map(item => item.root), true).map(hit => ownerOf(hit.object)).find(Boolean);
@@ -168,7 +166,6 @@ const framedStep = 0.5;
 // the lens, which video models then draw.
 const lensMargin = 25;
 // A person looks up or down at another whose head is this much higher or lower, in metres.
-const eyeHeightStep = 0.3;
 
 /**
  * How the camera sees each person `framed` at the posed moment and where they look, in English for video prompts and
@@ -186,12 +183,12 @@ function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: 
     const box = new Box3().setFromObject(root);
     const person = personTypes.has(object.objType);
     return object.name && box.max.y >= 0 && (person || /^prop\d+$/.test(object.threeJsonId))
-      ? [{ name: object.name, person, lying: person && lyingDown(root), centre: box.getCenter(new Vector3()), head: box.max.y, facing: level(root.getWorldDirection(new Vector3())) }] : [];
+      ? [{ name: object.name, person, lying: person && lyingDown(root), centre: box.getCenter(new Vector3()), facing: level(root.getWorldDirection(new Vector3())) }] : [];
   });
   const degrees = (radians: number) => radians * 180 / Math.PI;
   return Object.fromEntries(placed.filter(item => item.person && framed.includes(item.name)).map(person => {
-    // ACT: Someone lying down is taken to look up; a head turned on the pillow is not planned.
-    if (person.lying) return [person.name, { gaze: "lying down, looks up, away from the camera", look: "lying down, the face turned up, the eyes looking up, not at the viewer" }];
+    // A rotated body proxy does not represent independent head or eye articulation.
+    if (person.lying) return [person.name, { direction: "unmeasured", gaze: "head and eye direction are unmeasured by this coarse body proxy", look: "lying body posture; head and eye direction are unmeasured" }];
     const angleTo = (item: (typeof placed)[number]) => degrees(level(item.centre.clone().sub(person.centre)).angleTo(person.facing));
     const nearest = (items: typeof placed, limit: number) => items.filter(item => item !== person && angleTo(item) < limit).sort((a, b) => angleTo(a) - angleTo(b))[0];
     const other = nearest(placed.filter(item => item.person && !item.lying), 60);
@@ -199,26 +196,16 @@ function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: 
     const prop = other ? undefined : nearest(placed.filter(item => !item.person && /^[a-z][A-Za-z]*\d*$/.test(item.name)), 30);
     const toLens = level(camera.position.clone().sub(person.centre));
     const fromLens = degrees(person.facing.angleTo(toLens));
+    if (fromLens <= 3) return [person.name, { direction: "camera", gaze: "body proxy faces the camera; independent head and eye gaze are unmeasured", look: "body shown frontally" }];
     // The right of the frame as seen along this person's own line to the lens, as the shot and their pose render see
     // them; the look goes to the side its target is on, or else the side they face.
     const screenRight = new Vector3(0, 1, 0).cross(toLens);
     const sideOf = (direction: Vector3) => direction.dot(screenRight) >= 0 ? "right" : "left";
     const aim = other ?? prop;
     const side = sideOf(aim ? level(aim.centre.clone().sub(person.centre)) : person.facing);
-    const turn = sideOf(person.facing);
     const view = fromLens < lensMargin ? "turned towards the camera" : fromLens < 75 ? "seen in three-quarter view" : fromLens < 120 ? "seen in profile" : "seen from behind";
-    const height = other ? other.head - person.head : 0;
-    const tilt = height > eyeHeightStep ? "up " : height < -eyeHeightStep ? "down " : "";
-    const target = !aim ? `${fromLens < 120 ? "looks" : "faces away from the camera, looking"} towards the ${side} of the frame`
-      : prop ? `looks at the ${prop.name.replace(/\d+$/, "").replace(/([A-Z])/g, " $1").toLowerCase()}, towards the ${side} of the frame`
-        : framed.includes(other!.name) ? `looks ${tilt}at ${other!.name}, towards the ${side} of the frame`
-          : `looks ${tilt}off the ${side} edge of the frame, at someone out of frame`;
-    const gaze = `${view}, ${target}${fromLens < lensMargin ? `, the eyes on someone just beside the camera to the ${side}` : ""}`;
-    const look = fromLens < lensMargin ? `shown with the body facing the viewer, the head turned slightly to the ${turn} of the image, the eyes looking past the viewer to the ${turn}`
-      : fromLens < 75 ? `seen in three-quarter view, the face turned to the ${turn} of the image, the eyes looking off to the ${turn}, not at the viewer`
-        : fromLens < 120 ? `seen in profile, facing the ${turn} of the image, the eyes looking ahead to the ${turn}, not at the viewer`
-          : "seen from behind, the face turned away from the viewer and hidden";
-    return [person.name, { gaze, look }];
+    const direction = fromLens >= 120 ? "away" : side === "right" ? "screenRight" : "screenLeft";
+    return [person.name, { direction, gaze: `body proxy ${view}, estimated heading ${direction}; independent head and eye gaze are unmeasured`, look: `body proxy ${view}` }];
   }));
 }
 
@@ -226,8 +213,7 @@ function gazeOf(roots: { object: { name?: string; objType: string; threeJsonId: 
  * Who a plan shows, by name: the people any of whom is in frame in the opening, and everyone who is at any moment of
  * the shot, by the same measure as describeBlocking; where each person framed in the opening or at the end looks, as
  * the opening's gaze and the end's when it changes; and the opening's look of each person in it, for their pose. The
- * shot list's cast cell may leave out someone the camera sees, such as the person a close shot looks past, who is drawn
- * all the same.
+ * staging applies each shot's authoritative visible cast before these measurements are taken.
  */
 export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, aspect: number) {
   const stage = await framingStage(scene, plan, aspect);
@@ -239,7 +225,7 @@ export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, asp
       return people.flatMap(({ object, root }) => {
         const box = new Box3().setFromObject(root);
         // People who have not come in yet wait below the floor.
-        return object.name && box.max.y >= 0 && framedBy(box, stage.camera) ? [object.name] : [];
+        return object.name && box.max.y >= 0 && framedBy(root, box, stage.camera) ? [object.name] : [];
       });
     };
     const shown = new Set<string>();
@@ -255,7 +241,7 @@ export async function framedPeople(scene: SceneDocument, plan: DirectorPlan, asp
       const [first, last] = [start[name]?.gaze, ending[name]?.gaze];
       return [name, !first ? `by the end ${last}` : !last || last === first ? first : `at the start ${first}; by the end ${last}`];
     }));
-    return { opening, shown: [...shown], gaze, looks: Object.fromEntries(Object.entries(start).map(([name, item]) => [name, item.look])) };
+    return { opening, shown: [...shown], gaze, directions: Object.fromEntries(Object.entries(start).map(([name, item]) => [name, item.direction])), looks: Object.fromEntries(Object.entries(start).map(([name, item]) => [name, item.look])) };
   } finally {
     stage.dispose();
   }
@@ -290,7 +276,7 @@ export async function framingIssues(scene: SceneDocument, plan: DirectorPlan, as
         const box = new Box3().setFromObject(person.root);
         const centre = box.getCenter(new Vector3());
         // The head is what every shot size keeps in frame; a close-up leaves the middle of the body out.
-        const head = new Vector3(centre.x, box.min.y + (box.max.y - box.min.y) * 0.9, centre.z).project(camera);
+        const head = headPoint(person.root, camera);
         if (head.z > 1 || Math.abs(head.x) > 1 || Math.abs(head.y) > 1) {
           hard.push(`At ${time} s ${name}'s head is out of frame.`);
           continue;
@@ -341,7 +327,7 @@ export async function smallFaces(scene: SceneDocument, plan: DirectorPlan, aspec
         if (!object.name || !cast.includes(object.name) || !personTypes.has(object.objType) || lyingDown(root)) continue;
         const box = new Box3().setFromObject(root);
         // People who have not come in yet wait below the floor.
-        if (box.max.y < 0 || !inFrame(headPoint(box, stage.camera))) continue;
+        if (box.max.y < 0 || !inFrame(headPoint(root, stage.camera))) continue;
         const centre = box.getCenter(new Vector3());
         const [crown, chin] = [box.max.y, box.max.y - headHeight].map(y => new Vector3(centre.x, y, centre.z).project(stage.camera));
         const share = Math.abs(crown!.y - chin!.y) / 2;
@@ -369,7 +355,7 @@ export async function coveredPeople(scene: SceneDocument, plan: DirectorPlan, as
       stage.pose(time, motion);
       const seen = named.flatMap(person => {
         const box = new Box3().setFromObject(person.root);
-        return box.max.y >= 0 && framedBy(box, stage.camera) ? [{ name: person.object.name!, box, rect: screenRect(box, stage.camera), distance: box.getCenter(new Vector3()).distanceTo(stage.camera.position) }] : [];
+        return box.max.y >= 0 && framedBy(person.root, box, stage.camera) ? [{ name: person.object.name!, box, head: headPoint(person.root, stage.camera), rect: screenRect(box, stage.camera), distance: box.getCenter(new Vector3()).distanceTo(stage.camera.position) }] : [];
       });
       for (const [index, a] of seen.entries()) {
         for (const b of seen.slice(index + 1)) {
@@ -377,7 +363,7 @@ export async function coveredPeople(scene: SceneDocument, plan: DirectorPlan, as
           if (found.has(pair) || overlapShare(a.rect, b.rect) <= overlapLimit) continue;
           const [front, back] = a.distance < b.distance ? [a, b] : [b, a];
           // Only a head hidden counts: someone seated in front of a person standing behind leaves that face clear.
-          const head = headPoint(back.box, stage.camera);
+          const head = back.head;
           if (!inFrame(head) || head.x < front.rect.left || head.x > front.rect.right || head.y < front.rect.bottom || head.y > front.rect.top) continue;
           found.set(pair, `At ${time} s ${front.name} stands between the camera and ${back.name} and covers them in frame; place them, or where they go, so both are seen apart.`);
         }
@@ -401,11 +387,12 @@ export type ShotCamera = { direction: { x: number; z: number }; angle: "eye" | "
  * shot size shows (or low, or a metre above it), aims at it, and steps back until all of it is inside the safe area:
  * wherever they move while the camera holds, or for a close shot at its opening, as people may well leave a close-up.
  * When something is in the way, or someone would face within lensMargin of the lens, it swings round in 30° steps, at
- * most 60° either way so it keeps to its side of the action. A move adds a keyframe at the end: a push in starts further back, a pull out ends there, and a follow frames
+ * most 60° either way, or around the full circle when explicit screen gaze requires another side. A move adds a
+ * keyframe at the end: a push in starts further back, a pull out ends there, and a follow frames
  * the people again where they end. Over a shoulder it stands just behind that person at their eye height, looking past
  * them at the others' heads over the shot, on the side `direction` gives. The camera stays below `ceiling`.
  */
-export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string, shot: ShotCamera, ceiling = Infinity): Promise<DirectorPlan> {
+export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, cast: string[], size: string, shot: ShotCamera, ceiling = Infinity, gaze: Record<string, string> = {}): Promise<DirectorPlan> {
   const stage = await framingStage(scene, plan, aspect);
   try {
     const people = cast.flatMap(name => stage.roots.filter(({ object }) => object.name === name && personTypes.has(object.objType)));
@@ -450,15 +437,16 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
 
     const up = new Vector3(0, 1, 0);
     const side = new Vector3(shot.direction.x, 0, shot.direction.z).normalize();
+    const maxTurn = Object.values(gaze).some(direction => ["screenLeft", "screenRight", "away", "camera"].includes(direction)) ? 6 : 2;
     /** The camera that frames the people at all of `times`, from the first of `turns` that sees them clearly. */
-    const fit = (times: number[], turns = [0, 1, -1, 2, -2], faced = times) => {
+    const fit = (times: number[], turns?: number[], faced = times) => {
       // Where each person stands and faces at each of the times, so no camera stands on anyone's line of sight.
-      const facings: { centre: Vector3; facing: Vector3 }[] = [];
+      const facings: { name: string; time: number; centre: Vector3; facing: Vector3 }[] = [];
       const boxes = times.flatMap(time => {
         const posed = boxesAt(time);
         // Where people face is read at `faced` only: mid-walk they face where they go, not what they will look at.
         if (faced.includes(time)) people.forEach((person, index) => {
-          if (!lyingDown(person.root)) facings.push({ centre: posed[index]!.getCenter(new Vector3()), facing: level(person.root.getWorldDirection(new Vector3())) });
+          if (!lyingDown(person.root) && posed[index]!.max.y >= 0) facings.push({ name: person.object.name!, time, centre: posed[index]!.getCenter(new Vector3()), facing: level(person.root.getWorldDirection(new Vector3())) });
         });
         return posed;
       });
@@ -484,7 +472,10 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
       };
       const at = (direction: Vector3, distance: number) => target.clone().addScaledVector(direction, distance).setY(height);
       poseAt(times[0]!);
-      const candidates = turns.map(turn => {
+      const required = facings.filter(person => person.time === 0 && ["screenLeft", "screenRight", "away", "camera"].includes(gaze[person.name]!));
+      // Explicit screen gaze outranks the model's suggested camera side.
+      const searched = turns ?? (required.length ? [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6] : [0, 1, -1, 2, -2]);
+      const candidates = searched.map(turn => {
         const direction = side.clone().applyAxisAngle(up, turn * Math.PI / 6);
         let distance = nearest;
         while (distance < 60 && !fits(at(direction, distance))) distance *= 1.05;
@@ -499,13 +490,26 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
         return Math.max(0, ...rects.flatMap((a, index) => rects.slice(index + 1).map(b => overlapShare(a, b))));
       };
       // Whether everyone faces at least lensMargin away from the camera: closer, they read as looking into the lens.
-      const offLens = (from: Vector3) => facings.every(({ centre, facing }) => facing.angleTo(level(from.clone().sub(centre))) * 180 / Math.PI >= lensMargin);
+      const offLens = (from: Vector3) => facings.every(({ name, centre, facing }) => {
+        const angle = facing.angleTo(level(from.clone().sub(centre))) * 180 / Math.PI;
+        return gaze[name] === "camera" ? angle <= 3 : angle >= lensMargin;
+      });
+      const matchesGaze = (from: Vector3) => {
+        camera.position.copy(from);
+        camera.lookAt(target);
+        camera.updateMatrixWorld();
+        const measured = gazeOf(stage.roots, required.map(person => person.name), camera);
+        return required.every(person => measured[person.name]?.direction === gaze[person.name]);
+      };
+      const faceAngle = (from: Vector3) => required.filter(person => gaze[person.name] !== "away").reduce((sum, person) => sum + person.facing.angleTo(level(from.clone().sub(person.centre))), 0);
       // The asked side unless something hides someone, someone faces the lens or people cover each other there; then
       // the nearest side that is clear, preferring one where no one faces the lens, then the clear side where they
       // cover each other least.
       const clear = candidates.filter(({ from }) => people.every(person => !stage.blockerOf(from, person))).map(item => ({ ...item, overlap: overlapFrom(item.from), offLens: offLens(item.from) }));
-      return clear.find(item => item.offLens && item.overlap <= overlapLimit) ?? clear.find(item => item.offLens)
-        ?? clear.find(item => item.overlap <= overlapLimit) ?? clear.sort((a, b) => a.overlap - b.overlap)[0] ?? candidates[0]!;
+      // Body heading is a camera preference, not proof of independent head/eye gaze.
+      const choices = required.length ? clear.sort((a, b) => Number(matchesGaze(b.from)) - Number(matchesGaze(a.from)) || faceAngle(a.from) - faceAngle(b.from)) : clear;
+      return choices.find(item => item.offLens && item.overlap <= overlapLimit) ?? choices.find(item => item.offLens)
+        ?? choices.find(item => item.overlap <= overlapLimit) ?? choices.sort((a, b) => a.overlap - b.overlap)[0] ?? candidates[0]!;
     };
     const backed = (framing: ReturnType<typeof fit>) => {
       const offset = framing.from.clone().sub(framing.target).setY(0).multiplyScalar(moveRatio);
@@ -518,7 +522,7 @@ export async function frameShot(scene: SceneDocument, plan: DirectorPlan, aspect
       // The end keeps the opening's side unless someone has turned to face the lens there; then it moves to the
       // nearest side where no one does, so the move between the two stays short.
       const kept = fit([end], [first.turn]);
-      const nearby = [first.turn, first.turn + 1, first.turn - 1].filter(turn => Math.abs(turn) <= 2);
+      const nearby = [first.turn, first.turn + 1, first.turn - 1].filter(turn => Math.abs(turn) <= maxTurn);
       cameraFrames = [key(0, first), key(end, "offLens" in kept && !kept.offLens ? fit([end], nearby) : kept)];
     } else {
       // A held camera frames everyone at the opening, the middle, the end and every place someone stops on the way.

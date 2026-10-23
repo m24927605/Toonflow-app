@@ -68,7 +68,7 @@ export function shotNodesTemplate(sceneCount: number, characters: { name: string
 
 // Music is laid over the joined film afterwards, so every shot keeps only the sound of the scene and cuts stay seamless.
 export const defaultVideoTemplate = () => [
-  translate("Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged."),
+  translate("Start from the first frame and keep the people, clothing and set unchanged."),
   "{{shot}}",
   translate("No background music: only dialogue and the sounds of the scene."),
 ].join("\n");

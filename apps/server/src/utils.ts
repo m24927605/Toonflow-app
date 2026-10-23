@@ -4,6 +4,8 @@ import * as singleAgent from "@/utils/singleAgent";
 import * as providerDebug from "@/utils/media/debug";
 import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaJobs from "@/utils/media/jobs";
+import * as colabPool from "@/utils/media/colabPool";
+import * as mediaSnapshots from "@/utils/media/snapshot";
 import * as lora from "@/utils/media/lora";
 import * as production from "@/utils/production";
 import * as mediaProvider from "@/utils/media/provider";
@@ -36,6 +38,8 @@ export default {
   providerDebug,
   mediaGeneration,
   mediaJobs,
+  colabPool,
+  mediaSnapshots,
   lora,
   production,
   mediaProvider,

@@ -24,13 +24,15 @@
       @keydown.space.prevent="imageRef?.showPreview()">
       <template #error><icon-photo :size="20" /></template>
     </el-image>
+    <button v-else-if="attachment.mimeType.startsWith('audio/')" class="thumbnailButton" type="button" :title="attachment.name" :aria-label="`播放 ${attachment.name}`" :disabled="!thumbnailUrl" @click="videoPreviewVisible = true"><icon-music :size="20" /></button>
     <button v-else class="thumbnailButton" type="button" :title="attachment.name" :aria-label="`预览 ${attachment.name}`" :disabled="!thumbnailUrl" @click="videoPreviewVisible = true">
       <video v-if="thumbnailUrl" :src="thumbnailUrl" preload="metadata" muted playsinline aria-hidden="true" />
       <icon-video class="videoIcon" :size="16" />
     </button>
     <el-button v-if="removable" class="removeAttachment" circle :disabled="disabled" :aria-label="`移除 ${attachment.name}`" title="移除附件" @click="emit('remove')"><icon-x :size="10" /></el-button>
     <el-dialog v-model="videoPreviewVisible" :title="attachment.name" width="min(800px, 90vw)" alignCenter appendToBody destroyOnClose>
-      <video v-if="videoPreviewVisible" class="videoPreview" :src="thumbnailUrl" controls playsinline preload="metadata" />
+      <audio v-if="videoPreviewVisible && attachment.mimeType.startsWith('audio/')" class="audioPreview" :src="thumbnailUrl" controls preload="metadata" />
+      <video v-else-if="videoPreviewVisible" class="videoPreview" :src="thumbnailUrl" controls playsinline preload="metadata" />
     </el-dialog>
     <el-dialog v-model="textPreviewVisible" :title="attachment.name" width="min(720px, 90vw)" alignCenter appendToBody destroyOnClose>
       <p v-if="textLoading || textError" :role="textError ? 'alert' : 'status'">{{ textLoading ? '正在读取…' : textError }}</p>
@@ -42,7 +44,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { ImageInstance } from "element-plus";
-import { IconFileText, IconPhoto, IconVideo, IconX } from "@tabler/icons-vue";
+import { IconFileText, IconMusic, IconPhoto, IconVideo, IconX } from "@tabler/icons-vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { AgentAttachment } from "./types";
 import { readTextAttachment } from "./textAttachments";
@@ -58,7 +60,7 @@ const imageRef = ref<ImageInstance>();
 const videoPreviewVisible = ref(false);
 const thumbnailUrl = ref("");
 
-watch(() => [props.directory, props.attachment.file, props.attachment.path, props.attachment.mimeType] as const, async ([directory, file, path, mimeType], _previous, onCleanup) => {
+watch([() => props.directory, () => props.attachment.file, () => props.attachment.path, () => props.attachment.mimeType], async ([directory, file, path, mimeType], _previous, onCleanup) => {
   videoPreviewVisible.value = false;
   thumbnailUrl.value = "";
   if (mimeType === "text/plain") return;
@@ -194,6 +196,7 @@ watch([textPreviewVisible, () => props.attachment, () => props.directory], async
 
 }
 
+.audioPreview { width: 100%; }
 .videoPreview {
   display: block;
   width: 100%;

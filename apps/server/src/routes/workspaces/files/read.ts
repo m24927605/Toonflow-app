@@ -13,7 +13,7 @@ export default router.get("/", validateFields({ directory: z.string().min(1).max
   const { path } = await u.workspaceFile.resolveWorkspaceFile(req, req.query.directory as string, req.query.path as string);
   const file = await lstat(path);
   if (!file.isFile()) throw Object.assign(new Error("can only read files"), { status: 400 });
-  res.set("Cache-Control", "no-store");
+  res.set({ "Cache-Control": "no-store", "Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff" });
   if (req.query.snapshot === "true") {
     const maxBytes = req.query.maxBytes === undefined ? undefined : Number(req.query.maxBytes);
     if (maxBytes !== undefined && file.size > maxBytes) throw Object.assign(new Error("The file exceeds the size limit for this text read"), { status: 413 });

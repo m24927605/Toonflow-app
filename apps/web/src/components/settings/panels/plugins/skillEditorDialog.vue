@@ -98,8 +98,7 @@ const dirtyPaths = ref(new Set<string>());
 const headers = { "x-toonflow-workspace": "1" };
 let controller = new AbortController();
 
-// A single-file skill has only its main file, with no directory of auxiliary files to manage.
-const isDirectorySkill = computed(() => files.value.length > 1 || files.value[0] !== mainPath.value);
+const isDirectorySkill = ref(false);
 const treeRoot = computed<TreeNode>(() => {
   const root: TreeNode = { key: "", label: skill.displayName, type: "directory", children: [] };
   const directories = new Map<string, TreeNode>([["", root]]);
@@ -128,10 +127,11 @@ async function loadFiles() {
   filesError.value = "";
   try {
     const { data } = await axios.get("/api/skills/list", { params: { name: skill.name }, headers, signal: controller.signal });
-    if (data.code !== 200 || typeof data.data?.mainPath !== "string" || !Array.isArray(data.data.files) || !data.data.files.every((path: unknown) => typeof path === "string")) {
+    if (data.code !== 200 || typeof data.data?.mainPath !== "string" || typeof data.data.isDirectorySkill !== "boolean" || !Array.isArray(data.data.files) || !data.data.files.every((path: unknown) => typeof path === "string")) {
       throw new Error(data.message || "技能文件列表格式错误");
     }
     mainPath.value = data.data.mainPath;
+    isDirectorySkill.value = data.data.isDirectorySkill === true;
     files.value = data.data.files;
     treeVersion.value++;
     if (!selectedPath.value || !files.value.includes(selectedPath.value)) await selectFile(mainPath.value);

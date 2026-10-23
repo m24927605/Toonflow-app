@@ -8,6 +8,8 @@
         <el-button class="toolButton" text aria-label="设置" title="设置" @click="emit('openSettings')">
           <icon-settings :size="17" aria-hidden="true" />
         </el-button>
+        <el-button text @click="openSimpleMode">簡易模式</el-button>
+        <machineStatus compact />
       </div>
     </el-card>
     <el-dialog v-model="exitVisible" title="退出项目" width="360px" alignCenter appendToBody>
@@ -24,11 +26,18 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { IconX, IconSettings } from "@tabler/icons-vue";
+import { useWorkspaceStore } from "@/stores/workspace";
+import machineStatus from "@/components/machineStatus.vue";
 
 const emit = defineEmits<{ openSettings: [] }>();
 const router = useRouter();
 const exitVisible = ref(false);
 const leaving = ref(false);
+
+async function openSimpleMode() {
+  await router.push("/home");
+  if (router.currentRoute.value.path === "/home") useWorkspaceStore().creationMode = "simple";
+}
 
 async function exitProject() {
   if (leaving.value) return;

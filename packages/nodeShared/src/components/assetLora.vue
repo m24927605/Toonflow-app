@@ -17,9 +17,9 @@ const { getNodes } = useVueFlow();
 const ai = useNodeAi();
 const files = useNodeFiles();
 const training = ref(false);
-// Characters train for video (MiniMax H3) and keyframes (Qwen-Image); scenes for keyframes, since videos start from them.
+// Characters train for video (Sulphur 2) and keyframes (Qwen-Image); scenes for keyframes, since videos start from them.
 const kind = computed(() => node.data.role === "character" ? "character" as const : node.data.role === "scene" ? "scene" as const : undefined);
-const families = computed<NodeLoraFamily[]>(() => kind.value === "character" ? ["h3", "qwen"] : ["qwen"]);
+const families = computed<NodeLoraFamily[]>(() => kind.value === "character" ? ["ltx", "qwen"] : ["qwen"]);
 const nameField = computed(() => kind.value === "character" ? "character" as const : "scene" as const);
 const name = computed(() => String(node.data[nameField.value] ?? "").trim());
 const records = ref<NodeLoraRecord[]>([]);
@@ -61,10 +61,10 @@ async function train() {
     // The clicked image goes first: it is the reference for generated variants.
     .sort((a, b) => Number(b.id === node.id) - Number(a.id === node.id));
   const targets = missing.value.length ? missing.value : families.value;
-  const models = targets.length > 1 ? translate("videos and keyframes") : targets[0] === "h3" ? translate("videos") : translate("keyframes");
+  const models = targets.length > 1 ? translate("videos and keyframes") : targets[0] === "ltx" ? translate("videos") : translate("keyframes");
   const topUp = views.length < 12 ? ` ${t`Only ${views.length} of the 12 images it needs exist, so about ${16 - views.length} more in other clothes, places and light are generated from this image first (roughly 0.5–1 more units). Use the clearest image; giving more real views the name ${subject} makes it better.`}` : "";
   const go = await ElMessageBox.confirm(
-    t`Train ${subject} for ${models}? It runs on Colab for about 30–60 minutes and uses roughly ${targets.length * 0.5}–${targets.length * 1.5} compute units. You can close this page; the LoRA is used automatically by "Build shot nodes" when it finishes.` + topUp,
+    t`Train ${subject} for ${models}? It runs on Colab for about 30–90 minutes and uses roughly ${targets.reduce((sum, family) => sum + (family === "ltx" ? 5 : 0.5), 0)}–${targets.reduce((sum, family) => sum + (family === "ltx" ? 10 : 1.5), 0)} compute units. You can close this page; the LoRA is used automatically by "Build shot nodes" when it finishes.` + topUp,
     label.value, { confirmButtonText: translate("Train"), cancelButtonText: translate("Cancel"), type: "info" },
   ).then(() => true, () => false);
   if (!go) return;

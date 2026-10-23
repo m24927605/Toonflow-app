@@ -24,9 +24,12 @@ import { chatLocale } from "@/lib/i18n";
 import { uiSettings } from "@/stores/settings";
 import { useMcpControl } from "@/lib/mcpControl";
 import ffmpegRequired from "@/components/settings/ffmpegRequired.vue";
+import { useMachineStatusStore } from "@/stores/machineStatus";
 import "element-plus/theme-chalk/dark/css-vars.css";
 
 useMcpControl();
+const disconnectMachineStatus = useMachineStatusStore().connect();
+onBeforeUnmount(disconnectMachineStatus);
 
 // Chat controls are filled in from the app dictionary.
 const tdesignLocales = { "zh-CN": tdesignZhCn, "zh-TW": tdesignZhTw, en: tdesignEn };

@@ -37,9 +37,10 @@ export type NodeImageResult = { path: string; mimeType: string; mediaType: "imag
 export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video"; seed?: number };
 export type NodeAudioRequest = Pick<MediaGenerationRequest, "providerId" | "modelId" | "prompt" | "images" | "audios" | "voice" | "emotion" | "speed" | "volume" | "pitch" | "language" | "format" | "sampleRate" | "duration"> & { directory: string; outputDirectory: string };
+export type NodeInputSnapshot = { request: string; fingerprint: string; files: { source: string; path: string; sha256: string }[] };
 export type NodeAudioResult = { path: string; mimeType: string; mediaType: "audio" };
-export type NodeLoraKind = "character" | "scene" | "costume" | "style" | "motion" | "voice" | "slider";
-export type NodeLoraFamily = "h3" | "qwen";
+export type NodeLoraKind = "character" | "scene" | "costume" | "style" | "motion" | "slider";
+export type NodeLoraFamily = "ltx" | "qwen";
 /**
  * What to train: images, clips or recordings (a caption such as a voice line's transcript replaces the automatic one),
  * or a slider's prompts; one LoRA per model family, trained side by side.
@@ -59,6 +60,8 @@ export type NodeAiRequest = {
   directory?: string;
   references?: Extract<NodeOutput, { dataType: "STRING" | "IMAGE" | "VIDEO" }>[];
   tools?: NodeAiTool[];
+  /** A JSON Schema the reply must fit; a model that samples under a grammar (the Colab models) cannot break it. */
+  responseSchema?: Record<string, unknown>;
   onEvent?: (event: NodeAiEvent) => void;
   signal?: AbortSignal;
 };
@@ -124,7 +127,7 @@ async function readModels<T>(url: string, signal: AbortSignal): Promise<T[]> {
 }
 
 async function requestModel(input: NodeAiRequest, transcript: TranscriptContext, model: Model<NodeAiModel["protocol"]>, signal: AbortSignal, session?: string) {
-  const { providerId, modelId, references, directory, onEvent } = input;
+  const { providerId, modelId, references, directory, responseSchema, onEvent } = input;
   // The server API keeps the flat context shape; system messages carry the prompt and tool declarations in the transcript.
   const tools = getCurrentTools(transcript.messages);
   const context: Context = {
@@ -137,7 +140,7 @@ async function requestModel(input: NodeAiRequest, transcript: TranscriptContext,
     signal.throwIfAborted();
     const response = await fetch("/api/ai/generate", {
       method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ providerId, modelId, context, directory, references, session }), signal,
+      body: JSON.stringify({ providerId, modelId, context, directory, references, session, responseSchema }), signal,
     });
     if (!response.ok) await readResult(response);
     if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) throw new Error("AI 未返回 SSE 数据流");
@@ -259,6 +262,9 @@ export function useNodeAi() {
   function generateAudio(input: NodeAudioRequest, signal?: AbortSignal) {
     return generateMedia("audio", input, signal);
   }
+  function snapshotMedia(directory: string, request: { files: { path: string; mimeType: string }[]; outputDirectory: string; binding: unknown }, signal?: AbortSignal) {
+    return guarded(async () => readResult<NodeInputSnapshot>(await fetch("/api/ai/media/snapshot", { method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory, request }), signal: requestSignal(signal) })));
+  }
 
   async function generate(input: NodeAiRequest): Promise<NodeAiResult> {
     const signal = requestSignal(input.signal);
@@ -326,5 +332,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, trainLora, generate };
+  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, snapshotMedia, trainLora, generate };
 }

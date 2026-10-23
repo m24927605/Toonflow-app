@@ -1,10 +1,12 @@
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { errorFromCause, success } from "@/lib/responseFormat";
 import { generateMedia } from "@/utils/media/generation";
+import { markVideoActivity, stopColabPoolWhenUnused } from "@/utils/media/colabPool";
 
 type Job = { cwd: string; controller: AbortController; seen: number; result?: ReturnType<typeof errorFromCause> };
 
 const jobs = new Map<string, Job>();
+export const mediaWorkPending = () => [...jobs.values()].some(job => !job.result);
 // ACT: A running job that no page has polled for this long is treated as abandoned (tab closed or frozen) and
 // cancelled so paid work stops. Chrome runs timers in long-hidden tabs about once a minute, so this stays
 // well above that. Resuming a job after a page reload would need the job ID stored in the node data.
@@ -34,7 +36,11 @@ export function startJob(cwd: string, run: (signal: AbortSignal) => Promise<unkn
 }
 
 export function startMediaJob(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest) {
-  return startJob(cwd, signal => generateMedia(cwd, mediaType, request, signal));
+  if (mediaType === "video") markVideoActivity();
+  return startJob(cwd, async signal => {
+    try { return await generateMedia(cwd, mediaType, request, signal); }
+    finally { if (mediaType === "video") { markVideoActivity(); await stopColabPoolWhenUnused(); } }
+  });
 }
 
 function findJob(id: string, cwd: string) {

@@ -8,7 +8,7 @@ const relativePath = z.string().min(1).max(2048).refine(
 );
 const imageReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^image\/[a-z0-9.+-]+$/i) });
 const videoReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i) });
-const audioReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^audio\/[a-z0-9.+-]+$/i) });
+const audioReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^audio\/[a-z0-9.+-]+$/i), text: z.string().trim().min(1).max(100000).optional() });
 const sharedFields = {
   providerId: z.string().regex(/^[a-z][a-zA-Z0-9]{0,95}$/),
   modelId: z.string().trim().min(1).max(256),
@@ -34,6 +34,7 @@ export const imageGenerationSchema = z.strictObject({
 export const videoGenerationSchema = z.strictObject({
   ...sharedFields,
   videos: z.array(videoReference).max(64).optional(),
+  previsVideo: videoReference.describe("The previs blocking reference, which must also appear in videos; depth control instead uses videoControl mode").optional(),
   audios: z.array(audioReference).max(64).optional(),
   firstFrame: imageReference.optional(),
   lastFrame: imageReference.optional(),
@@ -43,7 +44,7 @@ export const videoGenerationSchema = z.strictObject({
   generateAudio: z.boolean().optional(),
   skipTextCheck,
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe("The seed of an earlier result, reported with it, to change one thing and keep the rest; omit for a new random seed").optional(),
-  skipPrevis: z.boolean().describe("Set to true only when the user explicitly agrees not to use previs; otherwise you must connect the depth video exported from Director's Studio in videoControl mode").optional(),
+  skipPrevis: z.boolean().describe("Set true only when the user explicitly agrees to skip previs; otherwise supply previsVideo in videos for blocking, or a depth video in videoControl mode").optional(),
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text", "videoExtension", "videoControl"]),
     z.array(referenceMode).min(1).max(3),

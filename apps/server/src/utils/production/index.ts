@@ -1,3 +1,4 @@
 export * from "./engine";
 export * from "./estimate";
-export { productionGates, productionQualities, productionRatios, readProduction, readProductionText, type Production, type ProductionInput } from "./state";
+export { referenceAttachmentSchema } from "./references";
+export { productionGates, productionQualities, productionRatios, productionProgress, productionGuidance, readProduction, readProductionText, simpleWorkspaceDirectory, type Production, type ProductionInput } from "./state";

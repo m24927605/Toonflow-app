@@ -83,7 +83,8 @@
     "packages/nodes/characterNode/src/index.vue"
   ],
   "未完成": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
+    "apps/web/src/components/settings/panels/developer/index.vue",
+    "apps/web/src/pages/home/productionProgress.vue"
   ],
   "当前{0}。重置后打开引导页，保留已配置的模型。": [
     "apps/web/src/components/settings/panels/developer/index.vue"
@@ -421,8 +422,7 @@
   ],
   "时长（秒）": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
-    "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue",
-    "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
+    "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue"
   ],
   "视频时长": [
     "apps/web/src/components/settings/panels/developer/providerDebugDialog.vue",
@@ -847,7 +847,8 @@
     "apps/web/src/components/settings/panels/plugins/extensionAssociationsDialog.vue"
   ],
   "完成": [
-    "apps/web/src/components/settings/panels/plugins/extensionAssociationsDialog.vue"
+    "apps/web/src/components/settings/panels/plugins/extensionAssociationsDialog.vue",
+    "apps/web/src/pages/home/productionProgress.vue"
   ],
   "读取文件扩展失败": [
     "apps/web/src/components/settings/panels/plugins/extensionAssociationsDialog.vue"
@@ -1625,7 +1626,7 @@
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue",
     "apps/web/src/components/settings/panels/mediaModel/modelEditorDialog.vue"
   ],
-  "Daily generation limit": [
+  "Daily generation attempt limit": [
     "apps/web/src/components/settings/panels/mediaModel/editProviderDialog.vue"
   ],
   "No limit": [
@@ -2119,6 +2120,57 @@
   "暂不下载": [
     "apps/web/src/components/settings/ffmpegRequired.vue"
   ],
+  "Toonflow 機器狀態": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "工作執行中，不會因閒置計時而關機。": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "未連線": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "已關機": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "啟動中": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "已開機 · 處理中": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "已開機 · 閒置": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "關機中": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "尚無法確認": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "正在讀取機器狀態…": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "機器狀態待確認": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "機器關閉中": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "機器啟動中": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "{0} 台機器已啟動": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "閒置關機倒數 {0} 分 {1} 秒": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "即將閒置關機": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
+  "更新於 {0}": [
+    "apps/web/src/components/machineStatus.vue"
+  ],
   "对话消息": [
     "apps/web/src/components/singleAgentDialog.vue",
     "apps/web/src/components/agent/conversation.vue"
@@ -2260,6 +2312,9 @@
     "apps/web/src/pages/workspace/panels/canvas/components/assetLibrary.vue"
   ],
   "还原到输入框": [
+    "apps/web/src/components/agent/attachmentPreview.vue"
+  ],
+  "播放 {0}": [
     "apps/web/src/components/agent/attachmentPreview.vue"
   ],
   "移除附件": [
@@ -3017,6 +3072,9 @@
   "MCP 调用已取消": [
     "apps/web/src/lib/mcpControl.ts"
   ],
+  "製作模式": [
+    "apps/web/src/pages/home/index.vue"
+  ],
   "创建项目": [
     "apps/web/src/pages/home/index.vue"
   ],
@@ -3207,6 +3265,350 @@
   ],
   "操作失败，请重试": [
     "apps/web/src/pages/home/workspacePicker.vue"
+  ],
+  "影片製作進度": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "已用 {0}": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "錯誤詳情": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "原始技術紀錄": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "已完成 {0}／{1} 個製作階段": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "各階段狀態": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "完成 {0}／{1}": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "待完成": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "完成 {0}／{1} · 進行中 {2} · {3} {4}": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "失敗 {0}": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "鏡頭完成 {0}／{1}": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "進行中": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "失敗": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "本次製作已停止，未完成的階段不會自動繼續執行。": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "各階段可同時進行；進度依實際完成的工作更新。": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "準備資源": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "劇本與分鏡": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "角色與場景": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "聲音製作": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "鏡頭生成": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "剪輯與後製": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "完成收尾": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "{0} 分 {1} 秒": [
+    "apps/web/src/pages/home/productionProgress.vue"
+  ],
+  "聊天記錄": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "新聊天": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作中": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "簡易模式": [
+    "apps/web/src/pages/home/simpleProduction.vue",
+    "apps/web/src/pages/workspace/components/workspaceMenu.vue"
+  ],
+  "說說你的想法，或直接告訴 AI 想製作的影片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "影片製作對話": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "你": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "你的補充": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作通知": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "AI 正在理解內容或準備回覆…": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "重送": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "本次調整：{0}": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整已寫入製作內容。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整已記錄，要求開始或接續製作後才會套用。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整尚未完成，可接續製作。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整已排入，會在目前步驟完成後套用。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "正在套用調整，原始檔案仍會保留。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "讓 AI 檢查並繼續": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "補充要求": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整故事另建製作": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "觀看成片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "下載影片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "補充這支影片的製作要求": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "返回新聊天": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "與 AI 聊聊，或說明想調整的內容…": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "與 AI 對話": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "上傳圖片、影片或音訊參考": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "上傳參考素材": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "聊天": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "開始製作": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "安排參考素材": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "準備製作資源": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "準備畫面與聲音模型": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "規劃影片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "撰寫劇本": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整劇本與製作規格": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "安排分鏡": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "設計角色與場景": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "檢查製作規格": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "協調配音與分鏡時間": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "安排製作流程": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "安排鏡頭": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作角色與場景圖片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作鏡頭引導": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "調整人物姿勢": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作配音": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "準備影片描述": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作環境音": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作背景音樂": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "生成影片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "剪輯影片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "完成後製": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "檢查成片": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "準備交付": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "目前無法確認收尾進度，尚未交付成片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "成片已產出，正在完成收尾。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作中斷，正在釋放製作資源。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "製作資源清理未完成，尚未確認製作完成。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "影片已完成。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "正在載入成片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "收尾狀態尚未確認，尚未交付成片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "這次製作已達系統的資源額度，未能完成影片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "這次製作未能完成，沒有交付影片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "目前無法確認製作進度，尚未交付成片。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "正在準備畫面與聲音的製作資源。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "AI 正在{0}，完成後會在這裡交付。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "成片讀取失敗，請重新整理頁面以重試。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "暫時無法取得製作進度，正在重新連線。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "讀取製作進度失敗。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "暫時無法接續製作，請稍後再試。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "無法送出調整。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "請選擇有效的圖片、影片或音訊，每個檔案不得超過 100 MB。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "每段聊天最多使用 10 個參考附件。": [
+    "apps/web/src/pages/home/simpleProduction.vue",
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "工作區尚未載入，請稍後重試；輸入與附件仍會保留。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "訊息送出狀態未確認，重送會沿用同一則訊息。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "無法送出訊息。": [
+    "apps/web/src/pages/home/simpleProduction.vue"
+  ],
+  "實際製作內容": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "以下是這支影片實際產生的內容，會隨製作更新；你不需要逐項確認。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "正在讀取製作內容…": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "劇本與人物設定": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "劇本尚未產生。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "圖片載入中…": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "圖片讀取失敗": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "圖片尚未產生。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "人物與場景圖片設定尚未產生。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "人物參考": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "服裝參考": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "空景參考": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "製作狀態尚未確認，暫時無法讀取素材。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "製作內容與目前影片不符。": [
+    "apps/web/src/pages/home/productionContext.vue"
+  ],
+  "製作內容讀取失敗，請重新整理頁面重試。": [
+    "apps/web/src/pages/home/productionContext.vue"
   ],
   "切换面板": [
     "apps/web/src/pages/workspace/index.vue"
@@ -4760,6 +5162,9 @@
   "Tool configuration is invalid": [
     "apps/server/src/utils/plugins/tools.ts"
   ],
+  "Built-in skill content changed while staging the update": [
+    "apps/server/src/utils/plugins/initialize.ts"
+  ],
   "Invalid personalization document type": [
     "apps/server/src/utils/personalization.ts"
   ],
@@ -5052,6 +5457,9 @@
   "A Claude Code session can only continue with this turn's tool results. Please generate again.": [
     "apps/server/src/utils/ai/claudeCode.ts"
   ],
+  "Production preparation requires a configured GGUF model": [
+    "apps/server/src/utils/ai/colab.ts"
+  ],
   "Unsupported Colab CLI model": [
     "apps/server/src/utils/ai/colab.ts"
   ],
@@ -5099,6 +5507,21 @@
   ],
   "Duplicate paging cursor in model list": [
     "apps/server/src/utils/ai/models.ts"
+  ],
+  "Set PERSONAL_JEV_API_KEY in the Toonflow process environment or ~/.env": [
+    "apps/server/src/utils/ai/jev.ts"
+  ],
+  "Jev needs named, bounded questions": [
+    "apps/server/src/utils/ai/jev.ts"
+  ],
+  "Jev Choice needs 2–255 available options": [
+    "apps/server/src/utils/ai/jev.ts"
+  ],
+  "Jev request exceeds 32 MiB; split the evidence": [
+    "apps/server/src/utils/ai/jev.ts"
+  ],
+  "Jev returned a different question set": [
+    "apps/server/src/utils/ai/jev.ts"
   ],
   "Select a team package with a lowerCamelCase filename ending in .agent.zip": [
     "apps/server/src/utils/teams/install.ts"
@@ -5182,8 +5605,56 @@
   "Total team file size cannot exceed 20 MB": [
     "apps/server/src/utils/teams/files.ts"
   ],
+  "這次製作的資源額度已達上限。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "可以縮短或簡化故事後另建製作；原本的檔案會保留。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "配音長度與鏡頭時間無法配合，製作已中斷；已完成的錄音與素材仍保留。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "接續時會先協調配音與分鏡時間，再製作影片。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "已收到你的補充，但製作在套用前中斷；補充內容仍完整保留。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "讓 AI 接續套用既有補充即可，不需要再次提交相同內容。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "製作流程發生錯誤，已完成的檔案與補充內容仍會保留。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
+  "可以接續處理未完成的工作；只有想更改故事時，才需要補充要求。": [
+    "apps/server/src/utils/production/state.ts"
+  ],
   "Not a Toonflow production file": [
     "apps/server/src/utils/production/state.ts"
+  ],
+  "Rendered inputs changed; regenerate the shot before delivery": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Shot input bindings are incomplete": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Assembly blocked: every shot needs complete preparation and matching frozen inputs": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Final delivery blocked: no film": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Final delivery blocked: codec, dimensions, duration or audio track differs from the delivery contract": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Final assembly needs every planned ambience recording": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Archived clip differs from its receipt": [
+    "apps/server/src/utils/production/video.ts"
+  ],
+  "Final film digest mismatch": [
+    "apps/server/src/utils/production/video.ts"
   ],
   "The server address is not known yet; try again in a moment": [
     "apps/server/src/utils/production/previs.ts"
@@ -5194,6 +5665,54 @@
   "The model did not list the cast as JSON": [
     "apps/server/src/utils/production/assets.ts"
   ],
+  "Assets must be created with the B3 recipe": [
+    "apps/server/src/utils/production/assets.ts"
+  ],
+  "另一支影片正在製作，這次先保留討論內容，尚未開始新製作。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "This conversation belongs to simple mode": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "回覆已中斷，請查看目前製作進度。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "AI 正在回覆上一則訊息，請稍候。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Message ID already belongs to different content": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Production brief exceeds 20000 characters": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "已開始製作，進度會在這裡持續更新。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Production changes exceed the story length limit": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "已收到調整要求。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "目前無法啟動這次調整，討論內容已保留，請查看製作狀態。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "訊息回覆未完成，請查看目前製作進度，或稍後重送。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Cast correction changed shot IDs, removed a valid character, or used invalid character IDs": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Cast correction violates the shot-list requirements": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Dialogue timing could not fit the requested film duration after two repairs": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "The shot list has no usable shots; correct it before production continues": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "Production report": [
     "apps/server/src/utils/production/engine.ts"
   ],
@@ -5203,13 +5722,10 @@
   "Colab compute units: {0} spent of a {1} budget (estimate {2}).": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Dialogue: Gemini TTS, billed by the Google account.": [
+  "Dialogue: Fish Audio Drama 3 on Colab, with newly generated character voices.": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "Music: Suno V6, billed by the sunoapi.org account.": [
-    "apps/server/src/utils/production/engine.ts"
-  ],
-  "Ambience of {0}: \"{1}\", {2} ({3})": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "Shots": [
@@ -5267,28 +5783,160 @@
   "Script, shot list and prompts: {0} on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Clip checks: {0} on Colab": [
-    "apps/server/src/utils/production/engine.ts"
-  ],
   "Designs: Qwen-Image 2.1 Turbo on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Video: MiniMax H3 on Colab from the previs and the designs as references, lip-synced to the dubbed lines": [
+  "Video: Sulphur 2 (LTX-2.3) on Colab from each shot's keyframe, following its previs depth video, lip-synced to the dubbed lines": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Production spending threshold reached": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "這個舊任務的素材無法確認為 B3，請新建製作；原始檔案仍保留。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Simple productions do not accept manual changes": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "This production is not waiting for a review": [
     "apps/server/src/utils/production/engine.ts"
   ],
+  "Production is still running or cleaning up": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Simple productions do not accept manual continuation": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
   "This production has nothing to continue": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Shot {0}, line {1} ({2}) could not be voiced: {3}": [
+  "製作仍在執行或收尾，請稍候。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "這支影片目前不需要調整。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "這次製作額度已達上限，請調整故事後另建製作。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "目前需要先補充調整內容，AI 才能重新處理未通過的素材。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "請補充你希望保留或調整的內容。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "補充後的故事超過長度限制，請縮短調整內容。": [
+    "apps/server/src/utils/production/engine.ts"
+  ],
+  "Dialogue timing must preserve the requested film duration and every shot": [
     "apps/server/src/utils/production/dub.ts"
   ],
-  "Could not measure the ambience recording's loudness": [
+  "Dialogue timing changed shot or line order": [
+    "apps/server/src/utils/production/dub.ts"
+  ],
+  "Measured dialogue must fit without overlap or truncation": [
+    "apps/server/src/utils/production/dub.ts"
+  ],
+  "Revised dialogue timing violates the shot-list requirements": [
+    "apps/server/src/utils/production/dub.ts"
+  ],
+  "Rounded shot timing cannot contain its dialogue": [
+    "apps/server/src/utils/production/dub.ts"
+  ],
+  "Ambience needs a bounded sound description": [
     "apps/server/src/utils/production/ambience.ts"
   ],
-  "A clip's reference images are not drawn yet": [
+  "Conversation exceeds 2 MiB": [
+    "apps/server/src/utils/production/conversation.ts"
+  ],
+  "Duplicate reference attachments": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference attachments must belong to this conversation": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "The attachment does not contain the declared media type": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference plan must cover every attachment exactly once": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference plan contains an unknown attachment": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference role does not match its media type": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "This reference role does not accept a named target": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Only voice references accept a transcript": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference target must be an existing character": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Reference target must be an existing place": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "聲線參考需要提供音訊的逐字稿，才能交給 Drama-3 使用。": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "聲線參考的逐字稿必須取自你的說明，AI 不能自行編造。請補充音訊的逐字稿。": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "A shot's opening frame is drawn from at most nine images, people and place included: use at most seven visual references": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "聲線參考音訊須為 1 至 30 秒，並附上相同內容的逐字稿。": [
+    "apps/server/src/utils/production/references.ts"
+  ],
+  "Compile the production contract and dialogue before planning execution": [
+    "apps/server/src/utils/production/execution.ts"
+  ],
+  "Two render workers require an independent second A100 and at least two shots": [
+    "apps/server/src/utils/production/execution.ts"
+  ],
+  "Compile the production contract before planning execution": [
+    "apps/server/src/utils/production/execution.ts"
+  ],
+  "Startup resource plan conflicts with the compiled film; replan before dispatch": [
+    "apps/server/src/utils/production/execution.ts"
+  ],
+  "Production inputs changed; rebuild the execution plan before dispatch": [
+    "apps/server/src/utils/production/execution.ts"
+  ],
+  "Speaker correction must cover only the unresolved shots in order": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Speaker correction changed words, order, an existing speaker or used an unknown character": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Speaker correction changed dialogue separators": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Speaker correction must only add character labels": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Speaker correction changed performance notes or added extra labels": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Character and environment IDs must be unique": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Production contract must cover every shot exactly once": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Production contract changed shot order or IDs": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Every speaking character needs exactly one voice design": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "Production sources changed: rebuild the contract and dependent assets before continuing": [
+    "apps/server/src/utils/production/plan.ts"
+  ],
+  "A keyframe's reference images are not drawn yet": [
     "apps/server/src/utils/production/shots.ts"
   ],
   "The skill root directory must be a non-symbolic link directory": [
@@ -5357,38 +6005,50 @@
   "Environment variable {0} is not set. Set it in the Toonflow process environment or in ~/.env.": [
     "apps/server/src/utils/conf/env.ts"
   ],
-  "MiniMax H3 prompt cannot be empty": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "A snapshot source has conflicting media types": [
+    "apps/server/src/utils/media/snapshot.ts"
   ],
-  "MiniMax H3 duration must be a whole number of seconds from 4 to 15": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Snapshot media type is unsupported": [
+    "apps/server/src/utils/media/snapshot.ts"
   ],
-  "A MiniMax H3 long take is a whole number of seconds from 16 to 120": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Input snapshots exceed 100 MiB": [
+    "apps/server/src/utils/media/snapshot.ts"
   ],
-  "A MiniMax H3 long take renders at 480p or 720p, without control video or pinned frames": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Downloaded runtime cache digest mismatch": [
+    "apps/server/src/utils/media/preparation.ts"
   ],
-  "MiniMax H3 only supports 480p, 720p and 1080p": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Character LoRA training requires at least one identity reference image": [
+    "apps/server/src/utils/media/lora.ts"
   ],
-  "Invalid MiniMax H3 aspect ratio": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Missing clip artifact receipt": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
-  "MiniMax H3 supports at most 9 reference images": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Production rendering needs one or two A100s": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
-  "MiniMax H3 supports at most 3 reference videos": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "A locked soundtrack requires audio output to be enabled": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
-  "MiniMax H3 supports at most 3 reference audio clips": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Sulphur 2 only supports 480p, 720p and 1080p": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
-  "MiniMax H3 loads at most 4 LoRAs": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Invalid Sulphur 2 aspect ratio": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
-  "Invalid MiniMax H3 seed": [
-    "apps/server/src/utils/media/minimaxH3.ts"
+  "Sulphur 2 loads at most 4 LoRAs": [
+    "apps/server/src/utils/media/sulphur.ts"
+  ],
+  "Invalid Sulphur 2 seed": [
+    "apps/server/src/utils/media/sulphur.ts"
+  ],
+  "Unexpected postproduction archive": [
+    "apps/server/src/utils/media/sulphur.ts"
+  ],
+  "Postproduction archive digest mismatch": [
+    "apps/server/src/utils/media/sulphur.ts"
+  ],
+  "Clip artifact digest mismatch": [
+    "apps/server/src/utils/media/sulphur.ts"
   ],
   "Audio input must be a Uint8Array": [
     "apps/server/src/utils/media/audioProcessor.ts"
@@ -5471,6 +6131,54 @@
   "Invalid media encoding or MIME type": [
     "apps/server/src/utils/media/debug.ts"
   ],
+  "Drama 3 text must contain 1–20000 characters": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Drama 3 accepts speaker IDs from 0 to 15": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Drama 3 voice direction must be one plain descriptor without control tags": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Invalid speech sequence or recording bounds": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Unexpected speech artifact name": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Speech artifact digest mismatch": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Incomplete speech artifact manifest": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "The voice reference needs its transcript": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "The voice reference must contain 1 byte–100 MB of audio": [
+    "apps/server/src/utils/media/drama3.ts"
+  ],
+  "Machine changed while recording capacity": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "Cannot prepare a model without its physical machine": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "The Colab pool is stopping": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "Invalid Colab execution lane": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "The Colab pool was stopped": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "Runtime cache session is no longer owned by this pool": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
+  "Model preparation has not supplied a verified machine capacity snapshot": [
+    "apps/server/src/utils/media/colabPool.ts"
+  ],
   "Job cancelled: no page is waiting for it": [
     "apps/server/src/utils/media/jobs.ts"
   ],
@@ -5498,10 +6206,28 @@
   "Training a character identity needs 5 to 20 images.": [
     "apps/server/src/utils/media/higgsfield.ts"
   ],
+  "Colab upload file names must be unique": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
   "Could not read the Colab compute unit balance": [
     "apps/server/src/utils/media/colab.ts"
   ],
-  "The Colab session was stopped": [
+  "Invalid retained Colab session name": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Remote output must stay inside /content": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Remote input needs a plain file name": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Could not confirm that the cancelled model released the GPU": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Colab execution output failed byte integrity validation": [
+    "apps/server/src/utils/media/colab.ts"
+  ],
+  "Invalid Colab session name": [
     "apps/server/src/utils/media/colab.ts"
   ],
   "Colab reference media must be local data; remote URLs are not supported": [
@@ -5516,7 +6242,7 @@
   "Invalid Qwen-Image aspect ratio": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
-  "Qwen-Image supports at most 16 reference images": [
+  "Qwen-Image 2.1 supports at most 10 reference images": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Qwen-Image loads at most 4 LoRAs": [
@@ -5529,6 +6255,12 @@
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Redrawing an image with Qwen-Image needs a denoise above 0 and up to 1": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "Qwen-Image prompt contains an unresolved reference placeholder": [
+    "apps/server/src/utils/media/qwenImage.ts"
+  ],
+  "This production uses the B3 image recipes only": [
     "apps/server/src/utils/media/qwenImage.ts"
   ],
   "Failed to read image: HTTP {0}": [
@@ -5693,13 +6425,19 @@
   "The generated result is not in a supported image, video or audio format": [
     "apps/server/src/utils/media/generation.ts"
   ],
+  "This production uses the B3 image, speech and video models only": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
   "Enter a generation prompt": [
     "apps/server/src/utils/media/generation.ts"
   ],
   "The selected media model does not exist or the type does not match, please select again.": [
     "apps/server/src/utils/media/generation.ts"
   ],
-  "Video generation needs the previs depth video connected in control video mode. Skip it only with the user's explicit consent.": [
+  "The previs blocking reference must be connected in videos": [
+    "apps/server/src/utils/media/generation.ts"
+  ],
+  "Video generation needs a previs blocking reference or depth control video. Skip it only with the user's explicit consent.": [
     "apps/server/src/utils/media/generation.ts"
   ],
   "The selected model does not support character identities. Use an image model that does.": [
@@ -6238,11 +6976,20 @@
   "Model request failed": [
     "apps/server/src/routes/ai/generate.ts"
   ],
-  "Qwen-Image learns from images only; train motion and voice for MiniMax H3": [
+  "Qwen-Image learns from images only; train motion for Sulphur 2": [
+    "apps/server/src/routes/ai/lora/train.ts"
+  ],
+  "Sliders train for Qwen-Image only": [
     "apps/server/src/routes/ai/lora/train.ts"
   ],
   "This node has no production": [
     "apps/server/src/routes/production/get.ts"
+  ],
+  "This production already exists": [
+    "apps/server/src/routes/production/simple/create.ts"
+  ],
+  "Simple productions do not accept manual intervention": [
+    "apps/server/src/routes/production/stop.ts"
   ],
   "This node already has a production": [
     "apps/server/src/routes/production/create.ts"
@@ -6470,9 +7217,6 @@
   "Shot list: {0} shots": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Shot {0} needs a look: {1}": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Budget {0} units · estimate {1} units": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6523,7 +7267,7 @@
   "Estimated cost: about {0} Colab compute units for {1} shots.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Spend at most (units)": [
+  "Colab spending threshold (units)": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Start": [
@@ -6551,6 +7295,9 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Stop": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Generation completed, but the film file is missing.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Writing the script…": [
@@ -6583,9 +7330,6 @@
   "Rendering the clips at {0} ({1}/{2})…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Checking the clips frame by frame ({0}/{1})…": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Joining the rough cut…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -6610,7 +7354,7 @@
   "Stopped": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "The film and its delivery report are ready on the canvas.": [
+  "The film is generated and its delivery report is ready.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Request failed": [
@@ -6619,7 +7363,7 @@
   "Name every connected photo first": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Start an automatic production of about {0} seconds? It spends at most {1} Colab compute units (estimate {2}) and stops for your review where you asked. It keeps running if you close this page.": [
+  "Start an automatic production of about {0} seconds? It stops when measured Colab usage reaches {1} units (estimate {2}); remote shutdown can consume additional units. It also stops for your requested review. It keeps running if you close this page.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Cancel": [
@@ -6972,6 +7716,12 @@
   "暂无生成音频": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
+  "參考聲音的逐字稿": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
+  "輸入參考聲音中實際說出的完整文字": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
   "描述您想要的音频效果或输入待朗读文本": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
@@ -7002,7 +7752,13 @@
   "请输入生成提示词或待朗读文本": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
-  "图片和音频不能同时引用，且合计最多引用一个；文本数量不限": [
+  "Drama-3 支援最多一個參考聲音，不接受圖片參考": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
+  "請先在「聲線與表演」描述角色的聲音與說話方式": [
+    "packages/nodes/audioGenerationNode/src/index.vue"
+  ],
+  "請提供參考聲音的完整逐字稿": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
   "请重新选择有效的语种、采样率和输出格式": [
@@ -7050,7 +7806,7 @@
   "节点正在删除或已关闭，请稍后修改": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
-  "图片或音频限1个，文本不限": [
+  "參考聲音限1個，文本不限": [
     "packages/nodes/audioGenerationNode/src/index.vue"
   ],
   "音频生成": [
@@ -7074,13 +7830,13 @@
   "音频声线": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
-  "语气": [
+  "聲線與表演": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
-  "音频语气": [
+  "聲線與表演描述": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
-  "音乐或音效时长": [
+  "描述性別、音色、口音與表演方式": [
     "packages/nodes/audioGenerationNode/src/components/generationSettings.vue"
   ],
   "采样率": [
@@ -7297,6 +8053,9 @@
   "图片引用按顺序作为首帧、尾帧": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
+  "The control video drives the movement; images are the first and last frames, in order.": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
   "Prompt changed since preflight": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
@@ -7366,13 +8125,22 @@
   "Generation cancelled: grade the input keyframes L3 or above first": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
-  "This prompt failed its preflight ({0}/100):\n{1}\n\nGenerate anyway?": [
+  "Generation cancelled: rerun Prepare videos and pass the current prompt's preflight first": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
-  "Preflight": [
+  "Generation cancelled: the shot list changed or its preflight is missing; rerun Prepare videos": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
-  "Generation cancelled: fix the preflight issues first": [
+  "Generation cancelled: the source shot is missing": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generation cancelled: connect a complete character dialogue track before generating this shot": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generation cancelled: enable audio output to preserve the supplied soundtrack": [
+    "packages/nodes/videoGenerationNode/src/index.vue"
+  ],
+  "Generation cancelled: the soundtrack changed; rerun Prepare videos": [
     "packages/nodes/videoGenerationNode/src/index.vue"
   ],
   "供应商未返回视频": [
@@ -7434,6 +8202,9 @@
   "比例 {0}": [
     "packages/nodes/videoGenerationNode/src/components/generationSettings.vue",
     "packages/nodes/imageGenerationNode/src/components/generationSettings.vue"
+  ],
+  "Text with a locked soundtrack": [
+    "packages/nodes/videoGenerationNode/src/components/generationSettings.vue"
   ],
   "Join videos": [
     "packages/nodes/videoConcatNode/vite.config.ts",
@@ -7589,7 +8360,7 @@
     "packages/nodes/textNode/src/index.vue",
     "packages/nodes/textNode/src/shotNodesDialog.vue"
   ],
-  "For every shot whose keyframe is generated, create its MiniMax H3 video node and have an uncensored model write its prompt; generation itself is not started": [
+  "For every shot whose keyframe is generated, create its Sulphur 2 video node and have an uncensored model write its prompt; generation itself is not started": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Prepare videos": [
@@ -7719,7 +8490,7 @@
   "This node is busy; try again when it is done": [
     "packages/nodes/textNode/src/index.vue"
   ],
-  "Add the MiniMax H3 (Colab) media provider in Settings first": [
+  "Add the Sulphur 2 (Colab) media provider in Settings first": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Every shot with a generated keyframe already has a video node with a written prompt.": [
@@ -7728,7 +8499,7 @@
   "The chosen quality and ratio also apply to the existing video nodes of shots {0}.": [
     "packages/nodes/textNode/src/index.vue"
   ],
-  "Create MiniMax H3 video nodes for shots {0}, each starting from its keyframe.": [
+  "Create Sulphur 2 video nodes for shots {0}, each starting from its keyframe.": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Write and preflight the video prompts of shots {0} with {1}, one after another; a prompt scoring under {2} is rewritten once.": [
@@ -7743,7 +8514,7 @@
   "Shot {0} video ({1})": [
     "packages/nodes/textNode/src/index.vue"
   ],
-  "Dialogue markers are misplaced ({0}).": [
+  "The draft breaks the prompt format ({0}).": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "The review did not return a valid score.": [
@@ -7768,9 +8539,6 @@
     "packages/nodes/textNode/src/index.vue"
   ],
   "Previs blocking at the start of this shot: {0}.": [
-    "packages/nodes/textNode/src/index.vue"
-  ],
-  "{0} is this shot''s grey-box previs: use it only for where each person stands and moves, their relative positions, timing and the camera move; take no shapes, materials, colours, set dressing or markings from it. People and the set look exactly like {1}.": [
     "packages/nodes/textNode/src/index.vue"
   ],
   "Shot {0} keyframe ({1})": [
@@ -7860,7 +8628,7 @@
   "复制失败，请在原文中选择并复制": [
     "packages/nodes/textNode/src/markdownEditor.vue"
   ],
-  "Start from the first frame {{ref 1}} and keep the people, clothing and set unchanged.": [
+  "Start from the first frame and keep the people, clothing and set unchanged.": [
     "packages/nodes/textNode/src/shotNodes.ts"
   ],
   "No background music: only dialogue and the sounds of the scene.": [
@@ -7875,34 +8643,16 @@
   "无法打开链接": [
     "packages/nodes/textNode/src/markdownPreview.vue"
   ],
-  "The prompt does not start with the first-frame line for <Picture 1>.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
-  "The prompt is missing {0}.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
-  "non_diegetic_music must be N/A: music is laid over the joined film later.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
   "The spoken lines do not match the shot list's dialogue cell exactly.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
-  "A spoken line has the wrong language tag.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
-  "The prompt does not name <Video 1> as a blocking-only previs.": [
     "packages/nodes/textNode/src/videoPreflight.ts"
   ],
   "The prompt never names the person with the trigger word {0}.": [
     "packages/nodes/textNode/src/videoPreflight.ts"
   ],
-  "The prompt still contains unfilled markers.": [
+  "The prompt is {0} characters; Sulphur 2 takes at most {1}.": [
     "packages/nodes/textNode/src/videoPreflight.ts"
   ],
-  "The prompt is {0} characters; MiniMax H3 cuts it off after {1}.": [
-    "packages/nodes/textNode/src/videoPreflight.ts"
-  ],
-  "The duration of {0} s is outside MiniMax H3''s 4–15 s.": [
+  "The duration of {0} s is outside Sulphur 2''s 1–20 s.": [
     "packages/nodes/textNode/src/videoPreflight.ts"
   ],
   "Original script: {0}. Each shot''s text node also reads it.": [
@@ -8276,6 +9026,9 @@
     "packages/nodes/imageNode/src/components/imagePanorama.vue"
   ],
   "预览与校正": [
+    "packages/nodes/imageNode/src/components/imagePanorama.vue"
+  ],
+  "当前图片模型不支持全景所需的 {0} 比例，请先选择支持该比例的模型": [
     "packages/nodes/imageNode/src/components/imagePanorama.vue"
   ],
   "全景节点创建失败": [
@@ -8940,7 +9693,7 @@
   "{0}: trigger word {1}": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
-  "Training on Colab, about half an hour. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
+  "Training on Colab, up to about an hour and a half. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
   "What the LoRA learns": [
@@ -8993,15 +9746,11 @@
     "packages/nodes/loraTrainingNode/src/index.vue",
     "packages/nodeShared/src/components/loraPicker.vue"
   ],
-  "Voice": [
-    "packages/nodes/loraTrainingNode/src/index.vue",
-    "packages/nodeShared/src/components/loraPicker.vue"
-  ],
   "Slider": [
     "packages/nodes/loraTrainingNode/src/index.vue",
     "packages/nodeShared/src/components/loraPicker.vue"
   ],
-  "Video (MiniMax H3)": [
+  "Video (Sulphur 2)": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
   "Image (Qwen-Image)": [
@@ -9022,13 +9771,10 @@
   "Connect at least 4 video clips of the movement, by varied people.": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
-  "Connect at least 4 recordings of one voice; each recording's text becomes its caption.": [
-    "packages/nodes/loraTrainingNode/src/index.vue"
-  ],
   "No material: the two ends are described in words.": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
-  "Train a {0} LoRA for {1} on Colab? Each model trains on its own L4 at the same time, about 30–60 minutes and roughly 0.5–1.5 compute units each. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
+  "Train a {0} LoRA for {1} on Colab? Each model trains on its own GPU at the same time: Qwen-Image about 30–60 minutes and roughly 0.5–1.5 compute units, Sulphur 2 about 45–90 minutes and roughly 5–10 units. You can close this page; the LoRA appears in the LoRA menus when it finishes.": [
     "packages/nodes/loraTrainingNode/src/index.vue"
   ],
   "{0} is trained; pick it in the LoRA menu of generation nodes": [
@@ -9578,6 +10324,9 @@
     "packages/nodeShared/src/markdownContent.ts"
   ],
   "图片替换失败": [
+    "packages/nodes/imageGenerationNode/src/index.vue"
+  ],
+  "当前模型不支持比例 {0}，请选择支持该比例的模型或更改比例": [
     "packages/nodes/imageGenerationNode/src/index.vue"
   ],
   "图片正在生成，请等待完成": [
@@ -10168,6 +10917,9 @@
   "Time is the range of the shot in seconds, such as 0–3.5; each shot starts where the previous one ends, with no gaps or overlaps.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
+  "One row represents one continuous camera take. Keep timed pauses, speech and reactions within that row's Action cell when the camera does not cut. An explicitly requested single continuous take overrides the default pacing and shot-duration preferences; never split its performance beats into separate shots.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
   "Keep every shot at most 8 s and most shots at 3–4 s.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
@@ -10177,10 +10929,13 @@
   "Keep each cell on one line: separate several parts of a cell, such as two people's lines or states, with a full-width semicolon (；), never with <br> or a line break.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
-  "Cast lists the characters in frame by the names the script uses, separated by commas, including anyone only partly visible such as a hand or their back; leave it empty when nobody is in frame.": [
+  "Cast lists performing characters in frame by their exact names, separated by commas, including anyone only partly visible such as a hand or their back. Ordinary products, drinks, furniture and other props belong in Action and State, never Cast; leave Cast empty when no character is visible. An explicitly personified object may be a character when the story actually treats it as one.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
   "State gives each cast member's posture, what they wear (or that they are unclothed) and what they hold at the start of the shot.": [
+    "packages/nodeShared/src/shotListPrompt.ts"
+  ],
+  "Prefix every utterance in Dialogue with its exact speaker name and a colon, including single-person shots.": [
     "packages/nodeShared/src/shotListPrompt.ts"
   ],
   "The characters on the canvas are named {0}. In Cast and State, call each person by exactly one of these names, matching the people of the script to them even when the script calls them differently; use another name only for someone who is none of them.": [
@@ -10196,6 +10951,9 @@
     "packages/nodeShared/src/components/loraPicker.vue"
   ],
   "Strength of {0}": [
+    "packages/nodeShared/src/components/loraPicker.vue"
+  ],
+  "Voice": [
     "packages/nodeShared/src/components/loraPicker.vue"
   ],
   "历史记录": [
@@ -10375,7 +11133,7 @@
   "Only {0} of the 12 images it needs exist, so about {1} more in other clothes, places and light are generated from this image first (roughly 0.5–1 more units). Use the clearest image; giving more real views the name {2} makes it better.": [
     "packages/nodeShared/src/components/assetLora.vue"
   ],
-  "Train {0} for {1}? It runs on Colab for about 30–60 minutes and uses roughly {2}–{3} compute units. You can close this page; the LoRA is used automatically by \"Build shot nodes\" when it finishes.": [
+  "Train {0} for {1}? It runs on Colab for about 30–90 minutes and uses roughly {2}–{3} compute units. You can close this page; the LoRA is used automatically by \"Build shot nodes\" when it finishes.": [
     "packages/nodeShared/src/components/assetLora.vue"
   ],
   "{0} is trained; \"Build shot nodes\" uses it automatically": [

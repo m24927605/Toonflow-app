@@ -1,17 +1,18 @@
 import { mkdir, readFile } from "@toonflow/file";
 import { dirname } from "node:path";
-import { openColabSession } from "@/utils/media/colab";
+import { createColabWorker } from "@/utils/media/colabPool";
 import { runQwenImage } from "@/utils/media/qwenImage";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import pipeline from "./loraColab.py" with { type: "text" };
 
-export const loraKinds = ["character", "scene", "costume", "style", "motion", "voice", "slider"] as const;
+export const loraKinds = ["character", "scene", "costume", "style", "motion", "slider"] as const;
 export type LoraKind = typeof loraKinds[number];
-export type LoraFamily = "h3" | "qwen";
+export type LoraFamily = "ltx" | "qwen";
+const workers = { qwen: createColabWorker("loraTraining", 1), ltx: createColabWorker("loraTraining", 2) };
 export type LoraInput = {
   /** One LoRA per family, trained side by side from the same items. */
   kind: LoraKind; families: LoraFamily[]; name: string;
-  /** Workspace images, clips or recordings; a caption, such as a voice line's transcript, replaces the automatic one. */
+  /** Workspace images or clips; a caption replaces the automatic one. */
   items: { path: string; caption?: string }[];
   /** A slider's two ends, added to the base prompt: +1 at full strength, -1 at negative strength. */
   slider?: { base: string; positive: string; negative: string };
@@ -21,10 +22,7 @@ export type LoraInput = {
 /** Stored beside each LoRA as `loras/<trigger>.json`, so nodes find the workspace's LoRAs and their trigger words. */
 export type LoraRecord = { name: string; kind: LoraKind; family: LoraFamily; trigger: string; path: string; createdAt: string };
 
-// A thin set is topped up to about this many images with generated variants of its first image, at most as many as
-// its kind has. A character set is brought towards 32, about half of them tight face close-ups from many angles: H3
-// users find a character LoRA learns the face from many clear, consistent face pictures, and pictures of one master
-// agree with each other.
+// Character sets contain at least 32 source/generated images before optional face crops are added.
 const setSizes: Partial<Record<LoraKind, { min: number; to: number }>> = { character: { min: 32, to: 32 }, scene: { min: 12, to: 16 } };
 const rules: Partial<Record<LoraKind, string>> = {
   character: "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body. Only the clothing and the place change.",
@@ -60,6 +58,12 @@ const variants: Partial<Record<LoraKind, [ratio: string, scene: string][]>> = {
     ["3:4", "Half-body shot of the person in side profile facing right, standing by a window, wearing a plain shirt, soft daylight."],
     ["3:4", "Medium shot of the person from the waist up, looking at someone off the left of the frame, wearing a plain blouse or shirt, dim warm indoor light."],
     ["2:3", "Full-body shot of the person seated on the floor of a traditional room, three-quarter view, wearing casual home clothes, soft lamp light."],
+    ["1:1", "Tight close-up of the person's face filling the frame, front view, lips gently parted, wearing a dark green shirt, diffuse daylight, plain grey background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the left, neutral expression, wearing a white linen shirt, even studio light, pale blue background."],
+    ["1:1", "Tight close-up of the person's face in three-quarter view turned to the right, thoughtful expression, wearing a brown cardigan, soft window light, plain cream background."],
+    ["1:1", "Close-up left side profile of the person's face, lips slightly parted, wearing a grey crew-neck shirt, diffuse studio light, plain white background."],
+    ["1:1", "Close-up right side profile of the person's face, neutral expression, wearing a navy sweater, overcast daylight, plain grey background."],
+    ["1:1", "Tight close-up of the person's face filling the frame, front view, eyebrows slightly raised in surprise, wearing a beige shirt, soft frontal light, plain dark grey background."],
   ],
   scene: [
     ["16:9", "The place exactly as framed in {{ref 1}}, empty, soft morning daylight."],
@@ -80,7 +84,7 @@ async function topUp(kind: LoraKind, reference: Uint8Array, count: number, signa
   const image = { type: "binary" as const, data: reference, mimeType: "image/png" };
   const scenes = (variants[kind] ?? []).slice(0, count);
   const results = await Promise.all(scenes.map(([ratio, scene]) => runQwenImage({
-    prompt: `${scene} ${rules[kind]} One single photograph, photorealistic, sharp focus, natural texture, no text.`, ratio, size: "1K", images: [image],
+    prompt: `Recompose the subject from the image into the following single photograph. ${scene} ${rules[kind]} Preserve the subject's identity and natural surface texture.`, ratio, size: "1K", images: [image],
   }, signal)));
   return results.map(result => result.data);
 }
@@ -92,9 +96,9 @@ const training = new Set<string>();
 export const triggerWord = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), value => String.fromCharCode(97 + value % 26)).join("");
 
 /**
- * Trains a LoRA for each model family on its own Colab L4 at the same time and saves each with its record in the
- * workspace's `loras/` folder. MiniMax H3 LoRAs learn from images, clips and voice recordings and serve video nodes;
- * Qwen-Image 2.1 LoRAs learn from images and serve image nodes. The job writes the captions, leaving out what the LoRA
+ * Trains a LoRA for each model family on its own Colab GPU at the same time and saves each with its record in the
+ * workspace's `loras/` folder. Sulphur 2 (LTX-2.3) LoRAs learn from images and clips and serve video nodes; Qwen-Image
+ * 2.1 LoRAs learn from images and serve image nodes. The job writes the captions, leaving out what the LoRA
  * learns, and crops faces for characters; a character or scene set under `minImages` images is first topped up once
  * with Qwen-Image variants of its first image, shared by every family.
  */
@@ -116,8 +120,10 @@ async function trainSet(cwd: string, input: LoraInput, signal?: AbortSignal) {
     data: new Uint8Array(await readFile((await resolveWorkspacePath(cwd, path)).path, { signal })),
   })));
   const size = setSizes[input.kind];
+  if (input.kind === "character" && !sources.length) throw new Error("Character LoRA training requires at least one identity reference image");
   const extra = size && sources.length && sources.length < size.min ? await topUp(input.kind, sources[0]!.data, size.to - sources.length, signal) : [];
   const items = [...sources, ...extra.map(data => ({ extension: "png", caption: undefined, data }))];
+  if (input.kind === "character" && items.length < size!.min) throw new Error(`Character LoRA training requires at least ${size!.min} images before face crops; prepared ${items.length}`);
   // A family that fails does not stop the other, whose LoRA is kept; the error names what failed.
   const results = await Promise.allSettled(input.families.map(family => trainFamily(cwd, input, family, items, signal)));
   const failed = results.flatMap((result, index) => result.status === "rejected"
@@ -129,32 +135,18 @@ async function trainSet(cwd: string, input: LoraInput, signal?: AbortSignal) {
 
 async function trainFamily(cwd: string, input: LoraInput, family: LoraFamily, items: { extension: string; caption?: string; data: Uint8Array }[], signal?: AbortSignal) {
   const trigger = input.triggers?.[family] ?? triggerWord();
+  const jobName = `lora${crypto.randomUUID().replaceAll("-", "")}`;
   const uploads = items.flatMap(({ extension, caption, data }, index) => {
-    const name = `lora_item_${String(index).padStart(2, "0")}`;
+    const name = `${jobName}Item${String(index).padStart(2, "0")}`;
     return [{ name: `${name}.${extension}`, data }, ...caption ? [{ name: `${name}.txt`, data: caption.replaceAll("{trigger}", trigger) }] : []];
   });
   const job = { trigger, family, kind: input.kind, ...input.slider ? { slider: input.slider } : {} };
-  // An A100 rather than an L4: Fizgig's automatic block swapping keeps far more of the model on the larger card, and the
-  // account's three A100s train a film's people side by side, where its two L4s are shared with the text model.
-  const session = await openColabSession("loraTraining", { gpu: "A100", highMem: true }, signal);
-  let lora: Uint8Array;
-  try {
-    // Training runs for hours, so it runs detached and survives the host's network dropping for a while.
-    [lora] = await session.job({ script: pipeline, uploads: [{ name: "lora_job.json", data: JSON.stringify(job) }, ...uploads], env: {}, outputs: ["/content/lora_final.safetensors"], detached: true }, signal) as [Uint8Array];
-  } catch (error) {
-    await session.close(error);
-    throw error;
-  }
-  // The LoRA is saved before the session stops, and a stop that keeps failing (host offline) is logged rather than
-  // failing the job: by the time it gives up, the VM watchdog has released the idle session.
+  // Training shares the family's A100; unique job names prevent old inputs entering a later dataset.
+  const [lora] = await workers[family].run((session, jobSignal) => session.job({ script: pipeline, uploads: [{ name: `${jobName}.json`, data: JSON.stringify(job) }, ...uploads], env: { LORA_JOB: jobName }, outputs: [`/content/${jobName}.safetensors`], detached: true }, jobSignal), signal) as [Uint8Array];
   const record: LoraRecord = { name: input.name, kind: input.kind, family, trigger, path: `loras/${trigger}.safetensors`, createdAt: new Date().toISOString() };
-  try {
-    const target = await resolveWorkspacePath(cwd, record.path, true);
-    await mkdir(dirname(target.path), { recursive: true });
-    await writeWorkspaceFile(target.path, lora, true);
-    await writeWorkspaceFile((await resolveWorkspacePath(cwd, `loras/${trigger}.json`, true)).path, `${JSON.stringify(record, null, 2)}\n`, true);
-  } finally {
-    await session.close().catch((error: unknown) => console.error("[colab] Session stop failed after LoRA training; check with `colab sessions`:", error));
-  }
+  const target = await resolveWorkspacePath(cwd, record.path, true);
+  await mkdir(dirname(target.path), { recursive: true });
+  await writeWorkspaceFile(target.path, lora, true);
+  await writeWorkspaceFile((await resolveWorkspacePath(cwd, `loras/${trigger}.json`, true)).path, `${JSON.stringify(record, null, 2)}\n`, true);
   return record;
 }

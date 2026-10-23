@@ -152,6 +152,7 @@
 </template>
 
 <script setup lang="ts">
+import { uploadAttachments } from "./attachmentUploads";
 import { locale, t, translate } from "@toonflow/i18n/vue";
 import { computed, inject, nextTick, reactive, ref, shallowRef, watch, type ComponentPublicInstance } from "vue";
 import { defaultRangeExtractor, measureElement, observeElementRect, useVirtualizer } from "@tanstack/vue-virtual";
@@ -556,26 +557,6 @@ function stopMessage() {
   controller?.abort();
 }
 
-async function uploadAttachments(attachments: AgentAttachment[], directory: string, signal: AbortSignal) {
-  if (!attachments.some(item => item.file)) return;
-  const files = useWorkspaceFiles(directory);
-  for (const path of ["assets", "assets/chat"]) {
-    await files.mkdir(path).catch(error => {
-      if (error?.response?.data?.data?.code !== "EEXIST") throw error;
-    });
-    signal.throwIfAborted();
-  }
-  for (const attachment of attachments) {
-    if (!attachment.file) continue;
-    const extension = attachment.name.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase() ?? "";
-    const path = `assets/chat/${crypto.randomUUID()}${extension}`;
-    await files.write(path, attachment.file, true, signal);
-    attachment.path = path;
-    attachment.file = undefined;
-    signal.throwIfAborted();
-  }
-}
-
 async function sendCanvasResult(event: Extract<AgentEvent, { type: "canvasCall" }>, canvasContext: CanvasContext | undefined, signal: AbortSignal) {
   let body: string;
   try {
@@ -643,7 +624,7 @@ async function sendMessage(source?: AgentMessage) {
   try {
     if (!source) await instance.reset();
     requestController.signal.throwIfAborted();
-    await uploadAttachments(attachments, directory, requestController.signal);
+    await uploadAttachments(attachments, directory, "assets/chat", requestController.signal);
     const response = await fetch("/api/agent", {
       method: "POST",
       headers: { "Accept-Language": locale.value, "Content-Type": "application/json", "x-toonflow-workspace": "1" },

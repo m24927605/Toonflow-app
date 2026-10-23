@@ -93,6 +93,8 @@ interface FfmpegRequiredError extends Error {
 }
 
 interface ProviderTools {
+  /** Runs the pinned Fish Audio Drama 3 checkpoint on a private Colab GPU with at least 48 GiB VRAM. */
+  drama3(request: { text: string; direction?: string; reference?: { audio: MediaInput; text: string } }): Promise<{ data: Uint8Array; mimeType: "audio/wav" }>;
   fetch: typeof globalThis.fetch;
   /** Extracts a readable reason from a provider error body, hiding configured keys and URL query parameters. */
   errorMessage(value: unknown): string;
@@ -142,35 +144,27 @@ interface ProviderTools {
     media?: Partial<Record<"image-references" | "video-references" | "audio-references" | "start-image" | "end-image", MediaInput[]>>;
   }): Promise<{ url: string }>;
   /**
-   * Renders one MiniMax H3 Ref2VA video on a Google Colab A100 through the Colab CLI installed and signed in on the
-   * host, using the compute units of that Google account. Blocks until the session finishes (about 10–35 minutes)
-   * and always stops the session. The host never exposes the Colab credentials.
+   * Renders one Sulphur 2 (LTX-2.3) video with sound on a Google Colab A100 through the Colab CLI installed and signed
+   * in on the host, using the compute units of that Google account. The host never exposes the Colab credentials.
    */
-  minimaxH3(request: {
+  sulphur(request: {
+    /** One English paragraph in Sulphur's caption format: style and camera, the people, then every movement, line and sound in order. */
     prompt: string;
-    /** Up to 9 reference images, referred to in the prompt as <Picture 1>…<Picture 9>. */
-    images?: MediaInput[];
-    /** Up to 3 reference videos (2–15 s, re-encoded to 24 fps), referred to as <Video 1>…<Video 3>; the model copies their look. */
-    videos?: MediaInput[];
-    /**
-     * Up to 3 reference audio clips (resampled to 32 kHz stereo), referred to as <Audio 1>…<Audio 3>. Marked fully_copy
-     * in the prompt, a clip becomes the soundtrack and the speaker lip-syncs to it; marked reference, only its voice
-     * timbre and delivery are followed.
-     */
-    audios?: MediaInput[];
-    /** Structure video (depth, pose or edges, e.g. a previs depth pass) applied with the Fun ControlNet Union 2.0; its look is never copied. */
-    controlVideo?: MediaInput;
     /** Image pinned as the first frame. */
     firstFrame?: MediaInput;
     /** Image pinned as the last frame. */
     lastFrame?: MediaInput;
-    /** LoRAs (.safetensors) chained after the Turbo LoRA at their strength. */
+    /** Structure video (depth, pose or edges, e.g. a previs depth pass) applied with the IC-LoRA Union Control; its look is never copied. */
+    controlVideo?: MediaInput;
+    /** Audio locked as the clip's soundtrack: the picture, mouths included, is drawn to it and the clip keeps the file. */
+    soundtrack?: MediaInput;
+    /** LoRAs (.safetensors) applied to the model at their strength. */
     loras?: LoraInput[];
-    /** Whole seconds, 4–15, or up to 120 for a long take with `parts`. */
+    /** Whole seconds, 1–20, or up to 120 for a long take with `parts`. */
     duration: number;
     /**
      * A long take: the prompt of each of its consecutive parts, as many as `longTakeParts` gives for the duration. Each
-     * part continues the last 22 frames of the one before, and they are joined without cuts; not at 1080p.
+     * part opens on the last 25 frames of the one before, and they are joined without cuts.
      */
     parts?: string[];
     resolution: "480p" | "720p" | "1080p";
@@ -207,9 +201,9 @@ interface ProviderTools {
     denoise?: number;
     /**
      * Draws with the base model instead of Turbo: "pose" puts the person of the second image into the pose of the
-     * textureless mannequin render given as the first image; "photo" is a slower, more detailed photographic recipe.
+     * textureless mannequin render given as the first image.
      */
-    recipe?: "pose" | "photo";
+    recipe?: "pose";
   }): Promise<{ data: Uint8Array; mimeType: "image/png"; seed: number }>;
 }
 

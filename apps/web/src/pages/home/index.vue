@@ -1,10 +1,17 @@
 <template>
-  <el-container class="home">
+  <el-container class="home" :class="{ simpleMode: workspaceStore.creationMode === 'simple' }">
     <bg class="pageBackground" />
-    <el-header class="pageHeader">
-      <el-button round size="large" :icon="IconSettings" @click="settingsVisible = true">设置</el-button>
+    <el-header v-if="workspaceStore.creationMode !== 'simple'" class="pageHeader">
+      <el-button round size="large" :icon="IconSettings" :disabled="simpleRunning" @click="settingsVisible = true">设置</el-button>
+      <el-segmented v-model="workspaceStore.creationMode" :options="[{ label: '簡易模式', value: 'simple' }, { label: '專家模式', value: 'expert' }]" :disabled="simpleRunning" aria-label="製作模式" />
+      <machineStatus />
     </el-header>
     <el-main class="pageContent">
+      <simpleProduction v-if="workspaceStore.creationMode === 'simple'" @runningChange="simpleRunning = $event">
+        <template #mode><el-segmented v-model="workspaceStore.creationMode" :options="[{ label: '簡易模式', value: 'simple' }, { label: '專家模式', value: 'expert' }]" :disabled="simpleRunning" aria-label="製作模式" /></template>
+        <template #settings><machineStatus /><el-button :icon="IconSettings" :disabled="simpleRunning" @click="settingsVisible = true">设置</el-button></template>
+      </simpleProduction>
+      <template v-else>
       <section class="creationPanel" aria-label="创建项目">
         <div class="brand">
           <el-image class="brandLogo" :src="logoUrl" fit="contain" alt="Toonflow" />
@@ -65,6 +72,7 @@
           </el-card>
         </div>
       </section>
+      </template>
     </el-main>
     <settings v-model="settingsVisible" />
     <workspacePicker ref="relocationPicker" hideTrigger />
@@ -95,11 +103,14 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
 import bg from "./bg.vue";
 import workspacePicker from "./workspacePicker.vue";
+import simpleProduction from "./simpleProduction.vue";
+import machineStatus from "@/components/machineStatus.vue";
 
 const settingsVisible = ref(false);
 const router = useRouter();
 const creating = ref(false);
 const opening = ref(false);
+const simpleRunning = ref(false);
 const promptWorkspacePicker = ref<InstanceType<typeof workspacePicker>>();
 const relocationPicker = ref<InstanceType<typeof workspacePicker>>();
 const prompt = ref("");
@@ -270,6 +281,12 @@ async function createProject(fromPrompt = true) {
   isolation: isolate;
   min-height: 100dvh;
   color: var(--el-text-color-primary);
+
+  &.simpleMode {
+    height: 100dvh;
+    min-height: 0;
+    .pageContent { min-height: 0; overflow: hidden; padding-bottom: 20px; }
+  }
 
   .pageBackground {
     position: absolute;

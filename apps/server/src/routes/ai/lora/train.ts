@@ -10,7 +10,7 @@ const slider = z.strictObject({ base: z.string().trim().min(1).max(500).regex(/^
 export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),
   kind: z.enum(u.lora.loraKinds),
-  families: z.array(z.enum(["h3", "qwen"])).min(1).max(2).refine(list => new Set(list).size === list.length, "Each model family trains once"),
+  families: z.array(z.enum(["ltx", "qwen"])).min(1).max(2).refine(list => new Set(list).size === list.length, "Each model family trains once"),
   name: z.string().trim().min(1).max(64),
   items: z.array(z.strictObject({ path: z.string().min(1).max(4096), caption: z.string().trim().min(1).max(2000).optional() })).max(200),
   slider: slider.optional(),
@@ -24,8 +24,12 @@ export default Router().post("/", validateFields({
     res.status(400).json(error(kind === "slider" ? "A slider needs its base prompt and its two ends" : `Training needs at least ${minItems} items`));
     return;
   }
-  if (families.includes("qwen") && (kind === "motion" || kind === "voice")) {
-    res.status(400).json(error("Qwen-Image learns from images only; train motion and voice for MiniMax H3"));
+  if (families.includes("qwen") && kind === "motion") {
+    res.status(400).json(error("Qwen-Image learns from images only; train motion for Sulphur 2"));
+    return;
+  }
+  if (families.includes("ltx") && kind === "slider") {
+    res.status(400).json(error("Sliders train for Qwen-Image only"));
     return;
   }
   const cwd = await u.workspace.resolveWorkspace(req, directory);

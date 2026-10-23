@@ -1,23 +1,29 @@
+import { createColabWorker, waitForColabPreparation, type ColabPreparation } from "./colabPool";
 import { createHash } from "node:crypto";
 import type { ProviderTools } from "@toonflow/providers";
-import { createColabWorker, inputBytes, inputExtension, randomSeed, type ColabSession } from "@/utils/media/colab";
+import { inputBytes, inputExtension, randomSeed, type ColabSession } from "@/utils/media/colab";
 import pipeline from "./qwenImageColab.py" with { type: "text" };
 
 export type QwenImageRequest = Parameters<ProviderTools["qwenImage"]>[0];
 type QwenImageResult = Awaited<ReturnType<ProviderTools["qwenImage"]>>;
 type Pending = { request: QwenImageRequest; signal?: AbortSignal; resolve: (result: QwenImageResult) => void; reject: (reason: unknown) => void };
 
-// ACT: Requests are gathered until 10 s pass without a new one (60 s at most) and drawn in one Colab session, so
-// setup is paid once per batch. Only one session runs at a time; requests arriving meanwhile form the next batch.
-// The batch is in-process state, like the other utility singletons; tune these values if users batch differently.
-const quietWindow = 10_000;
-const maxWait = 60_000;
+// Batch requests arriving in the same burst; the shared VM already preserves setup between batches.
+const quietWindow = 50;
+const maxWait = 250;
 const maxBatch = 32;
 
 // ACT: The high-RAM shape is required: the Qwen-Image weights (30+ GB) passed through host memory crashed the standard
 // shape's kernel. It needs Colab Pro or Pro+, which A100 access already implies.
-// The session stops as soon as a batch ends, unless a caller holds it for a batch that depends on this one.
-const worker = createColabWorker("qwenImage", { gpu: "A100", highMem: true }, 0);
+// Production owns the VM lifetime; this worker owns image jobs on its shared lane.
+const worker = createColabWorker("qwenImage", 1);
+export function qwenImagePreparation(recipes: "pose"[]): ColabPreparation {
+  return { name: recipes.includes("pose") ? "imagePose" : "imageTurbo", runtime: "qwenImage", installSource: "comfy/7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217", prefetch: true, job: {
+    script: `${pipeline.slice(0, pipeline.indexOf("def build(item):"))}\nprint("COLAB_DONE")\n`,
+    uploads: [{ name: "qwin_job.json", data: JSON.stringify([{}, ...recipes.map(recipe => ({ recipe }))].map(item => ({ refs: [], size: "1K", ratio: "16:9", ...item }))) }],
+    env: { QWEN_JOB: "00000000-0000-0000-0000-000000000000" }, outputs: [],
+  } };
+}
 // LoRA files already on a session's machine, so a held session receives each LoRA once.
 const sentLoras = new WeakMap<ColabSession, Set<string>>();
 
@@ -41,10 +47,11 @@ async function drawBatch() {
   running = true;
   // The session stops early only when every request in the batch has been cancelled.
   const controller = new AbortController();
+  const job = crypto.randomUUID();
   const live = new Set(batch);
   for (const item of batch) {
     item.signal?.addEventListener("abort", () => {
-      live.delete(item);
+      if (!live.delete(item)) return;
       item.reject(item.signal!.reason);
       if (!live.size) controller.abort();
     }, { once: true });
@@ -70,10 +77,10 @@ async function drawBatch() {
       recipe: request.recipe ?? null,
       loras: loras[index]!.map(({ name, strength }) => ({ name, strength })),
     }));
-    const results = await worker.run(async (session, signal) => {
+    await worker.run(async (session, signal) => {
       const sent = sentLoras.get(session) ?? new Set<string>();
       const loraUploads = [...new Map(loras.flat().filter(lora => !sent.has(lora.name)).map(lora => [lora.name, { name: lora.name, data: lora.data }])).values()];
-      const outputs = await session.job({
+      await session.job({
         script: pipeline,
         uploads: [
           { name: "qwin_job.json", data: JSON.stringify(items) },
@@ -81,14 +88,17 @@ async function drawBatch() {
             .map(image => [imageName(image), { name: imageName(image), data: inputBytes(image) }])).values(),
           ...loraUploads,
         ],
-        env: {},
-        outputs: batch.map((_, index) => `/content/qwout/image_${index}.png`),
+        env: { QWEN_JOB: job },
+        outputs: batch.map((_, index) => `/content/qwout/${job}/image_${index}.png`),
+        onOutput: (index, data) => {
+          const item = batch[index]!;
+          live.delete(item);
+          item.resolve({ data, mimeType: "image/png", seed: items[index]!.seed });
+        },
       }, signal);
       for (const { name } of loraUploads) sent.add(name);
       sentLoras.set(session, sent);
-      return outputs;
     }, controller.signal);
-    batch.forEach((item, index) => item.resolve({ data: results[index]!, mimeType: "image/png", seed: items[index]!.seed }));
   } catch (error) {
     for (const item of batch) item.reject(error);
   } finally {
@@ -105,16 +115,32 @@ async function drawBatch() {
 export const holdQwenImage = (ms?: number, signal?: AbortSignal) => ms ? worker.holdFor(ms, signal) : worker.hold();
 
 /** Queues one Qwen-Image 2.1 image, Turbo unless a recipe asks for the base model; it is drawn on Colab together with the other requests of its batch. */
-export function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
+export async function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (!request.prompt.trim()) throw new Error("Qwen-Image prompt cannot be empty");
   if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");
   if (!/^[1-9]\d?:[1-9]\d?$/.test(request.ratio)) throw new Error("Invalid Qwen-Image aspect ratio");
-  if ((request.images?.length ?? 0) > 16) throw new Error("Qwen-Image supports at most 16 reference images");
+  if ((request.images?.length ?? 0) > 10) throw new Error("Qwen-Image 2.1 supports at most 10 reference images");
   if ((request.loras?.length ?? 0) > 4) throw new Error("Qwen-Image loads at most 4 LoRAs");
   if (request.seed !== undefined && (!Number.isSafeInteger(request.seed) || request.seed < 0)) throw new Error("Invalid Qwen-Image seed");
   if (request.recipe === "pose" && (request.images?.length ?? 0) < 2) throw new Error("Pose transfer needs a mannequin render and a picture of the person");
   if (request.initImage && !(typeof request.denoise === "number" && request.denoise > 0 && request.denoise <= 1)) throw new Error("Redrawing an image with Qwen-Image needs a denoise above 0 and up to 1");
+  // Official 2.1 editing syntax: natural references for one image, <imageN> for multiple images.
+  // https://github.com/QwenLM/Qwen-Image-2.1/blob/main/prompt_rewrite/prompts/system_prompt_edit.txt
+  const imageCount = request.images?.length ?? 0;
+  const prompt = request.prompt.replace(/\{\{ref\s+(\d+)\}\}|<image\s*(\d+)>/gi, (_match, ref: string | undefined, image: string | undefined) => {
+    const index = Number(ref ?? image);
+    if (index < 1 || index > imageCount) throw Object.assign(new Error(`Qwen-Image prompt references image ${index}, but only ${imageCount} reference images are connected`), { status: 400 });
+    return imageCount === 1 ? "the image" : `<image${index}>`;
+  });
+  if (/\{\{ref\b/i.test(prompt)) throw Object.assign(new Error("Qwen-Image prompt contains an unresolved reference placeholder"), { status: 400 });
+  if (imageCount > 1) for (let index = 1; index <= imageCount; index++) {
+    if (!prompt.includes(`<image${index}>`)) throw Object.assign(new Error(`Qwen-Image editing prompt must identify the role of reference <image${index}>`), { status: 400 });
+  }
+  request = { ...request, prompt };
   for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : [], ...request.initImage ? [request.initImage] : []]) inputBytes(image);
+  signal?.throwIfAborted();
+  if (request.recipe !== undefined && request.recipe !== "pose") throw Object.assign(new Error("This production uses the B3 image recipes only"), { status: 400 });
+  await waitForColabPreparation(request.recipe === "pose" ? "imagePose" : "imageTurbo", signal);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {
     const item: Pending = { request, signal, resolve, reject };

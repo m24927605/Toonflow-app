@@ -7,8 +7,6 @@
         <span v-if="state.production.detail" class="failure">{{ state.production.detail }}</span>
         <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
         <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
-        <!-- Clips that failed the frame check twice; the film keeps them, so a person decides whether to redo them. -->
-        <span v-for="clip in flaggedClips" :key="clip.shot" class="warning">{{ t`Shot ${clip.shot} needs a look: ${clip.check.issues.filter(issue => issue.major).map(issue => issue.problem).join("; ")}` }}</span>
         <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
       </template>
       <span v-else>{{ translate("Give an outline and a length; the AI writes the script and makes the film, stopping for your review.") }}</span>
@@ -18,7 +16,7 @@
         <template v-if="!state">
           <el-input v-model="form.outline" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" :placeholder="translate('Story outline: who, where, what happens')" :aria-label="translate('Story outline')" />
           <div class="formRow">
-            <label>{{ translate("Length (seconds)") }} <el-input-number v-model="form.seconds" size="small" :min="10" :max="600" :step="10" controlsPosition="right" /></label>
+            <label>{{ translate("Length (seconds)") }} <el-input-number v-model="form.seconds" size="small" :min="5" :max="600" :step="5" controlsPosition="right" /></label>
             <label>{{ translate("Ratio") }}
               <el-select v-model="form.ratio" size="small" class="shortSelect"><el-option v-for="ratio in ratios" :key="ratio" :label="ratio" :value="ratio" /></el-select>
             </label>
@@ -41,7 +39,7 @@
           </div>
           <div v-if="quote" class="quote">
             <span>{{ t`Estimated cost: about ${quote.total} Colab compute units for ${quote.shots} shots.` }}</span>
-            <label>{{ translate("Spend at most (units)") }} <el-input-number :modelValue="form.budget" size="small" :min="1" :max="1000" :step="1" controlsPosition="right" @update:modelValue="setBudget" /></label>
+            <label>{{ translate("Colab spending threshold (units)") }} <el-input-number :modelValue="form.budget" size="small" :min="1" :max="1000" :step="1" controlsPosition="right" @update:modelValue="setBudget" /></label>
           </div>
           <div class="footer">
             <el-button type="primary" :loading="busy" :disabled="!form.outline.trim() || !form.budget" @click="start">{{ translate("Start") }}</el-button>
@@ -100,12 +98,12 @@ type Production = {
   script?: { path: string };
   shotList?: { path: string; shots: number; issues: MessageDescriptor[] };
   assets?: { characters: Asset[]; places: Asset[] };
-  dub?: unknown; clips?: unknown; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
-  videos?: { shot: number; prompt?: string; video?: string; check?: { issues: { problem: string; major: boolean }[]; passed: boolean } }[];
+  dub?: unknown; clips?: { shot: number; clip: number }[]; previs?: { shot: number; depth?: string; video?: string }[]; roughCut?: string;
+  videos?: { shot: number; prompt?: string; video?: string }[];
   music?: string; film?: string; report?: string;
 };
 type Asset = { name: string; views?: string[]; outfits?: { name: string; views?: string[] }[]; loras?: { family: string; trigger: string }[] };
-type State = { production: Production; script?: string; shotList?: string; report?: string; estimate: Estimate };
+type State = { active: boolean; production: Production; script?: string; shotList?: string; report?: string; estimate: Estimate };
 type TextKind = "script" | "shotList" | "report";
 // `texts` are the text nodes this production made, each with the text last put into it, so a revision by the AI
 // replaces it only while nobody has edited it.
@@ -124,7 +122,7 @@ type Data = {
 
 const ratios: Ratio[] = ["16:9", "9:16", "1:1", "4:3", "3:4"];
 const qualities: Quality[] = ["480p", "720p", "1080p"];
-const { id, node, nodeProps, files } = useNode({ label: "Auto production" });
+const { id, node, nodeProps, nodeEvent, files } = useNode({ label: "Auto production" });
 const flow = useVueFlow();
 const { refList } = useNodeReferences();
 const data = computed(() => node.data as typeof node.data & Data);
@@ -157,11 +155,11 @@ watch(photos, list => {
   for (const photo of list) form.names[photo.key] ??= String(flow.findNode(photo.key)?.data?.character ?? "").trim();
 }, { immediate: true });
 
-const generationStatus = computed(() => !state.value ? "idle" : { running: "running", waiting: "idle", failed: "failed", done: "succeeded" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
-// A failed check is kept only once its corrections are used up, so every one left needs a person to look at it.
-const flaggedClips = computed(() => (state.value?.production.videos ?? []).flatMap(clip => clip.check && !clip.check.passed ? [{ shot: clip.shot, check: clip.check }] : []));
+const completed = computed(() => state.value?.production.status === "done" && !!state.value.production.film);
+const generationStatus = computed(() => !state.value ? "idle" : state.value.production.status === "done" ? completed.value ? "succeeded" : "failed" : { running: "running", waiting: "idle", failed: "failed" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
 const headline = computed(() => {
   const production = state.value!.production;
+  if (production.status === "done" && !completed.value) return translate("Generation completed, but the film file is missing.");
   if (production.status === "running") {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");
@@ -175,10 +173,9 @@ const headline = computed(() => {
     if (designing) return blocked ? translate("Designing the characters and places…") : translate("Designing the characters and places while blocking every shot in the previs…");
     if (training) return blocked ? translate("Training LoRAs so faces and places stay the same (about an hour)…") : translate("Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…");
     if (!blocked) return translate("Blocking every shot in the previs…");
-    if (!production.clips) return translate("Recording the dialogue…");
+    if (!production.clips || production.clips.length !== production.shotList.shots) return translate("Recording the dialogue…");
     if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
     if (production.videos.some(item => !item.video)) return t`Rendering the clips at ${production.input.quality} (${production.videos.filter(item => item.video).length}/${production.videos.length})…`;
-    if (production.videos.some(item => !item.check)) return t`Checking the clips frame by frame (${production.videos.filter(item => item.check).length}/${production.videos.length})…`;
     if (!production.roughCut) return translate("Joining the rough cut…");
     if (!production.film) return translate("Finishing the film: music, sound levels and subtitles…");
     return translate("Writing the delivery report…");
@@ -189,7 +186,7 @@ const headline = computed(() => {
     budget: translate("Stopped: the next step would go over the budget"),
     balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
     stopped: translate("Stopped"),
-    filmDone: translate("The film and its delivery report are ready on the canvas."),
+    filmDone: translate("The film is generated and its delivery report is ready."),
   } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
 });
 
@@ -224,15 +221,16 @@ async function start() {
   const unnamed = photos.value.some(photo => !form.names[photo.key]?.trim());
   if (unnamed) return void ElMessage.warning(translate("Name every connected photo first"));
   const go = await ElMessageBox.confirm(
-    t`Start an automatic production of about ${form.seconds} seconds? It spends at most ${form.budget} Colab compute units (estimate ${quote.value?.total ?? "?"}) and stops for your review where you asked. It keeps running if you close this page.`,
+    t`Start an automatic production of about ${form.seconds} seconds? It stops when measured Colab usage reaches ${form.budget} units (estimate ${quote.value?.total ?? "?"}); remote shutdown can consume additional units. It also stops for your requested review. It keeps running if you close this page.`,
     translate("Auto production"), { confirmButtonText: translate("Start"), cancelButtonText: translate("Cancel"), type: "info" },
   ).then(() => true, () => false);
-  if (!go) return;
+  if (!go || flow.findNode(id) !== node) return;
   busy.value = true;
   try {
     await api("create", {
       directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality, budget: form.budget,
       gates: form.reviewScript ? ["script"] : [], subtitles: form.subtitles, music: form.music,
+      mode: "expert", modelRecipe: "sulphur2",
       photos: [...photos.value.map(photo => ({ name: form.names[photo.key]!.trim(), path: photo.url })), ...canvasCast.value.map(item => ({ name: item.name, path: item.url }))],
     });
     data.value.started = true;
@@ -329,7 +327,7 @@ async function refresh() {
     if (state.value.shotList) syncText("shotList", state.value.shotList);
     if (state.value.production.assets) syncAssets(state.value.production.assets);
     if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut, state.value.production.input.quality);
-    if (state.value.production.film) syncFilm(state.value.production.film, state.value.production.input.quality);
+    if (state.value.production.film && state.value.production.status === "done" && completed.value) syncFilm(state.value.production.film, state.value.production.input.quality);
     if (state.value.report) syncText("report", state.value.report);
     newBudget.value ??= state.value.production.input.budget;
   } catch (error) {
@@ -361,6 +359,10 @@ function answer(revise: boolean) {
 }
 const resume = () => act(async () => api("resume", { directory: await directory(), id, ...state.value?.production.message === "budget" ? { budget: newBudget.value } : {} }));
 const stop = () => act(async () => api("stop", { directory: await directory(), id }));
+nodeEvent.on("delete", async () => {
+  if (busy.value) throw new Error("Wait for the production operation to finish before deleting this node");
+  if (data.value.started) await api("stop", { directory: await directory(), id });
+});
 
 // The page shows progress by asking every few seconds; the production itself runs on the server.
 let poll: ReturnType<typeof setInterval> | undefined;

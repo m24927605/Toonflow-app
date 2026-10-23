@@ -12,7 +12,7 @@ import { streamClaudeCode } from "@/utils/ai/claudeCode";
 import { streamColab } from "@/utils/ai/colab";
 
 export { claudeCodeToolsRouter } from "@/utils/ai/claudeCode";
-export { holdColab, holdColabA100For, holdColabFor, stopColab } from "@/utils/ai/colab";
+export { holdColab, stopColab, colabModelPreparation } from "@/utils/ai/colab";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 export { startCodexLogin, submitCodexCode, getCodexStatus, logoutCodex } from "@/utils/ai/codex";
@@ -150,10 +150,13 @@ export async function streamAi(
   signal: AbortSignal,
   references: Awaited<ReturnType<typeof readAiReferences>> = [],
   session?: string,
+  responseSchema?: Record<string, unknown>,
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
+  // ACT: Only the Colab models sample under the schema's grammar; the hosted protocols get the prompt's own JSON
+  // instructions, as before. Pass response_format through pi-ai for them if a hosted model ever writes these texts.
   if (provider.protocol === "colab-cli") {
-    return streamColab(configured.providerId, configuredModel.id, context, signal, references);
+    return streamColab(configured.providerId, configuredModel.id, context, signal, references, responseSchema);
   }
   if (provider.protocol === "claude-code") {
     return await streamClaudeCode(configured.providerId, configuredModel.id, context, signal, referenceContent("anthropic-messages", "", references).slice(1), session);

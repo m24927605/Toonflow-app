@@ -2,15 +2,28 @@ import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
+import qwenImageSource from "@toonflow/providers/media/qwenImage" with { type: "text" };
+import sulphurSource from "@toonflow/providers/media/sulphur" with { type: "text" };
+import drama3Source from "@toonflow/providers/media/drama3" with { type: "text" };
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
 import conf from "@/utils/conf";
-import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
+import { loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { checkMediaBudget, recordGeneration } from "@/utils/media/usage";
+import { reserveGeneration, recordGeneration } from "@/utils/media/usage";
 
 const maxMediaSize = 100 * 1024 * 1024;
-const mediaExtensions: Record<string, string> = {
+// Bun loads these as source text; TypeScript resolves their provider object exports.
+const productionModels = {
+  image: { provider: "qwenImage", models: ["qwen_image_2_1_turbo", "qwen_image_2_1_turbo_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
+  video: { provider: "sulphur", models: ["sulphur_2_q8"], source: sulphurSource as unknown as string },
+  audio: { provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string },
+};
+
+function productionModel(type: "image" | "video" | "audio", provider: string, model: string) {
+  return productionModels[type].provider === provider && productionModels[type].models.some(id => id === model);
+}
+export const mediaExtensions: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif",
   "image/avif": "avif", "image/bmp": "bmp", "image/tiff": "tiff",
   "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov", "video/ogg": "ogv",
@@ -30,10 +43,10 @@ function imageOptions(value: unknown, pattern: RegExp) {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string" && item.length <= 64 && item === item.trim() && pattern.test(item)))] : undefined;
 }
 
-export async function listMediaModels(): Promise<MediaModel[]> {
-  const installedProviders = await listMediaProviders();
-  return installedProviders.flatMap(provider => provider.models.flatMap(model => {
+export function listMediaModels(): Promise<MediaModel[]> {
+  return Promise.resolve((mediaProviders as readonly Provider[]).flatMap(provider => provider.models.flatMap(model => {
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
+    if (!productionModel(model.type, provider.id, model.id)) return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
@@ -45,7 +58,7 @@ export async function listMediaModels(): Promise<MediaModel[]> {
         ...(typeof model.character === "string" && /^[\w-]{1,64}$/.test(model.character) ? { character: model.character } : {}),
       } : {}),
     } as MediaModel];
-  }));
+  })));
 }
 
 function detectMimeType(bytes: Uint8Array, fallback: string) {
@@ -153,21 +166,20 @@ export async function generateMedia(
   signal?: AbortSignal,
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
+  if (!productionModel(mediaType, request.providerId, request.modelId)) invalid("This production uses the B3 image, speech and video models only");
   if (!request.prompt.trim()) invalid("Enter a generation prompt");
   const directory = await realpath(cwd);
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
-  const providerInfo = await getMediaProvider(request.providerId);
+  const providerInfo = { ...(mediaProviders as readonly Provider[]).find(item => item.id === request.providerId)!, source: productionModels[mediaType].source };
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("The selected media model does not exist or the type does not match, please select again.");
-  // Every video is blocked out in the Director's Studio first; its depth export drives the model as a control video.
-  // ACT: The server cannot tell who set skipPrevis; nodes set it only after a confirmation dialog and the agent tool
-  // description requires the user's consent. A signed per-request consent would close that gap.
-  if (mediaType === "video" && request.mode !== "videoControl" && request.skipPrevis !== true) invalid("Video generation needs the previs depth video connected in control video mode. Skip it only with the user's explicit consent.");
+  const hasPrevisReference = request.previsVideo && request.videos?.some(video => video.path === request.previsVideo!.path && video.mimeType === request.previsVideo!.mimeType);
+  if (request.previsVideo && !hasPrevisReference) invalid("The previs blocking reference must be connected in videos");
+  if (mediaType === "video" && !(request.mode === "videoControl" && request.videos?.length) && !hasPrevisReference && request.skipPrevis !== true) invalid("Video generation needs a previs blocking reference or depth control video. Skip it only with the user's explicit consent.");
   const onScreenText = mediaType === "audio" || request.skipTextCheck ? [] : findOnScreenText(request.prompt);
   if (onScreenText.length) invalid(`The prompt asks the model to render on-screen text (${onScreenText.join(", ")}); add captions, title cards and signs in post-production, or confirm sending it anyway`);
   if (request.characterId && (mediaType !== "image" || typeof model.character !== "string")) invalid("The selected model does not support character identities. Use an image model that does.");
-  await checkMediaBudget(providerInfo.id, model, mediaType, request);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
@@ -177,22 +189,27 @@ export async function generateMedia(
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
   const loras = request.loras ? await Promise.all(request.loras.map(item => readLora(directory, item, signal))) : undefined;
+  const videos = await references(request.videos, "video");
+  const audios = await references(request.audios, "audio");
+  const speechReferences = audios?.map((audio, index) => ({ ...audio, text: request.audios?.[index]?.text }));
+  const firstFrame = request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined;
+  const lastFrame = request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined;
+  const initImage = request.initImage ? await readReference(directory, request.initImage, "image", signal) : undefined;
   signal?.throwIfAborted();
+  await reserveGeneration(providerInfo.id, model, mediaType, request);
   const assets = mediaType === "audio"
     ? await provider.generateAudio!({
-      model: request.modelId, text: request.prompt, images, audios: await references(request.audios, "audio"),
+      model: request.modelId, text: request.prompt, images, audios: speechReferences,
       voice: request.voice, emotion: request.emotion, speed: request.speed, volume: request.volume, pitch: request.pitch, language: request.language, format: request.format, sampleRate: request.sampleRate, duration: request.duration,
     })
     : mediaType === "image"
     ? await provider.generateImage!({
       model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras, seed: request.seed,
-      initImage: request.initImage ? await readReference(directory, request.initImage, "image", signal) : undefined, denoise: request.denoise,
+      initImage, denoise: request.denoise,
     })
     : await provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,
-      videos: await references(request.videos, "video"), audios: await references(request.audios, "audio"),
-      firstFrame: request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined,
-      lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
+      videos, audios, firstFrame, lastFrame,
       loras,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode, seed: request.seed, parts: request.parts,

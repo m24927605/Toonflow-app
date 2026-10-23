@@ -5,7 +5,7 @@
         <strong>{{ data.results[0]!.name }} · {{ kindLabels[data.results[0]!.kind] }}</strong>
         <span v-for="result in data.results" :key="result.path">{{ t`${familyLabels[result.family]}: trigger word ${result.trigger}` }}</span>
       </template>
-      <span v-else-if="training">{{ translate("Training on Colab, about half an hour. You can close this page; the LoRA appears in the LoRA menus when it finishes.") }}</span>
+      <span v-else-if="training">{{ translate("Training on Colab, up to about an hour and a half. You can close this page; the LoRA appears in the LoRA menus when it finishes.") }}</span>
     </div>
     <template #bottom>
       <el-card class="loraCard" shadow="never" :bodyStyle="{ padding: '14px 16px 12px' }">
@@ -15,9 +15,9 @@
             <el-option v-for="(label, value) in kindLabels" :key="value" :label="label" :value="value" />
           </el-select>
           <el-select v-model="familyChoice" size="small" :disabled="training" :aria-label="translate('Model')">
-            <el-option :label="translate('Video and image (recommended)')" value="h3,qwen" :disabled="kind === 'motion' || kind === 'voice'" />
-            <el-option :label="familyLabels.h3" value="h3" />
-            <el-option :label="familyLabels.qwen" value="qwen" :disabled="kind === 'motion' || kind === 'voice'" />
+            <el-option :label="translate('Video and image (recommended)')" value="ltx,qwen" :disabled="kind === 'motion' || kind === 'slider'" />
+            <el-option :label="familyLabels.ltx" value="ltx" :disabled="kind === 'slider'" />
+            <el-option :label="familyLabels.qwen" value="qwen" :disabled="kind === 'motion'" />
           </el-select>
           <el-input v-model="name" size="small" :disabled="training" :placeholder="translate('Name')" :aria-label="translate('Name')" class="nameInput" />
         </div>
@@ -38,7 +38,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useVueFlow } from "@vue-flow/core";
 import { IconBrain } from "@tabler/icons-vue";
 import { ElButton, ElCard, ElInput, ElMessage, ElMessageBox, ElOption, ElSelect } from "element-plus";
 import { t, translate } from "@toonflow/i18n/vue";
@@ -49,20 +48,19 @@ import referenceItem from "@toonflow/node-shared/referenceItem";
 defineOptions({
   inheritAttrs: false,
   icon: IconBrain,
-  handles: [{ id: "in", type: "target", dataType: ["IMAGE", "VIDEO", "AUDIO"], label: "Training material" }] satisfies NodeHandle[],
+  handles: [{ id: "in", type: "target", dataType: ["IMAGE", "VIDEO"], label: "Training material" }] satisfies NodeHandle[],
 });
 const { node, nodeProps, files } = useNode({ label: "Train LoRA" });
 const { refList, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
-const { findNode } = useVueFlow();
 const ai = useNodeAi();
 const training = ref(false);
 const failed = ref(false);
 const controller = ref<AbortController>();
 type Data = { kind?: NodeLoraKind; families?: NodeLoraFamily[]; name?: string; slider?: { base: string; positive: string; negative: string }; results?: NodeLoraRecord[] };
 const data = computed(() => node.data as typeof node.data & Data);
-// Looks train for both video and keyframes by default; motion and voice are learned from clips and sound, which only
-// MiniMax H3 trains on, and sliders are tuned for Qwen-Image.
-const defaultFamilies = (value: NodeLoraKind): NodeLoraFamily[] => value === "motion" || value === "voice" ? ["h3"] : value === "slider" ? ["qwen"] : ["h3", "qwen"];
+// Looks train for both video and keyframes by default; motion is learned from clips, which only Sulphur 2 trains on,
+// and sliders only for Qwen-Image.
+const defaultFamilies = (value: NodeLoraKind): NodeLoraFamily[] => value === "motion" ? ["ltx"] : value === "slider" ? ["qwen"] : ["ltx", "qwen"];
 const kind = computed({ get: () => data.value.kind ?? "character", set: (value: NodeLoraKind) => {
   data.value.kind = value;
   data.value.families = defaultFamilies(value);
@@ -79,9 +77,9 @@ const sliderPositive = sliderField("positive");
 const sliderNegative = sliderField("negative");
 const kindLabels = computed<Record<NodeLoraKind, string>>(() => ({
   character: translate("Character"), scene: translate("Scene"), costume: translate("Costume"), style: translate("Style"),
-  motion: translate("Motion"), voice: translate("Voice"), slider: translate("Slider"),
+  motion: translate("Motion"), slider: translate("Slider"),
 }));
-const familyLabels = computed<Record<NodeLoraFamily, string>>(() => ({ h3: translate("Video (MiniMax H3)"), qwen: translate("Image (Qwen-Image)") }));
+const familyLabels = computed<Record<NodeLoraFamily, string>>(() => ({ ltx: translate("Video (Sulphur 2)"), qwen: translate("Image (Qwen-Image)") }));
 // What each kind learns from; its captions leave that thing out so it binds to the trigger word.
 const hint = computed(() => ({
   character: translate("Connect images of one person, one is enough; with fewer than 12, variants of the first in other clothes and places are generated, and more real views make it better."),
@@ -89,7 +87,6 @@ const hint = computed(() => ({
   costume: translate("Connect at least 4 images of the outfit, worn by anyone."),
   style: translate("Connect at least 4 images in the look to learn, of varied subjects."),
   motion: translate("Connect at least 4 video clips of the movement, by varied people."),
-  voice: translate("Connect at least 4 recordings of one voice; each recording's text becomes its caption."),
   slider: translate("No material: the two ends are described in words."),
 })[kind.value]);
 const ready = computed(() => !training.value && !!name.value.trim() && (kind.value === "slider"
@@ -97,17 +94,10 @@ const ready = computed(() => !training.value && !!name.value.trim() && (kind.val
   : refList.value.filter(item => item.value).length >= (kind.value === "character" || kind.value === "scene" ? 1 : 4)));
 const generationStatus = computed(() => training.value ? "running" : failed.value ? "failed" : data.value.results?.length ? "succeeded" : "idle");
 
-/** A connected recording's caption is the text it reads: the generating node's text or prompt. */
-function voiceCaption(source: string) {
-  const sourceData = findNode(source)?.data as { text?: string; prompt?: string } | undefined;
-  const text = String(sourceData?.text || sourceData?.prompt || "").trim();
-  return text ? `{trigger} saying "${text.replaceAll('"', "'")}"` : undefined;
-}
-
 async function train() {
   if (!ready.value) return;
   const models = families.value.map(item => familyLabels.value[item]).join(" + ");
-  const go = await ElMessageBox.confirm(t`Train a ${kindLabels.value[kind.value]} LoRA for ${models} on Colab? Each model trains on its own L4 at the same time, about 30–60 minutes and roughly 0.5–1.5 compute units each. You can close this page; the LoRA appears in the LoRA menus when it finishes.`, translate("Train LoRA"), {
+  const go = await ElMessageBox.confirm(t`Train a ${kindLabels.value[kind.value]} LoRA for ${models} on Colab? Each model trains on its own GPU at the same time: Qwen-Image about 30–60 minutes and roughly 0.5–1.5 compute units, Sulphur 2 about 45–90 minutes and roughly 5–10 units. You can close this page; the LoRA appears in the LoRA menus when it finishes.`, translate("Train LoRA"), {
     confirmButtonText: translate("Train"), cancelButtonText: translate("Cancel"), type: "info",
   }).then(() => true, () => false);
   if (!go) return;
@@ -117,9 +107,8 @@ async function train() {
   try {
     assertReferencesReady();
     const items = kind.value === "slider" ? [] : refList.value.flatMap(item => {
-      if (!item.value || !["IMAGE", "VIDEO", "AUDIO"].includes(String(item.dataType))) return [];
-      const caption = item.dataType === "AUDIO" ? voiceCaption(item.source) : undefined;
-      return [{ path: (item.value as { url: string }).url, ...caption ? { caption } : {} }];
+      if (!item.value || !["IMAGE", "VIDEO"].includes(String(item.dataType))) return [];
+      return [{ path: (item.value as { url: string }).url }];
     });
     const { directory } = await files.getWorkspaceFiles().list();
     data.value.results = await ai.trainLora({

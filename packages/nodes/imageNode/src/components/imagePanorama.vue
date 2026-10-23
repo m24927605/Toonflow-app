@@ -40,6 +40,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { ElDialog, ElDropdown, ElDropdownItem, ElDropdownMenu } from "element-plus";
 import { IconPanoramaHorizontal } from "@tabler/icons-vue";
 import { useNode } from "@vue-flow/core";
+import { useNode as useScaffoldNode } from "@toonflow/nodes-scaffold/runtime";
 import type { NodeMediaValue } from "@toonflow/nodes-scaffold/runtime";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import { buildPanoramaPrompt, type PanoramaMode } from "../imagePanorama";
@@ -50,6 +51,7 @@ import imagePanoramaPreview from "./imagePanoramaPreview.vue";
 const props = defineProps<{ src: string; source?: NodeMediaValue; disabled?: boolean }>();
 const emit = defineEmits<{ open: [] }>();
 const { node } = useNode();
+const { ai } = useScaffoldNode();
 const dropdown = ref<InstanceType<typeof ElDropdown>>();
 const trigger = ref<HTMLElement>();
 const visible = ref(false);
@@ -82,12 +84,17 @@ async function selectAction(command: string) {
   if (!props.source) return;
   creating.value = true;
   try {
+    const ratio = mode.value === "sphere" ? "2:1" : "4:1";
+    const model = typeof node.data.model === "string" ? node.data.model : "";
+    const models = await ai.getMediaModels();
+    const selected = models.find(item => JSON.stringify([item.providerId, item.modelId]) === model);
+    if (!selected?.imageRatios?.includes(ratio)) throw new Error(`当前图片模型不支持全景所需的 ${ratio} 比例，请先选择支持该比例的模型`);
     await createVariation({
       label: mode.value === "sphere" ? "720°全景图" : "360°环绕图",
       prompt: buildPanoramaPrompt(mode.value),
-      model: typeof node.data.model === "string" ? node.data.model : "",
+      model,
       size: typeof node.data.size === "string" ? node.data.size : "",
-      ratio: mode.value === "sphere" ? "2:1" : "4:1",
+      ratio,
     });
   } catch (error) {
     showNodeError(error, "全景节点创建失败");

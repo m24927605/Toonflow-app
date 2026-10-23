@@ -76,6 +76,7 @@
         "@toonflow/ext-scaffold": "workspace:*",
         "@toonflow/i18n": "workspace:*",
         "@toonflow/model-icons": "workspace:*",
+        "@toonflow/node-video": "workspace:*",
         "@toonflow/nodes-scaffold": "workspace:*",
         "@toonflow/providers": "workspace:*",
         "@toonflow/server": "workspace:*",
@@ -341,6 +342,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@tabler/icons-vue": "^3.46.0",
+        "@toonflow/skills": "workspace:*",
         "@toonflow/tools-scaffold": "workspace:*",
         "vue-draggable-plus": "^0.6.1",
         "x-sender": "1.4.6",
@@ -688,6 +690,10 @@
       "dependencies": {
         "@toonflow/ffmpeg": "workspace:*",
       },
+    },
+    "packages/skills": {
+      "name": "@toonflow/skills",
+      "version": "0.0.0",
     },
     "packages/teamScaffold": {
       "name": "@toonflow/teams-scaffold",
@@ -1445,6 +1451,8 @@
     "@toonflow/providers": ["@toonflow/providers@workspace:packages/providers"],
 
     "@toonflow/server": ["@toonflow/server@workspace:apps/server"],
+
+    "@toonflow/skills": ["@toonflow/skills@workspace:packages/skills"],
 
     "@toonflow/team-storyboard": ["@toonflow/team-storyboard@workspace:packages/teams/storyboardTeam"],
 

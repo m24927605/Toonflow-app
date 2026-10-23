@@ -1,8 +1,7 @@
 import { resolve } from "node:path";
 import { createApp } from "./app";
-import { stopOrphanedColabSessions } from "./utils/media/colab";
-import { resumeRunningProductions } from "./utils/production";
 import packageInfo from "../../../package.json";
+import { scheduler } from "node:timers/promises";
 
 const startTime = Date.now();
 const realPort = 3000;
@@ -22,12 +21,19 @@ const app = await createApp({
   providersRoot: resolve(appDirectory, fromSource ? "packages/providers/src" : "build/providers"),
   skillsRoot: resolve(appDirectory, fromSource ? "packages/skills" : "build/skills"),
 });
-// A Colab A100 left running by a killed server keeps billing, so clear those sessions before taking new jobs; then
-// the productions that were running continue from their last saved step.
-stopOrphanedColabSessions().then(
-  sessions => sessions.length && console.log(`[colab] Stopped orphaned sessions: ${sessions.join(", ")}`),
-  error => console.error("[colab] Orphaned session cleanup failed; check with `colab sessions`:", error),
-).then(resumeRunningProductions).catch(error => console.error("[production] Resuming productions failed:", error));
+const { resumeRunningProductions, productionWorkPending } = await import("./utils/production");
+const { mediaWorkPending } = await import("./utils/media/jobs");
+const { restoreColabPool, checkpointColabPool, colabPoolIdle } = await import("./utils/media/colabPool");
+restoreColabPool(new AbortController().signal).then(resumeRunningProductions).catch(error => console.error("[colab] Existing machines could not be reconnected; no replacement was allocated:", error));
+let restarting = false;
+const restart = async () => {
+  if (restarting) return;
+  restarting = true;
+  while (productionWorkPending() || mediaWorkPending() || !colabPoolIdle()) await scheduler.wait(250);
+  await checkpointColabPool();
+  process.exit(0);
+};
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGUSR1"] as const) process.on(signal, () => { void restart().catch(error => { restarting = false; console.error("[server] Could not checkpoint before restart:", error); }); });
 const { initializeMcpRuntime } = await import("./utils/mcp/runtime");
 app.listen(realPort, async () => {
   // Auto production opens its headless previs page here.

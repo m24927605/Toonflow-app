@@ -99,7 +99,7 @@ export interface MediaGenerationRequest {
   outputDirectory?: string;
   images?: MediaReference[];
   videos?: MediaReference[];
-  audios?: MediaReference[];
+  audios?: (MediaReference & { text?: string })[];
   firstFrame?: MediaReference;
   lastFrame?: MediaReference;
   /** LoRA files in the workspace with their strength, for models that load them. */
@@ -120,8 +120,10 @@ export interface MediaGenerationRequest {
   sampleRate?: number;
   /** Trained character identity for image models that declare `character`. */
   characterId?: string;
-  /** Video only: generate without a previs control video; set only after the user explicitly agreed to skip the previs. */
+  /** Video only: generate without previs; set only after the user explicitly agreed to skip it. */
   skipPrevis?: boolean;
+  /** A connected reference video that supplies previs blocking rather than depth control. */
+  previsVideo?: MediaReference;
   /** Image and video only: send although the prompt asks for on-screen text; set only after the user confirmed it. */
   skipTextCheck?: boolean;
   /** Image and video only: the seed to draw with, so a rerun that changes one thing keeps the rest; models without seeds ignore it. */

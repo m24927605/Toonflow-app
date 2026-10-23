@@ -41,6 +41,7 @@ export async function convertAudio(input: Uint8Array, options: AudioConvertOptio
   if (!Number.isInteger(numChannels) || numChannels < 1 || numChannels > 2) invalid("Only supports mono or two-channel audio");
   if (!Number.isInteger(sourceSampleRate) || sourceSampleRate <= 0) invalid("Invalid audio sampling rate");
 
+  wave.toBitDepth("16");
   const raw = wave.getSamples(false, Int16Array) as unknown as Int16Array | Int16Array[];
   const channels = numChannels === 1 ? [raw as Int16Array] : raw as Int16Array[];
   const totalSamples = channels[0]?.length ?? 0;

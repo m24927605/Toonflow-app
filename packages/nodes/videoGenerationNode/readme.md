@@ -6,8 +6,8 @@ Generates video from a prompt and reference assets, supporting the text-to-video
 
 - Inputs accept text, images, video, and audio; which combinations actually work depends on the model and generation mode.
 - Outputs the generated video; the player can also capture the current, first, or last frame as an image node.
-- With MiniMax H3, the LoRA menu under the prompt lists the workspace's MiniMax H3 LoRAs (up to 4; sliders get a strength from -4 to 4), and the LoRAs of the shot's cast are preset by "Prepare videos" and "Build shot nodes". They are chained after the Turbo LoRA at their strength, and any trigger word missing from the prompt is added after `[Shot 1]`. LoRAs stay attached when another model is selected but load only with MiniMax H3. The AI agent reads them in the `getConfig` tool (`loras.available` and `loras.attached`) and sets them with `setLoras`.
-- The first/last frame modes also take up to 3 reference videos and 3 reference audio clips when the model lists them, such as a shot's previs render after its keyframe, or a dubbed line from audio generation for MiniMax H3 to lip-sync to (name it `fully_copy` in the prompt; see the MiniMax H3 provider notes); generating with a connected **Previs** video skips the question about skipping previs.
+- With Sulphur 2, the LoRA menu under the prompt lists the workspace's LTX LoRAs (up to 4; sliders get a strength from -4 to 4), and the LoRAs of the shot's cast are preset by "Prepare videos" and "Build shot nodes". They load on the model at their strength, and any trigger word missing from the prompt is added at its start. LoRAs stay attached when another model is selected but load only with Sulphur 2. The AI agent reads them in the `getConfig` tool (`loras.available` and `loras.attached`) and sets them with `setLoras`.
+- Sulphur 2 takes no reference images. In the first/last frame modes connected images are pinned as frames; in the video control mode the one connected video, such as a shot's previs depth video, drives the camera and movement while connected images are the first and last frames, in order. One connected audio clip, such as a dubbed line, is locked as the clip's soundtrack and the picture is lip-synced to it; keep "Generate audio" on. Generating with a connected **Previs** depth video skips the question about skipping previs.
 
 ## Usage
 
@@ -21,6 +21,6 @@ Generates video from a prompt and reference assets, supporting the text-to-video
 
 Frame capture requires the Image node plugin to be enabled. Duration and resolution options vary by model, and the provider decides which of the common aspect ratios are actually supported.
 
-For MiniMax H3, the `{{ref N}}` markers in the prompt are sent as H3's own labels, `<Picture N>` for images, `<Video N>` for videos and `<Audio N>` for audio, numbered per type in connection order; other providers receive the markers unchanged.
+Sulphur 2 prompts are plain prose without `{{ref N}}` markers, written like Sulphur's own captions: one English paragraph in the present tense that opens with the style and camera (`In this photorealistic live-action video, the camera ...`), introduces each person, then describes every movement, line and sound in the order it happens, and ends with `There are no watermarks present in the video.` Spoken words go in quotation marks after the speaker, their delivery and language, with the English meaning in brackets when they are not English. The bundled `sulphur-prompt-writing` skill has the full rules.
 
 A video node prepared by a shot list's "Prepare videos" shows its preflight above the prompt: the Gate 1 score and the review's findings, highlighted when it failed. Generating from a failed prompt asks first, and editing the prompt afterwards marks the preflight as out of date.

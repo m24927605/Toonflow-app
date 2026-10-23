@@ -4,4 +4,4 @@ export const languageOptions = [
   { label: "日文", value: "ja" },
 ];
 export const sampleRateOptions = [8000, 16000, 24000, 48000];
-export const formatOptions = ["wav", "mp3", "pcm", "ogg_opus"];
+export const formatOptions = ["wav", "mp3"];

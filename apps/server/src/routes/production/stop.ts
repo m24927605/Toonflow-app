@@ -8,6 +8,7 @@ export default Router().post("/", validateFields({ directory: z.string().min(1).
   u.mcpControl.assertAppRequest(req);
   const { directory, id } = req.body as { directory: string; id: string };
   const cwd = await u.workspace.resolveWorkspace(req, directory);
+  if ((await u.production.readProduction(cwd, id)).input.mode === "simple") throw Object.assign(new Error("Simple productions do not accept manual intervention"), { status: 409 });
   await u.production.stopProduction(cwd, id);
   res.json(success());
 });

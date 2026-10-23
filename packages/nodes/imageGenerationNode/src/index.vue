@@ -214,7 +214,6 @@ watch(
     if (!sizeOptions.value.includes(data.value.size)) data.value.size = sizeOptions.value.toSorted((left, right) =>
       (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity)
     )[0]!;
-    if (!ratioOptions.value.includes(data.value.ratio)) data.value.ratio = ratioOptions.value.includes("16:9") ? "16:9" : ratioOptions.value[0]!;
   },
   { flush: "sync" }
 );
@@ -273,9 +272,9 @@ function loadModels() {
   modelsRequest = ai.getMediaModels().then((items) => {
     if (generating.value || deleting.value) return;
     models.value = items.filter((item) => item.type === "image");
-    // ACT: Pick the default model only for empty config; keep a temporarily unavailable previous selection and its params.
-    if (!data.value.model) {
-      const first = models.value[0];
+    // Existing nodes must also use the production model set.
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
+      const first = models.value.find(item => item.modelId === "qwen_image_2_1_turbo");
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }
   }).finally(() => {
@@ -299,6 +298,7 @@ async function confirmInpaint() {
 }
 
 async function startGeneration(batch = false) {
+  if (!ratioOptions.value.includes(data.value.ratio)) throw new Error(`当前模型不支持比例 ${data.value.ratio}，请选择支持该比例的模型或更改比例`);
   const choice = selectedModel.value;
   if (generating.value) throw new Error("图片正在生成，请等待完成");
   if (panorama.value?.visible) throw new Error("请先关闭全景图，再启动图片生成");

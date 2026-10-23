@@ -39,15 +39,15 @@ export type Posture = (typeof postures)[number];
 export const cameraSides = ["front", "frontLeft", "frontRight", "left", "right", "back", "overShoulder"] as const;
 
 const name = z.string().trim().min(1).max(60);
+const placeShape = z.union([z.enum(roomPlaces), z.strictObject({ prop: name, side: z.enum(["front", "back", "left", "right", "on"]).optional() })]);
 // A place written as a prop's bare name, such as "cushion1", means that prop, as the model sometimes shortens it.
-const place = z.preprocess(
-  value => typeof value === "string" && !(roomPlaces as readonly string[]).includes(value) ? { prop: value } : value,
-  z.union([z.enum(roomPlaces), z.strictObject({ prop: name, side: z.enum(["front", "back", "left", "right", "on"]).optional() })]),
-);
-export type Place = z.infer<typeof place>;
-const metres = z.number().min(0.05).max(50);
+const place = z.preprocess(value => typeof value === "string" && !(roomPlaces as readonly string[]).includes(value) ? { prop: value } : value, placeShape);
+export type Place = z.infer<typeof placeShape>;
+// A size written as 0 (a mat with no height) or far too large is pulled into range rather than failing the plan: the
+// grammar the model samples under holds enums and fields, not number bounds.
+const metres = z.preprocess(value => typeof value === "number" ? Math.min(50, Math.max(0.05, value)) : value, z.number().min(0.05).max(50));
 
-export const previsSpecSchema = z.strictObject({
+const specSchema = <P extends z.ZodType<Place>>(place: P) => z.strictObject({
   set: z.strictObject({
     interior: z.boolean(),
     width: z.number().min(2).max(40),
@@ -68,14 +68,18 @@ export const previsSpecSchema = z.strictObject({
     }),
   })).max(200),
 });
+export const previsSpecSchema = specSchema(place);
+/** The plan's shape as a JSON Schema, which the model's sampling is held to, so no reply breaks the format. */
+export const previsSpecJsonSchema = z.toJSONSchema(specSchema(placeShape)) as Record<string, unknown>;
 export type PrevisSpec = z.infer<typeof previsSpecSchema>;
-export type SpecShot = { shot: number; seconds: number; cast: string[] };
+export type SpecShot = { shot: number; seconds: number; cast: string[]; gaze?: Record<string, string> };
 
 /** The instruction for the plan, with the script as {{ref 1}} and the shot list as {{ref 2}}. */
 export function previsSpecPrompt(shots: SpecShot[]) {
   return [
     "{{ref 1}} is the script of a short film and {{ref 2}} its shot list. Read both completely, then plan the previs of every shot: the set, where each person is and moves, and where the camera stands. Code builds the 3D set and computes every camera from your plan, so you name places and never give coordinates.",
     `The shots: ${shots.map(item => `${item.shot} (${item.seconds} s${item.cast.length ? `, in frame: ${item.cast.join(", ")}` : ""})`).join("; ")}.`,
+    `Required opening gaze in SCREEN coordinates, when specified: ${JSON.stringify(shots.map(({ shot, gaze }) => ({ shot, gaze })))}. Actor facing and camera placement must produce these directions in the rendered image; world left/right is not screen left/right.`,
     "",
     "Reply with one JSON object only, no other text: {\"set\": {...}, \"people\": [...], \"shots\": [...]}.",
     "",
@@ -87,6 +91,7 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side; or on a chair, sofa, bed, cushion or bench: {\"prop\": its name, \"side\": \"on\"}.",
     "",
     "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\", \"faces\": the person or prop they look at}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
+    "Seated means hips supported by a raised chair, sofa, bed or bench: include that furniture and put the person on it. Never use seated beside a desk without a chair. Use kneeling for floor sitting or seiza. A freestanding writing desk can use kind table named studyDesk; place the chair behind it so the desk is between the seated person and the camera when required.",
     "",
     "shots: one per shot, in order: {\"shot\": its number, \"moves\": [...], \"camera\": {...}}.",
     "- \"moves\": each person who moves, changes posture or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end, \"faces\": the person or prop they look at by the end, \"at\": the second of the shot the move starts}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
@@ -145,6 +150,10 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
   const knownFaces = (faces: string | undefined) => faces && (people.has(faces) || props.has(faces)) ? faces : undefined;
   for (const person of spec.people) {
     checkPlace(person.at, `${person.name}'s entrance`);
+    if (person.posture === "seated") {
+      const kind = typeof person.at === "string" ? undefined : props.get(person.at.prop);
+      if (typeof person.at === "string" || person.at.side && person.at.side !== "on" || !kind || !["chair", "sofa", "bed", "bench"].includes(kind)) problems.push(`${person.name} is seated but has no raised seat. Add a chair, sofa, bed or bench and place them on it; floor sitting must use kneeling.`);
+    }
     person.faces = knownFaces(person.faces);
   }
   for (const { shot, cast } of shots) {

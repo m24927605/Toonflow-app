@@ -140,7 +140,7 @@ async function readOrder(baseDir: string) {
 export async function list(name: string) {
   const { root, actualRoot, mainTarget, baseDir, isDirectorySkill } = await resolveSkill(name);
   const mainPath = relative(root, mainTarget).split(sep).join("/");
-  if (!isDirectorySkill) return { mainPath, files: [mainPath] };
+  if (!isDirectorySkill) return { mainPath, files: [mainPath], isDirectorySkill };
   const files: string[] = [];
   async function walk(dir: string, prefix: string) {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -160,7 +160,7 @@ export async function list(name: string) {
   const order = (await readOrder(baseDir)).filter(path => path !== "SKILL.md" && known.has(path));
   const ordered = new Set(order);
   const remaining = files.filter(path => path !== "SKILL.md" && !ordered.has(path)).sort((left, right) => left.localeCompare(right));
-  return { mainPath: "SKILL.md", files: ["SKILL.md", ...order, ...remaining] };
+  return { mainPath: "SKILL.md", files: ["SKILL.md", ...order, ...remaining], isDirectorySkill };
 }
 
 export async function saveOrder(name: string, order: string[]) {

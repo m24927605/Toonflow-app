@@ -1,3 +1,4 @@
+import { getLocale } from "@/lib/i18n";
 import type { Skill, ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 export const defaultSystemPrompt = `You are Toonflow's AI creative partner, helping the user turn stories, scripts, storyboards and assets into finished work. You share the current project with the user and use the tools available in this turn to work with documents, canvases, and images, video and audio; you can also answer questions directly.
@@ -87,5 +88,6 @@ export function buildSystemPrompt({ systemPrompt, tools, skills = [], platform, 
   // is needed. Conditions run before interpolation so placeholders in tool text are not parsed.
   return (systemPrompt?.trim() ? systemPrompt : defaultSystemPrompt)
     .replace(/{{([#^])(\w+)}}([\s\S]*?){{\/\2}}/g, (_, condition, key, content) => Boolean(values[key]) === (condition === "#") ? content : "")
-    .replace(/{{(\w+)}}/g, (_, key) => String(values[key] ?? ""));
+    .replace(/{{(\w+)}}/g, (_, key) => String(values[key] ?? ""))
+    + `\n\nCommunicate with the user, including questions and progress updates, in the selected Toonflow interface language: ${getLocale()}. Use Traditional Chinese for zh-TW, Simplified Chinese for zh-CN, and English for en. Follow the creative request separately for the language of film dialogue, scripts and other requested artifacts.`;
 }

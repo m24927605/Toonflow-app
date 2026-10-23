@@ -4,7 +4,7 @@ import { createDirectorDraft } from "./agentTools";
 import { directorPrompt, mannequinsAllowed, mannequinsForbidden } from "./agentPrompt";
 import { coveredPeople, describeBlocking, frameShot, framedPeople, framingIssues, smallFaces } from "./blocking";
 import { anchorSchema, type CameraAnchor } from "./motion";
-import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot } from "./previsSpec";
+import { previsSpecPrompt, readPrevisSpec, type PrevisSpec, type SpecShot, previsSpecJsonSchema } from "./previsSpec";
 import { buildSet, ceilingOf, emptyShotView, figureScene, renderSettings, stageShots } from "./previsStage";
 import { renderImage, renderVideo } from "./renderMedia";
 import { getSceneLighting, type SceneDocument, type SceneSettings } from "./scene";
@@ -45,7 +45,8 @@ export async function planShot(options: {
 
 /**
  * The previs of one framed shot: the opening frame as the colour layout image and as a depth map for depth-controlled
- * keyframes, both from `still` (the opening with jointed figures), and the colour animation as the previs video.
+ * keyframes, both from `still` (the opening with jointed figures), the colour animation as the previs video and its
+ * depth animation as the control video of the shot's clip.
  */
 async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: number, signal: AbortSignal, settings: SceneSettings, still: { scene: SceneDocument; plan: DirectorPlan }) {
   const lighting = getSceneLighting(scene);
@@ -53,7 +54,8 @@ async function exportShot(scene: SceneDocument, plan: DirectorPlan, aspect: numb
   const layout = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "color");
   const depth = await renderImage(still.scene, anchor, aspect, 0, signal, still.plan, lighting, settings, "depth");
   const video = await renderVideo(scene, plan, aspect, signal, () => {}, lighting, settings, "color");
-  return { layout, depth, video };
+  const depthVideo = await renderVideo(scene, plan, aspect, signal, () => {}, lighting, settings, "depth");
+  return { layout, depth, video, depthVideo };
 }
 
 const poseBackground = "#e6e6e6";
@@ -124,62 +126,53 @@ async function renderPoses(still: SceneDocument, plan: DirectorPlan, aspect: num
 }
 
 /**
- * Asks the director model for the previs plan of the whole film in one reply, and up to twice more, with what is wrong,
- * when the reply cannot be used. With `earlier`, a plan that could be used and what its staging got wrong, the model is
- * asked to fix those instead.
- */
-async function writeSpec(options: { generate: Generate; providerId: string; modelId: string; signal: AbortSignal; onStep?: () => void }, shots: SpecShot[], earlier?: { reply: string; problems: string[] }) {
-  const prompt = previsSpecPrompt(shots);
-  const ask = async (text: string) => {
-    const reply = ((await options.generate({ providerId: options.providerId, modelId: options.modelId, prompt: text, signal: options.signal }) as { text?: string }).text ?? "");
-    options.onStep?.();
-    return reply;
-  };
-  const fixing = (reply: string, problems: string[]) => `${prompt}\n\nYour plan:\n${reply}\n\nIt cannot be used yet. Output the whole JSON again with these fixed:\n${problems.map(problem => `- ${problem}`).join("\n")}`;
-  // Twice asked to fix, as a fix request now and then breaks what the first reply had right.
-  let reply = await ask(earlier ? fixing(earlier.reply, earlier.problems) : prompt);
-  for (let fixes = 2; ; fixes--) {
-    const read = readPrevisSpec(reply, shots);
-    if (read.spec) return { spec: read.spec, reply };
-    if (!fixes) throw new Error(`The previs plan cannot be used: ${read.problems.join(" ")}`);
-    console.warn("The previs plan needs fixing", read.problems);
-    reply = await ask(fixing(reply, read.problems));
-  }
-}
-
-/**
  * The film's previs plan, every shot's framed plan, the measured blocking of each shot's opening as text for keyframe
  * prompts, and who each shot shows, in its opening and at any moment, for the keyframe and the clip to name, with where
  * each of them looks and, for the people of the opening, the way their head turns in their pose render.
  */
-export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; timeline: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; looks: Record<string, string> }[] };
+export type PrevisPlan = { spec: PrevisSpec; plans: SavedPlan[]; blocking: string[]; timeline: string[]; framed: { opening: string[]; shown: string[]; gaze: Record<string, string>; directions: Record<string, string>; looks: Record<string, string>; bodies: Record<string, { posture: string; support?: string; supportHeight: number }>; camera: { aspect: number; frames: { time: number; position: { x: number; y: number; z: number }; target: { x: number; y: number; z: number }; fov: number }[] } }[] };
 
 /**
  * Plans the previs of every shot without a person: the director model writes one plan for the whole film (the set,
  * where people are and move, the camera's side, angle and move) and code builds the set, stages each shot from where
  * the previous one ended, frames the camera from the shot size, checks the framing, describes the blocking and finds
  * who is in frame. A plan that shows someone's face too small for the video model to draw, or someone covering another
- * at any moment, is sent back once with where; the one with fewer such problems is kept, and what is left is logged. Nothing is rendered, so the texts written from the
+ * at any moment, or cannot be staged, is sent back with the reason, at most twice. The usable plan with fewer soft
+ * problems is kept. Nothing is rendered, so the texts written from the
  * blocking need not wait for the renders. `onStep` is called after each reply of the director model, for a caller that
  * watches for progress.
  */
 export async function planPrevis(options: {
   generate: Generate; providerId: string; modelId: string; shots: (SpecShot & { size: string })[]; aspect: number; signal: AbortSignal; onStep?: () => void;
 }): Promise<PrevisPlan> {
-  const first = await writeSpec(options, options.shots);
-  const staged = await stagePlan(first.spec, options);
-  if (!staged.problems.length) return staged.plan;
-  console.warn("The previs plan needs fixing", staged.problems);
   const advice = "Where a face is too small, bring those people nearer to each other and to the camera's side for as long as they are in frame: someone far off can start nearer, or walk up before the moment the face matters. Where someone covers another, send them to a place beside the others, never between the camera and them. Shot sizes come from the shot list and stay as they are.";
-  const retried = await writeSpec(options, options.shots, { reply: first.reply, problems: [...staged.problems, advice] })
-    .then(second => stagePlan(second.spec, options))
-    .catch((error: unknown) => {
-      options.signal.throwIfAborted();
-      console.warn("The previs plan's fix could not be used; the first plan is kept", error);
-      return staged;
-    });
-  if (retried.problems.length) console.warn("The previs plan still needs fixing", retried.problems);
-  return (retried.problems.length <= staged.problems.length ? retried : staged).plan;
+  const prompt = previsSpecPrompt(options.shots);
+  let request = prompt;
+  let best: Awaited<ReturnType<typeof stagePlan>> | undefined;
+  for (let fixes = 2; ; fixes--) {
+    options.signal.throwIfAborted();
+    const reply = ((await options.generate({ providerId: options.providerId, modelId: options.modelId, prompt: request, signal: options.signal, responseSchema: previsSpecJsonSchema }) as { text?: string }).text ?? "");
+    options.onStep?.();
+    const read = readPrevisSpec(reply, options.shots);
+    let problems = read.problems;
+    if (read.spec && !problems.length) {
+      try {
+        const staged = await stagePlan(read.spec, options);
+        if (!staged.problems.length) return staged.plan;
+        if (!best || staged.problems.length <= best.problems.length) best = staged;
+        problems = [...staged.problems, advice];
+      } catch (error) {
+        options.signal.throwIfAborted();
+        problems = [error instanceof Error ? error.message : String(error), "Adjust actor facing, placement or camera side to satisfy the required opening gaze without obstruction. Preserve the requested cast, shot sizes and gaze."];
+      }
+    }
+    console.warn("The previs plan needs fixing", problems);
+    if (!fixes) {
+      if (best) return best.plan;
+      throw new Error(`The previs plan cannot be used: ${problems.join(" ")}`);
+    }
+    request = `${prompt}\n\nYour plan:\n${reply}\n\nIt cannot be used yet. Output the whole JSON again with these fixed:\n${problems.map(problem => `- ${problem}`).join("\n")}`;
+  }
 }
 
 /** Stages, frames and checks every shot of a previs spec; `problems` lists the faces too small and the people covered, by shot. */
@@ -200,12 +193,12 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
     const angled = camera.angle !== "eye";
     // Over a shoulder, the frame cuts the person in front on purpose, so only the people looked at are checked.
     let checked = subjects.filter(name => name !== camera.over);
-    let plan = await frameShot(scene, base, options.aspect, subjects, size, camera, ceiling);
+    let plan = await frameShot(scene, base, options.aspect, subjects, size, camera, ceiling, options.shots[index]!.gaze);
     let issues = await framingIssues(scene, plan, options.aspect, checked, angled);
     // An over-the-shoulder view or a camera move that fails falls back to a held camera on the same side.
     if (issues.hard.length && (camera.over || camera.move !== "static")) {
       checked = subjects;
-      plan = await frameShot(scene, base, options.aspect, subjects, size, { ...camera, over: undefined, move: "static" }, ceiling);
+      plan = await frameShot(scene, base, options.aspect, subjects, size, { ...camera, over: undefined, move: "static" }, ceiling, options.shots[index]!.gaze);
       issues = await framingIssues(scene, plan, options.aspect, checked, angled);
     }
     if (issues.hard.length) throw new Error(`Shot ${shot}: ${issues.hard.join(" ")}`);
@@ -214,7 +207,9 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
     problems.push(...found.map(problem => `Shot ${shot}: ${problem}`));
     plans.push({ ...plan, id: crypto.randomUUID() });
     blocking.push(await describeBlocking(scene, plan, options.aspect, true));
-    framed.push(await framedPeople(scene, plan, options.aspect));
+    const people = await framedPeople(scene, plan, options.aspect);
+    // Independent head/eye gaze comes from the shot contract, not from the coarse body heading.
+    framed.push({ ...people, camera: { aspect: options.aspect, frames: plan.cameraFrames.map(frame => ({ time: frame.time, position: frame.view.camera.position, target: frame.view.controls.target, fov: frame.view.camera.fov })) }, bodies: Object.fromEntries([...staged.opening].map(([name, body]) => [name, { posture: body.posture, support: body.seat?.prop, supportHeight: body.seat?.height ?? 0 }])) });
   }
   return { plan: { spec, plans, blocking, timeline, framed } as PrevisPlan, problems };
 }
@@ -225,7 +220,7 @@ async function stagePlan(spec: PrevisSpec, options: { shots: (SpecShot & { size:
  */
 export async function renderPrevis(options: {
   plan: Pick<PrevisPlan, "spec" | "plans">; shots: SpecShot[]; rendered: number[]; aspect: number; signal: AbortSignal;
-  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; poses: Record<string, Blob> }) => Promise<void>;
+  onShot: (result: { shot: number; layout: Blob; depth: Blob; video: Blob; depthVideo: Blob; poses: Record<string, Blob> }) => Promise<void>;
 }) {
   const { spec, plans } = options.plan;
   const scene = buildSet(spec);

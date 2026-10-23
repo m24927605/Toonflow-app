@@ -41,6 +41,7 @@ import {
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
 import { finishGroupDrag, getSelectionRoots, getSelectionTree } from "../selectionNodes";
 import { arrangeSelection, type ArrangeSelectionMode } from "../arrangeSelection";
+import { remapCopiedNodeData } from "../canvasFiles";
 
 const props = defineProps<{
   batchHistory: (action: () => Promise<void>) => Promise<void>;
@@ -94,6 +95,7 @@ async function duplicateNodes(selection: GraphNode[], signal: AbortSignal, withE
     copy.position = positions ? { ...positions.get(node.id)! }
       : { x: saved.position.x + (rootsIds.has(node.id) ? bounds.width + 64 : 0), y: saved.position.y };
     copy.data = { ...copy.data, label: `${copy.data?.label || "未命名节点"} - 副本` };
+    remapCopiedNodeData(copy, ids);
     return copy;
   }));
   signal.throwIfAborted();

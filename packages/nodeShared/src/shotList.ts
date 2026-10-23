@@ -6,7 +6,7 @@ import type { ScriptShot } from "./scriptCheck";
  * shot-size, dialogue and action columns, when it has them;
  * `row` is the shot's whole line and `header` the table's header line, when the shot list is a table.
  */
-export type ShotSpan = { shot: number; start: number; end: number; cast?: string; state?: string; size?: string; dialogue?: string; action?: string; row?: string; header?: string };
+export type ShotSpan = { shot: number; start: number; end: number; cast?: string; state?: string; size?: string; camera?: string; dialogue?: string; action?: string; row?: string; header?: string };
 
 // A cast column header: "Cast", "Characters", or the Chinese "\u4eba\u7269" (people), "\u89d2\u8272" (characters) or
 // "\u51fa\u5834" / "\u51fa\u573a" (on screen).
@@ -41,6 +41,7 @@ export function shotSpans(shots: ScriptShot[], markdown: string): ShotSpan[] {
   const stateIndex = header.findIndex(cell => stateHeader.test(cell));
   const castIndex = header.findIndex((cell, index) => index !== stateIndex && castHeader.test(cell));
   const sizeIndex = header.findIndex(cell => sizeHeader.test(cell));
+  const cameraIndex = header.findIndex(cell => /camera|機位|机位|鏡頭運動|镜头运动|運鏡|运镜/i.test(cell));
   const dialogueIndex = header.findIndex(cell => dialogueHeader.test(cell));
   const actionIndex = header.findIndex(cell => actionHeader.test(cell));
   let cursor = 0;
@@ -53,12 +54,14 @@ export function shotSpans(shots: ScriptShot[], markdown: string): ShotSpan[] {
     const cast = castIndex >= 0 ? row[castIndex] : undefined;
     const state = stateIndex >= 0 ? row[stateIndex]?.trim() || undefined : undefined;
     const size = sizeIndex >= 0 ? row[sizeIndex]?.trim() || undefined : undefined;
+    const camera = cameraIndex >= 0 ? row[cameraIndex]?.trim() || undefined : undefined;
     const dialogue = dialogueIndex >= 0 ? row[dialogueIndex]?.trim() || undefined : undefined;
     const action = actionIndex >= 0 ? row[actionIndex]?.trim() || undefined : undefined;
     return {
       shot: index + 1, start, end: cursor, ...(rowText ? { row: rowText } : {}), ...(header.length ? { header: `| ${header.join(" | ")} |` } : {}),
       ...(cast === undefined ? {} : { cast }), ...(state === undefined ? {} : { state }), ...(size === undefined ? {} : { size }), ...(dialogue === undefined ? {} : { dialogue }),
       ...(action === undefined ? {} : { action }),
+      ...(camera === undefined ? {} : { camera }),
     };
   });
 }
@@ -117,4 +120,25 @@ export function castNames(span: Pick<ShotSpan, "cast">) {
   return (span.cast ?? "").split(/[,\uff0c\u3001;\uff1b/]+/)
     .map(name => name.replace(/(?<=\S)\s*[(\uff08][^()\uff08\uff09]*[)\uff09]?\s*$/, "").replace(/^[\s(\uff08[]+|[\s)\uff09\]]+$/g, ""))
     .filter(name => name && !/^(?:\u7121|\u65e0|none|n\/a|-+|\u2014+)$/i.test(name));
+}
+
+/** Replace selected source cells without changing the table's other fields or rows. */
+export function replaceShotCells(shots: ScriptShot[], markdown: string, field: "cast" | "dialogue", values: (string | undefined)[]) {
+  if (shots.length !== values.length) throw new Error("Cell corrections must cover every shot in order");
+  const spans = shotSpans(shots, markdown);
+  const header = cells(spans[0]?.header ?? "");
+  const column = header.findIndex(cell => field === "cast" ? castHeader.test(cell) && !stateHeader.test(cell) : dialogueHeader.test(cell));
+  if (column < 0) throw new Error(`Corrections need a shot-list ${field} column`);
+  const lines = markdown.split("\n");
+  for (const [index, shot] of shots.entries()) {
+    const value = values[index];
+    if (value === undefined) continue;
+    const row = lines[shot.line - 1]!;
+    const fields = row.split("|");
+    const cell = column + (row.trimStart().startsWith("|") ? 1 : 0);
+    if (cell >= fields.length || /[|\r\n]/.test(value)) throw new Error("Invalid correction cell");
+    fields[cell] = ` ${value} `;
+    lines[shot.line - 1] = fields.join("|");
+  }
+  return lines.join("\n");
 }

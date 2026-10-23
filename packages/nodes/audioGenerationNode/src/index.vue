@@ -24,6 +24,7 @@
       <div v-if="actions?.mode === 'speed'" ref="speedTarget" />
       <el-card v-else class="promptCard" shadow="never" :bodyStyle="{ padding: '14px 16px 12px' }">
         <referenceItem v-if="refList.length" v-model="refList" @preview="setReferencePreview" @remove="removeReference" />
+        <el-input v-if="refList.some(item => item.dataType === 'AUDIO')" v-model="data.referenceTranscript" type="textarea" :disabled="busy" :maxlength="20000" aria-label="參考聲音的逐字稿" placeholder="輸入參考聲音中實際說出的完整文字" />
         <promptInput v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" placeholder="描述您想要的音频效果或输入待朗读文本" expandable />
         <div class="promptFooter">
           <el-select
@@ -42,7 +43,7 @@
               <el-option v-for="item in provider.models" :key="item.modelId" :label="item.label" :value="JSON.stringify([item.providerId, item.modelId])" />
             </el-option-group>
           </el-select>
-          <generationSettings v-model:duration="data.duration" v-model:language="data.language" v-model:voice="data.voice" v-model:emotion="data.emotion" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :voices="selectedModel?.voices ?? []" :disabled="busy || !selectedModel" />
+          <generationSettings v-model:language="data.language" v-model:voice="data.voice" v-model:emotion="data.emotion" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :voices="selectedModel?.voices ?? []" :disabled="busy || !selectedModel" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -78,14 +79,14 @@ defineOptions({
   inheritAttrs: false,
   icon: IconMusicBolt,
   handles: [
-    { id: "in", type: "target", dataType: ["IMAGE", "AUDIO", "STRING"], label: "图片或音频限1个，文本不限" },
+    { id: "in", type: "target", dataType: ["AUDIO", "STRING"], label: "參考聲音限1個，文本不限" },
     { id: "audio", type: "source", dataType: "AUDIO", label: "音频输出" },
   ] satisfies NodeHandle[],
 });
 const vLoading = ElLoading.directive;
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({ label: "音频生成" });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; voice: string; emotion: string; sampleRate: number; format: string; duration?: number });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; voice: string; emotion: string; referenceTranscript: string; sampleRate: number; format: string });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -93,7 +94,8 @@ data.value.language ??= "zh-CN";
 // An empty voice leaves the choice to the provider's default.
 data.value.voice ??= "";
 data.value.emotion ??= "";
-data.value.sampleRate ??= 24000;
+data.value.referenceTranscript ??= "";
+data.value.sampleRate ??= 48000;
 data.value.format ??= "wav";
 const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
@@ -123,7 +125,7 @@ const outputFile = computed(() => outputs.value.audio?.dataType === "AUDIO" ? ou
 const previewUrl = files.useFileUrl(outputFile, error => showNodeError(error, "音频读取失败"));
 
 function referencesAllowed(values: NodeInputValue[]) {
-  return values.filter(item => isTypeCompatible(item.dataType, ["IMAGE", "AUDIO"])).length <= 1;
+  return !values.some(item => isTypeCompatible(item.dataType, "IMAGE")) && values.filter(item => isTypeCompatible(item.dataType, "AUDIO")).length <= 1;
 }
 
 nodeEvent.on("canConnect", (connection, context) => {
@@ -145,9 +147,9 @@ function loadModels() {
   modelsRequest = ai.getMediaModels().then(items => {
     if (disposed || busy.value) return;
     models.value = items.filter(item => item.type === "audio");
-    // ACT: Pick the default model only for empty config; keep temporarily unavailable models selected
-    // to avoid silently switching providers.
-    if (!data.value.model) {
+    if (!formatOptions.includes(data.value.format)) data.value.format = "wav";
+    // Existing nodes must also use the production model set.
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
       const first = models.value[0];
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }
@@ -163,8 +165,10 @@ async function startGeneration() {
   const choice = selectedModel.value;
   if (!choice) throw new Error("请先选择音频模型");
   if (!generationPrompt.value) throw new Error("请输入生成提示词或待朗读文本");
-  if (!referencesAllowed(refList.value)) throw new Error("图片和音频不能同时引用，且合计最多引用一个；文本数量不限");
+  if (!referencesAllowed(refList.value)) throw new Error("Drama-3 支援最多一個參考聲音，不接受圖片參考");
   assertReferencesReady();
+  if (!refList.value.some(item => item.dataType === "AUDIO") && !data.value.emotion.trim()) throw new Error("請先在「聲線與表演」描述角色的聲音與說話方式");
+  if (refList.value.some(item => item.dataType === "AUDIO") && !data.value.referenceTranscript.trim()) throw new Error("請提供參考聲音的完整逐字稿");
   if (!languageOptions.some(item => item.value === data.value.language) || !sampleRateOptions.includes(data.value.sampleRate) || !formatOptions.includes(data.value.format)) throw new Error("请重新选择有效的语种、采样率和输出格式");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
@@ -177,10 +181,8 @@ async function startGeneration() {
     emotion: data.value.emotion.trim() || undefined,
     sampleRate: data.value.sampleRate,
     format: data.value.format,
-    duration: data.value.duration ?? undefined,
     outputDirectory: `assets/${id}`,
-    images: refList.value.flatMap(item => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
-    audios: refList.value.flatMap(item => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
+    audios: refList.value.flatMap(item => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType, text: data.value.referenceTranscript.trim() }] : []),
   };
   generationController = controller;
   generation = generationState.run(async () => {
@@ -237,18 +239,18 @@ nodeEvent.on("delete", async () => {
 
 function getConfig() {
   return {
-    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, voice: data.value.voice, emotion: data.value.emotion, sampleRate: data.value.sampleRate, format: data.value.format, duration: data.value.duration },
+    config: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "", language: data.value.language, voice: data.value.voice, emotion: data.value.emotion, sampleRate: data.value.sampleRate, format: data.value.format, referenceTranscript: data.value.referenceTranscript },
     models: models.value,
     languages: languageOptions,
     sampleRates: sampleRateOptions,
     formats: formatOptions,
-    inputLimits: { text: "unlimited", imageOrAudio: 1 },
+    inputLimits: { text: "unlimited", audio: 1, image: 0 },
   };
 }
 
 nodeTools.register({
   name: "getConfig",
-  description: "Read this audio generation node's configuration, available audio models (including each model's voices), languages, sample rates, output formats and input count limits, without keys; text is unlimited, images and audio are mutually exclusive with at most one in total, and specific model capabilities are validated by the provider",
+  description: "Read this Drama-3 node's configuration, voice direction, reference transcript, languages, sample rates and output formats without keys. One reference audio with an exact transcript is supported; images are not supported.",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -259,7 +261,7 @@ nodeTools.register({
 });
 nodeTools.register({
   name: "setConfig",
-  description: "Modify the audio generation model, language, voice, tone, sample rate, format or duration; duration is the length of music or sound effects in seconds, and null means the model default; emotion describes emotion and speaking pace in words (such as \"low and slow\" or \"angry shouting\"), and an empty string means unspecified; first use getConfig to query the options, and providerId and modelId must be provided together; voice takes a voice from the selected model's voices, and an empty string means the provider's default voice; does not modify the prompt or start generation",
+  description: "Modify Drama-3 language, voice direction, referenceTranscript, sample rate or format; emotion must describe the voice and performance for a new voice; referenceTranscript is the exact text spoken by connected reference audio; first use getConfig to query the options, and providerId and modelId must be provided together; voice takes a voice from the selected model's voices, and an empty string means the provider's default voice; does not modify the prompt or start generation",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -268,7 +270,7 @@ nodeTools.register({
     emotion: z.string().max(500).optional(),
     sampleRate: z.number().int().positive().optional(),
     format: z.string().optional(),
-    duration: z.number().int().min(1).max(600).nullable().optional(),
+    referenceTranscript: z.string().max(20000).optional(),
   }).refine(args => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -288,7 +290,7 @@ nodeTools.register({
     if (args.emotion !== undefined) data.value.emotion = args.emotion;
     if (args.sampleRate !== undefined) data.value.sampleRate = args.sampleRate;
     if (args.format !== undefined) data.value.format = args.format;
-    if (args.duration !== undefined) data.value.duration = args.duration ?? undefined;
+    if (args.referenceTranscript !== undefined) data.value.referenceTranscript = args.referenceTranscript;
     return getConfig();
   },
 });

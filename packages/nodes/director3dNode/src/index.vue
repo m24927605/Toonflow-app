@@ -346,7 +346,7 @@ async function exportVideo(aspect: number, pass: RenderPass) {
     }).then(() => true, () => false);
     if (!proceed || disposed || selectedPlan.value !== plan) return;
   }
-  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, pass), pass === "color" ? { role: "previs" } : undefined);
+  return exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, pass), pass === "depth" ? { role: "previs" } : undefined);
 }
 
 function exportImage(anchor: CameraAnchor, aspect: number, time: number, pass: RenderPass) {
@@ -428,8 +428,8 @@ async function stepPrevis(aspect: number) {
       return new File([file], `${t`Shot ${step.shot} previs layout`}.png`, { type: file.type });
     }, { role: "layout", shot: step.shot, blocking });
     if (!exported || disposed) return;
-    // The shot's colour render goes to its video node as a blocking reference: where people stand and move, and the camera.
-    const rendered = await exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, "color"), { role: "previs", shot: step.shot });
+    // The shot's depth render goes to its video node as the control video: where people stand and move, and the camera.
+    const rendered = await exportToCanvas("video", "video", aspect, signal => renderVideo(scene.value, plan, aspect, signal, value => { exportProgress.value = value; }, lighting.value, sceneSettings.value, "depth"), { role: "previs", shot: step.shot });
     if (!rendered || disposed) return;
     queue.done = [...queue.done, step.shot];
     delete queue.current;

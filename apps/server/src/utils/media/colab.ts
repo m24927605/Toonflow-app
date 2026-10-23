@@ -3,20 +3,29 @@ import { join } from "node:path";
 import { scheduler } from "node:timers/promises";
 import { stripVTControlCharacters } from "node:util";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+import { zipSync } from "fflate";
 import { lstat, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from "@toonflow/file";
 import { findCommand } from "@/utils/cli";
 import { checkColabBudget, meterColab, recordColabUnits } from "@/utils/media/usage";
+import runtimeSource from "./colabRuntime.py" with { type: "text" };
+import preparationSource from "./modelPreparation.py" with { type: "text" };
+import pythonDependencies from "./pythonDependencies.json";
+import startupSource from "./dramaStartup.py" with { type: "text" };
+import { recordColabTiming } from "./timings";
+
+const runtimeSourceId = createHash("sha256").update(JSON.stringify([runtimeSource, preparationSource, pythonDependencies, startupSource])).digest("hex");
 
 // Compute units per hour of each machine as Toonflow opens it, the A100 with high RAM (colab usage, 2026-10-15), for a
 // session whose own rate the account's cannot show.
-// ACT: The H100's rate is a guess, twice the A100's, until a session measures it: the meter takes each session's own
-// rate from the account's usage rate before and after it starts.
-const machineRates = { H100: 13.5, A100: 6.77, L4: 1.54 };
+export const machineRates = { A100: 6.77, L4: 1.54 };
 // How long a refused or unavailable session start keeps retrying.
 const allocationWait = 60 * 60_000;
 // The Colab CLI uploads through the Jupyter contents API as base64, whose request limit (about 100 MiB) refuses files
 // over about 75 MB, such as a rank 16 LoRA, so larger files travel in parts that the job joins before its script runs.
 const uploadPart = 48 * 1024 * 1024;
+const transferConcurrency = 3;
+const inlineOutputLimit = 64 * 1024;
 // The CLI sets no timeout on a transfer, and one has hung for 22 minutes until the VM had released itself. An upload is
 // given this much, plus a second for every 128 KiB, before it is cut and sent again. ACT: assumes an uplink of at
 // least 1 Mbit/s; a slower one needs a measured rate here.
@@ -49,9 +58,18 @@ export type ColabJob = {
 export type ColabMachine = { gpu: "A100" | "L4"; highMem?: boolean };
 
 /** The job's Python script raised; the kernel is still running and keeps whatever earlier jobs loaded. */
-export class ColabScriptError extends Error {}
+export class ColabScriptError extends Error {
+  readonly unsafe: boolean;
 
-/** The session's VM is gone (released or reclaimed) before the job reached its kernel, so nothing of it ran. */
+  constructor(message: string, options?: ErrorOptions & { unsafe?: boolean }) {
+    super(message, options);
+    this.unsafe = options?.unsafe ?? false;
+  }
+}
+/** A fresh, idle heartbeat and an execution fence prove that no GPU job remains in flight. */
+export class ColabConnectionError extends Error {}
+
+/** The VM was released or reclaimed; this does not establish whether its last job ran. */
 class ColabSessionGoneError extends Error {}
 
 /**
@@ -71,8 +89,6 @@ async function guardColabLog() {
   await symlink(devNull, log);
 }
 
-// Sessions this process opened and has not stopped yet, with the CLI path that opened them.
-const activeSessions = new Map<string, string>();
 // The hourly rate of each session this process has running, which the compute unit meter adds up.
 const sessionRates = new Map<string, number>();
 // How often the meter is written while sessions run, well within releaseAfter.
@@ -109,6 +125,7 @@ const machineWaiters = new Set<() => void>();
 
 /** Waits for a free machine of this kind and returns its release. */
 async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const free = () => runningMachines.length < machineLimits.total && runningMachines.filter(item => item.gpu === gpu).length < (machineLimits[gpu] ?? machineLimits.total);
   while (!free()) {
     await new Promise<void>((resolve, reject) => {
@@ -124,7 +141,9 @@ async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
       machineWaiters.add(wake);
       signal?.addEventListener("abort", abort, { once: true });
     });
+    signal?.throwIfAborted();
   }
+  signal?.throwIfAborted();
   const slot = { gpu };
   runningMachines.push(slot);
   return () => {
@@ -134,80 +153,17 @@ async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
     for (const wake of [...machineWaiters]) wake();
   };
 }
-// Sessions whose `colab new` is still running. That CLI process outlives this one and records the session only once the
-// machine is assigned, about a minute later, so until then a stop finds nothing and the machine would bill unseen.
-const startingSessions = new Set<string>();
-// How long an exit keeps retrying the stop of a starting session: a `new` has taken up to about two minutes.
-const startingStopWait = 180_000;
-let exitGuarded = false;
-
-/**
- * A killed or restarted server never reaches the `finally` that stops its session, and an orphaned GPU keeps billing,
- * so every open session is stopped synchronously when the process is told to end, waiting for one still starting.
- */
-function guardProcessExit() {
-  if (exitGuarded) return;
-  exitGuarded = true;
-  const stopAll = () => {
-    for (const [session, command] of activeSessions) {
-      const deadline = Date.now() + (startingSessions.has(session) ? startingStopWait : 0);
-      for (;;) {
-        const { stdout, stderr } = Bun.spawnSync([command, "stop", "--session", session], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-        if (!`${stdout}${stderr}`.includes("not found") || Date.now() > deadline) break;
-        Bun.sleepSync(3_000);
-      }
-    }
-    activeSessions.clear();
-    sessionRates.clear();
-    meterSessions();
-  };
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
-    const handler = () => {
-      stopAll();
-      // Libraries such as signal-exit only end the process when no foreign listener remains, so this one always steps
-      // aside; when it was the only listener, the default is restored and the signal re-raised.
-      process.off(signal, handler);
-      if (!process.listenerCount(signal)) process.kill(process.pid, signal);
-    };
-    process.prependListener(signal, handler);
-  }
-  // The dev watch restart runs SIGUSR1 handlers before restarting (docs/development.md).
-  process.prependListener("SIGUSR1", stopAll);
-  process.once("exit", stopAll);
-}
-
-/**
- * Stops every Toonflow session left on the signed-in Colab account, such as one orphaned when a server was killed
- * outright (SIGKILL, crash, power loss), where no exit handler runs. Called once when the server starts, after the
- * compute unit meter has counted what such sessions billed meanwhile.
- */
-export async function stopOrphanedColabSessions() {
-  meterSessions();
-  let command: string;
-  try {
-    command = findCommand("colab", "");
-  } catch {
-    return [];
-  }
-  await guardColabLog();
-  const listing = await colab(command, ["sessions"]);
-  // ACT: Assumes one Toonflow server per Colab account (servers are single-process); a second server signed in to
-  // the same account would have its running session stopped here. Tag sessions with a server ID if that is ever needed.
-  const orphans = [...new Set(listing.match(/\btoonflow-[0-9a-f]{8}\b/g) ?? [])].filter(session => !activeSessions.has(session));
-  for (const session of orphans) await colab(command, ["stop", "--session", session]);
-  return orphans;
-}
-
 // CLI errors quote the VM's proxy URLs, whose token opens the running VM; messages are shown and saved, so it is cut.
 const tail = (text: string, length = 3000) => stripVTControlCharacters(text).replace(/(colab-runtime-proxy-token=)[^&\s]+/g, "$1\u2026").trim().slice(-length);
 
 const idempotent = new Set(["upload", "download", "sessions", "usage"]);
 // Includes the proxy's 502, 503 and 504, which it answers for a moment while the VM is busy or briefly unreachable.
-const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|50[234] Server Error/;
+const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|unable to open database file|database is locked|50[234] Server Error/;
 // The CLI's answer, on stdout, for a session Colab no longer has: its VM was released or reclaimed.
 const sessionGone = /Session '[^']+' not found/;
 
 async function colab(command: string, args: string[], signal?: AbortSignal, timeout?: number) {
+  const session = args.includes("--session") ? args[args.indexOf("--session") + 1] : undefined;
   for (let attempt = 1; ; attempt++) {
     const limit = timeout ? AbortSignal.timeout(timeout) : undefined;
     const attemptSignal = limit && signal ? AbortSignal.any([signal, limit]) : limit ?? signal;
@@ -223,12 +179,14 @@ async function colab(command: string, args: string[], signal?: AbortSignal, time
     }
     // Parallel jobs share the CLI's local session database, which another CLI process can hold for a moment.
     if (stderr.includes("unable to open database") && attempt < 5) {
+      console.log("[colabRetry]", JSON.stringify({ session, operation: args[0], attempt, reason: "sessionDatabase", waitSeconds: attempt * 3 }));
       await scheduler.wait(attempt * 3_000, { signal });
       continue;
     }
     // A dropped connection to the VM fails a whole job for a moment's network trouble; transfers and reads can simply
     // run again, while an exec may already have run and is left to its own recovery.
     if (idempotent.has(args[0]!) && transient.test(stderr) && attempt < 4) {
+      console.log("[colabRetry]", JSON.stringify({ session, operation: args[0], attempt, reason: transient.exec(stderr)?.[0], waitSeconds: attempt * 10 }));
       await scheduler.wait(attempt * 10_000, { signal });
       continue;
     }
@@ -281,10 +239,15 @@ while True:
 const heartbeatScript = `import json, os, threading, time
 if "toonflowState" not in globals():
     os.makedirs("/content", exist_ok=True)
-    toonflowState = {"current": None, "finished": None, "error": None}
+    toonflowState = {"current": None, "finished": None, "error": None, "active": None}
+    toonflowExecutions = {}
     def toonflowFinished(result):
+        execId = toonflowState.get("active")
+        if execId is None:
+            return
         error = None if result.success else repr(result.error_in_exec or result.error_before_exec)
-        toonflowState.update(finished=toonflowState["current"], error=error)
+        toonflowExecutions[execId] = error
+        toonflowState.update(finished=execId, error=error, active=None)
     get_ipython().events.register("post_run_cell", toonflowFinished)
     def toonflowHeartbeat():
         while True:
@@ -305,9 +268,9 @@ const stateLost = "TOONFLOW_KERNEL_STATE_LOST";
  * A hung CLI exec can leave the session on a new kernel while the old one keeps its memory (a loaded model) and its
  * heartbeat, so every job first checks that it runs in the kernel the heartbeat started in.
  */
-const stateCheck = `if "toonflowState" not in globals():\n    raise RuntimeError("${stateLost}")\n`;
+const stateCheck = `if "toonflowState" not in globals() or "toonflowExecutions" not in globals():\n    raise RuntimeError("${stateLost}")\n`;
 
-const beatSchema = z.object({ beat: z.number(), current: z.string().nullable(), finished: z.string().nullable(), error: z.string().nullable() });
+const beatSchema = z.object({ beat: z.number(), current: z.string().nullable(), finished: z.string().nullable(), error: z.string().nullable(), active: z.string().nullable() });
 
 /** Why the watcher ended an exec early. */
 type ExecLost =
@@ -324,39 +287,47 @@ print(subprocess.run("free -g; dmesg 2>/dev/null | grep -i -E 'killed process|ou
  * `colab exec` can hang without running anything: right after a session starts, its kernel websocket may drop and the
  * CLI raises "Connection was lost" yet never exits. It also never returns when the kernel dies (crash, out of memory),
  * spinning past its own timeout while the GPU bills, or when the connection drops after the job finished. Each
- * reading of the heartbeat (every 45 s) tells these apart, and the exec is aborted with the reason once one holds.
+ * reading of the heartbeat tells these apart; retries share a logical ID so a delayed request cannot run work twice.
  */
 function watchHeartbeat(command: string, session: string, directory: string, execId: string, controller: AbortController) {
   const local = join(directory, "heartbeat");
   let lastBeat = 0;
   let missed = 0;
   let waiting = 0;
-  let finished = 0;
   let reading = false;
+  let contactedAt = Date.now();
   const lost = (detail: ExecLost) => controller.abort(detail);
   const timer = setInterval(async () => {
     if (reading) return;
     reading = true;
     const state = await colab(command, ["download", "--session", session, heartbeatPath, local], AbortSignal.timeout(40_000))
-      .then(async () => beatSchema.parse(JSON.parse(await readFile(local, "utf8"))), () => undefined)
+      .then(async () => beatSchema.parse(JSON.parse(await readFile(local, "utf8"))))
+      .catch(() => undefined)
       .finally(() => { reading = false; });
-    missed = state && state.beat !== lastBeat ? 0 : missed + 1;
+    if (!state) {
+      if (Date.now() - contactedAt > offlineGrace) lost({ reason: "kernelLost" });
+      return;
+    }
+    contactedAt = Date.now();
+    const advanced = !!state && state.beat > lastBeat;
+    missed = advanced ? 0 : missed + 1;
     lastBeat = state?.beat ?? lastBeat;
-    if (missed >= 4) return lost({ reason: "kernelLost" });
+    if (missed >= 12) return lost({ reason: "kernelLost" });
     if (!state) return;
     if (state.finished === execId) {
-      if (++finished >= 2) lost({ reason: "finished", error: state.error });
-    } else if (state.current !== execId && ++waiting >= 3) {
+      lost({ reason: "finished", error: state.error });
+    } else if (advanced && state.active === null && state.current !== execId && ++waiting >= 3) {
       lost({ reason: "notStarted" });
-    }
-  }, 45_000);
+    } else if (state.active !== null) waiting = 0;
+  }, 15_000);
   return () => clearInterval(timer);
 }
 
 function checkJob({ uploads, env, outputs }: Omit<ColabJob, "provider">) {
   // Every value below reaches argv, so only plain tokens are accepted; free text travels as uploaded files.
   for (const { name } of uploads) if (!/^[\w.-]+$/.test(name)) throw new Error(`Invalid Colab upload file name: ${name}`);
-  for (const [name, value] of Object.entries(env)) if (!/^[A-Z][A-Z0-9_]*$/.test(name) || !/^[\w.:-]+$/.test(String(value))) throw new Error(`Invalid Colab environment variable: ${name}`);
+  if (new Set(uploads.map(item => item.name)).size !== uploads.length) throw new Error("Colab upload file names must be unique");
+  for (const [name, value] of Object.entries(env)) if (!/^[A-Z][A-Z0-9_]*$/.test(name) || !/^[\w.:-]+$/.test(String(value)) || typeof value === "number" && !Number.isFinite(value)) throw new Error(`Invalid Colab environment variable: ${name}`);
   for (const output of outputs) if (!/^\/content\/[\w./-]+$/.test(output) || output.includes("..")) throw new Error(`Invalid Colab output path: ${output}`);
 }
 
@@ -375,16 +346,33 @@ export type ColabSession = Awaited<ReturnType<typeof openColabSession>>;
  * Opens a Colab session with the user's local Colab CLI login. Jobs run in one kernel, so state from earlier jobs stays
  * loaded; the caller must close() the session. Toonflow never reads or forwards the Colab credentials.
  */
-export async function openColabSession(provider: string, { gpu, highMem }: ColabMachine, signal?: AbortSignal) {
+export async function openColabSession(provider: string, { gpu, highMem }: ColabMachine, signal?: AbortSignal, retainedName?: string) {
   await checkColabBudget(provider);
   const command = findCommand("colab", "Colab CLI not found. Install google-colab-cli and run `colab sessions` in a terminal to sign in with Google");
   await guardColabLog();
   const directory = await mkdtemp(join(tmpdir(), "toonflow-colab-"));
-  const name = `toonflow-${crypto.randomUUID().slice(0, 8)}`;
+  if (retainedName && !/^toonflow-[0-9a-f]{8}$/.test(retainedName)) throw new Error("Invalid retained Colab session name");
+  const name = retainedName ?? `toonflow-${crypto.randomUUID().slice(0, 8)}`;
   let startedAt = 0;
   let hourlyRate = machineRates[gpu];
   let files = 0;
   let stopped = false;
+  let billedAt = 0;
+  let runtimeUploaded = false;
+  const inputCache = new Map<string, number>();
+
+  async function attribute(next: string) {
+    await checkColabBudget(next);
+    if (next === provider) return;
+    const now = Date.now();
+    if (billedAt) await recordColabUnits(provider, (now - billedAt) / 3_600_000 * hourlyRate);
+    provider = next;
+    billedAt = now;
+  }
+
+  async function keepAlive(signal?: AbortSignal) {
+    await exec("print('COLAB_DONE')\n", {}, signal);
+  }
 
   async function spawnExec(path: string, env: ColabJob["env"], signal: AbortSignal) {
     const child = Bun.spawn([
@@ -404,6 +392,10 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
     if (stderr.includes(stateLost)) throw new Error(`The Colab CLI switched session ${name} to a new kernel, which lost everything loaded so far`);
     // `colab exec` exits with 0 when the script raises and prints the traceback on stderr.
     if (!stdout.includes("COLAB_DONE")) throw new ColabScriptError(`Colab job failed: ${tail(stderr || stdout, 2000)}`);
+    for (const line of stdout.split("\n").filter(line => line.startsWith("COLAB_MODEL "))) {
+      const measured = z.strictObject({ model: z.string(), switched: z.boolean(), seconds: z.number().finite().nonnegative() }).parse(JSON.parse(line.slice("COLAB_MODEL ".length)));
+      console.log("[colabModelTiming]", JSON.stringify({ session: name, ...measured }));
+    }
     return stdout;
   }
 
@@ -425,10 +417,22 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   }
 
   async function exec(script: string, env: ColabJob["env"], signal?: AbortSignal) {
+    const execId = `${name}-${crypto.randomUUID()}`;
     for (let attempt = 1; ; attempt++) {
-      const execId = `${name}-${files}`;
       const path = join(directory, `script${files++}.py`);
-      await writeFile(path, `${stateCheck}__import__("os").utime("${seenPath}")\ntoonflowState.update(current="${execId}", finished=None, error=None)\n${script}`);
+      await writeFile(path, `${stateCheck}__import__("os").utime("${seenPath}")
+if "${execId}" in toonflowExecutions:
+    toonflowState.update(current="${execId}", finished="${execId}", error=toonflowExecutions["${execId}"])
+    if toonflowExecutions["${execId}"] is not None:
+        raise RuntimeError(toonflowExecutions["${execId}"])
+    print("COLAB_REUSED_EXEC", "${execId}")
+    print("COLAB_DONE")
+else:
+    toonflowState.update(current="${execId}", finished=None, error=None, active="${execId}")
+    if __import__("os").path.exists("/content/toonflowExecCancelled${execId}"):
+        raise RuntimeError("Execution cancelled before dispatch")
+    exec(compile(__import__("base64").b64decode(${JSON.stringify(Buffer.from(script).toString("base64"))}), "${execId}", "exec"), globals())
+`);
       const watcher = new AbortController();
       const stopWatching = watchHeartbeat(command, name, directory, execId, watcher);
       const result = await spawnExec(path, env, signal ? AbortSignal.any([signal, watcher.signal]) : watcher.signal).finally(stopWatching);
@@ -436,31 +440,50 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
       let lost = watcher.signal.reason as ExecLost;
       if (!watcher.signal.aborted) {
         if (result.exitCode !== 0 && sessionGone.test(`${result.stdout}${result.stderr}`)) throw new ColabSessionGoneError(`Colab session ${name} lost its VM`);
-        if (!(result.exitCode !== 0 && transient.test(result.stderr))) return checkOutput(result);
+        if (result.stderr.includes(stateLost)) return checkOutput(result);
+        if (result.exitCode === 0 && result.stdout.includes("COLAB_DONE")) return checkOutput(result);
         // The CLI lost its connection to the VM mid-exec, which tells nothing of the job: the kernel's heartbeat says
         // whether it never started, is still running (followed until it ends) or finished.
-        const follow = new AbortController();
-        const stopFollowing = watchHeartbeat(command, name, directory, execId, follow);
-        await new Promise(resolve => {
-          follow.signal.addEventListener("abort", resolve, { once: true });
-          signal?.addEventListener("abort", resolve, { once: true });
-        }).finally(stopFollowing);
-        signal?.throwIfAborted();
-        lost = follow.signal.reason as ExecLost;
+        lost = await followExec(execId, signal);
       }
-      // The job never reached the kernel, so running it again cannot run it twice.
-      if (lost.reason === "notStarted" && attempt < 2) continue;
-      if (lost.reason === "notStarted") throw new Error(`Colab could not start the job on session ${name}: ${tail(result.stderr, 1000)}`);
+      // The same guarded ID also covers an original request that reaches the kernel after this retry is sent.
+      if (lost.reason === "notStarted" && attempt < 3) {
+        console.log("[colabRetry]", JSON.stringify({ session: name, execId, attempt, reason: lost.reason }));
+        continue;
+      }
+      if (lost.reason === "notStarted") {
+        const cancelled = join(directory, `cancelExec${files++}`);
+        await writeFile(cancelled, "");
+        await colab(command, ["upload", "--session", name, cancelled, `/content/toonflowExecCancelled${execId}`], AbortSignal.timeout(40_000));
+        lost = await followExec(execId, signal);
+        if (lost.reason === "notStarted") throw new ColabConnectionError(`Colab could not start the job on session ${name}; the fenced, idle VM was retained for reconnection: ${tail(result.stderr, 1000)}`);
+      }
       // The kernel finished but the CLI lost its connection, so the outcome comes from the kernel's own report.
       if (lost.reason === "finished") {
-        if (lost.error) throw new ColabScriptError(`Colab job failed: ${lost.error}`);
+        if (lost.error) throw new ColabScriptError(`Colab job failed: ${lost.error}`, { unsafe: /^RuntimeError\(['"]TOONFLOW_MODEL_UNSAFE:/.test(lost.error) });
         return result.stdout;
       }
       // The VM outlives its kernel, so read why it died before the session is stopped; the exec output so far is kept.
       const report = join(directory, "diagnose.py");
       await writeFile(report, diagnoseScript);
       const details = await colab(command, ["exec", "--session", name, "--timeout", "60", "--file", report], AbortSignal.timeout(90_000)).catch(() => "");
-      throw new Error(`The Colab kernel stopped responding (session ${name}); it crashed, ran out of memory or lost its VM\n${tail(details)}\nLast job output:\n${tail(`${result.stdout}\n${result.stderr}`)}`);
+      throw new Error(`Could not establish a safe Colab kernel state for session ${name}; the cause is unconfirmed\n${tail(details)}\nLast job output:\n${tail(`${result.stdout}\n${result.stderr}`)}`);
+    }
+  }
+
+  async function followExec(execId: string, signal?: AbortSignal): Promise<ExecLost> {
+    signal?.throwIfAborted();
+    const follow = new AbortController();
+    const stopFollowing = watchHeartbeat(command, name, directory, execId, follow);
+    const interrupted = () => follow.abort(signal!.reason);
+    signal?.addEventListener("abort", interrupted, { once: true });
+    try {
+      await new Promise(resolve => follow.signal.addEventListener("abort", resolve, { once: true }));
+      signal?.throwIfAborted();
+      return follow.signal.reason as ExecLost;
+    } finally {
+      stopFollowing();
+      signal?.removeEventListener("abort", interrupted);
     }
   }
 
@@ -499,7 +522,7 @@ print("COLAB_DONE")
       }
       const state = /TOONFLOW_EXIT (\S+) (TOONFLOW_SCRIPT_\w+)/.exec(output);
       if (!state) continue;
-      if (state[1] !== "0" || state[2] !== "TOONFLOW_SCRIPT_DONE") throw new ColabScriptError(`Colab job failed (exit ${state[1]}): ${tail(output, 2000)}`);
+      if (state[1] !== "0" || state[2] !== "TOONFLOW_SCRIPT_DONE") throw new ColabScriptError(`Colab job failed (exit ${state[1]}): ${tail(output, 2000)}`, { unsafe: /^RuntimeError: TOONFLOW_MODEL_UNSAFE:/m.test(output) });
       return;
     }
   }
@@ -508,39 +531,261 @@ print("COLAB_DONE")
    * Uploads the inputs, runs the script and downloads the outputs. A detached job runs as a background process that
    * the host checks on, for jobs that run longer than a network connection can be trusted to last.
    */
-  async function job({ script, uploads, env, outputs, detached = false }: Omit<ColabJob, "provider"> & { detached?: boolean }, signal?: AbortSignal) {
+  type SessionJob = Omit<ColabJob, "provider"> & {
+    runtime?: string;
+    detached?: boolean;
+    /** Streaming callers own fresh output paths and publish each complete file atomically. */
+    onOutput?: (index: number, data: Uint8Array) => void;
+  };
+
+  async function readOutput(remote: string, signal?: AbortSignal) {
+    if (!remote.startsWith("/content/") || remote.split("/").includes("..")) throw new Error("Remote output must stay inside /content");
+    const local = join(directory, `output${files++}`);
+    await colab(command, ["download", "--session", name, remote, local], signal);
+    return new Uint8Array(await readFile(local));
+  }
+
+  async function writeInput(remote: string, data: string | Uint8Array, signal?: AbortSignal) {
+    if (!/^[A-Za-z0-9_.-]+$/.test(remote)) throw new Error("Remote input needs a plain file name");
+    const local = join(directory, `upload${files++}`);
+    await writeFile(local, data);
+    await colab(command, ["upload", "--session", name, local, `/content/${remote}`], signal);
+  }
+
+  async function job(request: SessionJob, signal?: AbortSignal) {
+    const execution = { id: crypto.randomUUID(), submitted: false };
+    try {
+      return await executeJob(request, execution, signal);
+    } catch (error) {
+      if (error instanceof ColabScriptError && /TOONFLOW_INPUT_CACHE_MISS:[a-f0-9]{64}/.test(error.message)) {
+        inputCache.clear();
+        execution.submitted = false;
+        try { return await executeJob(request, execution, signal); }
+        catch (retryError) { error = retryError; }
+      }
+      if (!signal?.aborted || !request.runtime) throw error;
+      if (!execution.submitted) throw new ColabScriptError("Model job cancelled before submission", { cause: error });
+      const local = join(directory, `cancel${execution.id}`);
+      await writeFile(local, "");
+      await colab(command, ["upload", "--session", name, local, `/content/toonflowCancel${execution.id}`], AbortSignal.timeout(40_000));
+      for (const deadline = Date.now() + 45_000; Date.now() < deadline;) {
+        const acknowledged = await colab(command, ["download", "--session", name, `/content/toonflowSettled${execution.id}.json`, local], AbortSignal.timeout(15_000))
+          .then(async () => JSON.parse(await readFile(local, "utf8")).settled === true, () => false);
+        if (acknowledged) throw new ColabScriptError("Model job cancelled; the VM and installed models were retained", { cause: error });
+        await scheduler.wait(2_000);
+      }
+      throw new Error("Could not confirm that the cancelled model released the GPU", { cause: error });
+    }
+  }
+
+  async function executeJob({ script, uploads, env, outputs, detached = false, onOutput, runtime }: SessionJob, executionState: { id: string; submitted: boolean }, signal?: AbortSignal) {
     checkJob({ script, uploads, env, outputs });
+    if (runtime) {
+      if (detached) await exec("if 'toonflowRuntime' in globals():\n    toonflowRuntime.stopModel()\nprint('COLAB_DONE')\n", {}, signal);
+      if (!runtimeUploaded) {
+        const local = join(directory, "runtime.py");
+        const files = [["modelPreparation.py", preparationSource], ["pythonDependencies.json", JSON.stringify(pythonDependencies)], ["dramaStartup.py", startupSource]].map(([name, source]) => [name, Buffer.from(source!).toString("base64")]);
+        await writeFile(local, `import base64\nfrom pathlib import Path\nfor name, data in ${JSON.stringify(files)}:\n    path = Path('/content') / name\n    temporary = path.with_suffix('.bootstrap')\n    temporary.write_bytes(base64.b64decode(data))\n    temporary.replace(path)\n${runtimeSource}`);
+        await colab(command, ["upload", "--session", name, local, "/content/toonflowRuntime.py"], signal);
+        runtimeUploaded = true;
+      }
+      const source = Buffer.from(script).toString("base64");
+      const call = `toonflowRuntime.runModel(${JSON.stringify(runtime)}, ${JSON.stringify(source)}, ${JSON.stringify(env)}, ${JSON.stringify(executionState.id)})`;
+      script = `import importlib.util as _toonflowImport\nif globals().get("toonflowRuntimeSourceId") != ${JSON.stringify(runtimeSourceId)}:\n    if "toonflowRuntime" in globals():\n        toonflowRuntime.stopModel()\n    _spec = _toonflowImport.spec_from_file_location("toonflowRuntime", "/content/toonflowRuntime.py")\n    toonflowRuntime = _toonflowImport.module_from_spec(_spec)\n    _spec.loader.exec_module(toonflowRuntime)\n    toonflowRuntimeSourceId = ${JSON.stringify(runtimeSourceId)}\n${detached ? `try:\n    ${call}\nfinally:\n    toonflowRuntime.stopModel()\n` : `${call}\n`}`;
+    }
+    const jobStarted = performance.now();
+    let wireUploads = uploads;
+    let inputSetup = "";
+    const remembered: { hash: string; bytes: number }[] = [];
+    const totalBytes = uploads.reduce((sum, item) => sum + (typeof item.data === "string" ? Buffer.byteLength(item.data) : item.data.length), 0);
+    // Keep bundles small; large LoRAs retain the existing bounded multipart transport.
+    if (uploads.length > 1 && totalBytes <= uploadPart) {
+      const bindings = uploads.map(item => {
+        const data = typeof item.data === "string" ? Buffer.from(item.data) : item.data;
+        return { name: item.name, data, hash: createHash("sha256").update(data).digest("hex"), bytes: data.length };
+      });
+      const used = new Set(bindings.map(item => item.hash));
+      const additions = [...new Map(bindings.map(item => [item.hash, item])).values()].filter(item => !inputCache.has(item.hash));
+      let size = [...inputCache.values()].reduce((sum, bytes) => sum + bytes, 0) + additions.reduce((sum, item) => sum + item.bytes, 0);
+      for (const [hash, bytes] of inputCache) {
+        if (size <= 1024 ** 3) break;
+        if (used.has(hash)) continue;
+        inputCache.delete(hash);
+        size -= bytes;
+      }
+      const archiveName = `toonflowInputs${executionState.id}.zip`;
+      wireUploads = additions.length ? [{ name: archiveName, data: zipSync(Object.fromEntries(additions.map(item => [item.hash, item.data])), { level: 0 }) }] : [];
+      remembered.push(...bindings.map(({ hash, bytes }) => ({ hash, bytes })));
+      inputSetup = `import hashlib as _inputHash, json as _inputJson, os as _inputOs, shutil as _inputShutil, zipfile as _inputZip
+from pathlib import Path as _inputPath
+_inputRoot = _inputPath('/content/toonflowInputs')
+_inputRoot.mkdir(exist_ok=True)
+_inputKeep = set(${JSON.stringify([...new Set([...inputCache.keys(), ...used])])})
+for _old in _inputRoot.iterdir():
+    _name = _old.name.removesuffix('.partial')
+    if len(_name) == 64 and all(_char in '0123456789abcdef' for _char in _name) and (_name not in _inputKeep or _old.name.endswith('.partial')):
+        _old.unlink()
+${additions.length ? `with _inputZip.ZipFile('/content/${archiveName}') as _bundle:
+    for _hash in _bundle.namelist():
+        if len(_hash) != 64 or any(_char not in '0123456789abcdef' for _char in _hash):
+            raise ValueError('Invalid input cache member')
+        _data = _bundle.read(_hash)
+        if _inputHash.sha256(_data).hexdigest() != _hash:
+            raise ValueError('Input bundle digest mismatch')
+        _temporary = _inputRoot / (_hash + '.partial')
+        _temporary.write_bytes(_data)
+        _temporary.replace(_inputRoot / _hash)
+_inputPath('/content/${archiveName}').unlink()
+` : ""}for _binding in _inputJson.loads(${JSON.stringify(JSON.stringify(bindings.map(({ name, hash, bytes }) => ({ name, hash, bytes }))))}):
+    _cached = _inputRoot / _binding['hash']
+    if not _cached.is_file() or _cached.stat().st_size != _binding['bytes'] or _inputHash.sha256(_cached.read_bytes()).hexdigest() != _binding['hash']:
+        raise RuntimeError('TOONFLOW_INPUT_CACHE_MISS:' + _binding['hash'])
+    _temporary = _inputPath('/content') / (_binding['name'] + '.partial')
+    _inputShutil.copyfile(_cached, _temporary)
+    _temporary.replace(_inputPath('/content') / _binding['name'])
+`;
+    }
+    const rememberInputs = () => { for (const item of remembered) { inputCache.delete(item.hash); inputCache.set(item.hash, item.bytes); } };
     const split: [string, number][] = [];
-    for (const { name: remote, data } of uploads) {
+    const transfers: { remote: string; data: string | Uint8Array }[] = [];
+    for (const { name: remote, data } of wireUploads) {
       const parts = typeof data === "string" || data.length <= uploadPart ? [data]
         : Array.from({ length: Math.ceil(data.length / uploadPart) }, (_, index) => data.subarray(index * uploadPart, (index + 1) * uploadPart));
       for (const [index, part] of parts.entries()) {
+        transfers.push({ remote: parts.length > 1 ? `${remote}.part${index}` : remote, data: part });
+      }
+      if (parts.length > 1) split.push([remote, parts.length]);
+    }
+    for (let index = 0; index < transfers.length; index += transferConcurrency) {
+      const results = await Promise.allSettled(transfers.slice(index, index + transferConcurrency).map(async ({ remote, data }) => {
+        signal?.throwIfAborted();
         const local = join(directory, `upload${files++}`);
-        await writeFile(local, part);
-        await colab(command, ["upload", "--session", name, local, `/content/${parts.length > 1 ? `${remote}.part${index}` : remote}`], signal, uploadTimeout(part.length))
+        await writeFile(local, data);
+        const bytes = typeof data === "string" ? Buffer.byteLength(data) : data.length;
+        await colab(command, ["upload", "--session", name, local, `/content/${remote}`], signal, uploadTimeout(bytes * transferConcurrency))
           .catch((error: unknown) => {
             // /content always exists on a running VM, so its contents API answering "not found" means the VM is gone.
             throw /File or directory not found/.test(String(error)) ? new ColabSessionGoneError(`Colab session ${name} lost its VM`, { cause: error }) : error;
           });
-      }
-      if (parts.length > 1) split.push([remote, parts.length]);
+      }));
+      const failure = results.find(result => result.status === "rejected");
+      if (failure) throw failure.reason;
     }
-    const joinParts = split.length ? `import os as _toonflowOs
+    const uploadedAt = performance.now();
+    const timingRole = provider === "colab" ? gpu === "L4" ? "text" : "visualReview" : provider;
+    void recordColabTiming({ role: timingRole, phase: "upload", gpu, seconds: (uploadedAt - jobStarted) / 1000, passed: true });
+    console.log("[colabInputTransfer]", JSON.stringify({ session: name, files: uploads.length, wireFiles: wireUploads.length, inputBytes: totalBytes, wireBytes: wireUploads.reduce((sum, item) => sum + (typeof item.data === "string" ? Buffer.byteLength(item.data) : item.data.length), 0) }));
+    const joinParts = (split.length ? `import os as _toonflowOs
 for _name, _count in ${JSON.stringify(split)}:
     with open(f"/content/{_name}", "wb") as _whole:
         for _index in range(_count):
             with open(f"/content/{_name}.part{_index}", "rb") as _part:
                 _whole.write(_part.read())
             _toonflowOs.remove(f"/content/{_name}.part{_index}")
-` : "";
-    if (detached) await runDetached(joinParts, script, env, signal);
-    else await exec(joinParts + script, env, signal);
-    const results: Uint8Array[] = [];
-    for (const remote of outputs) {
-      const local = join(directory, `output${files++}`);
-      await colab(command, ["download", "--session", name, remote, local], signal);
-      results.push(new Uint8Array(await readFile(local)));
+` : "") + inputSetup;
+    const download = readOutput;
+    if (onOutput) {
+      const controller = new AbortController();
+      const jobSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+      let finished = false;
+      let failed = false;
+      let failure: unknown;
+      executionState.submitted = true;
+      const execution = (detached ? runDetached(joinParts, script, env, jobSignal) : exec(joinParts + script, env, jobSignal))
+        .then(rememberInputs)
+        .catch((error: unknown) => { failed = true; failure = error; }).finally(() => { finished = true; });
+      const results: Uint8Array[] = [];
+      try {
+        for (const [index, remote] of outputs.entries()) {
+          for (;;) {
+            jobSignal.throwIfAborted();
+            if (failed) throw failure;
+            let data: Uint8Array;
+            try {
+              data = await download(remote, jobSignal);
+            } catch (error) {
+              if (failed) throw failure;
+              if (!/File or directory not found/.test(String(error))) throw error;
+              if (finished) {
+                // The failed read may predate the final file publication; observe the completed state once more.
+                data = await download(remote, jobSignal).catch(error => {
+                  if (/File or directory not found/.test(String(error))) throw new ColabScriptError(`Completed job did not publish ${remote}`, { cause: error });
+                  throw error;
+                });
+                results.push(data);
+                onOutput(index, data);
+                break;
+              }
+              await scheduler.wait(2_000, { signal: jobSignal });
+              continue;
+            }
+            results.push(data);
+            onOutput(index, data);
+            break;
+          }
+        }
+        await execution;
+        if (failed) throw failure;
+        return results;
+      } finally {
+        controller.abort();
+        await execution;
+        console.log("[colabTiming]", JSON.stringify({ provider, session: name, mode: "streaming", uploadSeconds: (uploadedAt - jobStarted) / 1000, executionAndDownloadSeconds: (performance.now() - uploadedAt) / 1000 }));
+      }
     }
+    executionState.submitted = true;
+    const inlineMarker = `TOONFLOW_OUTPUT ${executionState.id} `;
+    const inlineEnd = ` TOONFLOW_OUTPUT_END ${executionState.id}`;
+    // Keep small results on the established execution connection; retain files for interrupted replies.
+    const collectOutputs = !detached && outputs.length ? `
+exec(${JSON.stringify(`import base64, hashlib, json
+from pathlib import Path
+paths = [Path(path) for path in ${JSON.stringify(outputs)}]
+if all(path.resolve().is_relative_to('/content') and path.is_file() for path in paths) and sum(path.stat().st_size for path in paths) <= ${inlineOutputLimit}:
+    collected = []
+    remaining = ${inlineOutputLimit}
+    for path in paths:
+        with path.open('rb') as source:
+            data = source.read(remaining + 1)
+        remaining -= len(data)
+        if remaining < 0:
+            break
+        collected.append({'data': base64.b64encode(data).decode('ascii'), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+    if len(collected) == len(paths):
+        print(${JSON.stringify(inlineMarker)} + json.dumps(collected) + ${JSON.stringify(inlineEnd)}, flush=True)
+`)}, {})
+` : "";
+    let reply = "";
+    if (detached) await runDetached(joinParts, script, env, signal);
+    else reply = await exec(joinParts + script + collectOutputs, env, signal);
+    rememberInputs();
+    const executedAt = performance.now();
+    const inlineLine = reply.split("\n").findLast(line => line.startsWith(inlineMarker) && line.endsWith(inlineEnd));
+    const inlineResults = inlineLine ? z.array(z.strictObject({
+      data: z.string().max(Math.ceil(inlineOutputLimit / 3) * 4),
+      bytes: z.number().int().min(0).max(inlineOutputLimit),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    })).length(outputs.length).refine(items => items.reduce((sum, item) => sum + item.bytes, 0) <= inlineOutputLimit).parse(JSON.parse(inlineLine.slice(inlineMarker.length, -inlineEnd.length))).map(item => {
+      const data = Buffer.from(item.data, "base64");
+      if (data.toString("base64") !== item.data || data.length !== item.bytes || createHash("sha256").update(data).digest("hex") !== item.sha256) {
+        throw new Error("Colab execution output failed byte integrity validation");
+      }
+      return data;
+    }) : undefined;
+    const results: Uint8Array[] = [];
+    if (inlineResults) results.push(...inlineResults);
+    for (let index = 0; !inlineResults && index < outputs.length; index += transferConcurrency) {
+      const downloaded = await Promise.allSettled(outputs.slice(index, index + transferConcurrency).map(async remote => {
+        signal?.throwIfAborted();
+        return download(remote, signal);
+      }));
+      for (const result of downloaded) {
+        if (result.status === "rejected") throw result.reason;
+        results.push(result.value);
+      }
+    }
+    console.log("[colabTiming]", JSON.stringify({ provider, session: name, mode: detached ? "detached" : "batch", outputTransport: inlineResults ? "executionReply" : outputs.length ? "fileDownload" : "none", outputBytes: results.reduce((sum, item) => sum + item.byteLength, 0), uploadSeconds: (uploadedAt - jobStarted) / 1000, executionSeconds: (executedAt - uploadedAt) / 1000, downloadSeconds: (performance.now() - executedAt) / 1000 }));
+    void recordColabTiming({ role: timingRole, phase: "output", gpu, seconds: (performance.now() - executedAt) / 1000, passed: true });
     return results;
   }
 
@@ -564,203 +809,75 @@ for _name, _count in ${JSON.stringify(split)}:
       await scheduler.wait(30_000);
     }
     stopped = true;
-    activeSessions.delete(name);
     sessionRates.delete(name);
     meterSessions();
     releaseMachine();
-    if (startedAt) await recordColabUnits(provider, (Date.now() - startedAt) / 3_600_000 * hourlyRate);
+    if (billedAt) await recordColabUnits(provider, (Date.now() - billedAt) / 3_600_000 * hourlyRate);
     await rm(directory, { recursive: true, force: true });
   }
 
   // Taken last before the try, whose failure path stops the session and so frees the machine again.
-  const releaseMachine = await acquireMachine(gpu, signal);
-  guardProcessExit();
-  // Tracked before `new` returns, because an interrupted `new` can still leave the session running.
-  activeSessions.set(name, command);
+  const releaseMachine = await acquireMachine(gpu, signal).catch(async error => {
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  });
   try {
     // Colab refuses a new session while the account's GPU sessions are taken (four, fewer of one kind) and
     // answers 503 while it is short of machines, so such a start waits and retries instead of failing a job that may
     // follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
-    // An A100 job is offered an H100 first, the faster card the account may get; Colab hands those out only now and
-    // then, so a refused H100 falls back to the A100 at once, and a start where both are refused waits as before.
-    const choices = gpu === "A100" ? ["H100", "A100"] as const : [gpu];
-    const rateBefore = Number(/Usage rate:\s*([\d.]+)/.exec(await colab(command, ["usage"]).catch(() => ""))?.[1]);
-    let assigned: (typeof choices)[number] | undefined;
+    // Honor the planned hardware without probing an unrequested accelerator first.
+    let assigned: ColabMachine["gpu"] | undefined = retainedName ? gpu : undefined;
     for (const waitStart = Date.now(); !assigned; ) {
-      let refusal: unknown;
-      for (const choice of choices) {
-        try {
-          startingSessions.add(name);
-          // Never cancelled midway: a killed `new` can leave an assigned machine the CLI never recorded, which nothing
-          // can stop; a cancelled start is stopped once `new` returns.
-          await colab(command, ["new", "--session", name, "--gpu", choice, ...highMem ? ["--high-mem"] : []]).finally(() => startingSessions.delete(name));
-          assigned = choice;
-          break;
-        } catch (error) {
-          // An H100 the account is not entitled to at the moment ("rejected accelerator") falls back like a busy one.
-          const fallback = choice !== choices.at(-1) && /rejected accelerator/i.test(String(error));
-          if (!fallback && !/Allocation refused|Service Unavailable/.test(String(error))) throw error;
-          refusal = error;
-          // Logged so a film that rendered on fewer or slower machines than planned shows why.
-          console.warn(`[colab] ${choice} start for ${provider} refused (${fallback ? "not entitled now" : /Allocation refused/.test(String(error)) ? "allocation refused" : "service unavailable"})`);
-          await colab(command, ["stop", "--session", name]).catch(() => undefined);
-        }
+      try {
+        // A submitted allocation must settle before cancellation can safely release its VM.
+        await colab(command, ["new", "--session", name, "--gpu", gpu, ...highMem ? ["--high-mem"] : []]);
+        assigned = gpu;
+      } catch (error) {
+        if (!/Allocation refused|Service Unavailable/.test(String(error))) throw error;
+        console.warn(`[colab] ${gpu} start for ${provider} refused (${ /Allocation refused/.test(String(error)) ? "allocation refused" : "service unavailable"})`);
+        await colab(command, ["stop", "--session", name]).catch(() => undefined);
+        if (Date.now() - waitStart > allocationWait) throw error;
+        await scheduler.wait(60_000, { signal });
       }
-      if (assigned) break;
-      if (Date.now() - waitStart > allocationWait) throw refusal;
-      await scheduler.wait(60_000, { signal });
     }
     startedAt = Date.now();
+    billedAt = startedAt;
     signal?.throwIfAborted();
     hourlyRate = machineRates[assigned];
     if (assigned !== gpu) console.log(`[colab] ${provider} runs on an ${assigned}`);
-    // The account's usage rate rises by this session's own when it starts; when the usage cannot be read, or other
-    // sessions started or stopped meanwhile and the difference makes no sense, the machine's listed rate stands for it.
-    const usage = await colab(command, ["usage"]).catch(() => "");
-    const accountRate = Number(/Usage rate:\s*([\d.]+)/.exec(usage)?.[1]);
-    const ownRate = accountRate - rateBefore;
-    if (ownRate > 0.5 && ownRate < 40) hourlyRate = ownRate;
+    // Account-wide rate differences cannot identify one VM's rate when machines start in parallel.
+    // Meter by the assigned hardware's estimated rate; the account balance remains a separate live reading.
     sessionRates.set(name, hourlyRate);
     meterSessions();
     await startHeartbeat(signal);
+    if (retainedName) await keepAlive(signal);
   } catch (error) {
-    await close(error);
+    if (!retainedName) await close(error);
+    else releaseMachine();
     throw error;
   }
-  return { name, job, close };
+  return { name, job, readOutput, writeInput, close, attribute, keepAlive };
 }
 
-/**
- * Keeps one Colab session open across jobs so state a job loads into the kernel, such as model weights, serves the
- * next one. Jobs run one at a time in arrival order. The session stops after `idleMs` without jobs (never while one
- * runs or waits), on stop(), and when a job fails for any reason other than its own Python error, because a
- * cancelled exec, a lost kernel or a CLI failure leaves the kernel in an unknown state.
- */
-export function createColabWorker(provider: string, machine: ColabMachine, idleMs: number) {
-  let session: ColabSession | undefined;
-  let queue: Promise<unknown> = Promise.resolve();
-  let pending = 0;
-  let epoch = 0;
-  let idleTimer: ReturnType<typeof setTimeout> | undefined;
-  let running: AbortController | undefined;
-  let stopSoon = false;
-
-  async function close(failure?: unknown) {
-    const open = session;
-    if (!open) return;
-    await open.close(failure);
-    session = undefined;
+/** Read a Toonflow kernel heartbeat without executing code, owning the VM or refreshing its idle lease. */
+export async function readColabSessionStatus(name: string) {
+  if (!/^toonflow-[0-9a-f]{8}$/.test(name)) throw new Error("Invalid Colab session name");
+  let directory: string | undefined;
+  const checkedAt = new Date().toISOString();
+  try {
+    const command = findCommand("colab", "Colab CLI not found");
+    await guardColabLog();
+    directory = await mkdtemp(join(tmpdir(), "toonflowStatus"));
+    const local = join(directory, "heartbeat.json");
+    await colab(command, ["download", "--session", name, heartbeatPath, local], AbortSignal.timeout(8000));
+    const beat = beatSchema.parse(JSON.parse(await readFile(local, "utf8")));
+    if (Math.abs(Date.now() - beat.beat * 1000) > 90_000) return { state: "unknown" as const, checkedAt };
+    return { state: beat.active !== null || beat.current !== beat.finished ? "working" as const : "idle" as const, checkedAt: new Date().toISOString() };
+  } catch (error) {
+    return { state: error instanceof ColabSessionGoneError ? "off" as const : "unknown" as const, checkedAt };
+  } finally {
+    if (directory) await rm(directory, { recursive: true, force: true });
   }
-
-  function enqueue<T>(step: () => Promise<T>) {
-    const result = queue.then(step);
-    queue = result.catch(() => {});
-    return result;
-  }
-
-  function scheduleIdleStop() {
-    clearTimeout(idleTimer);
-    const wait = stopSoon ? 0 : idleMs;
-    stopSoon = false;
-    idleTimer = setTimeout(() => {
-      // Queued behind running jobs, and skipped when a job arrived meanwhile.
-      void enqueue(() => pending ? Promise.resolve() : close())
-        .catch((error: unknown) => console.error("[colab] Idle session stop failed; check with `colab sessions`:", error));
-    }, wait);
-    // A pending idle stop must not keep the process alive; the exit handlers stop the session instead.
-    idleTimer.unref();
-  }
-
-  function run<T>(task: (session: ColabSession, signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
-    if (signal?.aborted) return Promise.reject(signal.reason);
-    clearTimeout(idleTimer);
-    pending++;
-    const queuedEpoch = epoch;
-    const result = enqueue(async () => {
-      signal?.throwIfAborted();
-      if (queuedEpoch !== epoch) throw new Error("The Colab session was stopped");
-      const controller = running = new AbortController();
-      const jobSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-      try {
-        session ??= await openColabSession(provider, machine, jobSignal);
-        try {
-          return await task(session, jobSignal);
-        } catch (error) {
-          // A VM released while the session was held idle took nothing of the job, which runs once more on a new one.
-          if (!(error instanceof ColabSessionGoneError)) throw error;
-          await close(error);
-          session = await openColabSession(provider, machine, jobSignal);
-          return await task(session, jobSignal);
-        }
-      } catch (error) {
-        if (!(error instanceof ColabScriptError)) await close(error);
-        throw error;
-      } finally {
-        running = undefined;
-      }
-    }).finally(() => {
-      if (--pending === 0 && session) scheduleIdleStop();
-    });
-    if (!signal) return result;
-    // A cancelled request returns at once even while it waits for its turn; the queue skips it when its turn comes.
-    return new Promise<T>((resolve, reject) => {
-      const abort = () => reject(signal.reason);
-      signal.addEventListener("abort", abort, { once: true });
-      result.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
-    });
-  }
-
-  /**
-   * Keeps an open session from its idle stop, as a running job does, until the returned release is called; for a
-   * caller whose jobs come with gaps longer than `idleMs` in between. The caller must release in a finally block.
-   */
-  function hold() {
-    clearTimeout(idleTimer);
-    pending++;
-    let held = true;
-    return () => {
-      if (!held) return;
-      held = false;
-      if (--pending === 0 && session) scheduleIdleStop();
-    };
-  }
-
-  /**
-   * Holds the session for at most `ms`, for jobs known to follow but not yet sent: a warm machine nothing comes to bills
-   * no longer than that before its idle stop. The hold also ends when `signal` aborts or the returned release is called.
-   */
-  function holdFor(ms: number, signal?: AbortSignal) {
-    const release = hold();
-    const timer = setTimeout(release, ms);
-    timer.unref();
-    signal?.addEventListener("abort", release, { once: true });
-    return () => {
-      clearTimeout(timer);
-      release();
-    };
-  }
-
-  /**
-   * Stops the session once no job runs or waits, instead of after `idleMs`, for a caller that knows no more jobs follow;
-   * other callers' queued jobs still run first.
-   */
-  function stopWhenIdle() {
-    stopSoon = true;
-    if (!pending && session) scheduleIdleStop();
-  }
-
-  /** Stops the session now, cancelling the running job and every queued one. */
-  function stop() {
-    clearTimeout(idleTimer);
-    epoch++;
-    running?.abort(new Error("The Colab session was stopped"));
-    return enqueue(() => close());
-  }
-
-  /** Whether a session is open, or a job or hold is starting one. */
-  const live = () => !!session || pending > 0;
-
-  return { run, hold, holdFor, stopWhenIdle, stop, live };
 }
 
 /** A random seed with 53 bits, so it stays exact as a JavaScript number. */

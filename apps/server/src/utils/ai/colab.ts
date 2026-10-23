@@ -1,7 +1,8 @@
 import { createAssistantMessageEventStream, type AssistantMessage, type Context } from "@earendil-works/pi-ai";
 import { languageProviders } from "@toonflow/providers";
 import { z } from "zod";
-import { createColabWorker } from "@/utils/media/colab";
+import { colabLane, colabModelPrepared, createColabWorker, stopColabPool, waitForColabPreparation, type ColabPreparation } from "@/utils/media/colabPool";
+import { preparationKey } from "@/utils/media/preparation";
 import type { readAiReferences } from "@/utils/ai";
 import pipeline from "./colab.py" with { type: "text" };
 import ggufPipeline from "./colabGguf.py" with { type: "text" };
@@ -14,7 +15,16 @@ const provider = languageProviders.find(item => item.protocol === "colab-cli")!;
 // tool loop; every other model still rejects tools. `mmproj` is a GGUF model's vision projector, which lets it read
 // images in user messages and image references; models without one read text only. `a100` marks a model too large for
 // the L4 with its context and images, which runs on the A100 kept for it, its projector on the GPU too.
-const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean; mmproj?: string }; tools?: boolean; a100?: boolean }> = {
+const weights: Record<string, { revision: string; gguf?: { file: string; thinking: boolean; mmproj?: string; mtp?: boolean; template?: string; build?: string }; tools?: boolean; a100?: boolean }> = {
+  "ttindall/Qwen3.8-27B-Defiance-Uncensored-MTP-GGUF": {
+    revision: "1e664931451831589ce16389a55e0d5605dd4bc5",
+    gguf: {
+      file: "Qwen3.8-27B-Defiance-Uncensored-IQ4_XS.gguf", thinking: false,
+      mtp: true,
+      template: "defiance-27b.jinja", build: "b11609",
+    },
+    tools: true,
+  },
   "dphn/Dolphin-Mistral-24B-Venice-Edition": { revision: "b23ff40b4a25e4f93de432bd896d4464479a9f79" },
   "huihui-ai/Huihui-Qwen3.8-27B-abliterated": { revision: "739e3c5b89849f6c238ce1e5b70008612ae42cdd" },
   "HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive": {
@@ -40,31 +50,34 @@ const weights: Record<string, { revision: string; gguf?: { file: string; thinkin
     gguf: { file: "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-IQ3_M.gguf", thinking: true },
   },
 };
-// Two L4s answer requests side by side, each loading the model once and keeping it between requests, and each stops
-// after two idle minutes; a request goes to the one with the fewest waiting, so the clip prompts and checks of a film
-// are answered two at a time. A hold keeps only the first one warm. ACT: Colab allows the account four machines at
-// once, so while three A100s render clips the second L4 waits for a slot; five would need a larger quota.
-const workers = [0, 1].map(() => createColabWorker(provider.id, { gpu: "L4" }, 120_000));
-const waiting = workers.map(() => 0);
-// The A100 for the models marked `a100`, one at a time, stopped after two idle minutes like the L4s.
-const a100Worker = createColabWorker(provider.id, { gpu: "A100", highMem: true }, 120_000);
+// Text uses the L4 lane; dense visual and audio/audiovisual review share the review A100.
+const textWorker = createColabWorker(provider.id, 0);
+const a100Worker = createColabWorker(provider.id, 3);
 const resultSchema = z.object({
   text: z.string(), inputTokens: z.number().int().nonnegative(), outputTokens: z.number().int().nonnegative(),
   reasoning: z.string().optional(), stopReason: z.enum(["stop", "length", "toolUse"]),
   toolCalls: z.array(z.object({ id: z.string().min(1), name: z.string().min(1), arguments: z.string() })).optional(), loadSeconds: z.number().nonnegative(), generateSeconds: z.number().nonnegative(),
 });
 
-/** Stops the text sessions now, cancelling the running requests and every queued one. */
-export const stopColab = () => Promise.all([...workers, a100Worker].map(worker => worker.stop()));
+/** Stops the shared Colab pool, including running and queued requests. */
+export const stopColab = stopColabPool;
 
-/** Keeps the first text session open between requests until the returned release is called. */
-export const holdColab = () => workers[0]!.hold();
-/** Keeps the first text model's L4 for at most `ms`, for requests known to follow, until `signal` aborts or the release. */
-export const holdColabFor = (ms: number, signal?: AbortSignal) => workers[0]!.holdFor(ms, signal);
-/** Keeps the A100 of the `a100` models for at most `ms`, as holdColabFor does the first L4. */
-export const holdColabA100For = (ms: number, signal?: AbortSignal) => a100Worker.holdFor(ms, signal);
+/** Holds the shared pool between related text requests. */
+export const holdColab = () => textWorker.hold();
 
-export function streamColab(providerId: string, modelId: string, context: Context, signal: AbortSignal, references: Awaited<ReturnType<typeof readAiReferences>>) {
+export function colabModelPreparation(modelId: string): ColabPreparation {
+  const model = provider.models.find(item => item.id === modelId);
+  const weight = weights[modelId];
+  if (!model || !weight?.gguf) throw new Error("Production preparation requires a configured GGUF model");
+  const name = weight.a100 ? "visualReview" : "text";
+  return { name, runtime: provider.id, installSource: "gguf/b11559", job: {
+    script: `${ggufPipeline.slice(0, ggufPipeline.indexOf("# ACT: A low temperature"))}\nprint("COLAB_DONE")\n`,
+    uploads: [{ name: `${name}Input.json`, data: JSON.stringify({ modelId, revision: weight.revision, ...weight.gguf, messages: [{ role: "user", content: "Prepare the model." }], contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens, ...weight.a100 ? { visionOnGpu: true } : {} }) }],
+    env: { COLAB_INPUT: `${name}Input.json`, TOONFLOW_LOAD_ONLY: 1 }, outputs: [],
+  } };
+}
+
+export function streamColab(providerId: string, modelId: string, context: Context, signal: AbortSignal, references: Awaited<ReturnType<typeof readAiReferences>>, responseSchema?: Record<string, unknown>) {
   const model = provider.models.find(item => item.id === modelId);
   const weight = weights[modelId];
   if (providerId !== provider.id || !model || !weight) throw Object.assign(new Error("Unsupported Colab CLI model"), { status: 400 });
@@ -118,16 +131,15 @@ export function streamColab(providerId: string, modelId: string, context: Contex
   // ACT: The CLI job downloads the complete reply; token streaming needs an incremental CLI transport.
   void (async () => {
     const ask = async (extra: typeof messages, toolChoice?: "required") => {
-      const index = weight.a100 ? -1 : waiting.indexOf(Math.min(...waiting));
-      if (index >= 0) waiting[index]!++;
-      const [data] = await (index >= 0 ? workers[index]! : a100Worker).run((session, jobSignal) => session.job({
+      await waitForColabPreparation(weight.a100 ? "visualReview" : "text", signal);
+      const [data] = await (weight.a100 ? a100Worker : textWorker).run((session, jobSignal) => session.job({
         script: weight.gguf ? ggufPipeline : pipeline,
         uploads: [{ name: "colabInput.json", data: JSON.stringify({
           modelId, revision: weight.revision, ...weight.gguf, messages: [...messages, ...extra], ...tools?.length ? { tools } : {}, ...toolChoice ? { toolChoice } : {},
-          contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens, ...weight.a100 ? { visionOnGpu: true } : {},
+          contextWindow: model.contextWindow, maxOutputTokens: model.maxOutputTokens, ...weight.a100 ? { visionOnGpu: true } : {}, ...responseSchema ? { responseSchema } : {},
         }) }],
-        env: {}, outputs: ["/content/colabOutput.json"],
-      }, jobSignal), signal).finally(() => index >= 0 && waiting[index]!--);
+        env: { COLAB_INPUT: "colabInput.json", TOONFLOW_LOAD_ONLY: weight.gguf && colabModelPrepared(colabLane(weight.a100 ? 3 : 0), preparationKey(colabModelPreparation(modelId))) ? 1 : 0 }, outputs: ["/content/colabOutput.json"],
+      }, jobSignal), signal);
       const reply = resultSchema.parse(JSON.parse(new TextDecoder().decode(data)));
       console.log(`[colab] ${modelId}: load ${reply.loadSeconds} s, ${reply.outputTokens} tokens in ${reply.generateSeconds} s`);
       return reply;

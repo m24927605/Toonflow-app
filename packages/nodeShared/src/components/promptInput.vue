@@ -71,7 +71,7 @@ function normalizeModel(value: AnyTagProps[][]): AnyTagProps[][] {
       const template = document.createElement("template");
       template.innerHTML = tag.html;
       const id = template.content.querySelector<HTMLElement>(".imageReference[data-reference-id]")?.dataset.referenceId;
-      if (!id) return [tag];
+      if (!id) return [{ type: "Write", text: template.content.textContent ?? "" }];
       const reference = props.references.find(item => item.id === id);
       if (!reference) return [];
       return [{ type: "Custom", html: `<span style="display: inline-block;">${referenceHtml(reference)}</span>` }];

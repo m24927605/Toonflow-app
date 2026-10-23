@@ -163,6 +163,7 @@ import { generalSettings } from "@/stores/settings";
 import { getShortcutBindings, shortcutLabel, shortcutMatches, shortcutPressed } from "@/lib/canvasShortcuts";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { dropCanvasFiles, getClipboardMediaFiles, importCanvasFiles, isCanvasFileDrag } from "./canvasDrop";
+import { remapCopiedNodeData } from "./canvasFiles";
 import { installNodeHost } from "@/lib/nodeHost";
 import { translate } from "@toonflow/i18n/vue";
 import "@vue-flow/core/dist/style.css";
@@ -839,7 +840,7 @@ async function pasteClipboardNode(position: { x: number; y: number }, command?: 
       const top = Math.min(...roots.map(node => node.position.y));
       await canvasHistory.batch(async () => {
         flow.removeSelectedElements();
-        addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
+        addNodes(snapshot.nodes.map(node => ({ ...node, data: remapCopiedNodeData(node, ids), id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
           position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
         await nextTick();
         if (canvasSignal.aborted) return;

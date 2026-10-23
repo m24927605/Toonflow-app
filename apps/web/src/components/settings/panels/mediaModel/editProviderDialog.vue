@@ -102,9 +102,9 @@ watch(visible, isVisible => {
 
 // Daily caps checked by the server before each generation; empty or 0 means no cap.
 function budgetRules(providerId?: string) {
-  const rules: Rule[] = [{ type: "inputNumber", field: "dailyLimit", title: translate("Daily generation limit"), props: { min: 0, step: 1, precision: 0, valueOnClear: null, placeholder: translate("No limit") } }];
+  const rules: Rule[] = [{ type: "inputNumber", field: "dailyLimit", title: translate("Daily generation attempt limit"), props: { min: 0, step: 1, precision: 0, valueOnClear: null, placeholder: translate("No limit") } }];
   // Providers that run on Colab also meter measured A100 time against compute units.
-  if (providerId === "qwenImage" || providerId === "minimaxH3") {
+  if (providerId === "qwenImage" || providerId === "sulphur") {
     rules.push({ type: "inputNumber", field: "dailyComputeUnits", title: translate("Daily Colab compute unit limit"), props: { min: 0, step: 1, precision: 2, valueOnClear: null, placeholder: translate("No limit") } });
   }
   return rules;

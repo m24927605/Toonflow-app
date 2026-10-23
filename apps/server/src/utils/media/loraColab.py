@@ -1,9 +1,10 @@
-# LoRA training for MiniMax H3 (video) or Qwen-Image 2.1 (image) on a Colab GPU session, run by lora.ts.
-# Input: /content/lora_job.json ({"trigger", "family", "kind", "slider"?}) and /content/lora_item_* media, each with an
-# optional lora_item_*.txt caption written by Toonflow (voice lines carry their transcript this way).
-# Output: /content/lora_final.safetensors, followed by a COLAB_DONE line on success.
-# Fizgig is pinned and installed into its own venv with uv: Colab's Python has no ensurepip, and uv's default
-# first-index rule fails on packages the PyTorch index also lists, so it resolves across indexes like pip.
+# LoRA training for Sulphur 2 / LTX-2.3 (video) or Qwen-Image 2.1 (image) on a Colab GPU session, run by lora.ts.
+# Input: /content/<LORA_JOB>.json and <LORA_JOB>Item* media with optional text captions.
+# Output: /content/<LORA_JOB>.safetensors, followed by COLAB_DONE on success.
+# Qwen-Image trains with Fizgig, pinned and installed into its own venv with uv: Colab's Python has no ensurepip, and
+# uv's default first-index rule fails on packages the PyTorch index also lists, so it resolves across indexes like pip.
+# Sulphur 2 trains with Lightricks' own ltx-trainer on the dev weights the inference GGUF was quantised from, so its
+# LoRA keys (diffusion_model.*) load in ComfyUI unchanged.
 import json
 import os
 import shutil
@@ -11,22 +12,29 @@ import subprocess
 import sys
 from pathlib import Path
 
-os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
-# Pinned to the revisions this pipeline was verified with, the weights' repos too, so a changed upload upstream never
+os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1", WANDB_MODE="disabled")
+# Pinned to the revisions this pipeline was written against, the weights' repos too, so a changed upload upstream never
 # reaches a training unnoticed.
 fizgigCommit = "7ee4986dae28fe35cc4ef636b984729624b32b42"
+# ltx-trainer v1.5.0; the repo ships no uv.lock, so the lock is resolved as of a fixed date.
+ltxCommit = "e98f6d927d83c92ef2be6aec76c8440b19306e39"
+ltxLockDate = "2026-10-19T00:00:00Z"
 weightRevisions = {
-    "Comfy-Org/MiniMax-H3": "e5eb578a89295337b8ff433a035929ce0279e0b6",
-    "circlestone-labs/MiniMax-H3-Image-Training-Adapter": "7c6c04f75ba597232d4ce2bb4a14709948ec723a",
     "Comfy-Org/Qwen-Image-2.1": "a8342359c61979b06a8dafb1a47991fe1f30e994",
     "Qwen/Qwen-Image-2.1": "d26bb61231c349cf6b7896fa83353113880e1ba3",
     "ShootTheSound/Fizgig-Qwen-Image-2.1-Training-Adapter": "f55fcaa0cb9e3705d331a1268bc3dd4cc4e02d51",
+    "SulphurAI/Sulphur-2-base": "65587bbb38c700622f9434a16e732c8b280c115e",
+    # Google's gemma-3-12b-it, byte for byte the encoder Comfy-Org packs for inference, without the licence gate.
+    "unsloth/gemma-3-12b-it": "9478e665381f42974aa06177b019352fb6291876",
 }
-repo, venv, models, data = Path("/content/fizgig"), Path("/content/fzenv"), Path("/content/models"), Path("/content/loradata")
-job = json.loads(Path("/content/lora_job.json").read_text())
+models, data = Path("/content/models"), Path("/content/loradata")
+jobName = os.environ["LORA_JOB"]
+assert jobName.startswith("lora") and len(jobName) == 36 and all(char in "0123456789abcdef" for char in jobName[4:])
+job = json.loads(Path(f"/content/{jobName}.json").read_text())
 trigger, family, kind = job["trigger"], job["family"], job["kind"]
 assert trigger.isalpha() and trigger.islower() and 4 <= len(trigger) <= 12
-assert family in ("h3", "qwen") and kind in ("character", "scene", "costume", "style", "motion", "voice", "slider")
+assert family in ("ltx", "qwen") and kind in ("character", "scene", "costume", "style", "motion", "slider")
+assert not (family == "ltx" and kind == "slider") and not (family == "qwen" and kind == "motion")
 
 
 def run(*args, **kwargs):
@@ -36,43 +44,55 @@ def run(*args, **kwargs):
         raise RuntimeError(f"{args[0]} {args[1] if len(args) > 1 else ''} failed ({result.returncode}): {result.stderr[-3000:]}")
 
 
-if not (repo / ".git").exists():
-    run("git", "clone", "-q", "https://github.com/shootthesound/Fizgig.git", repo)
-run("git", "-C", repo, "checkout", "-q", fizgigCommit)
-python = venv / "bin/python"
-if not python.exists():
-    run(sys.executable, "-m", "pip", "install", "-q", "uv")
-    run("uv", "venv", "-q", "--python", sys.executable, venv)
-    run("uv", "pip", "install", "-q", "--index-strategy", "unsafe-best-match", "--python", python, "-r", repo / "requirements.txt",
-        env={**os.environ, "DISABLE_CUDA": "1"})
+def checkout(repo, url, commit):
+    if not (repo / ".git").exists():
+        run("git", "clone", "-q", url, repo)
+    run("git", "-C", repo, "checkout", "-q", "--detach", commit)
 
-from huggingface_hub import hf_hub_download
 
-items = sorted(path for path in Path("/content").glob("lora_item_*") if path.suffix != ".txt")
-videos = [path for path in items if path.suffix.lower() in (".mp4", ".mov", ".webm")]
-audios = [path for path in items if path.suffix.lower() in (".wav", ".mp3", ".flac", ".ogg", ".m4a")]
-files = {
-    "h3": {
-        "dit": ("Comfy-Org/MiniMax-H3", "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors"),
-        "te": ("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"),
-        "vae": ("Comfy-Org/MiniMax-H3", "vae/minimax_h3_video_vae_fp16.safetensors"),
-        "adapter": ("circlestone-labs/MiniMax-H3-Image-Training-Adapter", "minimax_h3_image_training_adapter.safetensors"),
-        **({"audioVae": ("Comfy-Org/MiniMax-H3", "vae/minimax_h3_audio_vae_fp32.safetensors")} if videos or audios else {}),
-    },
-    "qwen": {
+run(sys.executable, "-m", "pip", "install", "-q", "uv==0.13.1", "huggingface_hub==1.33.0")
+from huggingface_hub import hf_hub_download, snapshot_download
+
+if family == "ltx":
+    repo = Path("/content/LTX-2")
+    checkout(repo, "https://github.com/Lightricks/LTX-2.git", ltxCommit)
+    python = repo / ".venv/bin/python"
+    if not (repo / "toonflowReady").exists():
+        # Colab's UV_* variables push uv into the system Python; they go, the repo's own uv overrides (its cuDNN pin)
+        # stay. torch 2.13+cu132 needs a CUDA 13 driver.
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("UV_") and key != "PYTHONPATH"}
+        run("uv", "lock", "--python", "3.12", "--exclude-newer", ltxLockDate, cwd=repo, env=environment)
+        run("uv", "sync", "--frozen", "--no-dev", "--package", "ltx-trainer", "--python", "3.12", cwd=repo, env=environment)
+        (repo / "toonflowReady").touch()
+    paths = {
+        "dit": hf_hub_download("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors", revision=weightRevisions["SulphurAI/Sulphur-2-base"], local_dir=models / "sulphur"),
+        "te": snapshot_download("unsloth/gemma-3-12b-it", revision=weightRevisions["unsloth/gemma-3-12b-it"], local_dir=models / "gemma-3-12b-it"),
+    }
+else:
+    repo = Path("/content/fizgig")
+    venv = Path("/content/fzenv")
+    checkout(repo, "https://github.com/shootthesound/Fizgig.git", fizgigCommit)
+    python = venv / "bin/python"
+    if not (venv / "toonflowReady").exists():
+        run("uv", "venv", "-q", "--allow-existing", "--python", sys.executable, venv)
+        run("uv", "pip", "install", "-q", "--index-strategy", "unsafe-best-match", "--python", python, "-r", repo / "requirements.txt",
+            env={**os.environ, "DISABLE_CUDA": "1"})
+        (venv / "toonflowReady").touch()
+    files = {
         "dit": ("Comfy-Org/Qwen-Image-2.1", "diffusion_models/qwen_image_2.1_bf16.safetensors"),
         "te": ("Comfy-Org/Qwen-Image-2.1", "text_encoders/qwen3vl_8b_bf16.safetensors"),
         "vae": ("Qwen/Qwen-Image-2.1", "vae/diffusion_pytorch_model.safetensors"),
         "adapter": ("ShootTheSound/Fizgig-Qwen-Image-2.1-Training-Adapter", "fizgig_qwen_image_2.1_training_adapter_v2.safetensors"),
         **({"speed": ("Comfy-Org/Qwen-Image-2.1", "loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors")} if kind == "slider" else {}),
-    },
-}[family]
-paths = {key: hf_hub_download(repoId, name, revision=weightRevisions[repoId], local_dir=models / family) for key, (repoId, name) in files.items()}
-fizgigFamily = "minimax" if family == "h3" else "qwen_image21"
-env = {**os.environ, "PYTHONPATH": str(repo / "src")}
+    }
+    paths = {key: hf_hub_download(repoId, name, revision=weightRevisions[repoId], local_dir=models / family) for key, (repoId, name) in files.items()}
+
+items = sorted(path for path in Path("/content").glob(f"{jobName}Item*") if path.suffix != ".txt")
+env = {**os.environ, "PYTHONPATH": str(repo / "src")} if family == "qwen" else {key: value for key, value in os.environ.items() if not key.startswith("UV_") and key != "PYTHONPATH"}
 out = data / "out"
 shutil.rmtree(data, ignore_errors=True)
 data.mkdir(parents=True)
+videoSuffixes = (".mp4", ".mov", ".webm")
 
 if kind == "slider":
     # A slider trains from three prompts, rendering its own practice pictures; no dataset or cache. At commit 7ee4986 a
@@ -80,7 +100,7 @@ if kind == "slider":
     # CFG (no negative) on the Turbo LoRA, which renders well at CFG 1, as Fizgig's app does.
     slider = job["slider"]
     speed = ["--speed_lora", paths["speed"]] if "speed" in paths else []
-    run(python, repo / "src/fizgig/families/train.py", "--family", fizgigFamily, "--dit", paths["dit"], "--vae", paths["vae"],
+    run(python, repo / "src/fizgig/families/train.py", "--family", "qwen_image21", "--dit", paths["dit"], "--vae", paths["vae"],
         "--text_encoder", paths["te"], "--output_dir", out, "--output_name", trigger, "--network_dim", "8", "--network_alpha", "8",
         "--learning_rate", "2e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30", "--seed", "42", "--precision", "auto",
         "--blocks_to_swap", "-1", "--optimizer_type", "adamw8bit", "--slider_prompts", slider["base"], f'{slider["base"]} {slider["positive"]}',
@@ -90,48 +110,21 @@ else:
     media.mkdir()
     for index, source in enumerate(items):
         target = media / f"item_{index:02d}{source.suffix.lower()}"
-        shutil.copy(source, target)
+        if family == "ltx" and source.suffix.lower() in videoSuffixes:
+            # A clip becomes 24 fps (the trainer places frames by the source rate) on the latent's 32-pixel grid, at
+            # least the 49 frames its bucket takes, the last frame held when it is shorter; the bucket keeps the start.
+            target = target.with_suffix(".mp4")
+            run("ffmpeg", "-v", "error", "-y", "-i", source, "-vf", "fps=24,crop=trunc(iw/32)*32:trunc(ih/32)*32,tpad=stop_mode=clone:stop_duration=2.1",
+                "-an", "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", target)
+        elif family == "ltx" and source.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+            # The trainer reads only PNG and JPEG as stills; anything else would be taken for a clip.
+            target = target.with_suffix(".png")
+            run("ffmpeg", "-v", "error", "-y", "-i", source, target)
+        else:
+            shutil.copy(source, target)
         caption = source.with_suffix(".txt")
         if caption.exists():
             target.with_suffix(".txt").write_text(caption.read_text())
-    # Fizgig refuses H3 media off its spec, so items are brought onto it here. A recording is padded with silence to the
-    # next voice length (0.917 to 5.167 s), keeping every spoken word of its transcript. A clip is centre-cropped to
-    # multiples of 32, converted to 24 fps (real-time speed is kept) and 32 kHz stereo sound, and cut to the longest
-    # 17n+5 frame count it holds (at most 124 frames, about 5 s).
-    # ACT: a recording over 5.167 s is cut there and may lose the end of its line; split long recordings before training.
-    fit = r'''
-import sys, subprocess, numpy as np
-from pathlib import Path
-from fizgig.families.clips import read_frames
-from fizgig.minimax.audio import AUDIO_GRID_FRAMES, AUDIO_SAMPLE_RATE, AUDIO_CHANNELS, read_audio_file, trim_to_grid
-from fizgig.minimax.clip import GRID_FRAMES, SPEC, _ffmpeg
-from fizgig.minimax.model import FPS
-ffmpeg = [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y"]
-for name in sys.argv[1:]:
-    path = Path(name)
-    if path.suffix in (".mp4", ".mov", ".webm"):
-        edge, temp = SPEC.edge_multiple, path.with_name(f"{path.stem}_fit.mp4")
-        encode = ["-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-ar", str(SPEC.audio_rate), "-ac", str(SPEC.audio_channels)]
-        subprocess.run([*ffmpeg, "-i", str(path), "-vf", f"crop=trunc(iw/{edge})*{edge}:trunc(ih/{edge})*{edge},fps={SPEC.fps}", *encode, str(temp)], check=True)
-        count = len(read_frames(str(temp)))
-        frames = max(frames for frames in GRID_FRAMES if frames <= count)
-        path.unlink()
-        subprocess.run([*ffmpeg, "-i", str(temp), "-frames:v", str(frames), "-t", f"{frames / SPEC.fps:.4f}", *encode, str(path.with_suffix(".mp4"))], check=True)
-        temp.unlink()
-        print(path.name, f"{count} frames ->", frames, flush=True)
-        continue
-    wav = read_audio_file(str(path))
-    seconds = wav.shape[1] / AUDIO_SAMPLE_RATE
-    frames = next((frames for frames in AUDIO_GRID_FRAMES if frames / FPS >= seconds), AUDIO_GRID_FRAMES[-1])
-    wav = trim_to_grid(wav, frames)
-    path.unlink()
-    subprocess.run([*ffmpeg, "-f", "f32le", "-ar", str(AUDIO_SAMPLE_RATE), "-ac", str(AUDIO_CHANNELS), "-i", "-", str(path.with_suffix(".wav"))],
-                   input=wav.T.astype(np.float32).tobytes(), check=True)
-    print(path.name, f"{seconds:.2f} s ->", f"{frames / FPS:.3f} s", flush=True)
-'''
-    timed = [path for path in media.iterdir() if path.suffix in (".wav", ".mp3", ".flac", ".ogg", ".m4a", ".mp4", ".mov", ".webm")]
-    if family == "h3" and timed:
-        run(python, "-c", fit, *timed, env=env)
     # Character sets also learn from a square crop of each clear face: a face filling a small part of a training image
     # carries almost no identity.
     if kind == "character":
@@ -154,7 +147,7 @@ for source in sorted(media.glob("item_*")):
     if min(face.shape[:2]) >= 256:
         cv2.imwrite(str(media / f"face_{source.stem}.png"), cv2.resize(face, (768, 768), interpolation=cv2.INTER_LANCZOS4))
 '''
-        run(python, "-c", crop, media)
+        run(python, "-c", crop, media, env=env)
     # Captions describe everything except what the LoRA learns, so that one thing binds to the trigger word.
     asks = {
         "character": "the framing (close-up, half-body or full-body), the camera angle (front, three-quarter left or right, profile, from above or below, or back), the person's clothing or lack of it, pose and expression, the background and the lighting. Start with 'a woman' or 'a man'. Do not describe the face, eyes, hair, skin or body features.",
@@ -162,7 +155,6 @@ for source in sorted(media.glob("item_*")):
         "costume": "the framing, the person (their face, hair and body), their pose and expression, the background and the lighting. Do not describe the clothing, accessories or fabric.",
         "style": "only the content: the subjects, what they do and the setting. Never describe colours, light quality, grain, grading, film stock or any visual style.",
         "motion": "the person, their clothing and the setting, as in the first moment. Do not describe how they move or what action they perform.",
-        "voice": "",
     }
     captioner = r'''
 import sys, cv2, torch
@@ -190,11 +182,38 @@ for path in sorted(media.iterdir()):
     path.with_suffix(".txt").write_text(f"{trigger} {text}")
     print(path.name, "->", text, flush=True)
 '''
-    if asks[kind]:
-        run(python, "-c", captioner, media, trigger, asks[kind])
+    run(python, "-c", captioner, media, trigger, asks[kind], env=env)
     print("dataset:", sorted(path.name for path in media.iterdir()), flush=True)
-    resolution = 512 if family == "h3" else 704
-    (data / "dataset.toml").write_text(f'''[general]
+    if family == "ltx":
+        # Stills are one-frame clips in buckets near their ratio, clips 49 frames (about 2 s); captions already open with
+        # the trigger word. The LoRA trains the video branch only, leaving audio and the audio-video coupling as they are.
+        samples = [path for path in sorted(media.iterdir()) if path.suffix != ".txt"]
+        (data / "dataset.jsonl").write_text("".join(json.dumps({"caption": path.with_suffix(".txt").read_text().strip(), "video": f"media/{path.name}"}) + "\n" for path in samples))
+        buckets = "768x768x1;576x768x1;768x576x1;544x960x1;960x544x1" + (";512x512x49;512x768x49;768x512x49" if any(path.suffix == ".mp4" for path in samples) else "")
+        trainer = repo / "packages/ltx-trainer"
+        run(python, "scripts/process_dataset.py", data / "dataset.jsonl", "--resolution-buckets", buckets, "--model-path", paths["dit"],
+            "--text-encoder-path", paths["te"], "--output-dir", data / ".precomputed", "--skip-audio", cwd=trainer, env={**env, "HF_HUB_OFFLINE": "1"})
+        # ACT: one recipe for every kind, the trainer's own character defaults (rank 32, AdamW 1e-4, 1500 steps); a
+        # small style or costume set may overfit, which a later checkpoint comparison would show.
+        (data / "config.yaml").write_text(json.dumps({
+            "model": {"model_path": paths["dit"], "text_encoder_path": paths["te"], "training_mode": "lora", "load_checkpoint": None},
+            "lora": {"rank": 32, "alpha": 32, "dropout": 0.0, "target_modules": ["attn1.to_k", "attn1.to_q", "attn1.to_v", "attn1.to_out.0", "attn2.to_k", "attn2.to_q", "attn2.to_v", "attn2.to_out.0", "ff.net.0.proj", "ff.net.2"]},
+            "training_strategy": {"name": "flexible", "video": {"is_generated": True, "latents_dir": "latents"}},
+            "optimization": {"learning_rate": 1.0e-4, "steps": 1500, "batch_size": 1, "gradient_accumulation_steps": 1, "max_grad_norm": 1.0, "optimizer_type": "adamw", "scheduler_type": "linear", "scheduler_params": {}, "enable_gradient_checkpointing": True},
+            "acceleration": {"mixed_precision_mode": "bf16", "quantization": None, "load_text_encoder_in_8bit": False, "offload_optimizer_during_validation": False},
+            "data": {"preprocessed_data_root": str(data / ".precomputed"), "num_dataloader_workers": 2},
+            "validation": {"samples": [], "interval": None},
+            "checkpoints": {"interval": 1500, "keep_last_n": 1, "precision": "bfloat16", "save_training_state": "minimal"},
+            "flow_matching": {"timestep_sampling_mode": "shifted_logit_normal", "timestep_sampling_params": {}},
+            "hub": {"push_to_hub": False},
+            "wandb": {"enabled": False},
+            "seed": 42,
+            "output_dir": str(out),
+        }))
+        run(python, "scripts/train.py", data / "config.yaml", "--disable-progress-bars", cwd=trainer, env={**env, "HF_HUB_OFFLINE": "1"})
+    else:
+        resolution = 704
+        (data / "dataset.toml").write_text(f'''[general]
 resolution = [{resolution}, {resolution}]
 caption_extension = ".txt"
 batch_size = 1
@@ -206,36 +225,27 @@ bucket_no_upscale = true
 image_directory = "{media}"
 cache_directory = "{data / 'cache'}"
 ''')
-    cache = repo / "src/fizgig/families/cache.py"
-    sound = ["--aux", f"audio_vae={paths['audioVae']}"] if "audioVae" in paths else []
-    run(python, cache, "--family", fizgigFamily, "--stage", "latents", "--dataset_config", data / "dataset.toml", "--model", paths["vae"], *sound, cwd=repo, env=env)
-    run(python, cache, "--family", fizgigFamily, "--stage", "text", "--dataset_config", data / "dataset.toml", "--model", paths["te"], cwd=repo, env=env)
-    common = ["--dataset_config", data / "dataset.toml", "--dit", paths["dit"], "--vae", paths["vae"], "--text_encoder", paths["te"],
-              "--output_dir", out, "--output_name", trigger, "--seed", "42", "--precision", "auto", "--blocks_to_swap", "-1",
-              "--ema_decay", "0.98", "--optimizer_type", "adamw" if family == "h3" and kind == "character" else "adamw8bit", "--training_adapter", paths["adapter"]]
-    if family == "h3":
-        # Fizgig's documented default H3 recipe; motion reaches more of the model (blocks 6-49), as its guide advises. A
-        # character trains as H3 users who compared settings do: rank 16, AdamW (not 8-bit) at 1e-4 and about 1500
-        # steps over the set, one image a step; the face takes many steps to settle and a higher rate overbakes it.
-        blocks = "6-49" if kind == "motion" else "20-49"
-        if kind == "character":
-            epochs = str(max(20, -(-1500 // max(1, len(list(media.glob("*.png")) + list(media.glob("*.jp*g")) + list(media.glob("*.webp")))))))
-            settings = ["--network_dim", "16", "--network_alpha", "16", "--learning_rate", "1e-4", "--max_train_epochs", epochs, "--save_every_n_epochs", epochs]
+        cache = repo / "src/fizgig/families/cache.py"
+        run(python, cache, "--family", "qwen_image21", "--stage", "latents", "--dataset_config", data / "dataset.toml", "--model", paths["vae"], cwd=repo, env=env)
+        run(python, cache, "--family", "qwen_image21", "--stage", "text", "--dataset_config", data / "dataset.toml", "--model", paths["te"], cwd=repo, env=env)
+        common = ["--dataset_config", data / "dataset.toml", "--dit", paths["dit"], "--vae", paths["vae"], "--text_encoder", paths["te"],
+                  "--output_dir", out, "--output_name", trigger, "--seed", "42", "--precision", "auto", "--blocks_to_swap", "-1",
+                  "--ema_decay", "0.98", "--optimizer_type", "adamw8bit", "--training_adapter", paths["adapter"]]
+        if kind == "style":
+            # Fizgig's Qwen Style preset: a flat rate, since adaptive rates overbake styles.
+            recipe = ["--network_dim", "16", "--network_alpha", "16", "--learning_rate", "1.5e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30"]
         else:
-            settings = ["--network_dim", "8", "--network_alpha", "8", "--learning_rate", "2e-4", "--max_train_epochs", "50", "--save_every_n_epochs", "50"]
-        recipe = [*settings,
-                  "--family_option", "lownoise_pct=60", "--family_option", "highnoise_lr_pct=100", "--family_option", f"photo_blocks={blocks}",
-                  "--family_option", f"clip_blocks={blocks}", "--family_option", f"audio_blocks={blocks}", "--family_option", "caption_dropout=0.05",
-                  *(["--family_option", f"audio_vae={paths['audioVae']}"] if "audioVae" in paths else [])]
-    elif kind == "style":
-        # Fizgig's Qwen Style preset: a flat rate, since adaptive rates overbake styles.
-        recipe = ["--network_dim", "16", "--network_alpha", "16", "--learning_rate", "1.5e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30"]
-    else:
-        # Fizgig's Qwen Fast preset.
-        recipe = ["--network_dim", "8", "--network_alpha", "8", "--learning_rate", "1e-4", "--adaptive_lr", "--adaptive_lr_min", "2e-4",
-                  "--adaptive_lr_max", "4e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30"]
-    run(python, repo / "src/fizgig/families/train.py", "--family", fizgigFamily, *common, *recipe, cwd=repo, env=env)
+            # Fizgig's Qwen Fast preset.
+            recipe = ["--network_dim", "8", "--network_alpha", "8", "--learning_rate", "1e-4", "--adaptive_lr", "--adaptive_lr_min", "2e-4",
+                      "--adaptive_lr_max", "4e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30"]
+        run(python, repo / "src/fizgig/families/train.py", "--family", "qwen_image21", *common, *recipe, cwd=repo, env=env)
 
-final = sorted(out.rglob("*.safetensors"), key=lambda path: path.stat().st_mtime)[-1]
-shutil.copy(final, "/content/lora_final.safetensors")
+# ltx-trainer names its LoRA checkpoints lora_weights_step_*; Fizgig names the file after the trigger word.
+saved = list(out.rglob("lora_weights*.safetensors")) if family == "ltx" else list(out.rglob("*.safetensors"))
+final = sorted(saved, key=lambda path: path.stat().st_mtime)[-1]
+shutil.copy(final, f"/content/{jobName}.safetensors")
+for source in items:
+    source.unlink()
+    source.with_suffix(".txt").unlink(missing_ok=True)
+Path(f"/content/{jobName}.json").unlink()
 print("COLAB_DONE")

@@ -52,6 +52,7 @@
         <div v-if="frameMode" class="referenceHint">
           {{ selectedMode === "startFrameOptional" ? "仅一张图片时作为尾帧；两张图片按顺序作为首帧、尾帧" : "图片引用按顺序作为首帧、尾帧" }}
         </div>
+        <div v-else-if="selectedMode === 'videoControl' && mediaCounts.image" class="referenceHint">{{ translate("The control video drives the movement; images are the first and last frames, in order.") }}</div>
         <div v-if="preflightState" class="preflightResult">
           <el-tag size="small" :type="preflightState === 'passed' ? 'success' : preflightState === 'failed' ? 'warning' : 'info'">
             {{ preflightState === "stale" ? translate("Prompt changed since preflight") : t`Preflight ${data.preflight!.score}/100` }}
@@ -118,6 +119,9 @@ import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessageBox, ElTag } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { checkScript } from "@toonflow/node-shared/scriptCheck";
+import { shotSpans } from "@toonflow/node-shared/shotList";
+import { validateVideoPrompt } from "@toonflow/node-shared/videoPrompt";
 import { groupNodeModels } from "@toonflow/node-shared/groupNodeModels";
 import { showNodeError } from "@toonflow/node-shared/showNodeError";
 import { useNodeGeneration } from "@toonflow/node-shared/useNodeGeneration";
@@ -148,16 +152,17 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
 // `preflight` is written by the text node's "Prepare videos" and covers the prompt it holds.
 // `seeds` holds the seed of each result this node drew, by file, so the current one can be drawn again with one change.
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean; preflight?: { prompt: string; score: number; issues: string[]; passed: boolean }; loras?: AttachedLora[]; seeds?: Record<string, number>; keepSeed?: boolean });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean; preflight?: { prompt: string; score: number; issues: string[]; passed: boolean }; workflow?: { source: string; shotList: string; shot: number; audioPaths: string[] }; loras?: AttachedLora[]; seeds?: Record<string, number>; keepSeed?: boolean });
 const currentSeed = computed(() => data.value.seeds?.[outputFile.value?.url ?? ""]);
 const loras = computed({ get: () => data.value.loras ?? [], set: (value: AttachedLora[]) => { data.value.loras = value; } });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
-data.value.resolution ??= "";
+data.value.resolution ??= "720p";
+data.value.duration ??= 5;
 data.value.mode ??= "";
 data.value.generateAudio ??= true;
-data.value.ratio ??= "9:16";
+data.value.ratio ??= "16:9";
 const { refList, referenceMentions, setReferencePreview, removeReference, assertReferencesReady } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
@@ -180,6 +185,8 @@ const selectedModel = computed(() => models.value.find((item) => JSON.stringify(
 const loraFamily = computed(() => loraFamilyOf(selectedModel.value?.providerId));
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
 const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
+// Images are pinned frames in the frame modes and beside a control video.
+const framedImages = computed(() => frameMode.value || selectedMode.value === "videoControl");
 const mediaCounts = computed(() => ({
   image: refList.value.filter((item) => item.dataType === "IMAGE").length,
   video: refList.value.filter((item) => item.dataType === "VIDEO").length,
@@ -196,12 +203,12 @@ function getMatchingModes(choice?: NodeMediaModel) {
     if (mode === "text") return image + video + audio === 0;
     // Extension continues the one connected video; connected images stay as references.
     if (mode === "videoExtension") return video === 1 && audio === 0;
-    // A control video (e.g. a previs depth pass) drives structure only; connected images stay look references.
-    if (mode === "videoControl") return video === 1 && audio === 0;
-    // Frame modes also take reference videos, such as the shot's previs, and reference audio, such as a dubbed line to
-    // lip-sync, when the model lists those references.
-    const limit = (type: string) => ["endFrameOptional", "startFrameOptional"].includes(mode)
+    // Frame and control modes also take reference audio, such as a dubbed track to lip-sync, and frame modes reference
+    // videos, when the model lists those references.
+    const limit = (type: string) => ["endFrameOptional", "startFrameOptional", "videoControl"].includes(mode)
       ? Number((choice?.mode ?? []).flat().find(item => item.startsWith(`${type}Reference:`))?.split(":")[1] ?? 0) : 0;
+    // A control video (e.g. a previs depth pass) drives structure only; connected images are the first and last frames.
+    if (mode === "videoControl") return video === 1 && image <= 2 && audio <= limit("audio");
     if (video > limit("video") || audio > limit("audio")) return false;
     if (mode === "singleImage") return image === 1;
     if (mode === "startEndRequired") return image === 2;
@@ -255,19 +262,6 @@ const generationPrompt = computed(() =>
     .filter(Boolean)
     .join("\n\n")
 );
-/**
- * MiniMax H3 names its references <Picture N> and <Video N>, numbered per media type in connection order, so the node's
- * {{ref N}} markers are rewritten for it; other providers receive the markers unchanged.
- */
-function providerPrompt(providerId: string, prompt: string) {
-  if (providerId !== "minimaxH3") return prompt;
-  const counts = { Picture: 0, Video: 0, Audio: 0 };
-  const labels = refList.value.map(item => {
-    const name = item.dataType === "IMAGE" ? "Picture" : item.dataType === "VIDEO" ? "Video" : item.dataType === "AUDIO" ? "Audio" : undefined;
-    return name && `<${name} ${++counts[name]}>`;
-  });
-  return prompt.replace(/\{\{ref (\d+)\}\}/g, (marker, index: string) => labels[Number(index) - 1] ?? marker);
-}
 const outputFile = computed(() => outputs.value.video?.dataType === "VIDEO" ? outputs.value.video.value : undefined);
 const previewUrl = files.useFileUrl(
   outputFile,
@@ -310,8 +304,8 @@ function loadModels() {
   modelsRequest = ai.getMediaModels().then((items) => {
     if (generating.value || deleting.value) return;
     models.value = items.filter((item) => item.type === "video");
-    // ACT: Pick the default model only for empty config; keep a temporarily unavailable previous selection and its params.
-    if (!data.value.model) {
+    // Existing nodes must also use the production model set.
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
       const first = models.value[0];
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }
@@ -334,7 +328,9 @@ async function startGeneration() {
   if (choice.mode?.length && !matchingModes.value.length) throw new Error("当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用");
   // Previs is the default gate for every video: skipping it needs the user's explicit consent each time.
   // A previs video connected as a blocking reference counts as previs, like its depth video in video control mode.
-  const skipPrevis = selectedMode.value !== "videoControl" && !refList.value.some(item => roleOf(findNode(item.source)) === "previs");
+  const previsVideo = refList.value.flatMap(item => item.dataType === "VIDEO" && item.value && roleOf(findNode(item.source)) === "previs"
+    ? [{ path: item.value.url, mimeType: item.value.mimeType }] : [])[0];
+  const skipPrevis = selectedMode.value !== "videoControl" && !previsVideo;
   if (skipPrevis && !await ElMessageBox.confirm("没有以控制视频模式连接粗模试演的深度视频。粗模试演是成本最低的把关，确定跳过并直接生成吗？", "跳过粗模试演", {
     confirmButtonText: "跳过并生成", cancelButtonText: "取消", type: "warning", closeOnClickModal: false,
   }).then(() => true, () => false)) throw new Error("已取消生成：请先在导演台导出深度视频，并以控制视频模式连接到此节点");
@@ -348,42 +344,67 @@ async function startGeneration() {
   if (belowL3.length && !await ElMessageBox.confirm(t`These input images are not graded L3 or above:\n${belowL3.join("\n")}\n\nGrade the keyframes first; generating from weak keyframes wastes the video run. Generate anyway?`, translate("Keyframe grade"), {
     confirmButtonText: translate("Generate anyway"), cancelButtonText: translate("Cancel"), type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
   }).then(() => true, () => false)) throw new Error(translate("Generation cancelled: grade the input keyframes L3 or above first"));
-  if (preflightState.value === "failed" && !await ElMessageBox.confirm(t`This prompt failed its preflight (${data.value.preflight!.score}/100):\n${data.value.preflight!.issues.map(issue => `- ${issue}`).join("\n")}\n\nGenerate anyway?`, translate("Preflight"), {
-    confirmButtonText: translate("Generate anyway"), cancelButtonText: translate("Cancel"), type: "warning", closeOnClickModal: false, customStyle: { whiteSpace: "pre-line" },
-  }).then(() => true, () => false)) throw new Error(translate("Generation cancelled: fix the preflight issues first"));
+  if (preflightState.value === "failed" || preflightState.value === "stale") throw new Error(translate("Generation cancelled: rerun Prepare videos and pass the current prompt's preflight first"));
+  const workflow = data.value.workflow;
+  const source = workflow ? String(findNode(workflow.source)?.data?.outputs?.text?.value ?? "") : "";
+  if (workflow && (source !== workflow.shotList || preflightState.value !== "passed")) throw new Error(translate("Generation cancelled: the shot list changed or its preflight is missing; rerun Prepare videos"));
+  const span = workflow ? shotSpans(checkScript(source).shots, source).find(span => span.shot === workflow.shot) : undefined;
+  if (workflow && !span) throw new Error(translate("Generation cancelled: the source shot is missing"));
   const skipTextCheck = await confirmOnScreenText(generationPrompt.value);
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const attached = activeLoras(loras.value, choice.providerId);
   const input: Omit<NodeVideoRequest, "directory"> = {
     skipPrevis: skipPrevis || undefined,
+    previsVideo,
     skipTextCheck: skipTextCheck || undefined,
     providerId: choice.providerId,
     modelId: choice.modelId,
     // Attached LoRAs only work when their trigger words are in the prompt.
-    prompt: providerPrompt(choice.providerId, withTriggers(generationPrompt.value, attached)),
+    prompt: withTriggers(generationPrompt.value, attached),
     mode: selectedMode.value,
     duration: data.value.duration,
     resolution: data.value.resolution || undefined,
     ratio: data.value.ratio,
     generateAudio: choice.audio === "optional" ? data.value.generateAudio : choice.audio,
     outputDirectory: `assets/${id}`,
-    images: frameMode.value ? undefined : images,
-    firstFrame: frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
-    lastFrame: frameMode.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
+    images: framedImages.value ? undefined : images,
+    firstFrame: framedImages.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
+    lastFrame: framedImages.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
     videos: refList.value.flatMap((item) => item.dataType === "VIDEO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     // LoRAs picked here or set for the shot's cast by Prepare videos.
     ...attached.length ? { loras: attached.map(lora => ({ path: lora.path, strength: lora.strength })) } : {},
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     ...data.value.keepSeed && currentSeed.value !== undefined ? { seed: currentSeed.value } : {},
   };
+  if (workflow && span?.dialogue?.trim() && !input.audios?.length) throw new Error(translate("Generation cancelled: connect a complete character dialogue track before generating this shot"));
+  if (workflow && input.audios?.length && !input.generateAudio) throw new Error(translate("Generation cancelled: enable audio output to preserve the supplied soundtrack"));
+  if (workflow && JSON.stringify(workflow.audioPaths) !== JSON.stringify((input.audios ?? []).map(item => item.path).sort())) throw new Error(translate("Generation cancelled: the soundtrack changed; rerun Prepare videos"));
+  if (workflow) validateVideoPrompt(input.prompt);
   generationController = controller;
   // ACT: The tool returns immediately; the node owns the task and cancels it on stop or unmount.
   generation = generationState.run(() => workspace
     .list()
-    .then(({ directory }) => {
+    .then(async ({ directory }) => {
       controller.signal.throwIfAborted();
-      return ai.generateVideo({ ...input, directory }, controller.signal);
+      if (workflow) {
+        const media = [input.firstFrame, ...input.images ?? [], input.lastFrame, ...input.videos ?? [], input.previsVideo, ...input.audios ?? []].filter((item): item is { path: string; mimeType: string } => !!item);
+        const frozen = await ai.snapshotMedia(directory, { files: media, outputDirectory: "assets/" + id + "/inputs", binding: input }, controller.signal);
+        const snapshot = <T extends { path: string }>(item: T): T => {
+          const path = frozen.files.find(media => media.source === item.path)?.path;
+          if (!path) throw new Error(`Missing frozen video input: ${item.path}`);
+          return { ...item, path };
+        };
+        input.images = input.images?.map(snapshot);
+        input.firstFrame = input.firstFrame && snapshot(input.firstFrame);
+        input.lastFrame = input.lastFrame && snapshot(input.lastFrame);
+        input.videos = input.videos?.map(snapshot);
+        input.previsVideo = input.previsVideo && snapshot(input.previsVideo);
+        input.audios = input.audios?.map(snapshot);
+      }
+      const results = await ai.generateVideo({ ...input, directory }, controller.signal);
+
+      return results;
     })
     .then(([result]) => {
       controller.signal.throwIfAborted();
@@ -442,7 +463,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "Read this video generation node's current configuration, the capabilities of the available video models, common aspect ratios and the modes suitable for the current references, without keys; duration and resolution must match durationResolutionMap; loras lists the LoRAs attached to this node and the trained ones its model can load (only MiniMax H3 loads LoRAs)",
+  description: "Read this video generation node's current configuration, the capabilities of the available video models, common aspect ratios and the modes suitable for the current references, without keys; duration and resolution must match durationResolutionMap; loras lists the LoRAs attached to this node and the trained ones its model can load (only Sulphur 2 loads LoRAs)",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -514,7 +535,7 @@ async function loraConfig() {
 
 nodeTools.register({
   name: "setLoras",
-  description: "Replace the LoRAs loaded with this node's video generation by trained MiniMax H3 LoRAs from getConfig's loras.available, at most 4; strength defaults to 1 (sliders take -4 to 4) and an empty list removes them all. Their trigger words are added to the prompt when generating. Select the MiniMax H3 model with setConfig first; does not start generation",
+  description: "Replace the LoRAs loaded with this node's video generation by trained Sulphur 2 (LTX) LoRAs from getConfig's loras.available, at most 4; strength defaults to 1 (sliders take -4 to 4) and an empty list removes them all. Their trigger words are added to the prompt when generating. Select the Sulphur 2 model with setConfig first; does not start generation",
   parameters: z.strictObject({ loras: z.array(z.strictObject({ path: z.string().min(1), strength: z.number().min(-4).max(4).optional() })).max(4) }),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -522,7 +543,7 @@ nodeTools.register({
     await loadModels();
     signal?.throwIfAborted();
     const family = loraFamily.value;
-    if (!family) throw new Error("The selected model loads no LoRAs; select MiniMax H3 with setConfig first");
+    if (!family) throw new Error("The selected model loads no LoRAs; select Sulphur 2 with setConfig first");
     loras.value = pickLoras(await listLoras(files.getWorkspaceFiles()), family, args.loras);
     return loraConfig();
   },

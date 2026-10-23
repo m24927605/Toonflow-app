@@ -1,4 +1,5 @@
 import { h } from "vue";
+import { translate } from "@toonflow/i18n/vue";
 import { ElNotification } from "element-plus";
 import nodeError from "./components/nodeError.vue";
 
@@ -13,7 +14,7 @@ export function showNodeError(error: unknown, title: string) {
     type: "error",
     duration: 0,
     customClass: "nodeErrorNotification",
-    message: h(nodeError, { message: message || title, context: title, signal: controller.signal }),
+    message: h(nodeError, { message: translate(message || title), context: title, signal: controller.signal }),
     onClose: () => controller.abort(),
   });
 }
