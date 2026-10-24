@@ -3601,9 +3601,6 @@
   "空景參考": [
     "apps/web/src/pages/home/productionContext.vue"
   ],
-  "製作狀態尚未確認，暫時無法讀取素材。": [
-    "apps/web/src/pages/home/productionContext.vue"
-  ],
   "製作內容與目前影片不符。": [
     "apps/web/src/pages/home/productionContext.vue"
   ],
@@ -4832,6 +4829,9 @@
   ],
   "保存引导状态失败，请重试": [
     "apps/web/src/pages/hello/index.vue"
+  ],
+  "Local Toonflow only opens on this computer, at localhost or 127.0.0.1": [
+    "apps/server/src/app.ts"
   ],
   "The current operation requires FFmpeg. Download and install it in Plugins settings, or configure an available version, then try again.": [
     "apps/server/src/utils/ffmpeg/index.ts"
@@ -7298,6 +7298,9 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Generation completed, but the film file is missing.": [
+    "packages/nodes/productionNode/src/index.vue"
+  ],
+  "Interrupted: nothing is running it now; Continue resumes it": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Writing the script…": [

@@ -64,8 +64,6 @@ watch(() => [props.directory, props.id, props.active, props.status] as const, (_
   async function refresh() {
     loading.value = true;
     try {
-      // This endpoint resumes orphaned runs; never call it for an inactive running record.
-      if (props.status === "running" && !props.active) throw new Error(translate("製作狀態尚未確認，暫時無法讀取素材。"));
       const { data } = await axios.get<{ code: number; message: string; data: ProductionContext }>("/api/production/get", { params: { directory: props.directory, id: props.id }, signal: controller.signal });
       controller.signal.throwIfAborted();
       if (data.code !== 200) throw new Error(data.message);

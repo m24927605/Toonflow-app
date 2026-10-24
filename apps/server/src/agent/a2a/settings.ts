@@ -53,8 +53,6 @@ export async function resolveA2aWorkspace(path = getA2aSettings().directory) {
 export function authenticateA2a(req: Request) {
   const { enabled, token } = getA2aSettings();
   if (!enabled || token.length < 32) return;
-  const local = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform);
-  if (local && !["localhost", "127.0.0.1", "[::1]"].includes(req.hostname)) return;
   if (req.get("origin")) {
     try { getAppOrigin(req); } catch { return; }
   }

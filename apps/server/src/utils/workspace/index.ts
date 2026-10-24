@@ -3,13 +3,20 @@ import { realpath, stat } from "@toonflow/file";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import conf from "@/utils/conf";
 
-export function isLocalWorkspaceRequest(req: Request) {
+/**
+ * The connection comes from this computer, directly or through the Web dev server, which reports its own client, and
+ * names it as localhost: a page on another site that rebinds its domain to 127.0.0.1 still sends its own name.
+ */
+export function isLocalClient(req: Request) {
   const localAddress = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress ?? "") && req.get("x-toonflow-local-client") !== "0";
-  const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(req.hostname);
+  return localAddress && ["localhost", "127.0.0.1", "[::1]"].includes(req.hostname);
+}
+
+export function isLocalWorkspaceRequest(req: Request) {
   const origin = req.get("origin");
   const localOrigin = `${req.protocol}://${req.get("host")}`;
   const sameOrigin = origin === undefined ? req.get("referer")?.startsWith(`${localOrigin}/`) : origin === localOrigin;
-  return localAddress && localHost && sameOrigin && req.get("x-toonflow-workspace") === "1";
+  return isLocalClient(req) && sameOrigin && req.get("x-toonflow-workspace") === "1";
 }
 
 export async function resolveWorkspace(req: Request, path: string) {

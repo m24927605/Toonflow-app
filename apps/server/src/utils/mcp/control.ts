@@ -30,14 +30,10 @@ export function getMcpSettings() {
   };
 }
 
-function allowedHost(req: Request) {
-  const local = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform);
-  return !local || ["localhost", "127.0.0.1", "[::1]"].includes(req.hostname);
-}
-
+// In local mode the app admits only this computer, named as localhost, before any route runs (see createApp).
 export function getAppOrigin(req: Request) {
   const source = req.get("origin") ?? req.get("referer");
-  if (!source || !allowedHost(req)) throw Object.assign(new Error("Only Toonflow pages may access the control connection"), { status: 403 });
+  if (!source) throw Object.assign(new Error("Only Toonflow pages may access the control connection"), { status: 403 });
   let url: URL;
   try { url = new URL(source); }
   catch { throw Object.assign(new Error("Invalid page origin"), { status: 403 }); }
@@ -47,7 +43,7 @@ export function getAppOrigin(req: Request) {
 
 export function authorizeMcp(req: Request) {
   const { enabled, token } = getMcpSettings();
-  if (!enabled || token.length < 32 || !allowedHost(req)) return false;
+  if (!enabled || token.length < 32) return false;
   const actual = Buffer.from(req.get("authorization") ?? "");
   const expected = Buffer.from(`Bearer ${token}`);
   if (req.get("origin")) {

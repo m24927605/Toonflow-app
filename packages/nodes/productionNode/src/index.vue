@@ -54,7 +54,7 @@
               <el-button type="primary" :loading="busy" @click="answer(false)">{{ translate("Approve") }}</el-button>
             </div>
           </div>
-          <div v-else-if="state.production.status === 'waiting' || state.production.status === 'failed'" class="review">
+          <div v-else-if="state.production.status === 'waiting' || state.production.status === 'failed' || interrupted" class="review">
             <label v-if="state.production.message === 'budget'">{{ translate("New budget (units)") }} <el-input-number v-model="newBudget" size="small" :min="1" :max="1000" controlsPosition="right" /></label>
             <div class="footer">
               <el-button type="primary" :loading="busy" @click="resume">{{ translate("Continue") }}</el-button>
@@ -156,10 +156,13 @@ watch(photos, list => {
 }, { immediate: true });
 
 const completed = computed(() => state.value?.production.status === "done" && !!state.value.production.film);
-const generationStatus = computed(() => !state.value ? "idle" : state.value.production.status === "done" ? completed.value ? "succeeded" : "failed" : { running: "running", waiting: "idle", failed: "failed" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
+// Marked running, but this server is not running it, such as a production copied from elsewhere: it waits for Continue.
+const interrupted = computed(() => state.value?.production.status === "running" && !state.value.active);
+const generationStatus = computed(() => !state.value || interrupted.value ? "idle" : state.value.production.status === "done" ? completed.value ? "succeeded" : "failed" : { running: "running", waiting: "idle", failed: "failed" }[state.value.production.status] as "idle" | "running" | "failed" | "succeeded");
 const headline = computed(() => {
   const production = state.value!.production;
   if (production.status === "done" && !completed.value) return translate("Generation completed, but the film file is missing.");
+  if (interrupted.value) return translate("Interrupted: nothing is running it now; Continue resumes it");
   if (production.status === "running") {
     if (!production.script) return translate("Writing the script…");
     if (!production.shotList) return translate("Writing the shot list…");

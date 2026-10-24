@@ -85,6 +85,12 @@ export async function createApp({
     app.use(logger("dev"));
   }
   const { getAppOrigin } = await import("@/utils/mcp/control");
+  const { isLocalClient } = await import("@/utils/workspace");
+  // Local mode serves this computer only, for every request: the Origin check below runs only when a page sends one.
+  if (process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform)) app.use((req, _res, next) => {
+    if (!isLocalClient(req)) throw Object.assign(new Error("Local Toonflow only opens on this computer, at localhost or 127.0.0.1"), { status: 403 });
+    next();
+  });
   app.use("/api", (req, _res, next) => {
     if (req.get("origin") || req.get("referer") || !["GET", "HEAD"].includes(req.method)) getAppOrigin(req);
     next();
