@@ -174,8 +174,10 @@ interface ProviderTools {
     audio: boolean;
     /** Seed to draw with; a random one when left out. */
     seed?: number;
-    /** Sulphur's distilled workflows (the default), or its base text-to-video workflow: fifty steps at CFG 3.6. */
+    /** Sulphur's distilled workflows (the default), or its base workflows: fifty steps at CFG 3.6. */
     workflow?: "distilled" | "base";
+    /** The Sulphur model (the default), or TenStrip's 10Eros merge of it, which Sulphur recommends for image to video. */
+    checkpoint?: "sulphur" | "10eros";
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
   /**
    * Draws one Qwen-Image 2.1 image (base model, always with the Genitalia Anatomy Fix LoRA) on a Google Colab A100

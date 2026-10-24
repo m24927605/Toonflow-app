@@ -44,6 +44,7 @@ export const videoGenerationSchema = z.strictObject({
   generateAudio: z.boolean().optional(),
   skipTextCheck,
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe("The seed of an earlier result, reported with it, to change one thing and keep the rest; omit for a new random seed").optional(),
+  parts: z.array(z.string().trim().min(1).max(100000)).min(2).max(12).describe("A long take of consecutive parts joined without cuts: one prompt per part in order; every part after the first continues from the last frames of the one before").optional(),
   skipPrevis: z.boolean().describe("Set true only when the user explicitly agrees to skip previs; otherwise supply previsVideo in videos for blocking, or a depth video in videoControl mode").optional(),
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text", "videoExtension", "videoControl"]),

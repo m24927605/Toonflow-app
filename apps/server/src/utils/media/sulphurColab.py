@@ -50,19 +50,22 @@ kjRequirements = ["pillow>=10.3.0", "color-matcher", "matplotlib", "mss", "openc
 sagePackage = "1.0.6"
 weightRevisions = {
     "SulphurAI/Sulphur-2-base": "65587bbb38c700622f9434a16e732c8b280c115e",
+    "TenStrip/LTX2.3-10Eros": "84a05a13610d78dbe4340d1be23fd8185e10f697",
     "Comfy-Org/ltx-2": "ccde4ba417d7900669fd56dd292a883cee11ff37",
     "Lightricks/LTX-2.3": "7caa482d5cd10a2eae6b34cb48f093ebc45a263e",
     "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control": "20a580c8606c06a0988d40375a61309e0fe5893d",
 }
-# The model card's "use the lora or use the full models": the full model, as loraColab.py trains on it.
-checkpoint = "sulphur_dev_bf16.safetensors"
+# The model card's "use the lora or use the full models": the full model, as loraColab.py trains on it. The model card
+# recommends TenStrip's 10Eros merge of Sulphur 2 for image to video; it takes the same workflows. Its licence is not
+# stated, and character LoRAs are trained on the Sulphur model, not on it.
+checkpointRepo, checkpoint = {"sulphur": ("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors"), "10eros": ("TenStrip/LTX2.3-10Eros", "10Eros_v1.5_bf16.safetensors")}[os.environ.get("SULPHUR_CHECKPOINT", "sulphur")]
 distill = "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"
 encoder = "gemma_3_12B_it_fp4_mixed.safetensors"
 upscaler = "ltx-2.3-spatial-upscaler-x2-1.0.safetensors"
 controlLora = "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
 negativePrompt = "pc game, console game, video game, cartoon, childish, ugly"
 weights = [
-    ("SulphurAI/Sulphur-2-base", checkpoint, "checkpoints"),
+    (checkpointRepo, checkpoint, "checkpoints"),
     ("SulphurAI/Sulphur-2-base", f"distill_loras/{distill}", "loras"),
     ("Comfy-Org/ltx-2", f"split_files/text_encoders/{encoder}", "text_encoders"),
     ("Lightricks/LTX-2.3", upscaler, "latent_upscale_models"),
@@ -76,8 +79,9 @@ duration = int(os.environ["SULPHUR_DURATION"])
 segments = int(os.environ.get("SULPHUR_SEGMENTS", "1"))
 length = int(os.environ["SULPHUR_SEGMENT_FRAMES"])
 audio = os.environ["SULPHUR_AUDIO"] == "1"
-# The distilled workflows, or the base text-to-video one (workflows/ltx23_t2v base.json): fifty euler_ancestral steps
-# at CFG 3.6 without the distill LoRA at half size, then five lcm refining steps with the distill LoRA at 0.5.
+# The distilled workflows, or the base ones (workflows/ltx23_t2v base.json and ltx23_i2v base.json): fifty
+# euler_ancestral steps at CFG 3.6 without the distill LoRA at half size, then five lcm refining steps with the distill
+# LoRA at 0.5.
 workflow = os.environ.get("SULPHUR_WORKFLOW", "distilled")
 assert workflow in ("distilled", "base")
 baseWorkflow = workflow == "base"
@@ -197,7 +201,30 @@ class ImageScaleDownBy:
         return (torch.cat(results, dim=0),)
 
 
-NODE_CLASS_MAPPINGS = {"ToonflowLockedAudio": ToonflowLockedAudio, "ImageScaleDownBy": ImageScaleDownBy}
+# The image-to-video workflows' ResizeImageResolution, from ComfyUI-LogicUtils (MIT, aria1th, f77c6995): a resize of
+# each image, keeping its aspect, to about resolution squared pixels.
+class ResizeImageResolution:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"image": ("IMAGE",), "resolution": ("INT", {"default": 512}), "method": (["NEAREST", "LANCZOS", "BICUBIC"],)}}
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "resize"
+    CATEGORY = "toonflow"
+
+    def resize(self, image, resolution, method):
+        import numpy
+        from PIL import Image
+        results = []
+        for item in image:
+            picture = Image.fromarray(numpy.clip(255.0 * item.cpu().numpy(), 0, 255).astype(numpy.uint8)).convert("RGB")
+            ratio = (resolution ** 2 / (picture.width * picture.height)) ** 0.5
+            picture = picture.resize((int(picture.width * ratio), int(picture.height * ratio)), getattr(Image.Resampling, method))
+            results.append(torch.from_numpy(numpy.array(picture).astype(numpy.float32) / 255.0).unsqueeze(0))
+        return (torch.cat(results, dim=0),)
+
+
+NODE_CLASS_MAPPINGS = {"ToonflowLockedAudio": ToonflowLockedAudio, "ImageScaleDownBy": ImageScaleDownBy, "ResizeImageResolution": ResizeImageResolution}
 """
 nodeFile = comfy / "custom_nodes" / "toonflow_sulphur.py"
 # A ComfyUI started before these nodes changed has not registered them, so it is stopped here and started again below.
@@ -235,7 +262,7 @@ except requests.RequestException:
 # The machine is set up above this line; warmSulphur runs only that part, ahead of the first clip.
 mark("setup")
 info = requests.get(base + "/object_info", timeout=30).json()
-missing = [name for name in ["PathchSageAttentionKJ", "ToonflowLockedAudio", "ImageScaleDownBy", "GetICLoRAParameters", "LTXAVTextEncoderLoader"] if name not in info]
+missing = [name for name in ["PathchSageAttentionKJ", "ToonflowLockedAudio", "ImageScaleDownBy", "ResizeImageResolution", "GetICLoRAParameters", "LTXAVTextEncoderLoader"] if name not in info]
 if missing:
     raise RuntimeError(f"ComfyUI did not register {', '.join(missing)}:\n" + log.read_text()[-3000:])
 timings["recipe"] = {"model": "sulphur2Official", "comfyCommit": comfyCommit, "kjCommit": kjCommit, "weightRevisions": weightRevisions,
@@ -337,7 +364,8 @@ def segmentGraph(segment, prompt, control, sound, context):
         opening = ["contextFrames", 0]
     elif firstFrame and segment == 1:
         graph["firstImage"] = {"class_type": "LoadImage", "inputs": {"image": firstFrame.name}}
-        graph["first"] = {"class_type": "LTXVPreprocess", "inputs": {"image": ["firstImage", 0], "img_compression": 38}}
+        graph["firstResized"] = {"class_type": "ResizeImageResolution", "inputs": {"image": ["firstImage", 0], "resolution": 1024, "method": "NEAREST"}}
+        graph["first"] = {"class_type": "LTXVPreprocess", "inputs": {"image": ["firstResized", 0], "img_compression": 38}}
         opening = ["first", 0]
     closing = None
     if lastFrame and segment == segments:
@@ -379,13 +407,11 @@ def segmentGraph(segment, prompt, control, sound, context):
         return [f"{name}Crop", 2], [f"{name}Split", 1]
 
     segmentSeed = seed + 1000 * (segment - 1)
-    # The image-to-video workflow holds the half-size pass to the opening scaled down by half and refines with
-    # euler_ancestral_cfg_pp; the text-to-video one refines with lcm. Both refine with the noise seed fixed at 42.
-    if opening and baseWorkflow:
-        raise RuntimeError("The base workflow renders text to video only; use the distilled workflow with an opening frame")
+    # The image-to-video workflows hold the half-size pass to the opening scaled down by half. The distilled one refines
+    # with euler_ancestral_cfg_pp, every other workflow with lcm; all refine with the noise seed fixed at 42.
     if opening:
         graph["openingHalf"] = {"class_type": "ImageScaleDownBy", "inputs": {"images": opening, "scale_by": 0.5}}
-    graph["refineSampler"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler_ancestral_cfg_pp" if opening else "lcm"}}
+    graph["refineSampler"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler_ancestral_cfg_pp" if opening and not baseWorkflow else "lcm"}}
     graph["firstLatent"] = {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": generateWidth // 2, "height": generateHeight // 2, "length": length, "batch_size": 1}}
     video, sound1 = sample("first", ["firstLatent", 0], models[0], None, "sampler", segmentSeed, ["openingHalf", 0] if opening else None, 0.8, ["audioTemplate", 0], 3.6 if baseWorkflow else 1.0)
     graph["upscaled"] = {"class_type": "LTXVLatentUpsampler", "inputs": {"samples": video, "upscale_model": ["upscaler", 0], "vae": ["checkpoint", 2]}}

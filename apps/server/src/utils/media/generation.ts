@@ -16,7 +16,7 @@ const maxMediaSize = 100 * 1024 * 1024;
 // Bun loads these as source text; TypeScript resolves their provider object exports.
 const productionModels = {
   image: { provider: "qwenImage", models: ["qwen_image_2_1", "qwen_image_2_1_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
-  video: { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base"], source: sulphurSource as unknown as string },
+  video: { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base", "sulphur_2_10eros"], source: sulphurSource as unknown as string },
   audio: { provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string },
 };
 

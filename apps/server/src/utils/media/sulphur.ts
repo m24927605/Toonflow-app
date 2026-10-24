@@ -35,12 +35,12 @@ const snapped = (frames: number) => Math.max(25, frames + (8 - (frames - 1) % 8)
 
 /**
  * How a take of `duration` seconds renders: in one part up to 20 seconds, else in the fewest parts of one length that
- * cover it, each starting `step` frames after the one before.
+ * cover it, each starting `step` frames after the one before; `count` asks for that many parts instead.
  */
-export function longTakeParts(duration: number) {
+export function longTakeParts(duration: number, count?: number) {
   const frames = Math.round(duration * 24);
-  if (duration <= maxClipSeconds) return { parts: 1, frames: snapped(frames), step: 0 };
-  const parts = Math.ceil((frames - contextFrames) / (maxPartFrames - contextFrames));
+  if (!count && duration <= maxClipSeconds) return { parts: 1, frames: snapped(frames), step: 0 };
+  const parts = count ?? Math.ceil((frames - contextFrames) / (maxPartFrames - contextFrames));
   const length = snapped(Math.ceil((frames - contextFrames) / parts) + contextFrames);
   return { parts, frames: length, step: length - contextFrames };
 }
@@ -104,14 +104,15 @@ export function warmSulphur(resolution: string, ratio: string, machines: number,
 }
 
 /** Renders one Sulphur 2 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
-export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed(), workflow = "distilled" }: SulphurRequest, signal?: AbortSignal) {
+export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed(), workflow = "distilled", checkpoint = "sulphur" }: SulphurRequest, signal?: AbortSignal) {
   for (const value of parts ?? [prompt]) validateVideoPrompt(value);
   if (soundtrack && !audio) throw new Error("A locked soundtrack requires audio output to be enabled");
-  const plan = longTakeParts(duration);
+  const plan = longTakeParts(duration, parts?.length);
   if (!parts && (!Number.isInteger(duration) || duration < 1 || duration > maxClipSeconds)) throw new Error(`Sulphur 2 renders whole seconds from 1 to ${maxClipSeconds} at a time`);
   if (parts) {
-    if (!Number.isInteger(duration) || duration <= maxClipSeconds || duration > maxTakeSeconds) throw new Error(`A Sulphur 2 long take is a whole number of seconds from ${maxClipSeconds + 1} to ${maxTakeSeconds}`);
-    if (parts.length !== plan.parts || parts.some(part => !part.trim())) throw new Error(`A ${duration}-second Sulphur 2 long take needs ${plan.parts} part prompts`);
+    if (!Number.isInteger(duration) || duration > maxTakeSeconds) throw new Error(`A Sulphur 2 long take is a whole number of seconds up to ${maxTakeSeconds}`);
+    if (parts.length < 2 || parts.some(part => !part.trim())) throw new Error("A Sulphur 2 long take needs at least two part prompts");
+    if (plan.frames > maxPartFrames || plan.step < 1) throw new Error(`A ${duration}-second Sulphur 2 long take cannot be split into ${parts.length} parts of at most 20 seconds`);
   }
   if (!resolutions.has(resolution)) throw new Error("Sulphur 2 only supports 480p, 720p and 1080p");
   if (!/^[1-9]\d?:[1-9]\d?$/.test(ratio)) throw new Error("Invalid Sulphur 2 aspect ratio");
@@ -147,7 +148,7 @@ export async function runSulphur({ prompt, parts, firstFrame, lastFrame, control
         ...characterLoras.length ? [{ name: name("loras.json"), data: JSON.stringify(characterLoras.map(({ name, strength }) => ({ name, strength }))) }] : [],
       ],
       env: {
-        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0, SULPHUR_WORKFLOW: workflow,
+        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0, SULPHUR_WORKFLOW: workflow, SULPHUR_CHECKPOINT: checkpoint,
         SULPHUR_SEGMENTS: parts?.length ?? 1, SULPHUR_SEGMENT_FRAMES: plan.frames,
         ...postprocess ? { PRODUCTION_FINISH_JOB: job, PRODUCTION_FINISH_FUSED: 1 } : {},
       },
