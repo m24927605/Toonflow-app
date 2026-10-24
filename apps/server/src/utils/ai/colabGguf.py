@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from contextlib import nullcontext
-from modelPreparation import downloadSlots
+from modelPreparation import downloadSlots, hubToken, retryThrottled
 
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
 request = json.loads((Path("/content") / os.environ["COLAB_INPUT"]).read_text())
@@ -88,12 +88,12 @@ if globals().get("loadedModel") != modelKey or server is None or server.poll() i
     from huggingface_hub import hf_hub_download
     localFilesOnly = os.environ.get("TOONFLOW_LOAD_ONLY") == "1"
     with nullcontext() if localFilesOnly else downloadSlots():
-        weightPath = hf_hub_download(modelId, weightFile, revision=revision, local_dir="/content/gguf", local_files_only=localFilesOnly)
+        weightPath = retryThrottled(lambda: hf_hub_download(modelId, weightFile, revision=revision, local_dir="/content/gguf", local_files_only=localFilesOnly, token=hubToken()))
         speculative = ["--spec-type", "draft-mtp", "--spec-draft-n-max", "3", "--spec-draft-p-min", "0", "-ctk", "q8_0", "-ctv", "q8_0"] if mtp else []
-        chatTemplate = ["--chat-template-file", hf_hub_download(modelId, template, revision=revision, local_dir="/content/gguf", local_files_only=localFilesOnly)] if template else []
+        chatTemplate = ["--chat-template-file", retryThrottled(lambda: hf_hub_download(modelId, template, revision=revision, local_dir="/content/gguf", local_files_only=localFilesOnly, token=hubToken()))] if template else []
         # ACT: On the L4 the projector runs on the CPU: the quantized weights and the 32K context nearly fill it, so text work
         # never risks running out of GPU memory. A model on an A100 (`visionOnGpu`) has the headroom and reads images faster.
-        vision = ["--mmproj", hf_hub_download(request.get("mmprojModelId", modelId), mmproj, revision=request.get("mmprojRevision", revision), local_dir="/content/gguf", local_files_only=localFilesOnly), *([] if request.get("visionOnGpu") else ["--no-mmproj-offload"])] if mmproj else []
+        vision = ["--mmproj", retryThrottled(lambda: hf_hub_download(request.get("mmprojModelId", modelId), mmproj, revision=request.get("mmprojRevision", revision), local_dir="/content/gguf", local_files_only=localFilesOnly, token=hubToken())), *([] if request.get("visionOnGpu") else ["--no-mmproj-offload"])] if mmproj else []
     if os.environ.get("TOONFLOW_DOWNLOAD_ONLY") == "1":
         print("COLAB_DONE")
         raise SystemExit(0)

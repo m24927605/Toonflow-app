@@ -20,7 +20,8 @@ const planSchema = z.strictObject({
     shot: z.number().int().positive(),
     place: text,
     actors: z.array(z.strictObject({
-      name: text, gaze: z.enum(["screenLeft", "screenRight", "camera", "down", "up", "away"]),
+      // A gaze is a screen direction, closed eyes, or the name of another actor in the shot.
+      name: text, gaze: z.union([z.enum(["screenLeft", "screenRight", "camera", "down", "up", "away", "eyesClosed"]), text]),
       pose: text, props: z.array(text), outfit: text,
     })),
     lines: z.array(z.strictObject({ speaker: text, words: text, start: z.number().finite().nonnegative() })),
@@ -29,7 +30,8 @@ const planSchema = z.strictObject({
 export type ProductionPlan = z.infer<typeof planSchema> & { source: string };
 export const planJsonSchema = z.toJSONSchema(planSchema) as Record<string, unknown>;
 
-export const gazeDescriptions = { screenLeft: "toward the left of the frame", screenRight: "toward the right of the frame", camera: "directly at the camera", down: "downward", up: "upward", away: "away from the camera" };
+const gazeDescriptions: Record<string, string> = { screenLeft: "Looking toward the left of the frame", screenRight: "Looking toward the right of the frame", camera: "Looking directly at the camera", down: "Looking downward", up: "Looking upward", away: "Looking away from the camera", eyesClosed: "Eyes closed" };
+export const describeGaze = (gaze: string) => Object.hasOwn(gazeDescriptions, gaze) ? gazeDescriptions[gaze]! : `Looking at ${gaze}`;
 
 const speakerLabelsSchema = z.strictObject({ shots: z.array(z.strictObject({ shot: z.number().int().positive(), dialogue: z.string().min(1).max(10000) })).min(1) });
 export const speakerLabelsJsonSchema = z.toJSONSchema(speakerLabelsSchema);
@@ -78,7 +80,7 @@ export function planPrompt(script: string, shotList: string, assets: Production[
     "voices: every speaking character exactly once. presentation is the intended performed voice: feminine, masculine or androgynous, consistent with the character. Describe its age, timbre and delivery explicitly in English. language MUST be a BCP 47 spoken language/dialect tag, such as zh-TW (Taiwan Mandarin), zh-CN, en-US or ja-JP, never 'Traditional Chinese' (a writing system).",
     voiceAuditionInstructions,
     "shots: every shot exactly once in shot-list order. place: the exact name of its environment asset, inferred from the screenplay's scene heading when the row omits it. actors: exactly the visible cast, named identically; gaze is the side of the SCREEN (not the actor's own left/right). pose and props describe the OPENING state, in English; outfit is its exact asset outfit name. lines: copy each dialogue's speaker and words exactly and in order. start is the line's start in seconds relative to this shot; follow explicit timing in the row, otherwise choose a natural start. Leave room for the spoken words before the shot ends. Do not put timestamps into the dialogue text.",
-    "gaze: use camera when the actor looks directly into the lens; screenLeft/screenRight mean looking away from the lens toward that screen edge. Never substitute screenLeft for camera. A line's absolute film start is the shot's start plus its local start, so a line beginning at film second 1 in a shot beginning at second 1 has local start 0.",
+    "gaze: the name of another actor in the shot when the actor looks at them, eyesClosed when their eyes are shut, camera only when the screenplay has the actor look into the lens or address the audience; screenLeft/screenRight mean looking away from the lens toward that screen edge at no one in the shot. Never substitute screenLeft for camera. A line's absolute film start is the shot's start plus its local start, so a line beginning at film second 1 in a shot beginning at second 1 has local start 0.",
     `Available assets: ${JSON.stringify(assets)}`,
     `Screenplay:\n${script}\nShot list:\n${shotList}`,
   ].join("\n\n");
@@ -97,6 +99,7 @@ export function readPlan(reply: string, script: string, shotList: string, assets
     const cast = castNames(span);
     if (new Set(shot.actors.map(actor => actor.name)).size !== cast.length || shot.actors.length !== cast.length || cast.some(name => !shot.actors.some(actor => actor.name === name))) throw new Error(`Shot ${shot.shot}: contract cast differs from the shot list. Expected ${JSON.stringify(cast)}; received ${JSON.stringify(shot.actors.map(actor => actor.name))}`);
     for (const actor of shot.actors) {
+      if (!Object.hasOwn(gazeDescriptions, actor.gaze) && (actor.gaze === actor.name || !shot.actors.some(other => other.name === actor.gaze))) throw new Error(`Shot ${shot.shot}: ${actor.name}'s gaze must be a screen direction, eyesClosed or the exact name of another actor in the shot`);
       const person = assets.characters.find(person => person.name === actor.name);
       if (!person?.outfits?.some(outfit => outfit.name === actor.outfit)) throw new Error(`Shot ${shot.shot}: unknown character or outfit for ${actor.name}`);
     }

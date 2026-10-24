@@ -174,9 +174,12 @@ interface ProviderTools {
     audio: boolean;
     /** Seed to draw with; a random one when left out. */
     seed?: number;
+    /** Sulphur's distilled workflows (the default), or its base text-to-video workflow: fifty steps at CFG 3.6. */
+    workflow?: "distilled" | "base";
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
   /**
-   * Draws one Qwen-Image 2.1 Turbo image on a Google Colab A100 through the Colab CLI installed and signed in on the
+   * Draws one Qwen-Image 2.1 image (base model, always with the Genitalia Anatomy Fix LoRA) on a Google Colab A100
+   * through the Colab CLI installed and signed in on the
    * host, using the compute units of that Google account. The host gathers the requests made around the same time
    * and draws them in one session, so setup is paid once per batch; it resolves when the batch finishes and the
    * session always stops. The host never exposes the Colab credentials.
@@ -200,7 +203,7 @@ interface ProviderTools {
     /** With `initImage`, required: the noise level the redraw starts from, above 0 (kept) up to 1 (drawn anew). */
     denoise?: number;
     /**
-     * Draws with the base model instead of Turbo: "pose" puts the person of the second image into the pose of the
+     * A special recipe: "pose" puts the person of the second image into the pose of the
      * textureless mannequin render given as the first image.
      */
     recipe?: "pose";

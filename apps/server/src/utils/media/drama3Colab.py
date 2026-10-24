@@ -213,7 +213,16 @@ if request.get("sequence"):
             synthesize(sequence["lineText"], raw, reference, result["reference"]["text"])
             normalized = directory / f"lineAttempt{attempt}.wav"
             seconds = normalize(raw, normalized)
-            if math.isfinite(seconds) and 0 < seconds <= sequence["maximumLineSeconds"]:
+            limit = sequence["maximumLineSeconds"]
+            if math.isfinite(seconds) and seconds > limit:
+                # Drama 3 sometimes keeps voicing a short line long after its words; the words come first, so the
+                # recording is cut at the line's limit with a short fade instead of failing the line.
+                cut = directory / f"lineCut{attempt}.wav"
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(normalized), "-t", f"{limit:.3f}", "-af", f"afade=t=out:st={max(0, limit - 0.2):.3f}:d=0.2",
+                                "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(cut)], check=True)
+                cut.replace(normalized)
+                seconds = float(json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(normalized)], text=True))["format"]["duration"])
+            if math.isfinite(seconds) and 0 < seconds <= limit + 0.05:
                 destination = directory / "line.wav"
                 shutil.copyfile(normalized, destination)
                 result["line"] = {"file": destination.name, "seconds": seconds}

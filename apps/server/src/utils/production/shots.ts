@@ -9,10 +9,11 @@ import type { ProductionPlan } from "./plan";
  */
 export type ProductionShot = {
   shot: number; time: string; state?: string; place?: string; row?: string; outfits: Record<string, string>;
-  /** Each person of the opening drawn in their outfit and their pose in the previs, by name, once drawn. */
-  poses?: Record<string, string>;
-  /** The photographic opening frame the clip starts from, once drawn. */
-  keyframe?: string;
+  /**
+   * The previous clip's last clear frame, which this clip starts from when it keeps that clip's camera setup; every
+   * other clip starts from no picture at all, its people kept by their LoRAs.
+   */
+  startFrame?: string;
 };
 
 const seconds = (value: number) => Number(value.toFixed(2));
@@ -35,42 +36,21 @@ export function planShots(shotList: string, assets: NonNullable<Production["asse
 
 const byName = (list: ProductionAsset[], name?: string) => list.find(item => item.name === name);
 
-// The keyframe's depth model takes nine images beside its depth map: one pose/outfit per person and the environment.
+// Sulphur 2 loads at most four LoRAs: those of the people in frame.
 const maxPeople = 8;
 export const maxLoras = 4;
+const hasLtx = (item: ProductionAsset) => !!(item.triggers?.ltx || item.loras?.some(lora => lora.family === "ltx"));
 
 /**
- * The references a shot's keyframe is drawn from, in order: each person the previs shows, those in the opening first,
- * in the outfit they wear in the shot, then the place. They follow the plan, not the drawing; an image is the design's
- * view once it is drawn.
+ * Who a shot shows, each person the previs shows with those in the opening first, and the place it is in: the people's
+ * LoRAs and trigger words are what keep them the same from clip to clip. They follow the plan, not the drawing.
  */
 export function shotReferences(shot: ProductionShot, assets: NonNullable<Production["assets"]>, framed: { opening: string[]; shown: string[] }) {
   const names = [...new Set([...framed.opening, ...framed.shown])];
-  if (names.length > maxPeople || names.some(name => !byName(assets.characters, name))) throw new Error(`Shot ${shot.shot}: unknown cast or more people than a keyframe can be drawn from`);
+  if (names.length > maxPeople || names.some(name => !byName(assets.characters, name))) throw new Error(`Shot ${shot.shot}: unknown cast or more people than a clip can name`);
   const persons = names.map(name => byName(assets.characters, name)!);
-  if (persons.filter(person => person.triggers?.ltx || person.loras?.some(lora => lora.family === "ltx")).length > maxLoras) throw new Error(`Shot ${shot.shot}: more than four character LoRAs cannot be loaded; revise the shot before dispatch`);
   const place = byName(assets.places, shot.place);
   if (!place) throw new Error(`Shot ${shot.shot}: unknown environment`);
-  // A person drawn in their opening pose shows the clip that pose rather than standing facing the camera; one without a
-  // pose, such as someone who comes in later, is shown in three-quarter view, as a view facing the camera makes the clip
-  // look into the lens.
-  const image = (person: ProductionAsset) => shot.poses?.[person.name] ?? outfitView(person, shot, 1);
-  return { people: persons.map(person => ({ person, image: image(person) })), place: place ? { place, image: place.views?.[0] ?? place.base } : undefined };
-}
-
-/**
- * A person's view in the outfit they wear in a shot, the front view unless `view` picks another of the outfit's views,
- * or their base image before the views are drawn.
- */
-export const outfitView = (person: ProductionAsset, shot: ProductionShot, view = 0) => {
-  const outfit = person.outfits?.find(outfit => outfit.name === shot.outfits[person.name]);
-  if (!outfit) throw new Error(`Shot ${shot.shot}: unknown outfit for ${person.name}`);
-  return outfit.views?.[Math.min(view, outfit.views.length - 1)];
-};
-
-/** The reference images in prompt order, once every one is drawn. */
-export function referenceImages(references: ReturnType<typeof shotReferences>) {
-  const images = [...references.people.map(entry => entry.image), ...references.place ? [references.place.image] : []];
-  if (images.some(image => !image)) throw new Error("A keyframe's reference images are not drawn yet");
-  return images as string[];
+  if (persons.filter(hasLtx).length > maxLoras) throw new Error(`Shot ${shot.shot}: more than four LoRAs (one a person) cannot be loaded; revise the shot before dispatch`);
+  return { people: persons.map(person => ({ person })), place: { place } };
 }

@@ -117,6 +117,24 @@ def downloadSlots(count=1):
             slot.close()
 
 
+def hubToken():
+    """The Hugging Face token Toonflow passes as HF_TOKEN, or None to download anonymously. Downloads take it explicitly:
+    implicit lookups stay off (HF_HUB_DISABLE_IMPLICIT_TOKEN), as they probe Colab secrets first, which a run with no
+    notebook page cannot answer."""
+    return os.environ.get("HF_TOKEN") or None
+
+
+def retryThrottled(download):
+    """Runs a download, waiting and trying again when the Hub answers 429 because many machines download at once."""
+    for attempt in range(6):
+        try:
+            return download()
+        except Exception as error:
+            if "429" not in str(error) or attempt == 5:
+                raise
+            time.sleep(30 * 2 ** attempt)
+
+
 def downloadWeights(entries):
     from huggingface_hub import hf_hub_download, try_to_load_from_cache
 
@@ -131,7 +149,7 @@ def downloadWeights(entries):
             if target.exists() and isinstance(cached, str) and target.samefile(cached):
                 return
             with downloadSlots():
-                source = Path(hf_hub_download(repo_id=repo, filename=file, revision=revision, cache_dir="/content/toonflowWeights")).resolve()
+                source = Path(retryThrottled(lambda: hf_hub_download(repo_id=repo, filename=file, revision=revision, cache_dir="/content/toonflowWeights", token=hubToken()))).resolve()
             temporary = target.with_suffix(target.suffix + ".tmp")
             temporary.unlink(missing_ok=True)
             os.link(source, temporary)
@@ -144,7 +162,7 @@ def downloadWeights(entries):
 def downloadSnapshot(repo, revision):
     from huggingface_hub import snapshot_download
     with downloadSlots(2):
-        return snapshot_download(repo, revision=revision, max_workers=2, cache_dir="/content/toonflowWeights")
+        return retryThrottled(lambda: snapshot_download(repo, revision=revision, max_workers=2, cache_dir="/content/toonflowWeights", token=hubToken()))
 
 
 def startDownloads(requests):

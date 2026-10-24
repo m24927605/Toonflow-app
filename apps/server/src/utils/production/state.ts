@@ -34,8 +34,6 @@ export type ProductionInput = {
   seconds: number;
   ratio: typeof productionRatios[number];
   quality: typeof productionQualities[number];
-  /** Colab spending threshold; stopping remote machines can consume additional units. */
-  budget: number;
   gates: ProductionGate[];
   /** Photos of characters the user already has, by the name the outline uses. */
   photos: { name: string; path: string }[];
@@ -64,7 +62,7 @@ export type Production = {
   input: ProductionInput;
   originalOutline?: string;
   conversationChanges?: z.infer<typeof conversationChangesSchema>;
-  /** `waiting` stops for a person (a review gate or the budget), `failed` for an error a retry may clear. */
+  /** `waiting` stops for a person (a review gate), `failed` for an error a retry may clear. */
   status: "running" | "waiting" | "failed" | "done";
   /** Why it stopped, as a code the page words; `detail` carries the underlying error. */
   message?: string;
@@ -138,7 +136,6 @@ export const productionDirectory = (id: string) => `productions/${id}`;
 
 export function productionGuidance(production: Production) {
   if (production.status !== "failed" && !(production.status === "waiting" && !production.review)) return undefined;
-  if (production.message === "budget") return { summary: translateMessage("這次製作的資源額度已達上限。"), question: translateMessage("可以縮短或簡化故事後另建製作；原本的檔案會保留。"), suggestions: [] as string[], retryable: false, canRetry: false };
   if (/Dialogue recording did not meet|Recorded dialogue needs revised|Dialogue timing could not fit/.test(production.message ?? "")) return {
     summary: translateMessage("配音長度與鏡頭時間無法配合，製作已中斷；已完成的錄音與素材仍保留。"),
     question: translateMessage("接續時會先協調配音與分鏡時間，再製作影片。"),
@@ -166,13 +163,13 @@ export function productionProgress(production: Production, active: boolean) {
   const failedStep = production.failure?.step ?? (/Dialogue recording did not meet|Recorded dialogue needs revised|Dialogue timing could not fit/.test(production.message ?? "") ? "dub" : undefined);
   const phaseSteps: Record<string, string[]> = {
     preparation: ["startupPlan", "startupText", "startupMedia"], story: ["direction", "script", "scriptRevision", "shotList", "cast", "references", "contractPlan"],
-    visuals: ["previsPlan", "designs", "previsRender", "poses", "keyframes", "loras"], speech: ["dub", "dialogueTimingRepair", "ambience", "music"],
+    visuals: ["previsPlan", "designs", "previsRender", "loras"], speech: ["dub", "dialogueTimingRepair", "ambience", "music"],
     video: ["texts", "clips"], finishing: ["roughCut", "film", "deliveryValidation", "report"], cleanup: [],
   };
   const phases = [
     { id: "preparation", done: !!production.runtime?.readyAt, running: active && !production.runtime?.readyAt },
     { id: "story", done: !!production.shotList && !!production.plan, running: ["direction", "script", "scriptRevision", "shotList", "cast", "contractPlan"].some(step => pending.has(step)) },
-    { id: "visuals", done: !!assets && assets.every(item => assetDrawn(item) && !!item.loras) && !!production.previs?.every(shot => !!shot.video) && !!production.shots?.every(shot => !!shot.keyframe), running: ["previsPlan", "previsRender", "designs", "poses", "keyframes"].some(step => pending.has(step)) },
+    { id: "visuals", done: !!assets && assets.every(item => assetDrawn(item)) && !!production.assets?.characters.every(item => !!item.loras) && !!production.previs?.every(shot => !!shot.video), running: ["previsPlan", "previsRender", "designs", "loras"].some(step => pending.has(step)) },
     { id: "speech", done: !!production.dub?.shots.every(shot => shot.lines.every(line => !!line.path) && (!shot.lines.length || !!shot.track)) && !!production.ambience?.every(item => !!item.bed?.videoSha256) && (!production.input.music || !!production.music), running: ["dub", "dialogueTimingRepair", "ambience", "music"].some(step => pending.has(step)) },
     { id: "video", done: totalShots > 0 && completedShots === totalShots, running: pending.has("clips") },
     { id: "finishing", done: production.status === "done" && !!production.film, running: ["film", "roughCut", "deliveryValidation"].some(step => pending.has(step)) },
@@ -182,7 +179,7 @@ export function productionProgress(production: Production, active: boolean) {
   return {
     active, finished: production.status === "done" && !!production.film && production.cleanup?.status === "done", cleanupStatus: production.cleanup?.status ?? "unknown",
     elapsedSeconds: Math.max(0, (end - Date.parse(production.createdAt)) / 1000), totalShots, completedShots,
-    failure: production.status === "failed" || production.status === "waiting" && !production.review && production.message !== "budget" ? {
+    failure: production.status === "failed" || production.status === "waiting" && !production.review ? {
       step: failedStep,
       message: productionGuidance(production)?.summary ?? translateMessage("製作流程發生錯誤，已完成的檔案與補充內容仍會保留。"),
       technical: production.detail ?? production.failure?.message ?? production.message,

@@ -28,7 +28,7 @@ Write the prompt the way Sulphur's own captions are written:
      clothing, where they are (left, right, foreground, background), posture and what they hold.
      `Lucía, a Spanish woman in her thirties with a black bob and a grey cardigan, sits at the table on the left holding a mug.`
      When a person has a trained LoRA, write the trigger word right after their name there. Afterwards use the name or
-     a pronoun.
+     a pronoun, except in a sentence that speaks a line, which calls its speaker by name.
   3. **Action.** Everything that moves, in the order it happens, linked by "then", "as" and "while": which body part
      moves, which way, how fast and where it stops. One main event per clip, ending on the state the clip ends in.
      Speech and sounds are written into the action at the moment they happen, never gathered at the end.
@@ -54,7 +54,8 @@ Write the prompt the way Sulphur's own captions are written:
   words go and the application fills them in. After a line the speaker closes their lips; people who are not speaking
   keep their lips closed.
 - **Sound.** Name concrete sounds where they happen: the cup clicks on the saucer, a sliding door scrapes, rain patters
-  on the window. Breaths, moans, sighs and laughter are described in words, not quoted. Mention no music: it is added
+  on the window. Breaths, moans, sighs and laughter are described in words, not quoted, unless the instructions give
+  one as a line: then it is written as speech, with its marker. Mention no music: it is added
   when the film is assembled.
 - **Explicit content.** Name nudity and sexual acts plainly, with anatomical terms and the exact movement, position and
   rhythm; euphemisms give vague motion. Everyone shown is an adult.

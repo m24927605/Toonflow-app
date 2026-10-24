@@ -5,32 +5,59 @@ import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
 import { finishPrompt, shotDialogue, validateVideoPrompt, videoPromptInstructions } from "@toonflow/node-shared/videoPrompt";
 import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
-import { readFile, writeAtomic } from "@toonflow/file";
+import { mkdir, readdir, readFile, rename, rm, stat, writeAtomic } from "@toonflow/file";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { snapshotMedia, inputSnapshotSchema } from "@/utils/media/snapshot";
 import { longTakeParts, takeClipArtifact, withClipPostprocess, clipArtifactSchema, type ClipArtifact } from "@/utils/media/sulphur";
-import { useExistingColabSession } from "@/utils/media/colabPool";
+import { colabSessionName, useExistingColabSession } from "@/utils/media/colabPool";
 import postprocess from "./postprocessColab.py" with { type: "text" };
 import { ReplyCutError, replyJson } from "./review";
 import { maxLoras, shotReferences } from "./shots";
 import { clipSeconds, type ProductionDub } from "./dub";
 import { productionDirectory, writeProductionText, type Production } from "./state";
-import { gazeDescriptions } from "./plan";
+import { describeGaze } from "./plan";
 
 /** A generated shot and its exact prompt and seed; generated video is not AI-reviewed. */
 export type ProductionClip = { shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number; remote?: ClipArtifact; inputSnapshot?: z.infer<typeof inputSnapshotSchema> };
 
-const sulphur = { providerId: "sulphur", modelId: "sulphur_2_q8" };
+const sulphur = { providerId: "sulphur", modelId: "sulphur_2" };
 /**
  * How long a shot plays in the film: its time in the shot list, or longer when its lines need it. Sulphur 2 renders
  * whole seconds, so the film cuts each clip to this.
  */
 const shotSeconds = (production: Production, shot: number) => production.dub!.shots.find(item => item.shot === shot)!.seconds;
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
-/** Whether a shot's clip follows its previs depth video, which only a staged shot has. */
-const controlled = (production: Production, shot: number) => !production.previs!.find(item => item.shot === shot)!.referenceOnly;
+/**
+ * Whether a shot's clip follows its previs depth video: one where someone walks or the camera moves. Otherwise the
+ * previs has no movement to give, and its columns would only fight the poses the clip's prompt describes.
+ */
+const controlled = (production: Production, shot: number) => {
+  const previs = production.previs!.find(item => item.shot === shot)!;
+  return !!previs.framed.walkers?.length || (previs.framed.camera?.frames.length ?? 1) > 1;
+};
+
+// How near the camera has to stay, in metres, and how equal its lens, for a shot to keep the setup of the one before.
+const sameSetup = 0.15;
+
+/**
+ * The shot whose last frame this one starts from: the one before, when this shot keeps its camera setup (the camera
+ * starts where the previous one ended, with the same lens and the same people in frame) and that shot did not itself
+ * start from another clip. Each clip taken from a frame of another adds that clip's drift, so a third clip of one setup
+ * starts from no picture again, which the previs hides behind a new camera setup (its spec check asks for one).
+ */
+export function continuedFrom(production: Production, shot: number): number | undefined {
+  const index = production.previs!.findIndex(item => item.shot === shot);
+  const previous = production.previs![index - 1];
+  const current = production.previs![index];
+  const ended = previous?.framed.camera?.frames.at(-1);
+  const starts = current?.framed.camera?.frames[0];
+  if (!previous || !ended || !starts || continuedFrom(production, previous.shot) !== undefined) return undefined;
+  const distance = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const sameCast = [...previous.framed.shown].sort().join("|") === [...current.framed.opening].sort().join("|");
+  return sameCast && distance(ended.position, starts.position) < sameSetup && distance(ended.target, starts.target) < sameSetup && Math.abs(ended.fov - starts.fov) < 1 ? previous.shot : undefined;
+}
 
 /** The people of a shot as its prompt names them: by name and LoRA trigger word, with their look and opening state. */
 function promptPeople(production: Production, shot: number) {
@@ -43,7 +70,7 @@ function promptPeople(production: Production, shot: number) {
     const trigger = person.triggers?.ltx ?? person.loras?.find(lora => lora.family === "ltx")?.trigger;
     return {
       name: person.name, trigger, look: `${person.look}${outfit ? ` Wearing ${outfit.look}` : ""}`,
-      opening: previs.framed.opening.includes(person.name) ? `${actor ? `${actor.pose} Looking ${gazeDescriptions[actor.gaze]}.` : "In the frame."}` : "Not in the first frame; enters during the shot.",
+      opening: previs.framed.opening.includes(person.name) ? `${actor ? `${actor.pose} ${describeGaze(actor.gaze)}.` : "In the frame."}` : "Not in the first frame; enters during the shot.",
     };
   });
 }
@@ -82,18 +109,23 @@ export async function writeClipPrompts(production: Production, script: string, s
     const previs = production.previs!.find(item => item.shot === span.shot)!;
     const shot = production.shots!.find(item => item.shot === span.shot)!;
     const place = production.assets!.places.find(item => item.name === shot.place);
+    const placeLook = place?.look;
     const people = promptPeople(production, span.shot);
     const names = new Map(people.map(person => [person.name, [person.name, ...person.trigger ? [person.trigger] : []]]));
     const control = controlled(production, span.shot);
-    const opening = `${people.filter(person => previs.framed.opening.includes(person.name)).map(person => `${person.name}: ${person.opening}`).join(" ") || "Nobody is in the frame."}${place ? ` The place: ${place.look}` : ""}`;
+    const opening = `${people.filter(person => previs.framed.opening.includes(person.name)).map(person => `${person.name}: ${person.opening}`).join(" ") || "Nobody is in the frame."}${placeLook ? ` The place: ${placeLook}` : ""}`;
     const kept = shotSeconds(production, span.shot);
     const cut = kept < clip ? `The film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards everyone carries on calmly, their eyes still where the shot ends them looking.` : undefined;
-    const instructionsOf = (part: typeof span, duration: number, note?: string) => `${videoPromptInstructions(part, 1, { duration, style: "photorealistic live-action", opening, people, place: place?.look, control, blocking: previs.blocking, note })}\n\nAuthoritative production contract: ${JSON.stringify(production.plan?.shots.find(item => item.shot === span.shot))}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const instructionsOf = (part: typeof span, duration: number, note?: string) => `${videoPromptInstructions(part, 1, { duration, style: "photorealistic live-action", opening, people, place: placeLook, control, blocking: previs.blocking, note })}\n\nAuthoritative production contract: ${JSON.stringify(production.plan?.shots.find(item => item.shot === span.shot))}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // Has the text model write the prompt and fills in the lines of `partLines`; a draft that breaks a rule is rewritten
     // with the error, at most five times.
     const write = async (instructions: string, partLines = lines) => {
       const finish = (draft: string) => {
-        const prompt = finishPrompt(draft, partLines, names);
+        // No LoRA keeps the place: the same sentence in every shot keeps it the same room, so it follows the opening
+        // sentence when the draft does not hold it already.
+        const finished = finishPrompt(draft, partLines, names);
+        const placeSentence = placeLook && `${placeLook.replace(/\.$/, "")}.`;
+        const prompt = !placeSentence || finished.includes(placeSentence) ? finished : finished.replace(/^(.*?[.!?])\s/, `$1 ${placeSentence} `);
         validateVideoPrompt(prompt);
         const text = findOnScreenText(prompt);
         if (text.length) throw new Error(`Ask for no on-screen text (${text.join(", ")}): captions, signs and titles are added after the clip is made`);
@@ -104,6 +136,8 @@ export async function writeClipPrompts(production: Production, script: string, s
         try {
           return finish(draft);
         } catch (error) {
+          // The last draft is kept in the server log, so a shot whose prompt cannot be written can be diagnosed.
+          if (!fixes) console.error("[production] Clip prompt still breaks a rule after its fixes", { shot: span.shot, error: error instanceof Error ? error.message : String(error), draft });
           if (!fixes) throw error;
           return valid(await complete(`${instructions}\n\nYour draft:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`), fixes - 1);
         }
@@ -191,8 +225,39 @@ async function takeBeats(row: string, seconds: number, lines: ProductionDub["sho
 }
 
 /**
- * Renders each clip not rendered yet into `folder`: from its keyframe as the first frame, following its previs depth
- * video when the shot is staged, locked to its dubbed track, with those people's LoRAs and its own seed. All are
+ * Takes the last clear frame of the clip a shot continues as its start frame: of the frames in the last quarter second
+ * the film keeps of that clip (it cuts each clip to its shot's length), the one with the most detail.
+ * ACT: Detail is measured as the PNG's size, which falls with motion blur; a sharpness measure such as the variance of
+ * a Laplacian on the faces would be more exact, at the cost of decoding every candidate.
+ */
+export async function takeStartFrame(cwd: string, production: Production, shot: number, signal: AbortSignal, save: () => Promise<void>) {
+  const row = production.shots!.find(item => item.shot === shot)!;
+  const previous = continuedFrom(production, shot);
+  if (row.startFrame || previous === undefined) return;
+  const clip = production.videos!.find(item => item.shot === previous)!;
+  if (!clip.video) throw new Error(`Shot ${shot}: the clip it continues is not rendered yet`);
+  const folder = `${productionDirectory(production.id)}/startFrames`;
+  const candidates = `${folder}/shot${shot}Candidates`;
+  const directory = (await resolveWorkspacePath(cwd, candidates, true)).path;
+  await mkdir(directory, { recursive: true });
+  const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+  const end = shotSeconds(production, previous);
+  await finished(ffmpeg((await resolveWorkspacePath(cwd, clip.video)).path).seekInput(Math.max(0, end - 0.25)).duration(0.25).outputOptions(["-vsync 0"]).output(`${directory}/frame%02d.png`));
+  const frames = (await readdir(directory)).filter(name => name.endsWith(".png"));
+  if (!frames.length) throw new Error(`Shot ${shot}: no frame could be taken from the end of shot ${previous}`);
+  const sizes = await Promise.all(frames.map(async name => ({ name, size: (await stat(`${directory}/${name}`)).size })));
+  const best = sizes.sort((a, b) => b.size - a.size)[0]!.name;
+  const target = `${folder}/shot${shot}.png`;
+  await rename(`${directory}/${best}`, (await resolveWorkspacePath(cwd, target, true)).path);
+  await rm(directory, { recursive: true, force: true });
+  row.startFrame = target;
+  await save();
+}
+
+/**
+ * Renders each clip not rendered yet into `folder`: from no picture, or from the previous clip's last frame when it
+ * continues that clip's setup, following its previs depth video when someone walks or the camera moves, locked to its
+ * dubbed track, with the LoRAs of its people and its own seed. All are
  * requested at once and share the Sulphur 2 worker pool. The first clip that fails cancels the ones still queued, so a
  * broken render does not keep the A100 busy with clips that fail the same way.
  */
@@ -204,7 +269,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
     const previs = production.previs!.find(other => other.shot === item.shot)!;
     const references = shotReferences(shot, production.assets!, previs.framed);
     const track = production.dub!.shots.find(shot => shot.shot === item.shot)?.track;
-    const loras = references.people.flatMap(({ person }) => person.loras?.filter(lora => lora.family === "ltx") ?? []).slice(0, maxLoras);
+    const loras = references.people.map(({ person }) => person).flatMap(item => item.loras?.filter(lora => lora.family === "ltx") ?? []).slice(0, maxLoras);
     const snapshot = await prepareClipInputs(cwd, production, item, clipSignal, save);
     const frozenInput = (path: string) => {
       const frozen = snapshot.files.find(item => item.source === path)?.path;
@@ -213,10 +278,10 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
     };
     const control = controlled(production, item.shot);
     const generate = () => generateMedia(cwd, "video", {
-      ...sulphur, mode: control ? "videoControl" : "endFrameOptional", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
+      ...sulphur, mode: control ? "videoControl" : shot.startFrame ? "startFrameOptional" : "text", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
       generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`,
-      firstFrame: { path: frozenInput(shot.keyframe!), mimeType: mimeOf(shot.keyframe!) },
-      // A reference shot's previs is its keyframe: the opening it planned, held still, with no movement to follow.
+      ...shot.startFrame ? { firstFrame: { path: frozenInput(shot.startFrame), mimeType: mimeOf(shot.startFrame) } } : {},
+      // Without a walk or a camera move there is no movement to follow: the clip takes everything from its prompt.
       ...control ? { videos: [{ path: frozenInput(previs.depthVideo!), mimeType: "video/mp4" }] } : { skipPrevis: true },
       audios: track ? [{ path: frozenInput(track), mimeType: "audio/wav" }] : [],
       loras: loras.map(lora => ({ path: lora.path, strength: 1 })), seed: item.seed, parts: item.parts,
@@ -267,7 +332,7 @@ export async function prepareClipInputs(cwd: string, production: Production, ite
   const previs = production.previs!.find(shot => shot.shot === item.shot)!;
   const dub = production.dub!.shots.find(shot => shot.shot === item.shot)!;
   const control = controlled(production, item.shot);
-  if (!plan || !item.prompt || !previs.layout || !previs.video || !shot.keyframe || control && !previs.depthVideo) throw new Error(`Shot ${item.shot}: missing contract, prompt, keyframe or previs`);
+  if (!plan || !item.prompt || !previs.video || control && !previs.depthVideo || continuedFrom(production, item.shot) !== undefined && !shot.startFrame) throw new Error(`Shot ${item.shot}: missing contract, prompt, previs or the previous clip's last frame`);
   for (const prompt of item.parts ?? [item.prompt]) validateVideoPrompt(prompt);
   for (const [index, line] of dub.lines.entries()) {
     if (line.start !== plan.lines[index]?.start || line.words !== plan.lines[index]?.words || line.speaker !== plan.lines[index]?.speaker || !line.path || !Number.isFinite(line.seconds) || line.start! + line.seconds! > dub.seconds) throw new Error(`Shot ${item.shot}: dialogue differs from its contract or exceeds the shot`);
@@ -281,7 +346,7 @@ export async function prepareClipInputs(cwd: string, production: Production, ite
     if (!Number.isFinite(seconds) || Math.abs(seconds - input.expected) > 0.12) throw new Error(`Shot ${item.shot}: input ${input.path} lasts ${seconds} seconds, expected ${input.expected}`);
   }
   const snapshot = await snapshotMedia(cwd, {
-    files: [{ path: shot.keyframe, mimeType: mimeOf(shot.keyframe) }, ...control ? [{ path: previs.depthVideo!, mimeType: "video/mp4" }] : [], ...dub.track ? [{ path: dub.track, mimeType: "audio/wav" }] : []],
+    files: [...shot.startFrame ? [{ path: shot.startFrame, mimeType: mimeOf(shot.startFrame) }] : [], ...control ? [{ path: previs.depthVideo!, mimeType: "video/mp4" }] : [], ...dub.track ? [{ path: dub.track, mimeType: "audio/wav" }] : []],
     outputDirectory: productionDirectory(production.id) + "/inputs/shot" + item.shot,
     binding: clipInputBinding(production, item),
   }, signal);
@@ -308,13 +373,9 @@ function clipInputSource(production: Production, item: ProductionClip) {
 
 function validatedClips(production: Production) {
   const clips = [...production.videos ?? []].sort((a, b) => a.shot - b.shot);
-  const preparationComplete = clips.every(clip => {
-    const plan = production.execution?.shots.find(shot => shot.shot === clip.shot);
-    const guide = production.previs?.find(shot => shot.shot === clip.shot);
-    if (!plan || !guide?.layout || !guide.video) return false;
-    return plan.preparation === "reference" ? guide.referenceOnly === true : !guide.referenceOnly;
-  });
-  if (!preparationComplete || !clips.length || clips.length !== production.shots?.length || new Set(clips.map(clip => clip.shot)).size !== clips.length || clips.some(clip => !clip.video || !inputSnapshotSchema.safeParse(clip.inputSnapshot).success || !clip.inputSnapshot!.files.length || clip.inputSnapshot!.request !== clipInputSource(production, clip) || !production.shots!.some(shot => shot.shot === clip.shot))) throw new Error("Assembly blocked: every shot needs complete preparation and matching frozen inputs");
+  const preparationComplete = clips.every(clip => !!production.previs?.find(shot => shot.shot === clip.shot)?.video);
+  // A clip that starts from no picture, follows no previs and has no dub freezes no file; its prompt binding still counts.
+  if (!preparationComplete || !clips.length || clips.length !== production.shots?.length || new Set(clips.map(clip => clip.shot)).size !== clips.length || clips.some(clip => !clip.video || !inputSnapshotSchema.safeParse(clip.inputSnapshot).success || clip.inputSnapshot!.request !== clipInputSource(production, clip) || !production.shots!.some(shot => shot.shot === clip.shot))) throw new Error("Assembly blocked: every shot needs complete preparation and matching frozen inputs");
   return clips;
 }
 
@@ -486,9 +547,10 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
   }
   const { filters, soundInputs } = filmFilters(production, clips, lengths, subtitles);
   const output = `${folder}/film.mp4`;
-  if (!subtitles) {
-    const resident = clips.map(clip => clipArtifactSchema.parse(clip.remote));
-    const target = resident.at(-1)!;
+  const resident = subtitles ? [] : clips.map(clip => clipArtifactSchema.parse(clip.remote));
+  // The film is cut on a machine that still holds a clip; once none is left in the pool, it is cut here.
+  const target = resident.findLast(artifact => colabSessionName(artifact.lane) === artifact.session);
+  if (target) {
     const job = "finish" + crypto.randomUUID().replaceAll("-", "");
     const uploads: { name: string; data: string | Uint8Array }[] = [];
     const inputs: { path: string; bytes: number; sha256: string }[] = [];

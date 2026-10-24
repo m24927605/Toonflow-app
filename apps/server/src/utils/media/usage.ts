@@ -1,10 +1,8 @@
 import { dirname, join } from "node:path";
 import { readFile, readFileSync, writeAtomic, writeAtomicSync } from "@toonflow/file";
-import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 
-type BudgetModel = { id: string; label: string; imageSizes?: unknown; durationResolutionMap?: unknown };
-type Ledger = { date: string; providers: Record<string, { count: number; units: number }>; triedModels: string[] };
+type Ledger = { date: string; providers: Record<string, { count: number; units: number }> };
 
 const ledgerPath = () => join(dirname(conf.path), "mediaUsage.json");
 const today = () => new Date().toLocaleDateString("sv-SE");
@@ -16,8 +14,8 @@ async function readLedger(): Promise<Ledger> {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
-  // Spending resets every day; the list of models that passed a trial run is kept.
-  return { date: today(), providers: stored?.date === today() ? stored.providers : {}, triedModels: stored?.triedModels ?? [] };
+  // Spending resets every day.
+  return { date: today(), providers: stored?.date === today() ? stored.providers : {} };
 }
 
 function update(change: (ledger: Ledger) => void) {
@@ -43,39 +41,14 @@ function rejected(message: string): never {
   throw Object.assign(new Error(message), { status: 429 });
 }
 
-/**
- * Enforces the provider's daily generation cap and the first-run trial: the first request for a model must be small
- * (the smallest image size, or a short low-resolution video) so a new model is checked cheaply before real runs.
- */
-export function reserveGeneration(providerId: string, model: BudgetModel, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest) {
+/** Enforces the provider's daily generation cap. */
+export function reserveGeneration(providerId: string) {
   return update(ledger => {
     const used = ledger.providers[providerId]?.count ?? 0;
     const cap = limit(providerConfig(providerId).dailyLimit);
     if (cap !== undefined && used >= cap) rejected(`Daily generation limit reached for ${providerId} (${used}/${cap}); raise it in the media model settings or wait until tomorrow`);
-    if (!ledger.triedModels.includes(`${providerId}/${model.id}`) && mediaType !== "audio") {
-      const sizes = Array.isArray(model.imageSizes) ? model.imageSizes as string[] : [];
-      const durations = Array.isArray(model.durationResolutionMap) ? model.durationResolutionMap as { duration: number[]; resolution: string[] }[] : [];
-      const smallestSize = sizes[0];
-      if (mediaType === "image" && smallestSize && request.size && request.size !== smallestSize) {
-        rejected(`First run of ${model.label}: send one ${smallestSize} trial image before larger sizes`);
-      }
-      if (mediaType === "video") {
-        const shortest = durations.length ? Math.min(...durations.flatMap(entry => entry.duration)) : 5;
-        const lowest = durations[0]?.resolution[0];
-        if ((request.duration ?? 0) > Math.max(5, shortest) || (lowest && request.resolution && request.resolution !== lowest)) {
-          rejected(`First run of ${model.label}: send one trial of at most ${Math.max(5, shortest)} s${lowest ? ` at ${lowest}` : ""} before longer or sharper runs`);
-        }
-      }
-    }
     // A dispatched request can bill even when it fails or the server exits, so attempts reserve a durable daily slot.
     (ledger.providers[providerId] ??= { count: 0, units: 0 }).count += 1;
-  });
-}
-
-/** Marks a successfully finished model as trialled; its daily slot was reserved before dispatch. */
-export function recordGeneration(providerId: string, modelId: string) {
-  return update(ledger => {
-    if (!ledger.triedModels.includes(`${providerId}/${modelId}`)) ledger.triedModels.push(`${providerId}/${modelId}`);
   });
 }
 

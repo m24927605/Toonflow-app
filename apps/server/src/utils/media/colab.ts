@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { zipSync } from "fflate";
 import { lstat, mkdir, mkdtemp, readFile, readlink, rm, symlink, writeFile } from "@toonflow/file";
 import { findCommand } from "@/utils/cli";
+import { resolveEnvReference } from "@/utils/conf/env";
 import { checkColabBudget, meterColab, recordColabUnits } from "@/utils/media/usage";
 import runtimeSource from "./colabRuntime.py" with { type: "text" };
 import preparationSource from "./modelPreparation.py" with { type: "text" };
@@ -115,44 +116,6 @@ function meterSessions() {
   }
 }
 
-// Colab gives the Google AI Ultra account four GPU sessions at once, at most three of them A100s (measured 2026-10-19:
-// a fourth A100 was refused while an L4 still started) and two L4s; a start beyond that waits here for one of this
-// process's sessions to stop rather than being refused. ACT: Only this process's sessions count; another app on the
-// same account still meets the refusal, which the start retries. A smaller plan gets fewer and its starts wait there.
-const machineLimits: { total: number } & Partial<Record<ColabMachine["gpu"], number>> = { total: 4, A100: 3, L4: 2 };
-const runningMachines: { gpu: ColabMachine["gpu"] }[] = [];
-const machineWaiters = new Set<() => void>();
-
-/** Waits for a free machine of this kind and returns its release. */
-async function acquireMachine(gpu: ColabMachine["gpu"], signal?: AbortSignal) {
-  signal?.throwIfAborted();
-  const free = () => runningMachines.length < machineLimits.total && runningMachines.filter(item => item.gpu === gpu).length < (machineLimits[gpu] ?? machineLimits.total);
-  while (!free()) {
-    await new Promise<void>((resolve, reject) => {
-      const wake = () => {
-        machineWaiters.delete(wake);
-        signal?.removeEventListener("abort", abort);
-        resolve();
-      };
-      const abort = () => {
-        machineWaiters.delete(wake);
-        reject(signal!.reason);
-      };
-      machineWaiters.add(wake);
-      signal?.addEventListener("abort", abort, { once: true });
-    });
-    signal?.throwIfAborted();
-  }
-  signal?.throwIfAborted();
-  const slot = { gpu };
-  runningMachines.push(slot);
-  return () => {
-    const index = runningMachines.indexOf(slot);
-    if (index < 0) return;
-    runningMachines.splice(index, 1);
-    for (const wake of [...machineWaiters]) wake();
-  };
-}
 // CLI errors quote the VM's proxy URLs, whose token opens the running VM; messages are shown and saved, so it is cut.
 const tail = (text: string, length = 3000) => stripVTControlCharacters(text).replace(/(colab-runtime-proxy-token=)[^&\s]+/g, "$1\u2026").trim().slice(-length);
 
@@ -353,6 +316,10 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   const directory = await mkdtemp(join(tmpdir(), "toonflow-colab-"));
   if (retainedName && !/^toonflow-[0-9a-f]{8}$/.test(retainedName)) throw new Error("Invalid retained Colab session name");
   const name = retainedName ?? `toonflow-${crypto.randomUUID().slice(0, 8)}`;
+  // The user's Hugging Face token (HF_TOKEN in the environment or ~/.env), which the weight downloads send to the Hub so
+  // many machines starting at once are not throttled. It reaches the VM only as a kernel environment variable through
+  // `colab exec --env`, never inside a script, an upload or a log, and the scripts pass it to Hugging Face alone.
+  const hubToken = await resolveEnvReference("env:HF_TOKEN").then(value => typeof value === "string" && /^hf_\w+$/.test(value.trim()) ? value.trim() : undefined, () => undefined);
   let startedAt = 0;
   let hourlyRate = machineRates[gpu];
   let files = 0;
@@ -377,7 +344,7 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   async function spawnExec(path: string, env: ColabJob["env"], signal: AbortSignal) {
     const child = Bun.spawn([
       command, "exec", "--session", name, "--timeout", String(execTimeout),
-      ...Object.entries(env).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
+      ...Object.entries({ ...env, ...hubToken ? { HF_TOKEN: hubToken } : {} }).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
       "--file", path,
     ], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal });
     const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
@@ -811,20 +778,14 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
     stopped = true;
     sessionRates.delete(name);
     meterSessions();
-    releaseMachine();
     if (billedAt) await recordColabUnits(provider, (Date.now() - billedAt) / 3_600_000 * hourlyRate);
     await rm(directory, { recursive: true, force: true });
   }
 
-  // Taken last before the try, whose failure path stops the session and so frees the machine again.
-  const releaseMachine = await acquireMachine(gpu, signal).catch(async error => {
-    await rm(directory, { recursive: true, force: true });
-    throw error;
-  });
   try {
-    // Colab refuses a new session while the account's GPU sessions are taken (four, fewer of one kind) and
-    // answers 503 while it is short of machines, so such a start waits and retries instead of failing a job that may
-    // follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
+    // Toonflow sets no machine count of its own: Colab decides. It refuses a new session while the account's sessions
+    // are taken and answers 503 while it is short of machines, so such a start waits and retries instead of failing a
+    // job that may follow paid steps. A 503 may still have assigned a machine, so it is stopped before the next try.
     // Honor the planned hardware without probing an unrequested accelerator first.
     let assigned: ColabMachine["gpu"] | undefined = retainedName ? gpu : undefined;
     for (const waitStart = Date.now(); !assigned; ) {
@@ -853,10 +814,15 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
     if (retainedName) await keepAlive(signal);
   } catch (error) {
     if (!retainedName) await close(error);
-    else releaseMachine();
     throw error;
   }
   return { name, job, readOutput, writeInput, close, attribute, keepAlive };
+}
+
+/** Stops a Toonflow machine this process holds no session for, such as one left over from before a restart. */
+export async function stopColabSession(name: string) {
+  if (!/^toonflow-[0-9a-f]{8}$/.test(name)) throw new Error("Invalid Colab session name");
+  await colab(findCommand("colab", "Colab CLI not found"), ["stop", "--session", name]);
 }
 
 /** Read a Toonflow kernel heartbeat without executing code, owning the VM or refreshing its idle lease. */

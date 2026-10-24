@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from modelPreparation import hubToken
 
 os.environ.update(HF_HUB_DISABLE_TELEMETRY="1", HF_HUB_DISABLE_IMPLICIT_TOKEN="1", DO_NOT_TRACK="1")
 request = json.loads(Path("/content/colabInput.json").read_text())
@@ -39,9 +40,9 @@ if globals().get("loadedModel") != (modelId, revision):
     globals().get("releaseLoadedModel", lambda: None)()
     loadedModel = None
     started = time.monotonic()
-    processor = AutoProcessor.from_pretrained(modelId, revision=revision, fix_mistral_regex=True)
+    processor = AutoProcessor.from_pretrained(modelId, revision=revision, fix_mistral_regex=True, token=hubToken())
     model = AutoModelForImageTextToText.from_pretrained(
-        modelId, revision=revision, device_map="auto", dtype=torch.bfloat16,
+        modelId, revision=revision, device_map="auto", dtype=torch.bfloat16, token=hubToken(),
         quantization_config=BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=torch.bfloat16,

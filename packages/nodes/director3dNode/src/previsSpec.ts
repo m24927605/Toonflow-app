@@ -34,8 +34,6 @@ export const propKinds = {
 } satisfies Record<string, { size: [number, number, number]; wall?: boolean; raised?: number; seat?: number }>;
 export type PropKind = keyof typeof propKinds;
 
-export const postures = ["standing", "seated", "kneeling", "lying"] as const;
-export type Posture = (typeof postures)[number];
 export const cameraSides = ["front", "frontLeft", "frontRight", "left", "right", "back", "overShoulder"] as const;
 
 const name = z.string().trim().min(1).max(60);
@@ -58,10 +56,10 @@ const specSchema = <P extends z.ZodType<Place>>(place: P) => z.strictObject({
       size: z.strictObject({ width: metres, depth: metres, height: metres }).optional(),
     })).max(40),
   }),
-  people: z.array(z.strictObject({ name, enters: z.number().int().min(1), at: place, posture: z.enum(postures), faces: name.optional() })).min(1).max(12),
+  people: z.array(z.strictObject({ name, enters: z.number().int().min(1), at: place, faces: name.optional() })).min(1).max(12),
   shots: z.array(z.strictObject({
     shot: z.number().int().min(1),
-    moves: z.array(z.strictObject({ name, to: place.optional(), posture: z.enum(postures).optional(), faces: name.optional(), at: z.number().min(0).optional() })).max(24).optional(),
+    moves: z.array(z.strictObject({ name, to: place.optional(), faces: name.optional(), at: z.number().min(0).optional() })).max(24).optional(),
     camera: z.strictObject({
       side: z.enum(cameraSides), over: name.optional(),
       angle: z.enum(["eye", "low", "high"]).optional(), move: z.enum(["static", "pushIn", "pullOut", "follow"]).optional(),
@@ -72,12 +70,12 @@ export const previsSpecSchema = specSchema(place);
 /** The plan's shape as a JSON Schema, which the model's sampling is held to, so no reply breaks the format. */
 export const previsSpecJsonSchema = z.toJSONSchema(specSchema(placeShape)) as Record<string, unknown>;
 export type PrevisSpec = z.infer<typeof previsSpecSchema>;
-export type SpecShot = { shot: number; seconds: number; cast: string[]; gaze?: Record<string, string> };
+export type SpecShot = { shot: number; seconds: number; cast: string[]; gaze?: Record<string, string>; size?: string };
 
 /** The instruction for the plan, with the script as {{ref 1}} and the shot list as {{ref 2}}. */
 export function previsSpecPrompt(shots: SpecShot[]) {
   return [
-    "{{ref 1}} is the script of a short film and {{ref 2}} its shot list. Read both completely, then plan the previs of every shot: the set, where each person is and moves, and where the camera stands. Code builds the 3D set and computes every camera from your plan, so you name places and never give coordinates.",
+    "{{ref 1}} is the script of a short film and {{ref 2}} its shot list. Read both completely, then plan the previs of every shot: the set, where each person is and moves, and where the camera stands. The previs is blocking only: it marks where people are, never their poses, which the frames are drawn with later. Code builds the 3D set and computes every camera from your plan, so you name places and never give coordinates.",
     `The shots: ${shots.map(item => `${item.shot} (${item.seconds} s${item.cast.length ? `, in frame: ${item.cast.join(", ")}` : ""})`).join("; ")}.`,
     `Required opening gaze in SCREEN coordinates, when specified: ${JSON.stringify(shots.map(({ shot, gaze }) => ({ shot, gaze })))}. Actor facing and camera placement must produce these directions in the rendered image; world left/right is not screen left/right.`,
     "",
@@ -88,18 +86,17 @@ export function previsSpecPrompt(shots: SpecShot[]) {
     "- \"props\": every piece of furniture, door and window the shots use or the script names, each {\"name\": a unique name, \"kind\": a kind below, \"at\": a place}. Leave out things held in the hand, and floor coverings such as tatami or rugs: the floor is built already.",
     `- Kinds: ${Object.keys(propKinds).filter(kind => kind !== "other").join(", ")}, or "other" with "size": {"width", "depth", "height"} in metres. Doors, sliding doors, windows, desks, sofas, beds, cabinets and counters stand against the wall nearest their place.`,
     "",
-    "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side; or on a chair, sofa, bed, cushion or bench: {\"prop\": its name, \"side\": \"on\"}.",
+    "A place is a part of the floor seen from the front, where the camera of a wide shot stands looking at the back wall: \"centre\", \"back\", \"front\", \"left\", \"right\", \"backLeft\", \"backRight\", \"frontLeft\" or \"frontRight\". Or beside a prop: {\"prop\": its name, \"side\": \"front\", \"back\", \"left\" or \"right\"}, where a door's or window's front is the room side; or on a chair, sofa, bed, cushion or bench, for someone sitting or lying on it: {\"prop\": its name, \"side\": \"on\"}. People who are together on one bed or sofa are all \"on\" it.",
     "",
-    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"posture\": \"standing\", \"seated\", \"kneeling\" or \"lying\", \"faces\": the person or prop they look at}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place.",
-    "Seated means hips supported by a raised chair, sofa, bed or bench: include that furniture and put the person on it. Never use seated beside a desk without a chair. Use kneeling for floor sitting or seiza. A freestanding writing desk can use kind table named studyDesk; place the chair behind it so the desk is between the seated person and the camera when required.",
+    "people: everyone in any shot, named exactly as the shot list names them: {\"name\", \"enters\": the first shot they are in the place, \"at\": where they are when that shot starts, \"faces\": the person or prop they look at}. Someone who comes in through a door enters at its front, as it opens. Once in, people stay in the place. Someone who sits needs the chair, sofa, bed or bench they sit on in the set.",
     "",
     "shots: one per shot, in order: {\"shot\": its number, \"moves\": [...], \"camera\": {...}}.",
-    "- \"moves\": each person who moves, changes posture or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"posture\": their posture at the end, \"faces\": the person or prop they look at by the end, \"at\": the second of the shot the move starts}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
-    "- Someone who does several things in one shot, as in a long take, has one move for each, in story order, each with its \"at\" later than the one before, such as walking to the door at 0, then to a cushion and sitting down at 6; each move gets at least a second, and a person's only move may leave \"at\" out to start at once.",
+    "- \"moves\": each person who goes to another place or turns to look at something else during the shot: {\"name\", \"to\": the place where they end, \"faces\": the person or prop they look at by the end, \"at\": the second of the shot the move starts}; leave out what does not change. Everyone starts where the previous shot left them and keeps looking at what they looked at, so leave out anyone who stays as they are.",
+    "- Someone who does several things in one shot, as in a long take, has one move for each, in story order, each with its \"at\" later than the one before, such as walking to the door at 0, then to a cushion at 6; each move gets at least a second, and a person's only move may leave \"at\" out to start at once.",
     "- \"faces\" names a person or a prop exactly as the plan does; leave it out to have someone look at the nearest other person.",
-    "- \"camera\": {\"side\": where the camera stands, seen from the front: \"front\", \"frontLeft\", \"frontRight\", \"left\", \"right\" or \"back\"; or \"overShoulder\" with \"over\": the person whose shoulder it looks past at another person; \"angle\": \"eye\", \"low\" or \"high\"; \"move\": \"static\", \"pushIn\", \"pullOut\" or \"follow\"}. The shot size and who is in frame come from the shot list.",
+    "- \"camera\": {\"side\": where the camera stands, seen from the front: \"front\", \"frontLeft\", \"frontRight\", \"left\", \"right\" or \"back\"; or \"overShoulder\" with \"over\": the person whose shoulder it looks past at another person; \"angle\": \"eye\", \"low\" or \"high\"; \"move\": \"static\", \"pushIn\", \"pullOut\" or \"follow\"}. The shot size and who is in frame come from the shot list. Never give three shots in a row with the same people at the same shot size the same camera side and angle: the third needs another side or angle.",
     "",
-    "Follow each row's action, camera and state cells and the script. Keep the staging continuous, and when a row's state cell gives someone a posture or place other than where the previous shot left them, give that shot a move taking them there: people may sit down or stand up between shots.",
+    "Follow each row's action, camera and state cells and the script. Keep the staging continuous, and when a row's state cell puts someone at another place than where the previous shot left them, give that shot a move taking them there.",
   ].join("\n");
 }
 
@@ -111,8 +108,8 @@ const onWall = (kind: PropKind) => "wall" in propKinds[kind];
 
 /**
  * Reads the model's reply into a plan and lists what is wrong with it for the model to fix: the JSON and its shape,
- * then names that point nowhere, people missing from the shots they are in frame in, seats that are not seats, and
- * looks at nothing in the plan.
+ * then names that point nowhere, people missing from the shots they are in frame in, places on props that are not seats,
+ * and looks at nothing in the plan.
  * Behind a prop against a room's wall is inside the wall, and the model writes it for someone at a door, so it is
  * read as the prop's room side rather than sent back.
  * A shot the plan leaves out keeps everyone still under a front camera.
@@ -150,10 +147,6 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
   const knownFaces = (faces: string | undefined) => faces && (people.has(faces) || props.has(faces)) ? faces : undefined;
   for (const person of spec.people) {
     checkPlace(person.at, `${person.name}'s entrance`);
-    if (person.posture === "seated") {
-      const kind = typeof person.at === "string" ? undefined : props.get(person.at.prop);
-      if (typeof person.at === "string" || person.at.side && person.at.side !== "on" || !kind || !["chair", "sofa", "bed", "bench"].includes(kind)) problems.push(`${person.name} is seated but has no raised seat. Add a chair, sofa, bed or bench and place them on it; floor sitting must use kneeling.`);
-    }
     person.faces = knownFaces(person.faces);
   }
   for (const { shot, cast } of shots) {
@@ -183,6 +176,16 @@ export function readPrevisSpec(reply: string, shots: SpecShot[]): { spec?: Previ
     }
     const { over } = item.camera;
     if (item.camera.side === "overShoulder" && (!over || !people.has(over))) problems.push(`Shot ${item.shot} looks over a shoulder, but "over" does not name a person in "people".`);
+  }
+  // A clip may start from the last frame of the one before when both keep one camera setup, but not from a clip that
+  // itself did, as each adds its drift: the third of a setup starts afresh, which a new camera side or angle hides.
+  const setup = (index: number) => {
+    const item = spec.shots[index];
+    const shot = item && shots.find(other => other.shot === item.shot);
+    return item && shot ? JSON.stringify([item.camera.side, item.camera.angle ?? "eye", item.camera.over ?? "", shot.size ?? "", [...shot.cast].sort()]) : undefined;
+  };
+  for (let index = 2; index < spec.shots.length; index++) {
+    if (setup(index) !== undefined && setup(index) === setup(index - 1) && setup(index) === setup(index - 2)) problems.push(`Shots ${spec.shots[index - 2]!.shot}, ${spec.shots[index - 1]!.shot} and ${spec.shots[index]!.shot} keep one camera side and angle; give shot ${spec.shots[index]!.shot} another camera side or angle, as no more than two shots in a row may share a setup.`);
   }
   return problems.length ? { problems } : { spec, problems };
 }

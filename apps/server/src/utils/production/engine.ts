@@ -15,12 +15,12 @@ import { preparationKey, prepareModels, registerModelCaches, saveModelCaches } f
 import { applySpeakerLabels, missingSpeakerLabels, speakerLabelsJsonSchema, planJsonSchema, planPrompt, readPlan, requireCurrentPlan } from "./plan";
 import { executionAllocation, executionSource, planExecution, planStartup, startupAllocation } from "./execution";
 import { requireJevKey } from "@/utils/ai/jev";
-import { castPrompt, drawAssets, drawKeyframes, drawPoses, parseCast, planAssetLoras, trainAssetLora, castJsonSchema, emptyEnvironmentRule } from "./assets";
-import { applyDialogueTiming, clipSeconds, DialogueTimingError, dialogueTimingSchema, planDub, recordDub } from "./dub";
+import { castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLora, castJsonSchema, emptyEnvironmentRule } from "./assets";
+import { applyDialogueTiming, clipSeconds, DialogueTimingError, dialogueTimingSchema, fitDialogueTiming, planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis, cameraMeasurements, previsCastIssues } from "./previs";
 import { ReplyCutError, replyJson } from "./review";
 import { ambiencePrompt, generateAmbience } from "./ambience";
-import { finishFilm, joinRoughCut, renderClips, prepareClipInputs, validateFilm, scoreFilm, writeClipPrompts } from "./video";
+import { continuedFrom, finishFilm, joinRoughCut, renderClips, prepareClipInputs, takeStartFrame, validateFilm, scoreFilm, writeClipPrompts } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
 import { planShots, shotReferences } from "./shots";
 import { readConversation, updateConversation } from "./conversation";
@@ -35,7 +35,7 @@ import {
 // Qwen generates content; Jev selects execution resources. Quality checks are deterministic.
 const runners = new Map<string, { controller: AbortController; finished: Promise<void> }>();
 const runnerKey = (cwd: string, id: string) => JSON.stringify([cwd, id]);
-type RuntimeOwner = { release: () => void; budget: number; budgetReached: boolean; monitor?: ReturnType<typeof setInterval>; preparation?: { state: NonNullable<Production["runtime"]>; roles: Map<string, Promise<void>>; groups: Map<number, Promise<void>>; textReady: Promise<void>; allReady: Promise<void>; cancel: () => void; textRecorded: boolean; extrasStarted: boolean } };
+type RuntimeOwner = { release: () => void; started?: boolean; preparation?: { state: NonNullable<Production["runtime"]>; roles: Map<string, Promise<void>>; groups: Map<number, Promise<void>>; textReady: Promise<void>; allReady: Promise<void>; cancel: () => void; textRecorded: boolean; extrasStarted: boolean } };
 const runtimeOwners = new Map<string, RuntimeOwner>();
 const conversationReplies = new Map<string, Promise<void>>();
 const continuations = new Set<string>();
@@ -58,7 +58,6 @@ async function resetScriptOutputs(cwd: string, production: Production) {
 async function releaseRuntime(key: string, preserveCache = false) {
   const runtime = runtimeOwners.get(key);
   if (!runtime) return;
-  clearInterval(runtime.monitor);
   runtime.preparation?.cancel();
   if (runtime.preparation) await Promise.allSettled([runtime.preparation.allReady]);
   runtime.release();
@@ -137,10 +136,8 @@ async function prepareRuntime(cwd: string, production: Production, signal: Abort
   if (!production.execution || preparing.extrasStarted) return;
   preparing.extrasStarted = true;
   const extraReady = (async () => {
-    const recipes: "pose"[] = [];
-    if (production.execution!.shots.some(item => item.preparation === "staged")) recipes.push("pose");
     const pendingSpeech = production.dub!.shots.some(shot => shot.lines.some(line => !line.path));
-    const extra = [...recipes.length ? [qwenImagePreparation(recipes)] : [], ...pendingSpeech && !preparing.roles.has("drama3") ? [drama3Preparation()] : []];
+    const extra = pendingSpeech && !preparing.roles.has("drama3") ? [drama3Preparation()] : [];
     await Promise.all(extra.map(async item => {
       const lane = item.name === "drama3" ? 2 : 1;
       const ready = Promise.withResolvers<void>();
@@ -200,8 +197,7 @@ export async function createSimpleProduction(cwd: string, id: string, outline: s
   if (startingSimpleProduction || runners.size) throw Object.assign(new Error(translateMessage("另一支影片正在製作，這次先保留討論內容，尚未開始新製作。")), { status: 409 });
   startingSimpleProduction = true;
   try {
-    const input: ProductionInput = { outline, mode: "simple", fromConversation, modelRecipe: "sulphur2", references, referenceNotes, seconds: 30, ratio: "16:9", quality: "720p", budget: 1, gates: [], photos: [], subtitles: false, music: false };
-    input.budget = Math.min(1000, Math.ceil((await quoteProduction(input)).total * 2));
+    const input: ProductionInput = { outline, mode: "simple", fromConversation, modelRecipe: "sulphur2", references, referenceNotes, seconds: 30, ratio: "16:9", quality: "720p", gates: [], photos: [], subtitles: false, music: false };
     return await createProduction(cwd, id, input);
   } finally { startingSimpleProduction = false; }
 }
@@ -291,7 +287,7 @@ export async function sendProductionMessage(cwd: string, id: string, messageId: 
           if (response.change && current && current.input.outline.length + waiting + response.change.length + 40 > 20000) throw new Error("Production changes exceed the story length limit");
           turn.reply = response.reply; turn.status = "answered"; turn.seconds = (performance.now() - started) / 1000;
           if (!current && response.brief) state.brief = response.brief;
-          const canExecute = current && current.message !== "budget" && (!runners.size || runners.has(key));
+          const canExecute = current && (!runners.size || runners.has(key));
           if (current && response.change) {
             turn.change = { text: response.change, status: canExecute && startRequested ? "queued" : "draft" };
             if (startRequested) {
@@ -302,14 +298,14 @@ export async function sendProductionMessage(cwd: string, id: string, messageId: 
           if (startRequested && current && response.change && !canExecute) turn.reply = translateMessage("目前無法啟動這次調整，討論內容已保留，請查看製作狀態。");
           if (startRequested && canExecute) for (const item of state.turns.slice(0, state.turns.findIndex(turn => turn.id === messageId) + 1)) if (item.change?.status === "draft") item.change.status = "queued";
         });
-        if (current && startRequested && current.message !== "budget") {
+        if (current && startRequested) {
           const queued = (await readConversation(cwd, id)).turns.filter(turn => turn.change?.status === "queued").map(turn => turn.id);
           const resume = async () => {
             if (signal.aborted || runners.size || startingSimpleProduction) return;
             startingSimpleProduction = true;
             try {
               const latest = await readProduction(cwd, id);
-              if (latest.message === "budget" || latest.message === "stopped" && current.message !== "stopped") return;
+              if (latest.message === "stopped" && current.message !== "stopped") return;
               if (queued.length && queued.every(messageId => latest.conversationChanges?.applied.includes(messageId))) return;
               if (!queued.length && !startRequested) return;
               if (!queued.length && latest.status === "done") resetShotInputs(latest, latest.shots?.map(shot => shot.shot) ?? [], false);
@@ -520,7 +516,7 @@ function shotListPrompt(script: string, names: string[], input: ProductionInput)
   ].join("\n");
 }
 
-/** Stops for a person: a review, the budget, or anything else they must decide; `message` is a code the page words. */
+/** Stops for a person: a review, or anything else they must decide; `message` is a code the page words. */
 async function wait(cwd: string, production: Production, message: string, review?: Production["review"], detail?: string) {
   Object.assign(production, { status: production.input.mode === "simple" ? "failed" : "waiting", message, review, detail });
   await saveProduction(cwd, production);
@@ -538,14 +534,6 @@ async function spentUnits(production: Production, signal: AbortSignal) {
   production.balanceAtStart ??= balance;
   production.meterAtStart ??= metered;
   return Math.max(production.balanceAtStart - balance, metered - production.meterAtStart);
-}
-
-/** Stops before a step that would take the production past its budget; it never spends on a guess when the spend cannot be read. */
-async function withinBudget(cwd: string, production: Production, nextUnits: number, signal: AbortSignal) {
-  const spent = await spentUnits(production, signal).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
-  if (spent instanceof Error) return wait(cwd, production, "balanceUnreadable", undefined, spent.message);
-  if (spent + nextUnits > production.input.budget) return wait(cwd, production, "budget");
-  return true;
 }
 
 /**
@@ -576,12 +564,7 @@ async function timed<T>(cwd: string, production: Production, step: string, work:
 
 function resetShotInputs(production: Production, shots: number[], resetVisuals = true) {
   for (const shot of production.shots ?? []) if (resetVisuals && shots.includes(shot.shot)) {
-    delete shot.poses;
-    delete shot.keyframe;
-  }
-  for (const guide of production.previs ?? []) if (resetVisuals && shots.includes(guide.shot) && guide.referenceOnly) {
-    delete guide.layout;
-    delete guide.video;
+    delete shot.startFrame;
   }
   production.videos = production.videos?.map(item => shots.includes(item.shot) ? { shot: item.shot } : item);
   for (const field of ["roughCut", "film", "report"] as const) delete production[field];
@@ -591,19 +574,24 @@ async function repairDialogueTiming(cwd: string, production: Production, signal:
   const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
   const prompt = `Reallocate this film's shot durations and local dialogue starts using the measured recordings. Preserve every shot, action, speaker, words and the exact ${production.input.seconds}-second total. Do not speed up, trim or replace audio. Leave enough time for each visual action and natural speech. Return {"shots":[{"shot":1,"seconds":2,"starts":[]}]} in shot order, where starts contains one local start per recorded line.\nScript:\n${script}\nShot list:\n${shotList}\nMeasured recordings:\n${JSON.stringify(production.dub!.shots.map(shot => ({ shot: shot.shot, seconds: shot.seconds, lines: shot.lines.map(line => ({ speaker: line.speaker, words: line.words, start: line.start, seconds: line.seconds })) })))}`;
   let feedback = "";
-  while ((production.dialogueTimingRepairs ?? 0) < 2) {
+  let updated: string | undefined;
+  while (!updated && (production.dialogueTimingRepairs ?? 0) < 2) {
     production.dialogueTimingRepairs = (production.dialogueTimingRepairs ?? 0) + 1;
     await saveProduction(cwd, production);
     const reply = await complete(shotListWriter, `${prompt}${feedback}`, signal, { schema: z.toJSONSchema(z.strictObject({ shots: dialogueTimingSchema })) });
-    let updated: string;
     try {
       updated = applyDialogueTiming(production, script, shotList, replyJson(reply, "shots").shots);
     } catch (error) {
       signal.throwIfAborted();
       if (!(error instanceof Error)) throw error;
       feedback = `\nYour previous proposal was invalid: ${error.message}. Correct the timing without changing the story or total length.`;
-      continue;
     }
+  }
+  // The text model sometimes gets the arithmetic wrong twice; a timing that only grows shots to hold their recordings
+  // is computed instead, and the film fails only when the recordings cannot fit at all.
+  const fitted = updated ? undefined : fitDialogueTiming(production);
+  if (fitted) updated = applyDialogueTiming(production, script, shotList, fitted);
+  if (updated) {
     await writeProductionText(cwd, production.shotList!.path, updated);
     resetShotInputs(production, production.shots!.map(shot => shot.shot));
     production.shots = planShots(updated, production.assets!, production.plan!);
@@ -624,7 +612,6 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const preparation = runtimeOwners.get(runnerKey(cwd, id))?.preparation;
   if (preparation) production.runtime = preparation.state;
   if (production.status !== "running") return false;
-  const estimate = estimateProduction(production.input, 0, await costRatio());
   const needs = (gate: ProductionGate) => production.input.gates.includes(gate) && !production.approved.includes(gate);
 
   if (production.input.mode === "simple" && !production.direction) {
@@ -636,14 +623,11 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     ), "direction")));
     Object.assign(production.input, production.direction);
     production.estimate = (await quoteProduction(production.input)).total;
-    production.input.budget = Math.min(1000, Math.max(production.input.budget, Math.ceil(production.estimate * 2)));
-    runtimeOwners.get(runnerKey(cwd, id))!.budget = production.input.budget;
     await saveProduction(cwd, production);
     return true;
   }
 
   if (!production.script) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const path = `${productionDirectory(id)}/script.md`;
     await writeProductionText(cwd, path, `${await timed(cwd, production, "script", () => complete(screenwriter, scriptPrompt(production.input), signal))}\n`);
     production.script = { path };
@@ -666,7 +650,6 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
 
   // The cast follows the shot list, whose state cells name the outfits each shot needs.
   if (!production.shotList || !production.assets) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
     const script = await readProductionText(cwd, production.script);
     const listed = production.shotList ? Promise.resolve() : timed(cwd, production, "shotList", async () => {
       const names = production.input.photos.map(photo => photo.name);
@@ -725,8 +708,7 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
     await saveProduction(cwd, production);
     return true;
   }
-  if (!production.previs || previsCastIssues(production).length || production.previs.some(item => !item.referenceOnly && !cameraMeasurements.safeParse(item.framed?.camera).success)) {
-    if (!await withinBudget(cwd, production, estimate.steps.find(item => item.step === "text")!.units, signal)) return false;
+  if (!production.previs || previsCastIssues(production).length || production.previs.some(item => !cameraMeasurements.safeParse(item.framed?.camera).success)) {
     const model = configuredModel(uncensoredTextModelId);
     resetShotInputs(production, production.shots.map(shot => shot.shot));
     production.previs = await timed(cwd, production, "previsPlan", () => planPrevis(cwd, production, `${script}\n\nAuthoritative opening states and dialogue times (screenLeft/screenRight refer to the image, not actor anatomy):\n${JSON.stringify(contract.shots)}`, shotList, { providerId: model.providerId, modelId: model.modelId }, signal));
@@ -738,8 +720,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
   const castIssues = previsCastIssues(production);
   if (castIssues.length) throw new Error(castIssues.join("; "));
   const assets = [...production.assets.characters, ...production.assets.places];
-  if (assets.some(item => !assetDrawn(item) || !item.loras) || !production.clips || production.clips.length !== production.shots.length
-    || production.previs.some(item => !item.video || Object.keys(item.poses ?? {}).some(name => !production.shots!.find(shot => shot.shot === item.shot)?.poses?.[name])) || production.shots.some(shot => !shot.keyframe)
+  if (assets.some(item => !assetDrawn(item)) || production.assets.characters.some(item => !item.loras) || !production.clips || production.clips.length !== production.shots.length
+    || production.previs.some(item => !item.video)
     || textsMissing(production) || production.videos?.some(item => !item.video)
     || (production.input.music && !production.music) || production.ambience?.some(item => !item.bed?.videoSha256)) {
     return produceClips(cwd, production, signal);
@@ -768,17 +750,10 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
 async function produceClips(cwd: string, production: Production, signal: AbortSignal) {
   const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
   const assets = [...production.assets!.characters, ...production.assets!.places];
-  const plan = await planAssetLoras(cwd, production, shotList);
-  const estimate = estimateProduction(production.input, 0, await costRatio());
+  const plan = await planAssetLoras(cwd, production);
   production.videos ??= production.shots!.map(({ shot }) => ({ shot }));
   const videos = production.videos;
   const open = videos.filter(item => !item.video);
-  const clipUnits = estimate.steps.find(item => item.step === "clips")!.units / videos.length;
-  const textUnits = estimate.steps.find(item => item.step === "text")!.units;
-  const units = plan.units + (assets.every(assetDrawn) ? 0 : estimate.steps.find(item => item.step === "assets")!.units)
-    + (textsMissing(production) ? textUnits : 0) + videos.filter(item => !item.video).length * clipUnits
-    + (production.ambience?.every(item => item.bed?.videoSha256) ? 0 : estimate.steps.find(item => item.step === "ambience")!.units);
-  if (units && !await withinBudget(cwd, production, units, signal)) return false;
   const save = () => saveProduction(cwd, production);
   await save();
   const controller = new AbortController();
@@ -827,28 +802,18 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
       const job = plan.jobs.find(job => job.item === item);
       if (job) await timed(cwd, production, "loras", () => trainAssetLora(cwd, job, workSignal, save));
     })())]));
-    const blocked = track(timed(cwd, production, "previsRender", () => renderPrevis(cwd, production, shotList, workSignal, save, shot => previsReady.get(shot)!.resolve(), async id => {
-      const shot = production.shots!.find(shot => shot.shot === id)!;
-      const expected = production.plan!.shots.find(item => item.shot === id)!;
-      await Promise.all([...expected.actors.map(actor => assetReady.get(production.assets!.characters.find(person => person.name === actor.name)!)!.promise), assetReady.get(production.assets!.places.find(place => place.name === shot.place)!)!.promise]);
-    })).catch(error => rejectWaiting(previsReady.values(), error)));
+    const blocked = track(timed(cwd, production, "previsRender", () => renderPrevis(cwd, production, shotList, workSignal, save, shot => previsReady.get(shot)!.resolve())).catch(error => rejectWaiting(previsReady.values(), error)));
     const releaseDrama = holdDrama3();
     const dubbed = track(timed(cwd, production, "dub", () => recordDub(cwd, production, workSignal, save, shot => dubReady.get(shot)!.resolve()).finally(releaseDrama)).catch(error => rejectWaiting(dubReady.values(), error)));
     const materials = new Map(production.previs!.map(previs => {
       const shot = production.shots!.find(item => item.shot === previs.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
-      const people = references.people.map(({ person }) => person);
-      // The keyframe is drawn on the previs depth map from the posed people and the place, so it waits for both.
-      const poses = track((async () => {
-        await Promise.all([previsReady.get(shot.shot)!.promise, ...people.map(item => assetReady.get(item)!.promise), ...references.place ? [assetReady.get(references.place.place)!.promise] : []]);
-        await timed(cwd, production, "poses", () => drawPoses(cwd, production, [shot.shot], workSignal, save));
-        await timed(cwd, production, "keyframes", () => drawKeyframes(cwd, production, [shot.shot], workSignal, save));
-      })());
-      const ready = track(Promise.all([poses, ...people.map(item => training.get(item)!)]));
-      return [shot.shot, { poses, ready }] as const;
+      // A clip starts from no picture: it waits for its previs and for the LoRAs of its people.
+      const ready = track(Promise.all([previsReady.get(shot.shot)!.promise, ...references.people.map(({ person }) => training.get(person)!)]));
+      return [shot.shot, { ready }] as const;
     }));
-    const posed = track(Promise.all([drawing, ...[...materials.values()].map(item => item.poses)]).finally(releaseQwen));
-    const prepared = track(Promise.all([posed, blocked, ...training.values()]).then(() => {
+    const drawn = track(drawing.finally(releaseQwen));
+    const prepared = track(Promise.all([drawn, blocked, ...training.values()]).then(() => {
       workSignal.throwIfAborted();
     }));
     track(prepared.then(() => { preparedForVideo = true; warmVideo(); }));
@@ -859,12 +824,18 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
       await timed(cwd, production, "texts", () => writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, workSignal), save, [item.shot]));
     })())]));
     track(prepareSound(cwd, production, dubbed, prepared, workSignal));
-    const rendering: Promise<void>[] = [];
+    const rendering = new Map<number, Promise<void>>();
     for (const item of open) {
-      rendering.push(track((async () => {
+      rendering.set(item.shot, track((async () => {
         await dubbed;
         await materials.get(item.shot)!.ready;
         await prompts.get(item.shot)!;
+        // A shot that keeps the previous one's setup starts from that clip's last frame, so it waits for it.
+        const previous = continuedFrom(production, item.shot);
+        if (previous !== undefined) {
+          await rendering.get(previous);
+          await takeStartFrame(cwd, production, item.shot, workSignal, save);
+        }
         workSignal.throwIfAborted();
         await prepareClipInputs(cwd, production, item, workSignal, save);
         warmVideo();
@@ -872,7 +843,7 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
       })()));
     }
     track((async () => {
-      const results = await Promise.allSettled(rendering);
+      const results = await Promise.allSettled(rendering.values());
       releaseWarm();
       releaseVideo();
       releaseText();
@@ -964,7 +935,7 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `# ${t`Production report`}`,
     "",
     t`Film: ${production.film}, ${production.input.quality}, ${clips.length} shots.`,
-    t`Colab compute units: ${spent} spent of a ${production.input.budget} budget (estimate ${production.estimate}).`,
+    t`Colab compute units: ${spent} spent (estimate ${production.estimate}).`,
     t`Dialogue: Fish Audio Drama 3 on Colab, with newly generated character voices.`,
     "Video content review: not performed. Delivery validation checks file encoding, dimensions, duration and audio-track presence only.",
     ...production.music ? [t`Music: Suno V6, billed by the sunoapi.org account.`] : [],
@@ -975,7 +946,6 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `- Decisions: ${production.execution!.decision.model}.`,
     `- Planned physical machines: ${executionAllocation(production).lanes.length}; ${production.execution!.machines.reason}`,
     `- Video render workers: ${production.execution!.machines.renderWorkers}.`,
-    ...production.execution!.shots.map(item => `- Shot ${item.shot}: ${item.preparation}. ${item.reason}`),
     ...production.execution!.characters.map(item => `- Character ${item.name}: ${item.views} reference views. ${item.reason}`),
     ...production.execution!.places.map(item => `- Environment ${item.name}: ${item.views} reference views. ${item.reason}`),
     "",
@@ -1002,8 +972,8 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `- ${t`Script, shot list and prompts: ${uncensoredTextModelId} on Colab`}`,
     "- Written and image quality reviews: not performed.",
     "- Speech and pronunciation reviews: not performed.",
-    `- ${t`Designs: Qwen-Image 2.1 Turbo on Colab`}`,
-    `- ${t`Video: Sulphur 2 (LTX-2.3) on Colab from each shot's keyframe, following its previs depth video, lip-synced to the dubbed lines`}`,
+    `- ${t`Designs: Qwen-Image 2.1 with the anatomy LoRA on Colab`}`,
+    `- ${t`Video: Sulphur 2 (LTX-2.3) on Colab with the LoRAs of each shot's people, starting from the previous clip's last frame only when a shot keeps its camera setup, following its previs depth video when someone walks or the camera moves, lip-synced to the dubbed lines`}`,
   ];
   const path = `${productionDirectory(production.id)}/report.md`;
   await writeProductionText(cwd, path, `${lines.join("\n")}\n`);
@@ -1016,7 +986,7 @@ export function runProduction(cwd: string, id: string) {
   if (runners.has(key)) return;
   markVideoActivity();
   const controller = new AbortController();
-  const runtime = runtimeOwners.get(key) ?? { release: holdColabPool(), budget: 0, budgetReached: false };
+  const runtime: RuntimeOwner = runtimeOwners.get(key) ?? { release: holdColabPool() };
   runtimeOwners.set(key, runtime);
   const finished = (async () => {
     const releaseText = holdColab();
@@ -1024,23 +994,8 @@ export function runProduction(cwd: string, id: string) {
       await setRegistered(cwd, id, true);
       const initial = await readProduction(cwd, id);
       initial.meterAtStart ??= meteredColabUnits();
-      runtime.budget = initial.input.budget;
       await saveProduction(cwd, initial);
-      runtime.monitor ??= setInterval(() => {
-        if (runtime.budgetReached) return;
-        try {
-          if (meteredColabUnits() - initial.meterAtStart! < runtime.budget) return;
-        } catch (error) {
-          console.error("[production] Could not monitor Colab spending:", error);
-        }
-        runtime.budgetReached = true;
-        runners.get(key)?.controller.abort(new Error("Production spending threshold reached"));
-        void stopProduction(cwd, id).then(async () => {
-          const production = await readProduction(cwd, id);
-          if (production.status !== "done") await wait(cwd, production, "budget");
-        }).catch(error => console.error("[production] Budget stop failed:", error));
-      }, 1000);
-      runtime.monitor.unref();
+      runtime.started = true;
       await requireJevKey();
       const planning = await readProduction(cwd, id);
       if (planning.assets && planning.assets.recipe !== "b3") throw new Error(translateMessage("這個舊任務的素材無法確認為 B3，請新建製作；原始檔案仍保留。"));
@@ -1085,12 +1040,9 @@ export function runProduction(cwd: string, id: string) {
           more = await applyConversationChanges(cwd, id, controller.signal);
         }
       }
-      if (runtime.budgetReached) await wait(cwd, await readProduction(cwd, id), "budget");
     } catch (error) {
       controller.abort(error);
-      if (runtime.budgetReached) {
-        await wait(cwd, await readProduction(cwd, id), "budget");
-      } else if (!controller.signal.aborted || controller.signal.reason instanceof Error && controller.signal.reason.name !== "AbortError") {
+      if (!controller.signal.aborted || controller.signal.reason instanceof Error && controller.signal.reason.name !== "AbortError") {
         const production = await readProduction(cwd, id);
         Object.assign(production, { status: "failed", message: error instanceof Error ? error.message : String(error) });
         await saveProduction(cwd, production);
@@ -1101,7 +1053,7 @@ export function runProduction(cwd: string, id: string) {
       markVideoActivity();
       try {
         const latest = await readProduction(cwd, id);
-        if (latest.status === "done" || latest.status === "failed" || latest.input.mode === "simple" || runtime.budgetReached || controller.signal.aborted || !runtime.monitor) {
+        if (latest.status === "done" || latest.status === "failed" || latest.input.mode === "simple" || controller.signal.aborted || !runtime.started) {
           latest.cleanup = { status: "running", start: new Date().toISOString() };
           const began = performance.now();
           await saveProduction(cwd, latest).finally(async () => {
@@ -1167,16 +1119,16 @@ export async function reviewProduction(cwd: string, id: string, answer: { notes?
   runProduction(cwd, id);
 }
 
-/** Continues a production stopped by its budget or an error, with a new budget when given. */
-export async function resumeProduction(cwd: string, id: string, budget?: number) {
+/** Continues a production stopped by an error or for a person. */
+export async function resumeProduction(cwd: string, id: string) {
   if (runners.has(runnerKey(cwd, id))) throw Object.assign(new Error("Production is still running or cleaning up"), { status: 409 });
   const production = await readProduction(cwd, id);
   if (production.input.mode === "simple") throw Object.assign(new Error("Simple productions do not accept manual continuation"), { status: 409 });
   if (production.status === "done" || production.status === "waiting" && production.review && !production.runtime?.failure) throw Object.assign(new Error("This production has nothing to continue"), { status: 409 });
-  await continueProduction(cwd, production, budget);
+  await continueProduction(cwd, production);
 }
 
-async function continueProduction(cwd: string, production: Production, budget?: number) {
+async function continueProduction(cwd: string, production: Production) {
   const id = production.id;
   const key = runnerKey(cwd, id);
   if (runners.has(key) || continuations.has(key)) throw Object.assign(new Error(translateMessage("製作仍在執行或收尾，請稍候。")), { status: 409 });
@@ -1191,7 +1143,6 @@ async function continueProduction(cwd: string, production: Production, budget?: 
       delete production.runtime.readyAt;
       await writeProductionText(cwd, `${productionDirectory(id)}/runtimePreparation.json`, JSON.stringify(production.runtime));
     }
-    if (budget !== undefined) production.input.budget = budget;
     delete production.cleanup;
     delete production.failure;
     delete production.dialogueTimingRepairs;
@@ -1205,7 +1156,6 @@ export async function resolveSimpleProduction(cwd: string, id: string, action: "
   if (runners.has(runnerKey(cwd, id))) throw Object.assign(new Error("製作仍在執行或收尾，請稍候。"), { status: 409 });
   const production = await readProduction(cwd, id);
   if (production.input.mode !== "simple" || production.status !== "failed") throw Object.assign(new Error("這支影片目前不需要調整。"), { status: 409 });
-  if (production.message === "budget") throw Object.assign(new Error("這次製作額度已達上限，請調整故事後另建製作。"), { status: 409 });
   if (action === "retry" && !productionGuidance(production)?.canRetry) throw Object.assign(new Error("目前需要先補充調整內容，AI 才能重新處理未通過的素材。"), { status: 409 });
   if (action === "clarify") {
     if (!message?.trim()) throw Object.assign(new Error("請補充你希望保留或調整的內容。"), { status: 400 });

@@ -466,7 +466,7 @@ const shotNodesPlan = ref<ShotNodesPlan>();
 // ACT: Videos are prepared for Sulphur 2 on Colab, the video model of this pipeline; a node starts in the first-frame
 // mode "endFrameOptional" (the end frame is optional) and moves to the video control mode once the shot's previs depth
 // video is connected. Another video model would need its own prompt format.
-const sulphurModel = JSON.stringify(["sulphur", "sulphur_2_q8"]);
+const sulphurModel = JSON.stringify(["sulphur", "sulphur_2"]);
 const videoResolutions = ["480p", "720p", "1080p"];
 // The resolution chosen for this shot list's videos; 1080p unless the user picked another one before.
 const videoResolution = computed({ get: () => data.value.videoResolution ?? "1080p", set: (value: string) => { data.value.videoResolution = value; } });

@@ -274,7 +274,7 @@ function loadModels() {
     models.value = items.filter((item) => item.type === "image");
     // Existing nodes must also use the production model set.
     if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
-      const first = models.value.find(item => item.modelId === "qwen_image_2_1_turbo");
+      const first = models.value.find(item => item.modelId === "qwen_image_2_1");
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }
   }).finally(() => {

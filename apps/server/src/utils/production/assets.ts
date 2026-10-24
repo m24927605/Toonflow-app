@@ -1,15 +1,10 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { checkScript } from "@toonflow/node-shared/scriptCheck";
-import { shotSpans } from "@toonflow/node-shared/shotList";
 import { access, readdir, readFile } from "@toonflow/file";
 import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { holdQwenImage } from "@/utils/media/qwenImage";
-import { gazeDescriptions } from "./plan";
-import { keyframeReferences } from "./references";
-import { outfitView, shotReferences } from "./shots";
 import { productionDirectory, readProduction, type Production, type ProductionAsset } from "./state";
 
 const castSchema = z.object({
@@ -32,7 +27,7 @@ export function castPrompt(script: string, shotList: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
     "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\"}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of its architecture, materials, furniture and light, and only the static props resting there at the opening; actor-held props belong to actor state and are excluded from the empty set. Do not use quotation marks inside the sentences.",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of the fixed details that identify it from any camera angle (the walls and their colour, the floor, the main furniture with its shape and colour, lamps, windows and curtains) and its light, and only the static props resting there at the opening; actor-held props belong to actor state and are excluded from the empty set. Do not use quotation marks inside the sentences.",
     "A place is an EMPTY environment: no person, body part, hand holding a prop, reflection of a person or human silhouette. Its look includes only architecture, furniture, light and static props actually resting in the environment at the opening. A prop already held or worn by an actor belongs to that actor's opening state: exclude it from the empty environment rather than placing a duplicate on a table. Never put a character's pose or action in a place description.",
     "Include static furniture required by the actions, even when only the action mentions it: a person seated at a desk needs both the desk and a chair. EMPTY removes people, not the furniture supporting them.",
     "Frame and cropping instructions describe the camera composition. Include a physical picture frame only when the story explicitly names one as a set prop.",
@@ -66,7 +61,7 @@ export function parseCast(text: string, photos: Production["input"]["photos"]) {
   return { recipe: "b3" as const, characters, places: cast.places.map(bare) };
 }
 
-const qwen = { providerId: "qwenImage", modelId: "qwen_image_2_1_turbo" };
+const qwen = { providerId: "qwenImage", modelId: "qwen_image_2_1" };
 export const emptyEnvironmentRule = "Empty environment, no people, hands, human body parts, silhouettes or reflected people.";
 const finish = "Photorealistic, sharp focus, natural texture, one single photograph, no text.";
 const studio = "plain light grey studio background, even soft light";
@@ -211,106 +206,6 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
   }
 }
 
-const poseModel = "qwen_image_2_1_pose";
-const poseRatios = [[1, 1], [3, 4], [2, 3], [9, 16], [4, 3], [3, 2], [16, 9]] as const;
-
-/** The supported ratio closest to a PNG's own, read from its header. */
-async function ratioOf(cwd: string, path: string) {
-  const header = await readFile((await resolveWorkspacePath(cwd, path)).path).then(data => data.subarray(16, 24));
-  const aspect = header.readUInt32BE(0) / header.readUInt32BE(4);
-  const [width, height] = poseRatios.reduce((best, ratio) => Math.abs(Math.log(ratio[0] / ratio[1] / aspect)) < Math.abs(Math.log(best[0] / best[1] / aspect)) ? ratio : best);
-  return `${width}:${height}`;
-}
-
-/**
- * Draws every person of each shot's opening in the outfit they wear there and in their pose in the previs: pose
- * transfer puts the person of their outfit's front view into the pose of their full-body previs figure, so the clip's
- * reference shows them kneeling, seated or turned as the shot begins rather than standing facing the camera. The front
- * view looks into the lens and the figure's featureless head barely shows a turn, so the prompt says which way the head
- * and eyes turn, or the drawn person stares at the viewer and the clip copies the stare. Requests go out together, so
- * Qwen-Image draws them in one batch. A person without a pose render keeps the front view.
- * ACT: Each pose costs well under a minute of the Qwen machine, left out of the production estimate.
- */
-export async function drawPoses(cwd: string, production: Production, shots: number[], signal: AbortSignal, save: () => Promise<void>) {
-  const results = await Promise.allSettled(production.previs!.filter(item => shots.includes(item.shot)).flatMap(previs => Object.entries(previs.poses ?? {}).map(async ([name, render]) => {
-    const shot = production.shots!.find(item => item.shot === previs.shot)!;
-    const person = production.assets!.characters.find(item => item.name === name);
-    const view = person && outfitView(person, shot);
-    if (shot.poses?.[name] || !view) return;
-    const actor = production.plan?.shots.find(item => item.shot === shot.shot)?.actors.find(actor => actor.name === name);
-    if (!actor) throw new Error(`Shot ${shot.shot}: missing opening-state contract for ${name}`);
-    const body = previs.framed.bodies?.[name];
-    if (!body) throw new Error(`Shot ${shot.shot}: missing compiled posture and support for ${name}; regenerate the previs`);
-    const support = body.support ? `The ${body.posture} body is supported by ${body.support}, whose support surface is ${body.supportHeight} metres above the floor. Preserve that support. A chair-seated person's hips stay on the seat and only their feet touch the floor; never turn chair sitting into kneeling.` : `The person is ${body.posture}, supported by the floor, never floating. Preserve the specified posture.`;
-    const look = `Opening pose: ${actor.pose}. Required head/eye gaze: ${gazeDescriptions[actor.gaze]}. Required props and interaction: ${actor.props.join("; ") || "none"}. Shot opening state: ${shot.state ?? ""}`;
-    // The previs figure is drawn alone without a floor, and the pose kept it hanging in the air; the video then floated
-    // people kneeling or seated over the tatami, so the drawing is told what the body rests on.
-    const posed = await draw(cwd, production.id, `${look ? `The person is ${look}. ` : ""}${support} ${finish}`, await ratioOf(cwd, render), [render, view], signal, poseModel);
-    (shot.poses ??= {})[name] = posed;
-    await save();
-  })));
-  const failure = results.find(result => result.status === "rejected");
-  if (failure) throw failure.reason;
-}
-
-/**
- * Draws the photographic opening frame each clip starts from. A staged shot's is drawn on the previs depth map, with
- * each person of the opening as drawn in their pose and outfit and the place for the look, so it keeps the composition
- * the previs depth video then moves; a reference shot's opening reference is already that photograph. Requests go out
- * together, so Qwen-Image draws them in one batch.
- */
-export async function drawKeyframes(cwd: string, production: Production, shots: number[], signal: AbortSignal, save: () => Promise<void>) {
-  const size = production.input.quality === "1080p" ? "2K" : "1K";
-  const results = await Promise.allSettled(production.previs!.filter(item => shots.includes(item.shot)).map(async previs => {
-    const shot = production.shots!.find(item => item.shot === previs.shot)!;
-    if (shot.keyframe) return;
-    if (previs.referenceOnly) {
-      if (!previs.layout) throw new Error(`Shot ${shot.shot}: the opening reference is not drawn yet`);
-      shot.keyframe = previs.layout;
-      await save();
-      return;
-    }
-    if (!previs.depth) throw new Error(`Shot ${shot.shot}: the previs depth map is not rendered yet`);
-    const contract = production.plan!.shots.find(item => item.shot === shot.shot)!;
-    const references = shotReferences(shot, production.assets!, previs.framed);
-    const opening = references.people.filter(({ person }) => previs.framed.opening.includes(person.name));
-    const extra = keyframeReferences(production);
-    if (opening.some(entry => !entry.image) || references.place && !references.place.image) throw new Error(`Shot ${shot.shot}: the keyframe's references are not drawn yet`);
-    const images = [previs.depth, ...opening.map(entry => entry.image!), ...references.place ? [references.place.image!] : [], ...extra.map(item => item.path)];
-    if (images.length > 10) throw new Error(`Shot ${shot.shot}: the opening people, the place and the creator's visual references exceed the nine images a keyframe is drawn from`);
-    const prompt = [
-      "Draw one photorealistic film frame with exactly the composition, viewpoint and depth of {{ref 1}}: every person and object stands where {{ref 1}} places them, at that size.",
-      ...opening.map(({ person }, index) => {
-        const actor = contract.actors.find(item => item.name === person.name);
-        return `${person.name} is the person in {{ref ${index + 2}}}: keep their identity, clothing and pose.${actor ? ` ${actor.pose} Looking ${gazeDescriptions[actor.gaze]}.${actor.props.length ? ` Required props: ${actor.props.join("; ")}.` : ""}` : ""}`;
-      }),
-      ...references.place ? [`The environment, furniture, materials and lighting are those of {{ref ${opening.length + 2}}}.`] : [],
-      ...extra.map((item, index) => `${item.description} As shown in {{ref ${images.length - extra.length + index + 1}}}.`),
-      "Nobody else is in the frame.",
-      finish,
-    ].join(" ");
-    shot.keyframe = await draw(cwd, production.id, prompt, production.input.ratio, images, signal, "qwen_image_2_1_turbo_depth", size, "keyframes");
-    await save();
-  }));
-  const failure = results.find(result => result.status === "rejected");
-  if (failure) throw failure.reason;
-}
-
-// ACT: A LoRA (about 1–2 units each) only pays off for a person or place seen in this many shots; fewer get by on
-// their reference images. Tune it once productions show where identity drifts.
-const minShotsForLora = 3;
-
-/**
- * In how many shots each person and place appears: people by who the shot's previs shows, which the cast cell may leave
- * out, places by name in the row (all, if one).
- */
-export function appearances(shotList: string, assets: NonNullable<Production["assets"]>, previs: NonNullable<Production["previs"]>) {
-  const spans = shotSpans(checkScript(shotList).shots, shotList);
-  const people = new Map(assets.characters.map(item => [item.name, previs.filter(shot => shot.framed.shown.includes(item.name)).length]));
-  const places = new Map(assets.places.map(item => [item.name, assets.places.length === 1 ? spans.length : spans.filter(span => span.row?.includes(item.name)).length]));
-  return { people, places };
-}
-
 // ACT: Measured per LoRA: one L4 hour of training per family and about ten A100 minutes of generated variants per
 // person or place, with the same 1.3 margin as the production estimate; scaled since by the character recipe, about
 // 1500 steps instead of about 1200 and up to 31 drawn variants instead of 11. Training now runs on an A100, assumed
@@ -319,22 +214,19 @@ const unitsPerFamily = 6.77 * 1.3 * 1.25 / 2;
 const unitsPerTopUp = 6.77 / 6 * 1.3 * 31 / 11;
 
 /**
- * Which LoRAs each person and place gets: none when seen in too few shots, otherwise trained from this production's
- * matching source designs. A name alone cannot prove another production's training identity. Each trigger is fixed when
+ * The LoRA each person gets, trained from this production's matching source designs: clips start from no picture of
+ * them, so their LoRA is all that keeps them the same, even in a single shot. Places get none: a scene LoRA learns its
+ * designs' single framing with the room and pulled every shot back to that wide, still view, so the clip prompt
+ * describes the place instead. A name alone cannot prove another production's training identity. Each trigger is fixed when
  * planned and kept on the asset, so texts can name it
  * while it trains. `units` is what the training will cost.
  */
-export async function planAssetLoras(cwd: string, production: Production, shotList: string) {
+export async function planAssetLoras(cwd: string, production: Production) {
   const assets = production.assets!;
-  const counts = appearances(shotList, assets, production.previs!);
   const existing = await workspaceLoras(cwd);
-  const jobs = [
-    // Only the video model takes LoRAs: a clip keeps a person's face from its first frame and their LoRA, while a place
-    // stays as its first frame shows it and needs none.
-    ...assets.characters.map(item => ({ item, kind: "character" as const, families: ["ltx"] as ("ltx" | "qwen")[], shots: counts.people.get(item.name) ?? 0 })),
-    ...assets.places.map(item => ({ item, kind: "scene" as const, families: [] as ("ltx" | "qwen")[], shots: counts.places.get(item.name) ?? 0 })),
-  ].filter(job => !job.item.loras).map(({ item, kind, families, shots }) => {
-    if (shots < minShotsForLora) return { item, kind, kept: [] as LoraRecord[], missing: [] as ("ltx" | "qwen")[] };
+  // Only the video model takes LoRAs; Qwen-Image only draws the designs they are trained from.
+  const families: ("ltx" | "qwen")[] = ["ltx"];
+  const jobs = assets.characters.map(item => ({ item, kind: "character" as const })).filter(job => !job.item.loras).map(({ item, kind }) => {
     item.triggers ??= Object.fromEntries(families.map(family =>
       [family, triggerWord()]));
     const kept = existing.filter(record => record.trigger === item.triggers![record.family]);

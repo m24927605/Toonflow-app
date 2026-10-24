@@ -18,7 +18,7 @@ const maxBatch = 32;
 // Production owns the VM lifetime; this worker owns image jobs on its shared lane.
 const worker = createColabWorker("qwenImage", 1);
 export function qwenImagePreparation(recipes: "pose"[]): ColabPreparation {
-  return { name: recipes.includes("pose") ? "imagePose" : "imageTurbo", runtime: "qwenImage", installSource: "comfy/7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217", prefetch: true, job: {
+  return { name: recipes.includes("pose") ? "imagePose" : "image", runtime: "qwenImage", installSource: "comfy/7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217", prefetch: true, job: {
     script: `${pipeline.slice(0, pipeline.indexOf("def build(item):"))}\nprint("COLAB_DONE")\n`,
     uploads: [{ name: "qwin_job.json", data: JSON.stringify([{}, ...recipes.map(recipe => ({ recipe }))].map(item => ({ refs: [], size: "1K", ratio: "16:9", ...item }))) }],
     env: { QWEN_JOB: "00000000-0000-0000-0000-000000000000" }, outputs: [],
@@ -114,7 +114,7 @@ async function drawBatch() {
  */
 export const holdQwenImage = (ms?: number, signal?: AbortSignal) => ms ? worker.holdFor(ms, signal) : worker.hold();
 
-/** Queues one Qwen-Image 2.1 image, Turbo unless a recipe asks for the base model; it is drawn on Colab together with the other requests of its batch. */
+/** Queues one Qwen-Image 2.1 image, drawn by the base model with the anatomy LoRA; it is drawn on Colab together with the other requests of its batch. */
 export async function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (!request.prompt.trim()) throw new Error("Qwen-Image prompt cannot be empty");
   if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");
@@ -140,7 +140,7 @@ export async function runQwenImage(request: QwenImageRequest, signal?: AbortSign
   for (const image of [...request.images ?? [], ...request.controlImage ? [request.controlImage] : [], ...request.initImage ? [request.initImage] : []]) inputBytes(image);
   signal?.throwIfAborted();
   if (request.recipe !== undefined && request.recipe !== "pose") throw Object.assign(new Error("This production uses the B3 image recipes only"), { status: 400 });
-  await waitForColabPreparation(request.recipe === "pose" ? "imagePose" : "imageTurbo", signal);
+  await waitForColabPreparation(request.recipe === "pose" ? "imagePose" : "image", signal);
   signal?.throwIfAborted();
   return new Promise<QwenImageResult>((resolve, reject) => {
     const item: Pending = { request, signal, resolve, reject };

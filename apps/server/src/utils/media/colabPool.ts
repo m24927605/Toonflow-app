@@ -1,9 +1,10 @@
-import { openColabSession, readColabSessionStatus, ColabScriptError, ColabConnectionError, type ColabMachine, type ColabSession, type ColabJob } from "./colab";
+import { openColabSession, readColabSessionStatus, stopColabSession, ColabScriptError, ColabConnectionError, type ColabMachine, type ColabSession, type ColabJob } from "./colab";
 import { z } from "zod";
 import { dirname, join } from "node:path";
 import { readFile, writeAtomic } from "@toonflow/file";
 import conf from "@/utils/conf";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { scheduler } from "node:timers/promises";
 import { machineCapacitySchema, recordColabTiming } from "./timings";
 
 export type ColabAllocation = { speechLane: 1 | 2; reviewLane: 1 | 3; speechMode?: "eager" | "compiled"; speechRuntime?: "vllm" | "sglang"; renderWorkers: 1 | 2; renderLimit?: number; lanes: number[]; ready?: (model: string) => Promise<void> };
@@ -39,7 +40,7 @@ let checkpointQueue: Promise<unknown> = Promise.resolve();
 let poolReady: Promise<void> | undefined;
 function saveCheckpoint() {
   const next = checkpointQueue.then(async () => {
-    await writeAtomic(idleClockPath(), JSON.stringify({ since: videoIdleSince ?? null }));
+    await writeAtomic(idleClockPath(), JSON.stringify({ since: idleSince ?? null }));
     await writeAtomic(checkpointPath(), JSON.stringify(lanes.flatMap((lane, index) => lane.session ? [{ lane: index, name: lane.session.name, prepared: [...lane.prepared], capacity: lane.capacity }] : [])));
   });
   checkpointQueue = next.catch(() => {});
@@ -61,25 +62,41 @@ async function restoreSavedPool(signal: AbortSignal) {
     if (error.code !== "ENOENT") throw error;
     return null;
   });
-  videoIdleSince = clock ?? undefined;
+  idleSince = clock ?? undefined;
   const results = await Promise.allSettled(saved.map(item => enqueue(item.lane, async (lane, jobSignal) => {
-    const status = await readColabSessionStatus(item.name);
+    // A status read right after a restart may time out, so an unknown state is read again before it counts.
+    let status = await readColabSessionStatus(item.name);
+    for (let attempt = 1; status.state === "unknown" && attempt < 3; attempt++) {
+      await scheduler.wait(10_000, { signal: jobSignal });
+      status = await readColabSessionStatus(item.name);
+    }
     if (status.state === "off") { lane.closedAt = new Date().toISOString(); return; }
-    if (status.state !== "idle") throw new Error(`Existing Colab machine ${item.name} is ${status.state}; kept running without allocating a replacement`);
-    lane.closedAt = undefined;
-    lane.session = await openColabSession("production", lane.machine, jobSignal, item.name);
+    try {
+      if (status.state !== "idle") throw new Error(`Existing Colab machine ${item.name} is ${status.state}`);
+      lane.closedAt = undefined;
+      lane.session = await openColabSession("production", lane.machine, jobSignal, item.name);
+    } catch (error) {
+      // A machine that cannot be taken back has no owner left and would bill until it times out, so it is stopped;
+      // a restore cancelled by shutdown keeps it for the next start.
+      if (jobSignal.aborted) throw error;
+      const stopped = await stopColabSession(item.name).then(() => "it was stopped", (stopError: unknown) => `stopping it failed (${stopError instanceof Error ? stopError.message : stopError}); run colab stop --session ${item.name}`);
+      throw new Error(`${error instanceof Error ? error.message : error}; ${stopped}`, { cause: error });
+    }
     lane.prepared = new Set(item.prepared);
     lane.capacity = item.capacity;
   }, signal)));
-  const failed = results.find(result => result.status === "rejected");
-  if (lanes.some(lane => lane.session)) { videoIdleSince ??= Date.now(); ensureKeepAlive(); }
-  if (failed) throw failed.reason;
+  // A machine that cannot be taken back is reported and left out; the other lanes and all new work go on, as failing
+  // the whole pool made every later job fail until the next restart, which met the same stale checkpoint.
+  for (const result of results) if (result.status === "rejected") console.error("[colab] A machine was not reconnected:", result.reason instanceof Error ? result.reason.message : result.reason);
+  if (lanes.some(lane => lane.session)) { idleSince ??= Date.now(); ensureKeepAlive(); }
   await saveCheckpoint();
   scheduleIdleStop();
 }
 
 export const colabModelPrepared = (index: number, model: string) => lanes[index]?.prepared.has(model) ?? false;
 export const colabSessionName = (index: number) => lanes[index]?.session?.name;
+/** Jobs queued or running on a lane. */
+export const colabLanePending = (index: number) => lanes[index]?.pending ?? 0;
 export async function rememberColabCapacity(index: number, name: string, capacity: z.infer<typeof machineCapacitySchema>) {
   const lane = lanes[index];
   if (lane?.session?.name !== name) throw new Error("Machine changed while recording capacity");
@@ -99,15 +116,15 @@ let idleTimer: ReturnType<typeof setTimeout> | undefined;
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 let keepingAlive = false;
 let stopping: Promise<void> | undefined;
-let videoIdleSince: number | undefined;
+let idleSince: number | undefined;
 const pageIdleLimit = 60 * 60_000;
 
 function scheduleIdleStop() {
   clearTimeout(idleTimer);
   if (holds || lanes.some(lane => lane.pending)) return;
   if (!lanes.some(lane => lane.session)) return;
-  videoIdleSince ??= Date.now();
-  const delay = Math.max(0, pageIdleLimit - (Date.now() - videoIdleSince));
+  idleSince ??= Date.now();
+  const delay = Math.max(0, pageIdleLimit - (Date.now() - idleSince));
   idleTimer = setTimeout(() => void stopColabPoolWhenUnused().catch(error => console.error("[colabPool] Idle stop failed:", error)), delay);
   idleTimer.unref();
 }
@@ -142,7 +159,7 @@ function ensureKeepAlive() {
 }
 
 export function markVideoActivity() {
-  videoIdleSince = Date.now();
+  idleSince = Date.now();
   scheduleIdleStop();
 }
 
@@ -171,8 +188,8 @@ export async function readColabPoolStatus() {
     checkedAt: new Date().toISOString(),
     machines: rows.filter(row => row.lane < 3 || row.state !== "disconnected"),
     working,
-    idleShutdownAt: !working && !stopping && videoIdleSince !== undefined && lanes.some(lane => lane.session)
-      ? new Date(videoIdleSince + pageIdleLimit).toISOString() : null,
+    idleShutdownAt: !working && !stopping && idleSince !== undefined && lanes.some(lane => lane.session)
+      ? new Date(idleSince + pageIdleLimit).toISOString() : null,
   };
 }
 
@@ -209,7 +226,7 @@ export async function startColabPool(signal: AbortSignal, required: number[]) {
   const results = await Promise.allSettled(required.map(index => enqueue(index, async (lane, jobSignal) => {
     if (!lane.session) lane.closedAt = undefined;
     lane.session ??= await openColabSession("production", lane.machine, jobSignal);
-    videoIdleSince ??= Date.now();
+    idleSince ??= Date.now();
     await saveCheckpoint();
     return lane.session.name;
   }, signal)));
@@ -222,7 +239,7 @@ export const colabPoolEpoch = () => generation;
 export async function stopColabPoolWhenUnused() {
   await saveCheckpoint();
   if (holds || lanes.some(lane => lane.pending)) return Promise.resolve();
-  if (videoIdleSince === undefined || Date.now() - videoIdleSince < pageIdleLimit) {
+  if (idleSince === undefined || Date.now() - idleSince < pageIdleLimit) {
     scheduleIdleStop();
     return Promise.resolve();
   }
@@ -253,7 +270,7 @@ export function stopColabPool() {
   clearTimeout(idleTimer);
   clearInterval(keepAliveTimer);
   keepAliveTimer = undefined;
-  videoIdleSince = undefined;
+  idleSince = undefined;
   epoch++;
   generation++;
   lanes.forEach(lane => lane.controller?.abort(new Error("The Colab pool was stopped")));
@@ -289,7 +306,7 @@ export function createColabWorker(provider: string, index: number) {
       try {
         if (!lane.session) lane.closedAt = undefined;
         lane.session ??= await openColabSession(provider, lane.machine, jobSignal);
-        videoIdleSince ??= Date.now();
+        idleSince ??= Date.now();
         await saveCheckpoint();
         readyAt = performance.now();
         await lane.session.attribute(provider);
@@ -315,6 +332,9 @@ export function createColabWorker(provider: string, index: number) {
         }
         throw error;
       } finally {
+        // Any job, not only video, keeps the machines in use: the idle hour counts from the end of the last one, so an
+        // image batch or a training is never left to meet a pool that stopped between two of its requests.
+        idleSince = Date.now();
         const now = performance.now();
         const role = provider === "colab" ? index === 0 ? "text" : "visualReview" : provider === "drama3" ? allocation.getStore()?.speechRuntime === "sglang" ? "drama3Sglang" : allocation.getStore()?.speechMode === "compiled" ? "drama3Compiled" : "drama3Eager" : provider;
         const observation = { role, gpu: lane.machine.gpu, passed };

@@ -5605,12 +5605,6 @@
   "Total team file size cannot exceed 20 MB": [
     "apps/server/src/utils/teams/files.ts"
   ],
-  "這次製作的資源額度已達上限。": [
-    "apps/server/src/utils/production/state.ts"
-  ],
-  "可以縮短或簡化故事後另建製作；原本的檔案會保留。": [
-    "apps/server/src/utils/production/state.ts"
-  ],
   "配音長度與鏡頭時間無法配合，製作已中斷；已完成的錄音與素材仍保留。": [
     "apps/server/src/utils/production/state.ts"
   ],
@@ -5719,7 +5713,7 @@
   "Film: {0}, {1}, {2} shots.": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Colab compute units: {0} spent of a {1} budget (estimate {2}).": [
+  "Colab compute units: {0} spent (estimate {1}).": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "Dialogue: Fish Audio Drama 3 on Colab, with newly generated character voices.": [
@@ -5783,13 +5777,10 @@
   "Script, shot list and prompts: {0} on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Designs: Qwen-Image 2.1 Turbo on Colab": [
+  "Designs: Qwen-Image 2.1 with the anatomy LoRA on Colab": [
     "apps/server/src/utils/production/engine.ts"
   ],
-  "Video: Sulphur 2 (LTX-2.3) on Colab from each shot's keyframe, following its previs depth video, lip-synced to the dubbed lines": [
-    "apps/server/src/utils/production/engine.ts"
-  ],
-  "Production spending threshold reached": [
+  "Video: Sulphur 2 (LTX-2.3) on Colab with the LoRAs of each shot's people, starting from the previous clip's last frame only when a shot keeps its camera setup, following its previs depth video when someone walks or the camera moves, lip-synced to the dubbed lines": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "這個舊任務的素材無法確認為 B3，請新建製作；原始檔案仍保留。": [
@@ -5814,9 +5805,6 @@
     "apps/server/src/utils/production/engine.ts"
   ],
   "這支影片目前不需要調整。": [
-    "apps/server/src/utils/production/engine.ts"
-  ],
-  "這次製作額度已達上限，請調整故事後另建製作。": [
     "apps/server/src/utils/production/engine.ts"
   ],
   "目前需要先補充調整內容，AI 才能重新處理未通過的素材。": [
@@ -5935,9 +5923,6 @@
   ],
   "Production sources changed: rebuild the contract and dependent assets before continuing": [
     "apps/server/src/utils/production/plan.ts"
-  ],
-  "A keyframe's reference images are not drawn yet": [
-    "apps/server/src/utils/production/shots.ts"
   ],
   "The skill root directory must be a non-symbolic link directory": [
     "apps/server/src/utils/skills/files.ts"
@@ -7217,7 +7202,7 @@
   "Shot list: {0} shots": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Budget {0} units · estimate {1} units": [
+  "Estimate {0} units": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Give an outline and a length; the AI writes the script and makes the film, stopping for your review.": [
@@ -7267,9 +7252,6 @@
   "Estimated cost: about {0} Colab compute units for {1} shots.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Colab spending threshold (units)": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Start": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -7286,9 +7268,6 @@
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Approve": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "New budget (units)": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Continue": [
@@ -7318,10 +7297,10 @@
   "Designing the characters and places while blocking every shot in the previs…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Training LoRAs so faces and places stay the same (about an hour)…": [
+  "Training LoRAs so faces stay the same (about an hour)…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…": [
+  "Training LoRAs so faces stay the same (about an hour) while blocking every shot in the previs…": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Recording the dialogue…": [
@@ -7348,12 +7327,6 @@
   "Waiting for your review of the script": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Stopped: the next step would go over the budget": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
-  "Stopped: the Colab balance could not be read, so nothing more is spent": [
-    "packages/nodes/productionNode/src/index.vue"
-  ],
   "Stopped": [
     "packages/nodes/productionNode/src/index.vue"
   ],
@@ -7366,7 +7339,7 @@
   "Name every connected photo first": [
     "packages/nodes/productionNode/src/index.vue"
   ],
-  "Start an automatic production of about {0} seconds? It stops when measured Colab usage reaches {1} units (estimate {2}); remote shutdown can consume additional units. It also stops for your requested review. It keeps running if you close this page.": [
+  "Start an automatic production of about {0} seconds? It uses about {1} Colab units, with no spending limit. It stops for your requested review. It keeps running if you close this page.": [
     "packages/nodes/productionNode/src/index.vue"
   ],
   "Cancel": [

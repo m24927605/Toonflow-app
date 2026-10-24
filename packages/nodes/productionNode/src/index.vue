@@ -7,7 +7,7 @@
         <span v-if="state.production.detail" class="failure">{{ state.production.detail }}</span>
         <span v-if="state.production.shotList">{{ t`Shot list: ${state.production.shotList.shots} shots` }}</span>
         <span v-for="issue in state.production.shotList?.issues ?? []" :key="issue.id" class="warning">{{ translate(issue) }}</span>
-        <span>{{ t`Budget ${state.production.input.budget} units · estimate ${state.estimate.total} units` }}</span>
+        <span>{{ t`Estimate ${state.estimate.total} units` }}</span>
       </template>
       <span v-else>{{ translate("Give an outline and a length; the AI writes the script and makes the film, stopping for your review.") }}</span>
     </div>
@@ -39,10 +39,9 @@
           </div>
           <div v-if="quote" class="quote">
             <span>{{ t`Estimated cost: about ${quote.total} Colab compute units for ${quote.shots} shots.` }}</span>
-            <label>{{ translate("Colab spending threshold (units)") }} <el-input-number :modelValue="form.budget" size="small" :min="1" :max="1000" :step="1" controlsPosition="right" @update:modelValue="setBudget" /></label>
           </div>
           <div class="footer">
-            <el-button type="primary" :loading="busy" :disabled="!form.outline.trim() || !form.budget" @click="start">{{ translate("Start") }}</el-button>
+            <el-button type="primary" :loading="busy" :disabled="!form.outline.trim()" @click="start">{{ translate("Start") }}</el-button>
           </div>
         </template>
         <template v-else>
@@ -55,7 +54,6 @@
             </div>
           </div>
           <div v-else-if="state.production.status === 'waiting' || state.production.status === 'failed' || interrupted" class="review">
-            <label v-if="state.production.message === 'budget'">{{ translate("New budget (units)") }} <el-input-number v-model="newBudget" size="small" :min="1" :max="1000" controlsPosition="right" /></label>
             <div class="footer">
               <el-button type="primary" :loading="busy" @click="resume">{{ translate("Continue") }}</el-button>
             </div>
@@ -90,7 +88,7 @@ type Ratio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4";
 type Estimate = { shots: number; total: number; steps: { step: string; units: number }[] };
 type Production = {
   id: string;
-  input: { budget: number; seconds: number; ratio: Ratio; quality: Quality };
+  input: { seconds: number; ratio: Ratio; quality: Quality };
   status: "running" | "waiting" | "failed" | "done";
   message?: string;
   detail?: string;
@@ -115,8 +113,7 @@ type Data = {
   top?: number;
   roughCut?: string;
   film?: string;
-  // The budget follows the estimate until someone sets it (`budgetSet`).
-  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; budget: number; budgetSet?: boolean; reviewScript: boolean; subtitles: boolean; music: boolean; names: Record<string, string> };
+  form?: { outline: string; seconds: number; ratio: Ratio; quality: Quality; reviewScript: boolean; subtitles: boolean; music: boolean; names: Record<string, string> };
   started?: boolean;
 };
 
@@ -126,13 +123,12 @@ const { id, node, nodeProps, nodeEvent, files } = useNode({ label: "Auto product
 const flow = useVueFlow();
 const { refList } = useNodeReferences();
 const data = computed(() => node.data as typeof node.data & Data);
-data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", budget: 0, reviewScript: true, subtitles: true, music: false, names: {} };
+data.value.form ??= { outline: "", seconds: 60, ratio: "16:9", quality: "720p", reviewScript: true, subtitles: true, music: false, names: {} };
 const form = reactive(data.value.form);
 const state = ref<State>();
 const quote = ref<Estimate>();
 const busy = ref(false);
 const notes = ref("");
-const newBudget = ref<number>();
 
 const photos = computed(() => refList.value.flatMap(item => {
   const url = (item.value as { url?: string } | undefined)?.url;
@@ -171,10 +167,10 @@ const headline = computed(() => {
     // texts written from the plan.
     if (production.assets && !production.previs) return translate("Blocking every shot in the previs…");
     const designing = !production.assets || assets.some(item => !item.views || (item.outfits ?? []).some(outfit => !outfit.views));
-    const training = assets.some(item => !item.loras);
+    const training = production.assets?.characters.some(item => !item.loras);
     const blocked = !!production.previs?.every(shot => shot.video);
     if (designing) return blocked ? translate("Designing the characters and places…") : translate("Designing the characters and places while blocking every shot in the previs…");
-    if (training) return blocked ? translate("Training LoRAs so faces and places stay the same (about an hour)…") : translate("Training LoRAs so faces and places stay the same (about an hour) while blocking every shot in the previs…");
+    if (training) return blocked ? translate("Training LoRAs so faces stay the same (about an hour)…") : translate("Training LoRAs so faces stay the same (about an hour) while blocking every shot in the previs…");
     if (!blocked) return translate("Blocking every shot in the previs…");
     if (!production.clips || production.clips.length !== production.shotList.shots) return translate("Recording the dialogue…");
     if (!production.videos || production.videos.some(item => !item.prompt)) return translate("Writing the video prompts…");
@@ -186,8 +182,6 @@ const headline = computed(() => {
   if (production.status === "failed") return translate("Stopped by an error; Continue tries again");
   return ({
     reviewScript: translate("Waiting for your review of the script"),
-    budget: translate("Stopped: the next step would go over the budget"),
-    balanceUnreadable: translate("Stopped: the Colab balance could not be read, so nothing more is spent"),
     stopped: translate("Stopped"),
     filmDone: translate("The film is generated and its delivery report is ready."),
   } as Record<string, string>)[production.message ?? ""] ?? production.message ?? "";
@@ -202,7 +196,7 @@ async function api<T>(path: string, body?: object): Promise<T> {
 }
 const directory = async () => (await files.getWorkspaceFiles().list()).directory;
 
-// The quote follows the form, so the budget starts at the estimate rounded up.
+// The quote follows the form.
 let quoteTimer: ReturnType<typeof setTimeout> | undefined;
 // People whose LoRAs the workspace already has are quoted without training, so the names count too.
 const castNames = computed(() => [...photos.value.map(photo => form.names[photo.key]?.trim() ?? ""), ...canvasCast.value.map(item => item.name)]);
@@ -211,27 +205,21 @@ watch(() => [form.seconds, form.quality, castNames.value.join("\n")] as const, (
   clearTimeout(quoteTimer);
   quoteTimer = setTimeout(async () => {
     quote.value = await api<Estimate>("estimate", { directory: await directory(), seconds: form.seconds, quality: form.quality, names: castNames.value }).catch(() => undefined);
-    if (quote.value && !form.budgetSet) form.budget = Math.ceil(quote.value.total);
   }, 400);
 }, { immediate: true });
-
-function setBudget(value?: number) {
-  form.budget = value ?? 1;
-  form.budgetSet = true;
-}
 
 async function start() {
   const unnamed = photos.value.some(photo => !form.names[photo.key]?.trim());
   if (unnamed) return void ElMessage.warning(translate("Name every connected photo first"));
   const go = await ElMessageBox.confirm(
-    t`Start an automatic production of about ${form.seconds} seconds? It stops when measured Colab usage reaches ${form.budget} units (estimate ${quote.value?.total ?? "?"}); remote shutdown can consume additional units. It also stops for your requested review. It keeps running if you close this page.`,
+    t`Start an automatic production of about ${form.seconds} seconds? It uses about ${quote.value?.total ?? "?"} Colab units, with no spending limit. It stops for your requested review. It keeps running if you close this page.`,
     translate("Auto production"), { confirmButtonText: translate("Start"), cancelButtonText: translate("Cancel"), type: "info" },
   ).then(() => true, () => false);
   if (!go || flow.findNode(id) !== node) return;
   busy.value = true;
   try {
     await api("create", {
-      directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality, budget: form.budget,
+      directory: await directory(), id, outline: form.outline, seconds: form.seconds, ratio: form.ratio, quality: form.quality,
       gates: form.reviewScript ? ["script"] : [], subtitles: form.subtitles, music: form.music,
       mode: "expert", modelRecipe: "sulphur2",
       photos: [...photos.value.map(photo => ({ name: form.names[photo.key]!.trim(), path: photo.url })), ...canvasCast.value.map(item => ({ name: item.name, path: item.url }))],
@@ -332,7 +320,6 @@ async function refresh() {
     if (state.value.production.roughCut) syncRoughCut(state.value.production.roughCut, state.value.production.input.quality);
     if (state.value.production.film && state.value.production.status === "done" && completed.value) syncFilm(state.value.production.film, state.value.production.input.quality);
     if (state.value.report) syncText("report", state.value.report);
-    newBudget.value ??= state.value.production.input.budget;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : translate("Request failed"));
   }
@@ -360,7 +347,7 @@ function answer(revise: boolean) {
     notes.value = "";
   });
 }
-const resume = () => act(async () => api("resume", { directory: await directory(), id, ...state.value?.production.message === "budget" ? { budget: newBudget.value } : {} }));
+const resume = () => act(async () => api("resume", { directory: await directory(), id }));
 const stop = () => act(async () => api("stop", { directory: await directory(), id }));
 nodeEvent.on("delete", async () => {
   if (busy.value) throw new Error("Wait for the production operation to finish before deleting this node");

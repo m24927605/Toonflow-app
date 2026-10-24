@@ -104,7 +104,7 @@ export function warmSulphur(resolution: string, ratio: string, machines: number,
 }
 
 /** Renders one Sulphur 2 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
-export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed() }: SulphurRequest, signal?: AbortSignal) {
+export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed(), workflow = "distilled" }: SulphurRequest, signal?: AbortSignal) {
   for (const value of parts ?? [prompt]) validateVideoPrompt(value);
   if (soundtrack && !audio) throw new Error("A locked soundtrack requires audio output to be enabled");
   const plan = longTakeParts(duration);
@@ -147,7 +147,7 @@ export async function runSulphur({ prompt, parts, firstFrame, lastFrame, control
         ...characterLoras.length ? [{ name: name("loras.json"), data: JSON.stringify(characterLoras.map(({ name, strength }) => ({ name, strength }))) }] : [],
       ],
       env: {
-        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0,
+        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0, SULPHUR_WORKFLOW: workflow,
         SULPHUR_SEGMENTS: parts?.length ?? 1, SULPHUR_SEGMENT_FRAMES: plan.frames,
         ...postprocess ? { PRODUCTION_FINISH_JOB: job, PRODUCTION_FINISH_FUSED: 1 } : {},
       },

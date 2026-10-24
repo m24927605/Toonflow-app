@@ -73,8 +73,6 @@ export async function planReferences(production: Production, script: string, sho
   return references;
 }
 
-/** The creator's visual references, drawn into every shot's opening frame in this order. */
-export const keyframeReferences = (production: Production) => (production.references ?? []).filter(item => item.use === "visual");
 
 export async function applyAudioReferences(cwd: string, production: Production, signal: AbortSignal) {
   const references = production.references ?? [];

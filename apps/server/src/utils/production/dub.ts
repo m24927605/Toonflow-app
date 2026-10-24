@@ -19,6 +19,16 @@ export const clipSeconds = (seconds: number) => Math.min(maxTakeSeconds, Math.ma
 const trimSilence = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse";
 export const dialogueLoudness = "loudnorm=I=-16:TP=-1.5:LRA=11";
 
+/**
+ * The longest a line's recording may run: twice its speaking time, at about 4 letters a second for Chinese, Japanese or
+ * Korean and 12 for other languages, plus a second of breath, and never past the film; punctuation is not spoken. The
+ * speech model sometimes keeps voicing a short cry for many seconds; the recording is cut at this limit instead.
+ */
+function lineLimit(words: string, filmSeconds: number) {
+  const letters = words.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  return Math.min(filmSeconds, 1 + 2 * letters / (/[぀-ヿ㐀-鿿가-힯]/.test(words) ? 4 : 12));
+}
+
 type AudioAttempt = { path: string; seconds: number; reason: string; at: string };
 export type ProductionDub = {
   /** A generated reference anchors later lines; sound quality is not AI-reviewed. */
@@ -59,6 +69,31 @@ export function applyDialogueTiming(production: Production, script: string, shot
   production.dub = revised;
   production.shotList!.issues = checked.issues;
   return updated;
+}
+
+/**
+ * A timing that holds every measured line, in tenths of a second: each shot keeps its length unless its lines need
+ * more, read one after another from a quarter second in, and the time a grown shot takes comes from the shots with the
+ * most to spare. Undefined when the recordings cannot fit the film at all.
+ */
+export function fitDialogueTiming(production: Production) {
+  const lead = 0.25;
+  const shots = production.dub!.shots;
+  const total = Math.round(production.input.seconds * 10);
+  const least = shots.map(shot => Math.max(10, Math.ceil((lead + shot.lines.reduce((sum, line) => sum + line.seconds!, 0)) * 10 - 1e-6)));
+  if (least.reduce((sum, value) => sum + value, 0) > total) return undefined;
+  const tenths = shots.map((shot, index) => Math.max(Math.round(shot.seconds * 10), least[index]!));
+  const spare = () => tenths.reduce((best, value, index) => value - least[index]! > tenths[best]! - least[best]! ? index : best, 0);
+  for (let over = tenths.reduce((sum, value) => sum + value, 0) - total; over > 0; over--) tenths[spare()]!--;
+  for (let under = total - tenths.reduce((sum, value) => sum + value, 0); under > 0; under--) tenths[spare()]!++;
+  return shots.map((shot, index) => {
+    let start = lead;
+    return { shot: shot.shot, seconds: tenths[index]! / 10, starts: shot.lines.map(line => {
+      const at = start;
+      start += line.seconds!;
+      return at;
+    }) };
+  });
 }
 
 /** Plans dialogue and auditions from the validated production contract. */
@@ -147,7 +182,8 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
       }).then(async () => {
         const voice = dub.voices[line.speaker]!;
         if (!voice?.presentation || !voice.description?.trim() || !voice.language?.trim() || !voice.sample?.trim()) throw new Error(`Missing voice design for ${line.speaker}; rebuild the production contract`);
-        const recorded = line.attempts?.find(attempt => attempt.seconds > 0 && attempt.seconds <= production.input.seconds);
+        const limit = lineLimit(line.words, production.input.seconds);
+        const recorded = line.attempts?.find(attempt => attempt.seconds > 0 && attempt.seconds <= limit);
         if (recorded && voice.reference) {
           Object.assign(line, { path: recorded.path, seconds: recorded.seconds });
           await save();
@@ -155,7 +191,7 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
         }
         const direction = `${voice.presentation} voice. ${voice.description} Speak in ${voice.language}.`;
         const reference = voice.reference ? { audio: { type: "binary" as const, data: new Uint8Array(await readFile((await resolveWorkspacePath(cwd, voice.reference.path)).path)), mimeType: "audio/wav" }, text: voice.reference.text } : undefined;
-        const sequence = await runDrama3Sequence({ voiceText: voice.sample, voiceTranscript: voice.sample, lineText: line.words, direction, filters: [trimSilence, dialogueLoudness], referenceAttempts: Math.max(0, 2 - (voice.attempts?.length ?? 0)), lineAttempts: Math.max(0, 2 - (line.attempts?.length ?? 0)), maximumLineSeconds: production.input.seconds, reference }, signal);
+        const sequence = await runDrama3Sequence({ voiceText: voice.sample, voiceTranscript: voice.sample, lineText: line.words, direction, filters: [trimSilence, dialogueLoudness], referenceAttempts: Math.max(0, 2 - (voice.attempts?.length ?? 0)), lineAttempts: Math.max(0, 2 - (line.attempts?.length ?? 0)), maximumLineSeconds: limit, reference }, signal);
         const paths = new Map<string, string>();
         for (const artifact of sequence.result.artifacts) {
           const name = artifact.file[0]!.toUpperCase() + artifact.file.slice(1);

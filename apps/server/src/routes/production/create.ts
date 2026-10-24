@@ -14,7 +14,6 @@ export default Router().post("/", validateFields({
   seconds: z.number().int().min(5).max(600),
   ratio: z.enum(u.production.productionRatios),
   quality: z.enum(u.production.productionQualities),
-  budget: z.number().positive().max(1000),
   gates: z.array(z.enum(u.production.productionGates)).max(1),
   photos: z.array(z.strictObject({ name: z.string().trim().min(1).max(64), path: z.string().min(1).max(4096) })).max(20),
   subtitles: z.boolean(),
@@ -28,9 +27,9 @@ export default Router().post("/", validateFields({
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   // Photos are workspace files; resolving them here refuses paths outside the workspace before anything is spent.
   await Promise.all(input.photos.map(photo => u.workspaceFile.resolveWorkspacePath(cwd, photo.path)));
-  const { outline, seconds, ratio, quality, budget, gates, photos, subtitles, music, modelRecipe } = input;
+  const { outline, seconds, ratio, quality, gates, photos, subtitles, music, modelRecipe } = input;
   try {
-    await u.production.createProduction(cwd, id, { outline: outline.trim(), seconds, ratio, quality, budget, gates, photos, subtitles, music, modelRecipe });
+    await u.production.createProduction(cwd, id, { outline: outline.trim(), seconds, ratio, quality, gates, photos, subtitles, music, modelRecipe });
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code !== "EEXIST") throw cause;
     res.status(409).json(error("This node already has a production", undefined, 409));

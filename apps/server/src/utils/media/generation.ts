@@ -10,13 +10,13 @@ import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
 import conf from "@/utils/conf";
 import { loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { reserveGeneration, recordGeneration } from "@/utils/media/usage";
+import { reserveGeneration } from "@/utils/media/usage";
 
 const maxMediaSize = 100 * 1024 * 1024;
 // Bun loads these as source text; TypeScript resolves their provider object exports.
 const productionModels = {
-  image: { provider: "qwenImage", models: ["qwen_image_2_1_turbo", "qwen_image_2_1_turbo_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
-  video: { provider: "sulphur", models: ["sulphur_2_q8"], source: sulphurSource as unknown as string },
+  image: { provider: "qwenImage", models: ["qwen_image_2_1", "qwen_image_2_1_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
+  video: { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base"], source: sulphurSource as unknown as string },
   audio: { provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string },
 };
 
@@ -196,7 +196,7 @@ export async function generateMedia(
   const lastFrame = request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined;
   const initImage = request.initImage ? await readReference(directory, request.initImage, "image", signal) : undefined;
   signal?.throwIfAborted();
-  await reserveGeneration(providerInfo.id, model, mediaType, request);
+  await reserveGeneration(providerInfo.id);
   const assets = mediaType === "audio"
     ? await provider.generateAudio!({
       model: request.modelId, text: request.prompt, images, audios: speechReferences,
@@ -215,8 +215,6 @@ export async function generateMedia(
       generateAudio: request.generateAudio, mode: request.mode, seed: request.seed, parts: request.parts,
     });
   if (!Array.isArray(assets) || !assets.length) invalid("The provider did not return any generation results");
-  // The provider has been paid once it returns results, so the run counts even if writing them fails.
-  await recordGeneration(providerInfo.id, model.id);
   const written: string[] = [];
   const result: GeneratedMedia[] = [];
   try {

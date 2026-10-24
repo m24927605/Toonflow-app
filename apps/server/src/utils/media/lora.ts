@@ -1,6 +1,6 @@
 import { mkdir, readFile } from "@toonflow/file";
 import { dirname } from "node:path";
-import { createColabWorker } from "@/utils/media/colabPool";
+import { colabLane, colabLanePending, colabSessionName, createColabWorker } from "@/utils/media/colabPool";
 import { runQwenImage } from "@/utils/media/qwenImage";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import pipeline from "./loraColab.py" with { type: "text" };
@@ -8,7 +8,6 @@ import pipeline from "./loraColab.py" with { type: "text" };
 export const loraKinds = ["character", "scene", "costume", "style", "motion", "slider"] as const;
 export type LoraKind = typeof loraKinds[number];
 export type LoraFamily = "ltx" | "qwen";
-const workers = { qwen: createColabWorker("loraTraining", 1), ltx: createColabWorker("loraTraining", 2) };
 export type LoraInput = {
   /** One LoRA per family, trained side by side from the same items. */
   kind: LoraKind; families: LoraFamily[]; name: string;
@@ -92,11 +91,26 @@ async function topUp(kind: LoraKind, reference: Uint8Array, count: number, signa
 // Trainings running in this process, by workspace, kind and name.
 const training = new Set<string>();
 
+// Trainings queue on the A100 lanes of the Colab pool, a running machine with the least queued work first: asking Colab
+// for a machine of their own failed a film after an hour of refusals while the pool's A100s sat idle, and counting only
+// trainings put one on the image lane, where the next set's images then waited the whole training. A lane without a
+// machine opens one only when no lane has one.
+const gpuLanes = [1, 2, 3];
+const workers = new Map(gpuLanes.map(index => [index, createColabWorker("loraTraining", index)]));
+const laneTrainings = new Map<number, number>();
+function trainingLane() {
+  const rank = (index: number) => {
+    const physical = colabLane(index);
+    return (colabSessionName(physical) ? 0 : 100) + colabLanePending(physical) + (laneTrainings.get(physical) ?? 0);
+  };
+  return gpuLanes.reduce((best, index) => rank(index) < rank(best) ? index : best);
+}
+
 // A trigger word of plain letters the text encoder has no meaning for, so the LoRA owns it.
 export const triggerWord = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), value => String.fromCharCode(97 + value % 26)).join("");
 
 /**
- * Trains a LoRA for each model family on its own Colab GPU at the same time and saves each with its record in the
+ * Trains a LoRA for each model family on an A100 of the Colab pool at the same time and saves each with its record in the
  * workspace's `loras/` folder. Sulphur 2 (LTX-2.3) LoRAs learn from images and clips and serve video nodes; Qwen-Image
  * 2.1 LoRAs learn from images and serve image nodes. The job writes the captions, leaving out what the LoRA
  * learns, and crops faces for characters; a character or scene set under `minImages` images is first topped up once
@@ -141,8 +155,15 @@ async function trainFamily(cwd: string, input: LoraInput, family: LoraFamily, it
     return [{ name: `${name}.${extension}`, data }, ...caption ? [{ name: `${name}.txt`, data: caption.replaceAll("{trigger}", trigger) }] : []];
   });
   const job = { trigger, family, kind: input.kind, ...input.slider ? { slider: input.slider } : {} };
-  // Training shares the family's A100; unique job names prevent old inputs entering a later dataset.
-  const [lora] = await workers[family].run((session, jobSignal) => session.job({ script: pipeline, uploads: [{ name: `${jobName}.json`, data: JSON.stringify(job) }, ...uploads], env: { LORA_JOB: jobName }, outputs: [`/content/${jobName}.safetensors`], detached: true }, jobSignal), signal) as [Uint8Array];
+  const index = trainingLane();
+  const physical = colabLane(index);
+  laneTrainings.set(physical, (laneTrainings.get(physical) ?? 0) + 1);
+  let lora: Uint8Array;
+  try {
+    [lora] = await workers.get(index)!.run((session, jobSignal) => session.job({ script: pipeline, runtime: "loraTraining", uploads: [{ name: `${jobName}.json`, data: JSON.stringify(job) }, ...uploads], env: { LORA_JOB: jobName }, outputs: [`/content/${jobName}.safetensors`], detached: true }, jobSignal), signal) as [Uint8Array];
+  } finally {
+    laneTrainings.set(physical, laneTrainings.get(physical)! - 1);
+  }
   const record: LoraRecord = { name: input.name, kind: input.kind, family, trigger, path: `loras/${trigger}.safetensors`, createdAt: new Date().toISOString() };
   const target = await resolveWorkspacePath(cwd, record.path, true);
   await mkdir(dirname(target.path), { recursive: true });

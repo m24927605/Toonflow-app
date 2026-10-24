@@ -61,7 +61,7 @@ export async function generateAmbience(cwd: string, production: Production, sign
       const text = ambienceVideoPrompt(place!.look, item.query);
       await writeProductionText(cwd, prompt, text);
       const [video] = await generateMedia(cwd, "video", {
-        providerId: "sulphur", modelId: "sulphur_2_q8", mode: "endFrameOptional", prompt: text,
+        providerId: "sulphur", modelId: "sulphur_2", mode: "endFrameOptional", prompt: text,
         duration, resolution: "480p", ratio: production.input.ratio, generateAudio: true,
         firstFrame: { path: image, mimeType: /\.jpe?g$/i.test(image) ? "image/jpeg" : "image/png" },
         // This renders a stationary empty environment solely for its native audio, without actor choreography.

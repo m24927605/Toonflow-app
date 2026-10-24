@@ -3,8 +3,9 @@
 # Output: /content/<LORA_JOB>.safetensors, followed by COLAB_DONE on success.
 # Qwen-Image trains with Fizgig, pinned and installed into its own venv with uv: Colab's Python has no ensurepip, and
 # uv's default first-index rule fails on packages the PyTorch index also lists, so it resolves across indexes like pip.
-# Sulphur 2 trains with Lightricks' own ltx-trainer on the dev weights the inference GGUF was quantised from, so its
-# LoRA keys (diffusion_model.*) load in ComfyUI unchanged.
+# Sulphur 2 trains with Lightricks' own ltx-trainer on Sulphur's dev weights, the LTX-2.3 dev model with the Sulphur
+# LoRA merged in, which inference rebuilds from the dev fp8 checkpoint and that LoRA; its LoRA keys (diffusion_model.*)
+# load in ComfyUI unchanged.
 import json
 import os
 import shutil
@@ -26,6 +27,8 @@ weightRevisions = {
     "SulphurAI/Sulphur-2-base": "65587bbb38c700622f9434a16e732c8b280c115e",
     # Google's gemma-3-12b-it, byte for byte the encoder Comfy-Org packs for inference, without the licence gate.
     "unsloth/gemma-3-12b-it": "9478e665381f42974aa06177b019352fb6291876",
+    # OpenCV's YuNet face detector (MIT); OpenCV 5, which the LTX trainer's lock installs, no longer has Haar cascades.
+    "opencv/face_detection_yunet": "3cc26e7f1014a5ee5d74a42acee58bafc9d0a310",
 }
 models, data = Path("/content/models"), Path("/content/loradata")
 jobName = os.environ["LORA_JOB"]
@@ -52,6 +55,10 @@ def checkout(repo, url, commit):
 
 run(sys.executable, "-m", "pip", "install", "-q", "uv==0.13.1", "huggingface_hub==1.33.0")
 from huggingface_hub import hf_hub_download, snapshot_download
+from modelPreparation import hubToken, retryThrottled
+
+# The machine's shared weight cache, as modelPreparation.py fills it: Sulphur renders read the same dev bf16 file.
+weightCache = "/content/toonflowWeights"
 
 if family == "ltx":
     repo = Path("/content/LTX-2")
@@ -65,8 +72,8 @@ if family == "ltx":
         run("uv", "sync", "--frozen", "--no-dev", "--package", "ltx-trainer", "--python", "3.12", cwd=repo, env=environment)
         (repo / "toonflowReady").touch()
     paths = {
-        "dit": hf_hub_download("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors", revision=weightRevisions["SulphurAI/Sulphur-2-base"], local_dir=models / "sulphur"),
-        "te": snapshot_download("unsloth/gemma-3-12b-it", revision=weightRevisions["unsloth/gemma-3-12b-it"], local_dir=models / "gemma-3-12b-it"),
+        "dit": retryThrottled(lambda: hf_hub_download("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors", revision=weightRevisions["SulphurAI/Sulphur-2-base"], cache_dir=weightCache, token=hubToken())),
+        "te": retryThrottled(lambda: snapshot_download("unsloth/gemma-3-12b-it", revision=weightRevisions["unsloth/gemma-3-12b-it"], cache_dir=weightCache, token=hubToken())),
     }
 else:
     repo = Path("/content/fizgig")
@@ -85,7 +92,7 @@ else:
         "adapter": ("ShootTheSound/Fizgig-Qwen-Image-2.1-Training-Adapter", "fizgig_qwen_image_2.1_training_adapter_v2.safetensors"),
         **({"speed": ("Comfy-Org/Qwen-Image-2.1", "loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors")} if kind == "slider" else {}),
     }
-    paths = {key: hf_hub_download(repoId, name, revision=weightRevisions[repoId], local_dir=models / family) for key, (repoId, name) in files.items()}
+    paths = {key: retryThrottled(lambda: hf_hub_download(repoId, name, revision=weightRevisions[repoId], cache_dir=weightCache, token=hubToken())) for key, (repoId, name) in files.items()}
 
 items = sorted(path for path in Path("/content").glob(f"{jobName}Item*") if path.suffix != ".txt")
 env = {**os.environ, "PYTHONPATH": str(repo / "src")} if family == "qwen" else {key: value for key, value in os.environ.items() if not key.startswith("UV_") and key != "PYTHONPATH"}
@@ -132,22 +139,25 @@ else:
 import sys, cv2
 from pathlib import Path
 media = Path(sys.argv[1])
-detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+detector = cv2.FaceDetectorYN.create(sys.argv[2], "", (320, 320), 0.8)
 for source in sorted(media.glob("item_*")):
     image = cv2.imread(str(source))
     if image is None:
         continue
-    faces = sorted(detector.detectMultiScale(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), 1.1, 6, minSize=(96, 96)), key=lambda box: box[2] * box[3], reverse=True)
-    if not len(faces):
+    detector.setInputSize((image.shape[1], image.shape[0]))
+    found = detector.detect(image)[1]
+    faces = sorted((face for face in ([] if found is None else found) if face[2] >= 96 and face[3] >= 96), key=lambda face: face[2] * face[3], reverse=True)
+    if not faces:
         continue
-    x, y, w, h = faces[0]
+    x, y, w, h = (int(value) for value in faces[0][:4])
     side = int(max(w, h) * 2.2)
     left, top = max(0, x + w // 2 - side // 2), max(0, y + h // 2 - side // 2)
     face = image[top:top + side, left:left + side]
     if min(face.shape[:2]) >= 256:
         cv2.imwrite(str(media / f"face_{source.stem}.png"), cv2.resize(face, (768, 768), interpolation=cv2.INTER_LANCZOS4))
 '''
-        run(python, "-c", crop, media, env=env)
+        yunet = retryThrottled(lambda: hf_hub_download("opencv/face_detection_yunet", "face_detection_yunet_2023mar.onnx", revision=weightRevisions["opencv/face_detection_yunet"], local_dir=models / "yunet", token=hubToken()))
+        run(python, "-c", crop, media, yunet, env=env)
     # Captions describe everything except what the LoRA learns, so that one thing binds to the trigger word.
     asks = {
         "character": "the framing (close-up, half-body or full-body), the camera angle (front, three-quarter left or right, profile, from above or below, or back), the person's clothing or lack of it, pose and expression, the background and the lighting. Start with 'a woman' or 'a man'. Do not describe the face, eyes, hair, skin or body features.",
@@ -163,8 +173,10 @@ from PIL import Image
 from transformers import AutoModelForImageTextToText, AutoProcessor
 media, trigger, ask = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 name, revision = "Qwen/Qwen3-VL-4B-Instruct", "ebb281ec70b05090aa6165b016eac8ec08e71b17"
-model = AutoModelForImageTextToText.from_pretrained(name, revision=revision, torch_dtype=torch.bfloat16, device_map="cuda")
-processor = AutoProcessor.from_pretrained(name, revision=revision)
+# This runs in the trainer's own environment, without modelPreparation: the token is read the same way it does.
+token = __import__("os").environ.get("HF_TOKEN") or None
+model = AutoModelForImageTextToText.from_pretrained(name, revision=revision, torch_dtype=torch.bfloat16, device_map="cuda", token=token)
+processor = AutoProcessor.from_pretrained(name, revision=revision, token=token)
 prompt = "Describe this picture for an image caption in one short English phrase: " + ask + " No full sentence, no quotes."
 for path in sorted(media.iterdir()):
     if path.suffix == ".txt" or path.with_suffix(".txt").exists():
@@ -203,7 +215,9 @@ for path in sorted(media.iterdir()):
             "acceleration": {"mixed_precision_mode": "bf16", "quantization": None, "load_text_encoder_in_8bit": False, "offload_optimizer_during_validation": False},
             "data": {"preprocessed_data_root": str(data / ".precomputed"), "num_dataloader_workers": 2},
             "validation": {"samples": [], "interval": None},
-            "checkpoints": {"interval": 1500, "keep_last_n": 1, "precision": "bfloat16", "save_training_state": "minimal"},
+            # Only the trainer's own save at the end: a periodic save at the last step lists the same file twice, and
+            # keep_last_n then deletes the one LoRA as the older of the two (ltx-trainer at the pinned commit).
+            "checkpoints": {"interval": None, "keep_last_n": 1, "precision": "bfloat16", "save_training_state": "minimal"},
             "flow_matching": {"timestep_sampling_mode": "shifted_logit_normal", "timestep_sampling_params": {}},
             "hub": {"push_to_hub": False},
             "wandb": {"enabled": False},
