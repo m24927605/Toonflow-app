@@ -17,8 +17,6 @@
           </li>
         </ul>
         <p v-else>{{ summary }}</p>
-        <p v-if="fresh && snapshot?.working">工作執行中，不會因閒置計時而關機。</p>
-        <p v-else-if="countdown" class="shutdownCountdown">{{ countdown }}</p>
         <p v-if="snapshot" class="updatedAt">{{ updatedAt }}</p>
       </section>
     </el-popover>
@@ -53,13 +51,6 @@ const summary = computed(() => {
   return translate(snapshot.value?.machines.every(row => row.state === "off") ? "機器已關閉" : "機器未連線");
 });
 const tone = computed(() => !fresh.value || snapshot.value?.machines.some(row => row.state === "unknown") ? "unknown" : onlineCount.value ? "online" : "offline");
-const countdown = computed(() => {
-  const state = snapshot.value;
-  if (!fresh.value || !state?.idleShutdownAt || !state.machines.some(row => row.state === "working" || row.state === "idle")) return "";
-  // Server-relative time avoids making the shutdown countdown depend on the browser's wall clock.
-  const seconds = Math.max(0, Math.ceil((Date.parse(state.idleShutdownAt) - Date.parse(state.checkedAt) - (now.value - receivedAt.value)) / 1000));
-  return seconds ? t`閒置關機倒數 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : translate("即將閒置關機");
-});
 const updatedAt = computed(() => snapshot.value ? t`更新於 ${new Intl.DateTimeFormat(locale.value, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(snapshot.value.checkedAt))}` : "");
 </script>
 
@@ -76,7 +67,7 @@ const updatedAt = computed(() => snapshot.value ? t`更新於 ${new Intl.DateTim
   li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
   .machineState { color: var(--el-text-color-secondary); }
   p { margin: 10px 0 0; line-height: 1.6; color: var(--el-text-color-secondary); }
-  .shutdownCountdown, .updatedAt { font-variant-numeric: tabular-nums; }
+  .updatedAt { font-variant-numeric: tabular-nums; }
   .updatedAt { color: var(--el-text-color-placeholder); }
 }
 </style>

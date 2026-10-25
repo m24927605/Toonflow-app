@@ -6,7 +6,7 @@ import { shotListFixPrompt, shotListInstructions, storyScopeInstructions, uncens
 import { t, getLocale, runWithLocale, translateMessage } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, listAiModels, streamAi, colabModelPreparation } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
-import { holdColabPool, inspectColabPool, stopColabPoolWhenUnused, markVideoActivity, colabModelPrepared, markColabModelPrepared, colabLane, colabPoolIdle, withColabAllocation, type ColabPreparation } from "@/utils/media/colabPool";
+import { holdColabPool, inspectColabPool, colabModelPrepared, markColabModelPrepared, colabLane, colabPoolIdle, withColabAllocation, type ColabPreparation } from "@/utils/media/colabPool";
 import { meteredColabUnits } from "@/utils/media/usage";
 import { holdSulphur, limitSulphur, maxClipSeconds, maxTakeSeconds, warmSulphur, sulphurPreparation } from "@/utils/media/sulphur";
 import { holdQwenImage, qwenImagePreparation } from "@/utils/media/qwenImage";
@@ -62,9 +62,7 @@ async function releaseRuntime(key: string, preserveCache = false) {
   if (runtime.preparation) await Promise.allSettled([runtime.preparation.allReady]);
   runtime.release();
   runtimeOwners.delete(key);
-  try {
-    if (preserveCache && !runtimeOwners.size && colabPoolIdle()) await saveModelCaches(AbortSignal.timeout(120_000));
-  } finally { await stopColabPoolWhenUnused(); }
+  if (preserveCache && !runtimeOwners.size && colabPoolIdle()) await saveModelCaches(AbortSignal.timeout(120_000));
 }
 
 async function prepareRuntime(cwd: string, production: Production, signal: AbortSignal) {
@@ -322,7 +320,7 @@ export async function sendProductionMessage(cwd: string, id: string, messageId: 
           turn.status = "failed"; turn.error = translateMessage("訊息回覆未完成，請查看目前製作進度，或稍後重送。");
         });
         console.error("[production] Conversation reply failed", { id, error: error instanceof Error ? error.name : "unknown" });
-      } finally { release(); if (production && production.status !== "running") await stopColabPoolWhenUnused(); finish(); }
+      } finally { release(); finish(); }
     }).catch(error => { finish(); console.error("[production] Could not save conversation reply", { id, error: error instanceof Error ? error.name : "unknown" }); });
   } catch (error) { finish(); throw error; }
 }
@@ -984,7 +982,6 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
 export function runProduction(cwd: string, id: string) {
   const key = runnerKey(cwd, id);
   if (runners.has(key)) return;
-  markVideoActivity();
   const controller = new AbortController();
   const runtime: RuntimeOwner = runtimeOwners.get(key) ?? { release: holdColabPool() };
   runtimeOwners.set(key, runtime);
@@ -1050,7 +1047,6 @@ export function runProduction(cwd: string, id: string) {
     } finally {
       if (controller.signal.aborted && runtime.preparation) await Promise.allSettled([runtime.preparation.allReady]);
       releaseText();
-      markVideoActivity();
       try {
         const latest = await readProduction(cwd, id);
         if (latest.status === "done" || latest.status === "failed" || latest.input.mode === "simple" || controller.signal.aborted || !runtime.started) {

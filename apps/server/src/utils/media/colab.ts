@@ -39,9 +39,6 @@ const detachedPoll = 60_000;
 const offlineGrace = 30 * 60_000;
 // How long a failing stop is retried before the session is reported as possibly still billing.
 const stopRetry = 60 * 60_000;
-// A VM releases itself after its kernel has been idle this long without the host reaching it; longer than
-// offlineGrace, so a host that reconnects in time still stops the session and collects the outputs itself.
-const releaseAfter = 45 * 60_000;
 
 export type ColabJob = {
   /** Media provider the session is billed to, for the daily compute unit cap. */
@@ -92,18 +89,19 @@ async function guardColabLog() {
 
 // The hourly rate of each session this process has running, which the compute unit meter adds up.
 const sessionRates = new Map<string, number>();
-// How often the meter is written while sessions run, well within releaseAfter.
+/** Machines that started but could not be taken into use; they keep running until the user stops the machines. */
+export const strayColabSessions = new Set<string>();
+// How often the meter is written while sessions run.
 const meterTick = 60_000;
 let meterTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
- * Meters the running sessions' rates from now on, and while any run, every meterTick. A longer gap since the last
- * reading means this host was asleep, offline or killed, and its sessions' VMs released themselves releaseAfter after it
- * last reached them, so a gap counts for at most that long.
+ * Meters the running sessions' rates from now on, and while any run, every meterTick. Machines run until the user stops
+ * them, so a gap while this host was asleep, offline or killed counts in full.
  */
 function meterSessions() {
   try {
-    meterColab([...sessionRates.values()].reduce((sum, rate) => sum + rate, 0), releaseAfter);
+    meterColab([...sessionRates.values()].reduce((sum, rate) => sum + rate, 0));
   } catch (error) {
     console.error("[colab] The compute unit meter could not be updated:", error);
   }
@@ -159,39 +157,6 @@ async function colab(command: string, args: string[], signal?: AbortSignal, time
 }
 
 const heartbeatPath = "/content/.toonflowHeartbeat";
-// Touched by every exec, so the VM knows when the host last reached it.
-const seenPath = "/content/.toonflowSeen";
-
-/**
- * A separate process on the VM that releases it through Colab's runtime service (the POST behind
- * google.colab.runtime.unassign) once the kernel is idle and the host has not reached it for releaseAfter. The host
- * normally stops its sessions itself; this covers a host that cannot (offline, asleep, crashed), so a forgotten GPU
- * bills at most the running job plus releaseAfter. A job counts as running for at most execTimeout, so a hung kernel
- * is released too.
- */
-const watchdogScript = `import json, os, time, urllib.request
-last, busySince = time.time(), None
-while True:
-    time.sleep(60)
-    now = time.time()
-    try:
-        with open("${heartbeatPath}") as file:
-            beat = json.load(file)
-        busy = now - beat["beat"] < 120 and beat["current"] is not None and beat["current"] != beat["finished"]
-    except Exception:
-        busy = False
-    busySince = (busySince or now) if busy else None
-    if busy and now - busySince < ${execTimeout}:
-        last = now
-    last = max(last, os.path.getmtime("${seenPath}"))
-    if now - last > ${releaseAfter / 1000}:
-        try:
-            urllib.request.urlopen(urllib.request.Request("http://" + os.environ["TBE_RUNTIME_ADDR"] + "/unassign", method="POST"), timeout=30)
-            print("released", time.ctime(now), flush=True)
-            break
-        except Exception as error:
-            print("release failed, retrying:", error, flush=True)
-`;
 
 /**
  * Started once per session. `colab status` only reports the CLI's local bookkeeping (it shows IDLE before an exec
@@ -219,10 +184,6 @@ if "toonflowState" not in globals():
             os.replace("${heartbeatPath}.tmp", "${heartbeatPath}")
             time.sleep(15)
     threading.Thread(target=toonflowHeartbeat, daemon=True).start()
-    import subprocess, sys
-    open("${seenPath}", "a").close()
-    subprocess.Popen([sys.executable, "-c", ${JSON.stringify(watchdogScript)}], cwd="/content", start_new_session=True,
-                     stdout=open("/content/.toonflowWatchdog.log", "a"), stderr=subprocess.STDOUT)
 print("COLAB_DONE")
 `;
 
@@ -341,6 +302,12 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
     await exec("print('COLAB_DONE')\n", {}, signal);
   }
 
+  /** Restarts the kernel, dropping every loaded model, and keeps the machine, so the next job starts clean. */
+  async function reset(signal?: AbortSignal) {
+    await colab(command, ["restart-kernel", "--session", name], signal);
+    await startHeartbeat(signal);
+  }
+
   async function spawnExec(path: string, env: ColabJob["env"], signal: AbortSignal) {
     const child = Bun.spawn([
       command, "exec", "--session", name, "--timeout", String(execTimeout),
@@ -387,8 +354,7 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
     const execId = `${name}-${crypto.randomUUID()}`;
     for (let attempt = 1; ; attempt++) {
       const path = join(directory, `script${files++}.py`);
-      await writeFile(path, `${stateCheck}__import__("os").utime("${seenPath}")
-if "${execId}" in toonflowExecutions:
+      await writeFile(path, `${stateCheck}if "${execId}" in toonflowExecutions:
     toonflowState.update(current="${execId}", finished="${execId}", error=toonflowExecutions["${execId}"])
     if toonflowExecutions["${execId}"] is not None:
         raise RuntimeError(toonflowExecutions["${execId}"])
@@ -463,8 +429,7 @@ else:
     const local = join(directory, `upload${files++}`);
     await writeFile(local, script);
     await colab(command, ["upload", "--session", name, local, `/content/${id}.py`], signal);
-    // The shell writes the exit status once the script ends; the kernel only starts it and returns. Each check is an
-    // exec, so it also tells the session watchdog the host is still there.
+    // The shell writes the exit status once the script ends; the kernel only starts it and returns.
     await exec(`${prelude}import subprocess as _toonflowProcess, sys as _toonflowSys
 _toonflowProcess.Popen(["/bin/sh", "-c", f"{_toonflowSys.executable} -u /content/${id}.py > /content/${id}.log 2>&1; echo $? > /content/${id}.exit"], cwd="/content", start_new_session=True)
 print("COLAB_DONE")
@@ -768,9 +733,6 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
       if (await colab(command, ["stop", "--session", name]).then(() => true, () => !startedAt)) break;
       const reason = failure instanceof Error ? ` (it was stopping after: ${failure.message.slice(0, 500)})` : "";
       if (Date.now() - firstTry > stopRetry) {
-        // Its VM releases itself releaseAfter after this host last reached it, which has passed by now.
-        sessionRates.delete(name);
-        meterSessions();
         throw new Error(`Colab session ${name} could not be stopped; run colab stop --session ${name} so it stops billing${reason}`, { cause: failure });
       }
       await scheduler.wait(30_000);
@@ -813,19 +775,29 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
     await startHeartbeat(signal);
     if (retainedName) await keepAlive(signal);
   } catch (error) {
-    if (!retainedName) await close(error);
+    if (retainedName) throw error;
+    // Only the user stops machines: one that started is left running and stopped with the others.
+    if (!startedAt) await close(error);
+    else {
+      strayColabSessions.add(name);
+      await rm(directory, { recursive: true, force: true });
+      throw new Error(`${error instanceof Error ? error.message : error}; machine ${name} was left running until the machines are stopped`, { cause: error });
+    }
     throw error;
   }
-  return { name, job, readOutput, writeInput, close, attribute, keepAlive };
+  return { name, job, readOutput, writeInput, close, reset, attribute, keepAlive };
 }
 
 /** Stops a Toonflow machine this process holds no session for, such as one left over from before a restart. */
 export async function stopColabSession(name: string) {
   if (!/^toonflow-[0-9a-f]{8}$/.test(name)) throw new Error("Invalid Colab session name");
   await colab(findCommand("colab", "Colab CLI not found"), ["stop", "--session", name]);
+  strayColabSessions.delete(name);
+  sessionRates.delete(name);
+  meterSessions();
 }
 
-/** Read a Toonflow kernel heartbeat without executing code, owning the VM or refreshing its idle lease. */
+/** Read a Toonflow kernel heartbeat without executing code or owning the VM. */
 export async function readColabSessionStatus(name: string) {
   if (!/^toonflow-[0-9a-f]{8}$/.test(name)) throw new Error("Invalid Colab session name");
   let directory: string | undefined;

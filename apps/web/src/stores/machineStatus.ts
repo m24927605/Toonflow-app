@@ -3,7 +3,7 @@ import { ref, shallowRef } from "vue";
 
 export type MachineState = "disconnected" | "off" | "starting" | "working" | "idle" | "stopping" | "unknown";
 export type MachineSnapshot = {
-  checkedAt: string; working: boolean; idleShutdownAt: string | null;
+  checkedAt: string; working: boolean;
   machines: { lane: number; gpu: "L4" | "A100"; state: MachineState; checkedAt: string }[];
 };
 const states: MachineState[] = ["disconnected", "off", "starting", "working", "idle", "stopping", "unknown"];
@@ -12,7 +12,6 @@ function validSnapshot(value: unknown): value is MachineSnapshot {
   if (!value || typeof value !== "object") return false;
   const data = value as MachineSnapshot;
   return typeof data.checkedAt === "string" && Number.isFinite(Date.parse(data.checkedAt)) && typeof data.working === "boolean"
-    && (data.idleShutdownAt === null || typeof data.idleShutdownAt === "string" && Number.isFinite(Date.parse(data.idleShutdownAt)))
     && Array.isArray(data.machines) && data.machines.length >= 3 && data.machines.length <= 4
     && data.machines.every(row => row && Number.isInteger(row.lane) && row.lane >= 0 && row.lane < 4 && ["L4", "A100"].includes(row.gpu) && states.includes(row.state) && typeof row.checkedAt === "string" && Number.isFinite(Date.parse(row.checkedAt)))
     && new Set(data.machines.map(row => row.lane)).size === data.machines.length

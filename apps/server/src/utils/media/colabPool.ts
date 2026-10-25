@@ -1,4 +1,4 @@
-import { openColabSession, readColabSessionStatus, stopColabSession, ColabScriptError, ColabConnectionError, type ColabMachine, type ColabSession, type ColabJob } from "./colab";
+import { openColabSession, readColabSessionStatus, stopColabSession, strayColabSessions, ColabScriptError, ColabConnectionError, type ColabMachine, type ColabSession, type ColabJob } from "./colab";
 import { z } from "zod";
 import { dirname, join } from "node:path";
 import { readFile, writeAtomic } from "@toonflow/file";
@@ -35,12 +35,13 @@ export type ColabPreparation = { name: string; runtime: string; installSource: s
 const machines: ColabMachine[] = [{ gpu: "L4", highMem: true }, ...Array.from({ length: 3 }, () => ({ gpu: "A100" as const, highMem: true }))];
 const lanes = machines.map(machine => ({ machine, session: undefined as ColabSession | undefined, closedAt: undefined as string | undefined, capacity: undefined as z.infer<typeof machineCapacitySchema> | undefined, prepared: new Set<string>(), queue: Promise.resolve() as Promise<unknown>, pending: 0, controller: undefined as AbortController | undefined }));
 const checkpointPath = () => join(dirname(conf.path), "colabPool.json");
-const idleClockPath = () => join(dirname(conf.path), "colabIdle.json");
+// Machines that started but were never taken into use; the user's stop command stops them with the others.
+const strayPath = () => join(dirname(conf.path), "colabStrays.json");
 let checkpointQueue: Promise<unknown> = Promise.resolve();
 let poolReady: Promise<void> | undefined;
 function saveCheckpoint() {
   const next = checkpointQueue.then(async () => {
-    await writeAtomic(idleClockPath(), JSON.stringify({ since: idleSince ?? null }));
+    await writeAtomic(strayPath(), JSON.stringify([...strayColabSessions]));
     await writeAtomic(checkpointPath(), JSON.stringify(lanes.flatMap((lane, index) => lane.session ? [{ lane: index, name: lane.session.name, prepared: [...lane.prepared], capacity: lane.capacity }] : [])));
   });
   checkpointQueue = next.catch(() => {});
@@ -58,11 +59,11 @@ async function restoreSavedPool(signal: AbortSignal) {
     if (error.code !== "ENOENT") throw error;
     return [];
   });
-  const clock = await readFile(idleClockPath(), "utf8").then(text => z.object({ since: z.number().finite().nonnegative().nullable() }).parse(JSON.parse(text)).since, (error: NodeJS.ErrnoException) => {
+  const strays = await readFile(strayPath(), "utf8").then(text => z.array(z.string().regex(/^toonflow-[0-9a-f]{8}$/)).max(64).parse(JSON.parse(text)), (error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw error;
-    return null;
+    return [];
   });
-  idleSince = clock ?? undefined;
+  strays.forEach(name => strayColabSessions.add(name));
   const results = await Promise.allSettled(saved.map(item => enqueue(item.lane, async (lane, jobSignal) => {
     // A status read right after a restart may time out, so an unknown state is read again before it counts.
     let status = await readColabSessionStatus(item.name);
@@ -76,11 +77,10 @@ async function restoreSavedPool(signal: AbortSignal) {
       lane.closedAt = undefined;
       lane.session = await openColabSession("production", lane.machine, jobSignal, item.name);
     } catch (error) {
-      // A machine that cannot be taken back has no owner left and would bill until it times out, so it is stopped;
-      // a restore cancelled by shutdown keeps it for the next start.
+      // Only the user stops machines: one that cannot be taken back keeps running and is stopped with the others.
       if (jobSignal.aborted) throw error;
-      const stopped = await stopColabSession(item.name).then(() => "it was stopped", (stopError: unknown) => `stopping it failed (${stopError instanceof Error ? stopError.message : stopError}); run colab stop --session ${item.name}`);
-      throw new Error(`${error instanceof Error ? error.message : error}; ${stopped}`, { cause: error });
+      strayColabSessions.add(item.name);
+      throw new Error(`${error instanceof Error ? error.message : error}; it was left running until the machines are stopped`, { cause: error });
     }
     lane.prepared = new Set(item.prepared);
     lane.capacity = item.capacity;
@@ -88,9 +88,8 @@ async function restoreSavedPool(signal: AbortSignal) {
   // A machine that cannot be taken back is reported and left out; the other lanes and all new work go on, as failing
   // the whole pool made every later job fail until the next restart, which met the same stale checkpoint.
   for (const result of results) if (result.status === "rejected") console.error("[colab] A machine was not reconnected:", result.reason instanceof Error ? result.reason.message : result.reason);
-  if (lanes.some(lane => lane.session)) { idleSince ??= Date.now(); ensureKeepAlive(); }
+  if (lanes.some(lane => lane.session)) ensureKeepAlive();
   await saveCheckpoint();
-  scheduleIdleStop();
 }
 
 export const colabModelPrepared = (index: number, model: string) => lanes[index]?.prepared.has(model) ?? false;
@@ -112,35 +111,19 @@ export async function markColabModelPrepared(index: number, model: string) {
 let holds = 0;
 let epoch = 0;
 let generation = 0;
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined;
 let keepingAlive = false;
 let stopping: Promise<void> | undefined;
-let idleSince: number | undefined;
-const pageIdleLimit = 60 * 60_000;
 
-function scheduleIdleStop() {
-  clearTimeout(idleTimer);
-  if (holds || lanes.some(lane => lane.pending)) return;
-  if (!lanes.some(lane => lane.session)) return;
-  idleSince ??= Date.now();
-  const delay = Math.max(0, pageIdleLimit - (Date.now() - idleSince));
-  idleTimer = setTimeout(() => void stopColabPoolWhenUnused().catch(error => console.error("[colabPool] Idle stop failed:", error)), delay);
-  idleTimer.unref();
-}
-
-/** Holds physical machines, including idle models awaiting a review or a retry. It does not allocate machines. */
+/** Marks the machines as working, including idle models awaiting a review or a retry. It does not allocate machines. */
 export function holdColabPool() {
-  clearTimeout(idleTimer);
   holds++;
   ensureKeepAlive();
   let held = true;
   return () => {
     if (!held) return;
     held = false;
-    if (--holds === 0) {
-      scheduleIdleStop();
-    }
+    holds--;
   };
 }
 
@@ -158,14 +141,9 @@ function ensureKeepAlive() {
   }
 }
 
-export function markVideoActivity() {
-  idleSince = Date.now();
-  scheduleIdleStop();
-}
-
 const statusReads = new WeakMap<ColabSession, { at: number; result: ReturnType<typeof readColabSessionStatus> }>();
 
-/** Read-only status probes bypass the generation queue and never refresh the idle lease. */
+/** Read-only status probes bypass the generation queue. */
 export async function readColabPoolStatus() {
   const rows = await Promise.all(lanes.map(async (lane, index) => {
     const identity = { lane: index, gpu: lane.machine.gpu };
@@ -188,8 +166,6 @@ export async function readColabPoolStatus() {
     checkedAt: new Date().toISOString(),
     machines: rows.filter(row => row.lane < 3 || row.state !== "disconnected"),
     working,
-    idleShutdownAt: !working && !stopping && idleSince !== undefined && lanes.some(lane => lane.session)
-      ? new Date(idleSince + pageIdleLimit).toISOString() : null,
   };
 }
 
@@ -198,7 +174,6 @@ function enqueue<T>(index: number, work: (lane: typeof lanes[number], signal: Ab
   signal?.throwIfAborted();
   const lane = lanes[index];
   if (!lane) throw new Error("Invalid Colab execution lane");
-  clearTimeout(idleTimer);
   const queuedEpoch = epoch;
   let started = false;
   lane.pending++;
@@ -209,7 +184,7 @@ function enqueue<T>(index: number, work: (lane: typeof lanes[number], signal: Ab
     const controller = lane.controller = new AbortController();
     try { return await work(lane, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal); }
     finally { lane.controller = undefined; }
-  }).finally(() => { lane.pending--; scheduleIdleStop(); });
+  }).finally(() => { lane.pending--; });
   lane.queue = result.catch(() => {});
   if (!signal) return result;
   return new Promise<T>((resolve, reject) => {
@@ -226,7 +201,7 @@ export async function startColabPool(signal: AbortSignal, required: number[]) {
   const results = await Promise.allSettled(required.map(index => enqueue(index, async (lane, jobSignal) => {
     if (!lane.session) lane.closedAt = undefined;
     lane.session ??= await openColabSession("production", lane.machine, jobSignal);
-    idleSince ??= Date.now();
+    ensureKeepAlive();
     await saveCheckpoint();
     return lane.session.name;
   }, signal)));
@@ -236,15 +211,6 @@ export async function startColabPool(signal: AbortSignal, required: number[]) {
 
 export const colabPoolEpoch = () => generation;
 
-export async function stopColabPoolWhenUnused() {
-  await saveCheckpoint();
-  if (holds || lanes.some(lane => lane.pending)) return Promise.resolve();
-  if (idleSince === undefined || Date.now() - idleSince < pageIdleLimit) {
-    scheduleIdleStop();
-    return Promise.resolve();
-  }
-  return stopColabPool();
-}
 export const colabPoolIdle = () => !holds && lanes.every(lane => !lane.pending);
 
 /** Maintenance uses the same queue as inference and cannot allocate or replace a VM. */
@@ -264,18 +230,22 @@ export async function inspectColabPool(signal: AbortSignal, required: number[]) 
   });
 }
 
-/** Explicit stop cancels running work, drains queued jobs and verifies each physical VM was released. */
+/**
+ * The user's stop command, the only way machines are stopped: it cancels running work, drains queued jobs, stops the
+ * machines that were never taken into use and verifies each physical VM was released.
+ */
 export function stopColabPool() {
   if (stopping) return stopping;
-  clearTimeout(idleTimer);
   clearInterval(keepAliveTimer);
   keepAliveTimer = undefined;
-  idleSince = undefined;
   epoch++;
   generation++;
   lanes.forEach(lane => lane.controller?.abort(new Error("The Colab pool was stopped")));
   stopping = (async () => {
-    const results = await Promise.allSettled(lanes.map(async lane => {
+    const results = await Promise.allSettled([...[...strayColabSessions].map(async name => {
+      await stopColabSession(name);
+      await saveCheckpoint();
+    }), ...lanes.map(async lane => {
       await lane.queue;
       if (!lane.session) return;
       await lane.session.close();
@@ -284,7 +254,7 @@ export function stopColabPool() {
       lane.capacity = undefined;
       lane.prepared.clear();
       await saveCheckpoint();
-    }));
+    })]);
     const failed = results.find(result => result.status === "rejected");
     if (failed) throw failed.reason;
   })().finally(() => { stopping = undefined; });
@@ -306,7 +276,7 @@ export function createColabWorker(provider: string, index: number) {
       try {
         if (!lane.session) lane.closedAt = undefined;
         lane.session ??= await openColabSession(provider, lane.machine, jobSignal);
-        idleSince ??= Date.now();
+        ensureKeepAlive();
         await saveCheckpoint();
         readyAt = performance.now();
         await lane.session.attribute(provider);
@@ -320,21 +290,23 @@ export function createColabWorker(provider: string, index: number) {
         passed = true;
         return result;
       } catch (error) {
-        // A disconnected/cancelled kernel cannot safely hand its GPU state to another model.
+        // A disconnected/cancelled kernel cannot safely hand its GPU state to another model, so its kernel is restarted;
+        // only the user stops machines, and a machine is let go here only once Colab no longer has it.
         if (!(error instanceof ColabConnectionError) && (!(error instanceof ColabScriptError) || error.unsafe) && lane.session) {
-          await lane.session.close(error);
-          lane.closedAt = new Date().toISOString();
-          lane.session = undefined;
+          const session = lane.session;
           lane.capacity = undefined;
           lane.prepared.clear();
           generation++;
-          await saveCheckpoint();
+          try { await session.reset(); } catch (resetError) {
+            if ((await readColabSessionStatus(session.name)).state !== "off") throw new Error(`${error instanceof Error ? error.message : error}; restarting the kernel of ${session.name} also failed (${resetError instanceof Error ? resetError.message : resetError}), and the machine was left running`, { cause: error });
+            await session.close(error);
+            lane.closedAt = new Date().toISOString();
+            lane.session = undefined;
+          } finally { await saveCheckpoint(); }
         }
+        await saveCheckpoint();
         throw error;
       } finally {
-        // Any job, not only video, keeps the machines in use: the idle hour counts from the end of the last one, so an
-        // image batch or a training is never left to meet a pool that stopped between two of its requests.
-        idleSince = Date.now();
         const now = performance.now();
         const role = provider === "colab" ? index === 0 ? "text" : "visualReview" : provider === "drama3" ? allocation.getStore()?.speechRuntime === "sglang" ? "drama3Sglang" : allocation.getStore()?.speechMode === "compiled" ? "drama3Compiled" : "drama3Eager" : provider;
         const observation = { role, gpu: lane.machine.gpu, passed };

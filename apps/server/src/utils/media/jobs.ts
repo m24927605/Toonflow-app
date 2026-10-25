@@ -1,7 +1,6 @@
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { errorFromCause, success } from "@/lib/responseFormat";
 import { generateMedia } from "@/utils/media/generation";
-import { markVideoActivity, stopColabPoolWhenUnused } from "@/utils/media/colabPool";
 
 type Job = { cwd: string; controller: AbortController; seen: number; result?: ReturnType<typeof errorFromCause> };
 
@@ -36,11 +35,7 @@ export function startJob(cwd: string, run: (signal: AbortSignal) => Promise<unkn
 }
 
 export function startMediaJob(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest) {
-  if (mediaType === "video") markVideoActivity();
-  return startJob(cwd, async signal => {
-    try { return await generateMedia(cwd, mediaType, request, signal); }
-    finally { if (mediaType === "video") { markVideoActivity(); await stopColabPoolWhenUnused(); } }
-  });
+  return startJob(cwd, signal => generateMedia(cwd, mediaType, request, signal));
 }
 
 function findJob(id: string, cwd: string) {
