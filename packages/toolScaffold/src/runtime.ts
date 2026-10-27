@@ -137,6 +137,8 @@ export interface MediaGenerationRequest {
   initImage?: MediaReference;
   /** Image only, with `initImage`: how much of it is redrawn, from 0 (kept) to 1 (drawn anew). */
   denoise?: number;
+  /** Image only, with `initImage`: white where the picture is redrawn, black where it is kept. */
+  mask?: MediaReference;
   mode?: "singleImage" | "startEndRequired" | "endFrameOptional" | "startFrameOptional" | "text" | "videoExtension" | "videoControl"
     | (`${"image" | "video" | "audio"}Reference:${number}`)[];
 }

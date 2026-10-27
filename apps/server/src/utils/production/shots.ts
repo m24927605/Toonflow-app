@@ -1,6 +1,7 @@
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { shotSpans } from "@toonflow/node-shared/shotList";
 import type { Production, ProductionAsset } from "./state";
+import type { VisualCheck } from "./checks";
 import type { ProductionPlan } from "./plan";
 
 /**
@@ -10,10 +11,12 @@ import type { ProductionPlan } from "./plan";
 export type ProductionShot = {
   shot: number; time: string; state?: string; place?: string; row?: string; outfits: Record<string, string>;
   /**
-   * The previous clip's last clear frame, which this clip starts from when it keeps that clip's camera setup; every
-   * other clip starts from no picture at all, its people kept by their LoRAs.
+   * The picture this clip starts from: the previous clip's last clear frame when it keeps that clip's camera setup,
+   * otherwise the shot's keyframe, drawn from the people's and the place's designs.
    */
   startFrame?: string;
+  /** The keyframe's still-frame description, which the clip prompt takes as its opening, and its image prompt. */
+  keyframe?: { description: string; prompt: string; check?: VisualCheck };
 };
 
 const seconds = (value: number) => Number(value.toFixed(2));
@@ -53,4 +56,14 @@ export function shotReferences(shot: ProductionShot, assets: NonNullable<Product
   if (!place) throw new Error(`Shot ${shot.shot}: unknown environment`);
   if (persons.filter(hasLtx).length > maxLoras) throw new Error(`Shot ${shot.shot}: more than four LoRAs (one a person) cannot be loaded; revise the shot before dispatch`);
   return { people: persons.map(person => ({ person })), place: { place } };
+}
+
+/**
+ * Whether everyone in a shot opens upright, by the contract's English pose text: the previs draws people as upright
+ * columns, so a shot where anyone lies, sits or kneels must not take its shapes from the previs.
+ * ACT: matched by words; a pose phrased otherwise counts as upright.
+ */
+export function opensUpright(production: Production, shot: number) {
+  const actors = production.plan?.shots.find(item => item.shot === shot)?.actors ?? [];
+  return !actors.some(actor => /\b(lie|lies|lying|lay|lays|laying|sit|sits|sitting|seated|kneel\w*|knelt|crouch\w*|squat\w*|reclin\w*|straddl\w*|missionary|on (?:all fours|(?:his|her|their) (?:back|side|stomach|knees)))\b/i.test(actor.pose));
 }

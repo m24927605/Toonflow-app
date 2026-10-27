@@ -118,10 +118,11 @@ def downloadSlots(count=1):
 
 
 def hubToken():
-    """The Hugging Face token Toonflow passes as HF_TOKEN, or None to download anonymously. Downloads take it explicitly:
-    implicit lookups stay off (HF_HUB_DISABLE_IMPLICIT_TOKEN), as they probe Colab secrets first, which a run with no
-    notebook page cannot answer."""
-    return os.environ.get("HF_TOKEN") or None
+    """The Hugging Face token Toonflow uploads to /content/.toonflowHubToken, or None to download anonymously. Downloads
+    take it explicitly: implicit lookups stay off (HF_HUB_DISABLE_IMPLICIT_TOKEN), as they probe Colab secrets first,
+    which a run with no notebook page cannot answer."""
+    path = Path("/content/.toonflowHubToken")
+    return path.read_text().strip() or None if path.exists() else None
 
 
 def retryThrottled(download):

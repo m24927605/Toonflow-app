@@ -50,15 +50,12 @@ kjRequirements = ["pillow>=10.3.0", "color-matcher", "matplotlib", "mss", "openc
 sagePackage = "1.0.6"
 weightRevisions = {
     "SulphurAI/Sulphur-2-base": "65587bbb38c700622f9434a16e732c8b280c115e",
-    "TenStrip/LTX2.3-10Eros": "84a05a13610d78dbe4340d1be23fd8185e10f697",
     "Comfy-Org/ltx-2": "ccde4ba417d7900669fd56dd292a883cee11ff37",
     "Lightricks/LTX-2.3": "7caa482d5cd10a2eae6b34cb48f093ebc45a263e",
     "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control": "20a580c8606c06a0988d40375a61309e0fe5893d",
 }
-# The model card's "use the lora or use the full models": the full model, as loraColab.py trains on it. The model card
-# recommends TenStrip's 10Eros merge of Sulphur 2 for image to video; it takes the same workflows. Its licence is not
-# stated, and character LoRAs are trained on the Sulphur model, not on it.
-checkpointRepo, checkpoint = {"sulphur": ("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors"), "10eros": ("TenStrip/LTX2.3-10Eros", "10Eros_v1.5_bf16.safetensors")}[os.environ.get("SULPHUR_CHECKPOINT", "sulphur")]
+# The model card's "use the lora or use the full models": the full model, as loraColab.py trains on it.
+checkpointRepo, checkpoint = "SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors"
 distill = "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"
 encoder = "gemma_3_12B_it_fp4_mixed.safetensors"
 upscaler = "ltx-2.3-spatial-upscaler-x2-1.0.safetensors"
@@ -230,7 +227,8 @@ nodeFile = comfy / "custom_nodes" / "toonflow_sulphur.py"
 # A ComfyUI started before these nodes changed has not registered them, so it is stopped here and started again below.
 if not nodeFile.exists() or nodeFile.read_text() != toonflowNodes:
     nodeFile.write_text(toonflowNodes)
-    subprocess.run(["pkill", "-f", "main.py --listen 127.0.0.1 --port 8188"], check=False)
+    # This script runs as "python -c <source>", so a plain pattern would also match, and kill, this very process.
+    subprocess.run(["pkill", "-f", "main[.]py --listen 127[.]0[.]0[.]1 --port 8188"], check=False)
     time.sleep(3)
 
 downloadWeights(entries)

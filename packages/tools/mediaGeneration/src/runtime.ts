@@ -30,6 +30,9 @@ export const imageGenerationSchema = z.strictObject({
   loras: z.array(z.strictObject({ path: relativePath, strength: z.number().min(-4).max(4).optional() })).max(4).describe("LoRA files (.safetensors) in the workspace with an optional strength (1 by default; sliders take -4 to 4); the prompt names each by its trigger word").optional(),
   skipTextCheck,
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).describe("The seed of an earlier result, reported with it, to change one thing and keep the rest; omit for a new random seed").optional(),
+  initImage: imageReference.describe("A picture to redraw instead of drawing from noise, for models that redraw an image").optional(),
+  denoise: z.number().gt(0).max(1).describe("With initImage: how much of it is redrawn, from 0 (kept) to 1 (drawn anew)").optional(),
+  mask: imageReference.describe("With initImage: white where the picture is redrawn, black where it is kept").optional(),
 });
 export const videoGenerationSchema = z.strictObject({
   ...sharedFields,

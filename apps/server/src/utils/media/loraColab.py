@@ -1,4 +1,5 @@
-# LoRA training for Sulphur 2 / LTX-2.3 (video) or Qwen-Image 2.1 (image) on a Colab GPU session, run by lora.ts.
+# LoRA training for Sulphur 2 / LTX-2.3 (video), Qwen-Image 2.1 (image) or Krea 2 (LUSTIFY v10 stills) on a Colab GPU
+# session, run by lora.ts.
 # Input: /content/<LORA_JOB>.json and <LORA_JOB>Item* media with optional text captions.
 # Output: /content/<LORA_JOB>.safetensors, followed by COLAB_DONE on success.
 # Qwen-Image trains with Fizgig, pinned and installed into its own venv with uv: Colab's Python has no ensurepip, and
@@ -6,6 +7,9 @@
 # Sulphur 2 trains with Lightricks' own ltx-trainer on Sulphur's dev weights, the LTX-2.3 dev model with the Sulphur
 # LoRA merged in, which inference rebuilds from the dev fp8 checkpoint and that LoRA; its LoRA keys (diffusion_model.*)
 # load in ComfyUI unchanged.
+# Krea 2 trains with kohya's musubi-tuner on Krea 2 Raw, as Krea and the LUSTIFY author advise (train on Raw, draw on
+# Turbo and its finetunes), with musubi's documented defaults (rank and alpha 32, AdamW8bit at 1e-4, resolution-aware
+# shift); 800 steps held identity best on 20 clothed images of each test character.
 import json
 import os
 import shutil
@@ -20,6 +24,7 @@ fizgigCommit = "7ee4986dae28fe35cc4ef636b984729624b32b42"
 # ltx-trainer v1.5.0; the repo ships no uv.lock, so the lock is resolved as of a fixed date.
 ltxCommit = "e98f6d927d83c92ef2be6aec76c8440b19306e39"
 ltxLockDate = "2026-10-19T00:00:00Z"
+musubiCommit = "f8a1b03794a49239a3539015075f5123d6c07d66"
 weightRevisions = {
     "Comfy-Org/Qwen-Image-2.1": "a8342359c61979b06a8dafb1a47991fe1f30e994",
     "Qwen/Qwen-Image-2.1": "d26bb61231c349cf6b7896fa83353113880e1ba3",
@@ -29,15 +34,20 @@ weightRevisions = {
     "unsloth/gemma-3-12b-it": "9478e665381f42974aa06177b019352fb6291876",
     # OpenCV's YuNet face detector (MIT); OpenCV 5, which the LTX trainer's lock installs, no longer has Haar cascades.
     "opencv/face_detection_yunet": "3cc26e7f1014a5ee5d74a42acee58bafc9d0a310",
+    "Comfy-Org/Krea-2": "1171f4dc7e325bf3734586942e737872506c73e1",
 }
-models, data = Path("/content/models"), Path("/content/loradata")
+models = Path("/content/models")
 jobName = os.environ["LORA_JOB"]
 assert jobName.startswith("lora") and len(jobName) == 36 and all(char in "0123456789abcdef" for char in jobName[4:])
 job = json.loads(Path(f"/content/{jobName}.json").read_text())
 trigger, family, kind = job["trigger"], job["family"], job["kind"]
 assert trigger.isalpha() and trigger.islower() and 4 <= len(trigger) <= 12
-assert family in ("ltx", "qwen") and kind in ("character", "scene", "costume", "style", "motion", "slider")
+assert family in ("ltx", "qwen", "krea2") and kind in ("character", "scene", "costume", "style", "motion", "slider")
+# Each job has its own folder: training runs detached, so a job left running by a restarted server shared one folder
+# with the next and crashed when that job cleared it.
+data = Path("/content/loradata") / jobName
 assert not (family == "ltx" and kind == "slider") and not (family == "qwen" and kind == "motion")
+assert family != "krea2" or kind in ("character", "scene", "costume", "style")
 
 
 def run(*args, **kwargs):
@@ -59,6 +69,7 @@ from modelPreparation import hubToken, retryThrottled
 
 # The machine's shared weight cache, as modelPreparation.py fills it: Sulphur renders read the same dev bf16 file.
 weightCache = "/content/toonflowWeights"
+trainingWeights = Path("/dev/shm/krea2Training")
 
 if family == "ltx":
     repo = Path("/content/LTX-2")
@@ -75,6 +86,25 @@ if family == "ltx":
         "dit": retryThrottled(lambda: hf_hub_download("SulphurAI/Sulphur-2-base", "sulphur_dev_bf16.safetensors", revision=weightRevisions["SulphurAI/Sulphur-2-base"], cache_dir=weightCache, token=hubToken())),
         "te": retryThrottled(lambda: snapshot_download("unsloth/gemma-3-12b-it", revision=weightRevisions["unsloth/gemma-3-12b-it"], cache_dir=weightCache, token=hubToken())),
     }
+elif family == "krea2":
+    repo = Path("/content/musubi")
+    venv = Path("/content/musubiEnv")
+    checkout(repo, "https://github.com/kohya-ss/musubi-tuner.git", musubiCommit)
+    python = venv / "bin/python"
+    if not (venv / "toonflowReady").exists():
+        # musubi's dependencies move torch to 2.14.1, whose matching torchvision must come from the same CUDA index, or
+        # transformers fails to import torchvision's nms.
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("UV_")}
+        run("uv", "venv", "-q", "--allow-existing", "--system-site-packages", "--python", "/usr/bin/python3", venv, env=environment)
+        run("uv", "pip", "install", "-q", "--python", python, "-e", repo, env=environment)
+        run("uv", "pip", "install", "-q", "--python", python, "torchvision==0.29.1", "torch==2.14.1", "--index-url", "https://download.pytorch.org/whl/cu130",
+            "--extra-index-url", "https://pypi.org/simple", env=environment)
+        (venv / "toonflowReady").touch()
+    files = {"dit": "diffusion_models/krea2_raw_bf16.safetensors", "te": "text_encoders/qwen3vl_4b_bf16.safetensors", "vae": "vae/qwen_image_vae.safetensors"}
+    # Comfy-Org's Krea 2 Raw keeps the official key layout musubi loads and is not gated. These 33 GB serve training
+    # only, and the disk is full with the models that draw and render, so they go to the RAM disk and leave with the job.
+    shutil.rmtree(trainingWeights, ignore_errors=True)
+    paths = {key: retryThrottled(lambda: hf_hub_download("Comfy-Org/Krea-2", name, revision=weightRevisions["Comfy-Org/Krea-2"], local_dir=trainingWeights, token=hubToken())) for key, name in files.items()}
 else:
     repo = Path("/content/fizgig")
     venv = Path("/content/fzenv")
@@ -174,7 +204,8 @@ from transformers import AutoModelForImageTextToText, AutoProcessor
 media, trigger, ask = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
 name, revision = "Qwen/Qwen3-VL-4B-Instruct", "ebb281ec70b05090aa6165b016eac8ec08e71b17"
 # This runs in the trainer's own environment, without modelPreparation: the token is read the same way it does.
-token = __import__("os").environ.get("HF_TOKEN") or None
+tokenFile = Path("/content/.toonflowHubToken")
+token = tokenFile.read_text().strip() or None if tokenFile.exists() else None
 model = AutoModelForImageTextToText.from_pretrained(name, revision=revision, torch_dtype=torch.bfloat16, device_map="cuda", token=token)
 processor = AutoProcessor.from_pretrained(name, revision=revision, token=token)
 prompt = "Describe this picture for an image caption in one short English phrase: " + ask + " No full sentence, no quotes."
@@ -225,6 +256,27 @@ for path in sorted(media.iterdir()):
             "output_dir": str(out),
         }))
         run(python, "scripts/train.py", data / "config.yaml", "--disable-progress-bars", cwd=trainer, env={**env, "HF_HUB_OFFLINE": "1"})
+    elif family == "krea2":
+        (data / "dataset.toml").write_text(f'''[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
+
+[[datasets]]
+image_directory = "{media}"
+cache_directory = "{data / 'cache'}"
+num_repeats = 1
+''')
+        tuner = repo / "src/musubi_tuner"
+        run(python, tuner / "krea2_cache_latents.py", "--dataset_config", data / "dataset.toml", "--vae", paths["vae"], cwd=repo, env=env)
+        run(python, tuner / "krea2_cache_text_encoder_outputs.py", "--dataset_config", data / "dataset.toml", "--text_encoder", paths["te"], "--batch_size", "8", cwd=repo, env=env)
+        run(venv / "bin/accelerate", "launch", "--num_cpu_threads_per_process", "1", "--mixed_precision", "bf16", tuner / "krea2_train_network.py",
+            "--dit", paths["dit"], "--vae", paths["vae"], "--dataset_config", data / "dataset.toml", "--sdpa", "--mixed_precision", "bf16",
+            "--timestep_sampling", "krea2_shift", "--weighting_scheme", "none", "--optimizer_type", "adamw8bit", "--learning_rate", "1e-4",
+            "--gradient_checkpointing", "--max_data_loader_n_workers", "2", "--persistent_data_loader_workers", "--network_module", "networks.lora_krea2",
+            "--network_dim", "32", "--network_alpha", "32", "--max_train_steps", "800", "--seed", "42", "--output_dir", out, "--output_name", trigger, cwd=repo, env=env)
     else:
         resolution = 704
         (data / "dataset.toml").write_text(f'''[general]
@@ -254,7 +306,7 @@ cache_directory = "{data / 'cache'}"
                       "--adaptive_lr_max", "4e-4", "--max_train_epochs", "30", "--save_every_n_epochs", "30"]
         run(python, repo / "src/fizgig/families/train.py", "--family", "qwen_image21", *common, *recipe, cwd=repo, env=env)
 
-# ltx-trainer names its LoRA checkpoints lora_weights_step_*; Fizgig names the file after the trigger word.
+# ltx-trainer names its LoRA checkpoints lora_weights_step_*; Fizgig and musubi name the file after the trigger word.
 saved = list(out.rglob("lora_weights*.safetensors")) if family == "ltx" else list(out.rglob("*.safetensors"))
 final = sorted(saved, key=lambda path: path.stat().st_mtime)[-1]
 shutil.copy(final, f"/content/{jobName}.safetensors")
@@ -262,4 +314,6 @@ for source in items:
     source.unlink()
     source.with_suffix(".txt").unlink(missing_ok=True)
 Path(f"/content/{jobName}.json").unlink()
+shutil.rmtree(data, ignore_errors=True)
+shutil.rmtree(trainingWeights, ignore_errors=True)
 print("COLAB_DONE")

@@ -114,7 +114,7 @@ async function drawBatch() {
  */
 export const holdQwenImage = (ms?: number, signal?: AbortSignal) => ms ? worker.holdFor(ms, signal) : worker.hold();
 
-/** Queues one Qwen-Image 2.1 image, drawn by the base model with the anatomy LoRA; it is drawn on Colab together with the other requests of its batch. */
+/** Queues one Qwen-Image 2.1 image, drawn by the base model; it is drawn on Colab together with the other requests of its batch. */
 export async function runQwenImage(request: QwenImageRequest, signal?: AbortSignal) {
   if (!request.prompt.trim()) throw new Error("Qwen-Image prompt cannot be empty");
   if (request.size !== "1K" && request.size !== "2K") throw new Error("Qwen-Image only supports 1K and 2K");

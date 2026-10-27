@@ -176,11 +176,67 @@ interface ProviderTools {
     seed?: number;
     /** Sulphur's distilled workflows (the default), or its base workflows: fifty steps at CFG 3.6. */
     workflow?: "distilled" | "base";
-    /** The Sulphur model (the default), or TenStrip's 10Eros merge of it, which Sulphur recommends for image to video. */
-    checkpoint?: "sulphur" | "10eros";
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
   /**
-   * Draws one Qwen-Image 2.1 image (base model, always with the Genitalia Anatomy Fix LoRA) on a Google Colab A100
+   * Renders one clip with TenStrip's 10Eros "Basic I2V DMD V5" ComfyUI workflow on a Google Colab A100, exactly as
+   * published but for the start image, prompt, seed, size and length, through the Colab CLI signed in on the host.
+   */
+  /**
+   * Renders one MiniMax H3 clip on a Google Colab A100 through the official ComfyUI template for its mode, exactly as
+   * published but for the images, prompt, seed, duration and aspect ratio, through the Colab CLI signed in on the host.
+   */
+  minimaxH3(request: {
+    /** i2v opens on its single image; r2v uses 1–9 reference images as <Picture 1>..<Picture N>. */
+    mode: "i2v" | "r2v";
+    /** The prompt in MiniMax's official format, used verbatim. */
+    prompt: string;
+    images: MediaInput[];
+    /** Whole seconds, 2–15. */
+    duration: number;
+    /** Aspect ratio such as 16:9 or 9:16. */
+    ratio: string;
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+  }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
+  /**
+   * Draws one LUSTIFY v10 (Krea 2) still through Comfy-Org's Krea 2 Turbo template. Character LoRAs, in the
+   * left-to-right order the people stand in the frame, are confined to their heads on a second pass.
+   */
+  lustify(request: {
+    /** The prompt, used verbatim; name each locked character by their LoRA trigger. */
+    prompt: string;
+    /** Aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2 or 2:3. */
+    ratio: string;
+    /** Character LoRAs trained on Krea 2, left to right; their strength is fixed by the lock. */
+    loras?: LoraInput[];
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+    /** A picture to redraw instead of drawing from noise; it is fitted to the ratio's size. */
+    initImage?: MediaInput;
+    /** With `initImage`: how much of the redrawn area is drawn anew, above 0 and up to 1. */
+    denoise?: number;
+    /** With `initImage`: white where the picture is redrawn; without it only the locked heads are redrawn. */
+    mask?: MediaInput;
+  }): Promise<{ data: Uint8Array; mimeType: "image/png"; seed: number }>;
+  erosV5(request: {
+    /** The positive prompt, used verbatim. */
+    prompt: string;
+    /** The start image the clip opens on. */
+    firstFrame: MediaInput;
+    /** Dubbed audio locked as the clip's soundtrack in both passes; the clip keeps the file. */
+    soundtrack?: MediaInput;
+    /** Whole seconds, 1–15. */
+    duration: number;
+    resolution: "480p" | "720p" | "1080p";
+    /** Aspect ratio such as 16:9 or 9:16. */
+    ratio: string;
+    /** Keeps the generated soundtrack; false returns a silent video. */
+    audio: boolean;
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+  }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
+  /**
+   * Draws one Qwen-Image 2.1 image (base model) on a Google Colab A100
    * through the Colab CLI installed and signed in on the
    * host, using the compute units of that Google account. The host gathers the requests made around the same time
    * and draws them in one session, so setup is paid once per batch; it resolves when the batch finishes and the

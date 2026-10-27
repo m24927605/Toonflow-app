@@ -11,18 +11,30 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { snapshotMedia, inputSnapshotSchema } from "@/utils/media/snapshot";
 import { longTakeParts, takeClipArtifact, withClipPostprocess, clipArtifactSchema, type ClipArtifact } from "@/utils/media/sulphur";
+import { maxErosV5Seconds } from "@/utils/media/erosV5";
 import { colabSessionName, useExistingColabSession } from "@/utils/media/colabPool";
 import postprocess from "./postprocessColab.py" with { type: "text" };
 import { ReplyCutError, replyJson } from "./review";
-import { maxLoras, shotReferences } from "./shots";
+import type { VisualCheck } from "./checks";
+import { maxLoras, opensUpright, shotReferences } from "./shots";
 import { clipSeconds, type ProductionDub } from "./dub";
 import { productionDirectory, writeProductionText, type Production } from "./state";
 import { describeGaze } from "./plan";
+import { explicitShot } from "./keyframes";
 
-/** A generated shot and its exact prompt and seed; generated video is not AI-reviewed. */
-export type ProductionClip = { shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number; remote?: ClipArtifact; inputSnapshot?: z.infer<typeof inputSnapshotSchema> };
+/**
+ * A shot's clip. `check` is the vision model's verdict on its frames; `feedback` the major problems of the render before,
+ * which the prompt is rewritten to avoid; `attempts` keeps every earlier render that failed, so the best is kept.
+ */
+export type ProductionClip = {
+  shot: number; prompt?: string; parts?: string[]; video?: string; seed?: number; remote?: ClipArtifact; inputSnapshot?: z.infer<typeof inputSnapshotSchema>;
+  check?: VisualCheck; feedback?: string[]; attempts?: Omit<ProductionClip, "attempts">[];
+};
 
 const sulphur = { providerId: "sulphur", modelId: "sulphur_2" };
+// Explicit shots render on TenStrip's 10Eros V5 from their LUSTIFY start frame, without LoRAs: on V5, character LoRAs
+// made the acting stiff, and a V5 clip cannot be longer than one render.
+const tenStrip = { providerId: "sulphur", modelId: "tenstrip_10eros_v5" };
 /**
  * How long a shot plays in the film: its time in the shot list, or longer when its lines need it. Sulphur 2 renders
  * whole seconds, so the film cuts each clip to this.
@@ -31,11 +43,21 @@ const shotSeconds = (production: Production, shot: number) => production.dub!.sh
 const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$/i.test(path) ? "video/mp4" : /\.wav$/i.test(path) ? "audio/wav" : "image/png";
 /**
  * Whether a shot's clip follows its previs depth video: one where someone walks or the camera moves. Otherwise the
- * previs has no movement to give, and its columns would only fight the poses the clip's prompt describes.
+ * previs has no movement to give, and its columns would only fight the poses the clip's prompt describes. Its people
+ * are upright columns, so a shot where anyone lies, sits or kneels, or changes clothes (the column hides the arms and
+ * garments that move), never follows it: the clip draws them as pillars. An explicit shot renders on TenStrip V5, which
+ * takes no control video.
  */
 const controlled = (production: Production, shot: number) => {
   const previs = production.previs!.find(item => item.shot === shot)!;
-  return !!previs.framed.walkers?.length || (previs.framed.camera?.frames.length ?? 1) > 1;
+  const shots = production.plan?.shots ?? [];
+  const actors = shots.find(item => item.shot === shot)?.actors ?? [];
+  // The contract gives each shot's opening outfit, so an outfit that differs at the actor's next shot changes in this one.
+  const changesClothes = actors.some(actor => {
+    const next = shots.find(item => item.shot > shot && item.actors.some(other => other.name === actor.name));
+    return next && next.actors.find(other => other.name === actor.name)!.outfit !== actor.outfit;
+  });
+  return !explicitShot(production, shot) && opensUpright(production, shot) && !changesClothes && (!!previs.framed.walkers?.length || (previs.framed.camera?.frames.length ?? 1) > 1);
 };
 
 // How near the camera has to stay, in metres, and how equal its lens, for a shot to keep the setup of the one before.
@@ -45,7 +67,7 @@ const sameSetup = 0.15;
  * The shot whose last frame this one starts from: the one before, when this shot keeps its camera setup (the camera
  * starts where the previous one ended, with the same lens and the same people in frame) and that shot did not itself
  * start from another clip. Each clip taken from a frame of another adds that clip's drift, so a third clip of one setup
- * starts from no picture again, which the previs hides behind a new camera setup (its spec check asks for one).
+ * starts from its own keyframe again.
  */
 export function continuedFrom(production: Production, shot: number): number | undefined {
   const index = production.previs!.findIndex(item => item.shot === shot);
@@ -67,7 +89,8 @@ function promptPeople(production: Production, shot: number) {
   return shotReferences(row, production.assets!, previs.framed).people.slice(0, 8).map(({ person }) => {
     const outfit = person.outfits?.find(item => item.name === row.outfits[person.name]);
     const actor = contract.actors.find(item => item.name === person.name);
-    const trigger = person.triggers?.ltx ?? person.loras?.find(lora => lora.family === "ltx")?.trigger;
+    // An explicit shot's clip takes no LoRA, so its prompt names no trigger word.
+    const trigger = explicitShot(production, shot) ? undefined : person.triggers?.ltx ?? person.loras?.find(lora => lora.family === "ltx")?.trigger;
     return {
       name: person.name, trigger, look: `${person.look}${outfit ? ` Wearing ${outfit.look}` : ""}`,
       opening: previs.framed.opening.includes(person.name) ? `${actor ? `${actor.pose} ${describeGaze(actor.gaze)}.` : "In the frame."}` : "Not in the first frame; enters during the shot.",
@@ -110,21 +133,23 @@ export async function writeClipPrompts(production: Production, script: string, s
     const shot = production.shots!.find(item => item.shot === span.shot)!;
     const place = production.assets!.places.find(item => item.name === shot.place);
     const placeLook = place?.look;
-    const people = promptPeople(production, span.shot);
+    // A keyframe shows how everyone looks, so the prompt names people and leaves their looks to the picture.
+    const people = promptPeople(production, span.shot).map(person => shot.keyframe ? { ...person, look: undefined } : person);
     const names = new Map(people.map(person => [person.name, [person.name, ...person.trigger ? [person.trigger] : []]]));
     const control = controlled(production, span.shot);
-    const opening = `${people.filter(person => previs.framed.opening.includes(person.name)).map(person => `${person.name}: ${person.opening}`).join(" ") || "Nobody is in the frame."}${placeLook ? ` The place: ${placeLook}` : ""}`;
+    const opening = shot.keyframe ? `The clip starts from a pinned picture, its keyframe, which shows: ${shot.keyframe.description}` : `${people.filter(person => previs.framed.opening.includes(person.name)).map(person => `${person.name}: ${person.opening}`).join(" ") || "Nobody is in the frame."}${placeLook ? ` The place: ${placeLook}` : ""}`;
     const kept = shotSeconds(production, span.shot);
-    const cut = kept < clip ? `The film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards everyone carries on calmly, their eyes still where the shot ends them looking.` : undefined;
-    const instructionsOf = (part: typeof span, duration: number, note?: string) => `${videoPromptInstructions(part, 1, { duration, style: "photorealistic live-action", opening, people, place: placeLook, control, blocking: previs.blocking, note })}\n\nAuthoritative production contract: ${JSON.stringify(production.plan?.shots.find(item => item.shot === span.shot))}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
+    const fixes = video.feedback?.length ? `An earlier render of this shot failed its check with: ${video.feedback.join("; ")}. Write the prompt so that none of this happens again.` : undefined;
+    const cut = [kept < clip ? `The film keeps only the first ${kept.toFixed(1)} seconds of this clip, the shot's length: everything the row asks for happens within them, and afterwards everyone carries on calmly, their eyes still where the shot ends them looking.` : undefined, fixes].filter(Boolean).join(" ") || undefined;
+    const instructionsOf = (part: typeof span, duration: number, note?: string) => `${videoPromptInstructions(part, 1, { duration, style: "photorealistic live-action", opening, people, place: shot.keyframe ? undefined : placeLook, control, blocking: previs.blocking, note })}\n\nAuthoritative production contract: ${JSON.stringify(production.plan?.shots.find(item => item.shot === span.shot))}\n\nOriginal script ({{ref 1}}):\n${script}\n\nShot list ({{ref 2}}):\n${shotList}`;
     // Has the text model write the prompt and fills in the lines of `partLines`; a draft that breaks a rule is rewritten
     // with the error, at most five times.
     const write = async (instructions: string, partLines = lines) => {
       const finish = (draft: string) => {
-        // No LoRA keeps the place: the same sentence in every shot keeps it the same room, so it follows the opening
-        // sentence when the draft does not hold it already.
+        // A clip without a keyframe has nothing else that keeps the place: the same sentence in every shot keeps it the
+        // same room, so it follows the opening sentence when the draft does not hold it already.
         const finished = finishPrompt(draft, partLines, names);
-        const placeSentence = placeLook && `${placeLook.replace(/\.$/, "")}.`;
+        const placeSentence = !shot.keyframe && placeLook && `${placeLook.replace(/\.$/, "")}.`;
         const prompt = !placeSentence || finished.includes(placeSentence) ? finished : finished.replace(/^(.*?[.!?])\s/, `$1 ${placeSentence} `);
         validateVideoPrompt(prompt);
         const text = findOnScreenText(prompt);
@@ -144,6 +169,14 @@ export async function writeClipPrompts(production: Production, script: string, s
       };
       return valid(await complete(instructions));
     };
+    if (explicitShot(production, span.shot)) {
+      if (clip > maxErosV5Seconds) throw new Error(`Shot ${span.shot} is explicit and lasts ${clip} seconds; TenStrip V5 renders at most ${maxErosV5Seconds} seconds, so split it into shorter shots`);
+      // V5 does not move lips to words, so a line in an explicit shot would be heard without anyone saying it.
+      if (lines.length) throw new Error(`Shot ${span.shot} is explicit and has dialogue; TenStrip V5 does not lip-sync, so move its lines to a shot without sex`);
+      video.prompt = await writeExplicitPrompt(span.row ?? "", shot.keyframe?.description, fixes, complete);
+      await save();
+      return;
+    }
     const plan = longTakeParts(clip);
     if (plan.parts > 1) {
       // A long take: each part's prompt covers its own seconds of the shot and the lines that start in them, and
@@ -172,6 +205,7 @@ export async function writeClipPrompts(production: Production, script: string, s
           ...opening ? [`Where everyone is as this part starts, after the beats before it: ${opening}`] : [],
           ...part ? ["Open on that state; never on the row's opening state, and never on an action an earlier part already showed. The first frame described above is the start of part 1 only."] : [],
           ...part + 1 < plan.parts ? ["End with the take still going, mid-action, not on a pause or a resolved moment."] : [],
+          ...fixes ? [fixes] : [],
         ].join(" ");
         return write(instructionsOf(partSpan, seconds(plan.frames), note), own);
       }));
@@ -187,6 +221,48 @@ export async function writeClipPrompts(production: Production, script: string, s
   }));
   const failure = results.find(result => result.status === "rejected");
   if (failure) throw failure.reason;
+}
+
+/**
+ * Writes the TenStrip V5 prompt of an explicit shot strictly to the formula its prompts are written in (the user's
+ * highest constraint, 2026-10-27): one line of short comma-joined phrases, subject and action, then camera, then
+ * lighting, then style, the act in blunt colloquial words. In 〈雨夜〉 that wording alone decided the clip: "fast sloppy
+ * blowjob" moved the head twice as far as "sucks hard and fast", "slow, deep thrusts" never reached the root while
+ * "balls-deep, hips slapping flush" did, and "moans loudly with her mouth open" drew a screaming mouth. A draft that
+ * breaks the form is rewritten with the error, five times at most.
+ */
+async function writeExplicitPrompt(row: string, opening: string | undefined, fixes: string | undefined, complete: (prompt: string) => Promise<string>) {
+  const instructions = [
+    "Write the prompt of an explicit adult image-to-video clip for TenStrip 10Eros V5, an uncensored video model, from the shot-list row below and the first frame the clip starts from.",
+    `The shot-list row (shot size, camera, action, cast, state): ${row}`,
+    ...opening ? [`The first frame shows: ${opening}`] : [],
+    "Follow this formula exactly: one line of short phrases joined by commas, 50 to 100 words, in this order:",
+    "1. Subject and action: who is where as in the first frame, called the man and the woman (never by name), and the sex act in the bluntest, crudest everyday porn words, short, simple, rough and direct (fucks her pussy hard and fast, fast sloppy blowjob, pounding his cock balls-deep into her on every thrust, his hips slapping flush against hers, bobbing her head all the way down his cock and back to the tip, jerking his cock fast up and down the whole shaft). Every movement goes fast and to its full range. Then each hand exactly where the first frame has it, where they look, and their sounds in a few words; a moan is written with her lips slightly parted, never with her mouth open or loud, which draws a screaming mouth.",
+    "2. Camera: static, the shot size and the camera height from the row, for example static medium shot at bed level.",
+    "3. Lighting: the light source and its colour as the first frame shows it, and one detail of the place, for example warm bedside lamp light, rain on the window.",
+    "4. Style: end with exactly: photorealistic, preserve face identity",
+    "No full sentences, names, dialogue, quotation marks, timestamps, line breaks, Markdown or anything else. Output only the prompt.",
+    ...fixes ? [fixes] : [],
+  ].join("\n");
+  const check = (draft: string) => {
+    const prompt = draft.trim().replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
+    validateVideoPrompt(prompt);
+    const words = prompt.split(" ").length;
+    if (words < 40 || words > 130) throw new Error(`The prompt has ${words} words; write 50 to 100`);
+    if (/["“”]/.test(prompt)) throw new Error("Write no quotation marks or dialogue");
+    if (!prompt.endsWith("photorealistic, preserve face identity")) throw new Error('End with exactly "photorealistic, preserve face identity"');
+    if (/mouth (wide )?open|open[- ]mouthed|moans? loudly/i.test(prompt)) throw new Error("Write her moaning with her lips slightly parted, never with her mouth open or loud");
+    return prompt;
+  };
+  const valid = async (draft: string, left = 5): Promise<string> => {
+    try {
+      return check(draft);
+    } catch (error) {
+      if (!left) throw error;
+      return valid(await complete(`${instructions}\n\nYour draft:\n${draft}\n\nFix this and output the whole prompt again: ${error instanceof Error ? error.message : String(error)}`), left - 1);
+    }
+  };
+  return valid(await complete(instructions));
 }
 
 /**
@@ -242,7 +318,7 @@ export async function takeStartFrame(cwd: string, production: Production, shot: 
   await mkdir(directory, { recursive: true });
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   const end = shotSeconds(production, previous);
-  await finished(ffmpeg((await resolveWorkspacePath(cwd, clip.video)).path).seekInput(Math.max(0, end - 0.25)).duration(0.25).outputOptions(["-vsync 0"]).output(`${directory}/frame%02d.png`));
+  await finished(ffmpeg((await resolveWorkspacePath(cwd, clip.video)).path).seekInput(Math.max(0, end - 0.25)).duration(0.25).outputOptions(["-fps_mode passthrough"]).output(`${directory}/frame%02d.png`));
   const frames = (await readdir(directory)).filter(name => name.endsWith(".png"));
   if (!frames.length) throw new Error(`Shot ${shot}: no frame could be taken from the end of shot ${previous}`);
   const sizes = await Promise.all(frames.map(async name => ({ name, size: (await stat(`${directory}/${name}`)).size })));
@@ -276,8 +352,12 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
       if (!frozen) throw new Error(`Missing frozen clip input: ${path}`);
       return frozen;
     };
+    const explicit = explicitShot(production, item.shot);
     const control = controlled(production, item.shot);
-    const generate = () => generateMedia(cwd, "video", {
+    const generate = () => explicit ? generateMedia(cwd, "video", {
+      ...tenStrip, mode: "singleImage", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
+      generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`, firstFrame: { path: frozenInput(shot.startFrame!), mimeType: mimeOf(shot.startFrame!) }, skipPrevis: true, seed: item.seed,
+    }, clipSignal) : generateMedia(cwd, "video", {
       ...sulphur, mode: control ? "videoControl" : shot.startFrame ? "startFrameOptional" : "text", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
       generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`,
       ...shot.startFrame ? { firstFrame: { path: frozenInput(shot.startFrame), mimeType: mimeOf(shot.startFrame) } } : {},
@@ -288,7 +368,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
     }, clipSignal);
     let finishedFiles: Record<string, Uint8Array> | undefined;
     // One bounded shot can finish and archive on its generator before a single result transfer.
-    const fused = production.videos!.length === 1 && !production.input.subtitles && production.ambience !== undefined && production.ambience.every(item => !!item.bed?.videoSha256) && (!production.input.music || !!production.music);
+    const fused = !explicit && production.videos!.length === 1 && !production.input.subtitles && production.ambience !== undefined && production.ambience.every(item => !!item.bed?.videoSha256) && (!production.input.music || !!production.music);
     const work = async () => {
       if (!fused) return generate();
       const length = shotSeconds(production, item.shot);
@@ -305,7 +385,8 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
       throw error;
     });
     item.video = video!.path;
-    item.remote = takeClipArtifact(await readFile((await resolveWorkspacePath(cwd, item.video)).path));
+    // Only Sulphur renders leave a receipt of the clip kept on their machine; a V5 clip is finished from the workspace.
+    item.remote = explicit ? undefined : takeClipArtifact(await readFile((await resolveWorkspacePath(cwd, item.video)).path));
     item.seed = video!.seed;
     if (finishedFiles) {
       const directory = productionDirectory(production.id);
@@ -374,7 +455,7 @@ function clipInputSource(production: Production, item: ProductionClip) {
 function validatedClips(production: Production) {
   const clips = [...production.videos ?? []].sort((a, b) => a.shot - b.shot);
   const preparationComplete = clips.every(clip => !!production.previs?.find(shot => shot.shot === clip.shot)?.video);
-  // A clip that starts from no picture, follows no previs and has no dub freezes no file; its prompt binding still counts.
+  // A clip that follows no previs and has no dub freezes only its start frame; its prompt binding still counts.
   if (!preparationComplete || !clips.length || clips.length !== production.shots?.length || new Set(clips.map(clip => clip.shot)).size !== clips.length || clips.some(clip => !clip.video || !inputSnapshotSchema.safeParse(clip.inputSnapshot).success || clip.inputSnapshot!.request !== clipInputSource(production, clip) || !production.shots!.some(shot => shot.shot === clip.shot))) throw new Error("Assembly blocked: every shot needs complete preparation and matching frozen inputs");
   return clips;
 }
@@ -547,7 +628,8 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
   }
   const { filters, soundInputs } = filmFilters(production, clips, lengths, subtitles);
   const output = `${folder}/film.mp4`;
-  const resident = subtitles ? [] : clips.map(clip => clipArtifactSchema.parse(clip.remote));
+  // Every clip must still be on a machine for the film to be cut there; a V5 clip never is, so such films are cut here.
+  const resident = subtitles || clips.some(clip => !clip.remote) ? [] : clips.map(clip => clipArtifactSchema.parse(clip.remote));
   // The film is cut on a machine that still holds a clip; once none is left in the pool, it is cut here.
   const target = resident.findLast(artifact => colabSessionName(artifact.lane) === artifact.session);
   if (target) {

@@ -76,7 +76,8 @@ export function finishPrompt(draft: string, lines: DialogueLine[], names: Map<st
   if (markers.length !== lines.length || markers.some((marker, index) => Number(marker[1]) !== index + 1)) throw new Error(lines.length ? "Write every line once as its [[LINE n]] marker, in speaking order" : "This shot has no dialogue; write no [[LINE n]] markers");
   if (quotes.test(text.replace(/\[\[LINE \d+\]\]/g, ""))) throw new Error("Write no quotation marks or quoted speech; the application quotes each [[LINE n]]");
   // These words render skin as plastic.
-  const plastic = text.split(/[.!?;]\s/).find(sentence => /\b(skin|bod(y|ies))\b/i.test(sentence) && /\b(smooth|flawless|glossy|glisten\w*|shiny|sheen)\b/i.test(sentence));
+  // Only words near the skin count: "smooth silk sheets" in a sentence about bare skin says nothing about the skin.
+  const plastic = text.split(/[.!?;]\s/).find(sentence => /\b(smooth|flawless|glossy|glisten\w*|shiny|sheen)\W+(?:\w+\W+){0,2}(skin|bod(y|ies))\b|\b(skin|bod(y|ies))\W+(?:\w+\W+){0,3}(smooth|flawless|glossy|glisten\w*|shiny|sheen)\b/i.test(sentence));
   if (plastic) throw new Error(`Describe skin with natural texture and pores, never smooth, flawless, glossy, glistening or shiny: ${plastic}`);
   for (const [index, marker] of markers.entries()) {
     // The whole sentence around the marker: its speaker may be named after the line, as in "[[LINE 1]], Mika gasps".
@@ -112,7 +113,8 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
     `The clip's first frame shows: ${video.opening}`,
     ...video.people.length ? [["The people, each named exactly as written here, never translated or romanized:", ...video.people.map(person => `- ${person.name}${person.trigger ? ` (trained identity, trigger word ${person.trigger}: write it right after the name where ${person.name} first appears)` : ""}${person.look ? `: ${person.look}` : ""}${person.opening ? ` At the opening: ${person.opening}` : ""}`)].join("\n")] : ["Nobody is in this shot: no person, hand or silhouette appears."],
     ...video.place ? [`The place, which the application describes with this sentence; keep the room consistent with it: ${video.place}`] : [],
-    "Describe skin as real skin with natural texture, pores and fine lines; never call it smooth, flawless, glossy, glistening or shiny, even where the script does. Sweat is small droplets, not a sheen.",
+    "Describe only what the shot size frames: the model widens the frame to show whatever the prompt describes. In a close-up of hands or a body part, describe that part and its action, and leave out the faces, hair, eyes, gaze and whole bodies the frame does not show; still write each person's name and trigger word once.",
+    "Write nothing about faces or skin unless the action changes them; never call skin smooth, flawless, glossy, glistening or shiny, even where the script does. Sweat is small droplets, not a sheen.",
     ...video.control
       ? [`A grey-box previs drives the camera and where everyone stands and moves, and when; its grey shapes are not the look. Describe the same camera and movement, never a different one.${video.blocking ? ` The previs: ${video.blocking}` : ""}`]
       : video.blocking ? [`Planned blocking: ${video.blocking}`] : [],
@@ -120,9 +122,9 @@ export function videoPromptInstructions(span: ShotSpan, scripts: number, video: 
       ? [
         "The application inserts the spoken words. Write each line only as its marker, once, in speaking order, inside a sentence that names its speaker, how they say it and the language, such as: Mika asks quietly in Japanese, [[LINE 1]] (Won't you go home today?). That sentence calls the speaker by name, never only by a pronoun, and a cry or moan given as a line is written as a line in the same way. Follow a line that is not in English with its English meaning in brackets, as there. Never write quotation marks or other words anyone says.",
         ...lines.map((line, index) => `- [[LINE ${index + 1}]]: ${line.speaker} says ${JSON.stringify(line.words)}`),
-        "Each line is one completed speaking beat; afterwards the speaker's lips close. People who are not speaking keep their lips closed.",
+        "Each line is one completed speaking beat. Only the speaker of a line moves their lips to speak; nobody else mouths words, while breathing, gasps, moans and kisses move mouths freely.",
       ].join("\n")
-      : "Nobody speaks in this shot: write no dialogue and keep everyone's lips closed.",
+      : "Nobody speaks in this shot: write no dialogue, and nobody mouths words; breathing, gasps, moans and kisses move mouths freely.",
     "Mention no music: music is added when the film is assembled.",
     ...video.note ? [video.note] : [],
   ].join("\n\n");

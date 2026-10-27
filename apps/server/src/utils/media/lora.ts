@@ -1,13 +1,14 @@
-import { mkdir, readFile } from "@toonflow/file";
-import { dirname } from "node:path";
-import { colabLane, colabLanePending, colabSessionName, createColabWorker } from "@/utils/media/colabPool";
-import { runQwenImage } from "@/utils/media/qwenImage";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "@toonflow/file";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { findCommand } from "@/utils/cli";
+import { colabLane, colabLanePending, colabPoolRestored, colabSessionName, createColabWorker } from "@/utils/media/colabPool";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import pipeline from "./loraColab.py" with { type: "text" };
 
 export const loraKinds = ["character", "scene", "costume", "style", "motion", "slider"] as const;
 export type LoraKind = typeof loraKinds[number];
-export type LoraFamily = "ltx" | "qwen";
+export type LoraFamily = "ltx" | "qwen" | "krea2";
 export type LoraInput = {
   /** One LoRA per family, trained side by side from the same items. */
   kind: LoraKind; families: LoraFamily[]; name: string;
@@ -27,7 +28,7 @@ const rules: Partial<Record<LoraKind, string>> = {
   character: "The person is exactly the one shown in {{ref 1}}: the same face, eyes, nose, lips, skin tone, hairstyle and body. Only the clothing and the place change.",
   scene: "The place is exactly the one shown in {{ref 1}}, seen from the same side: the same architecture, materials, furniture and layout, every object where it is in {{ref 1}}.",
 };
-// Framing is spelled out because Qwen-Image otherwise copies the reference's composition. Characters change clothing
+// Framing is spelled out because an image model otherwise copies the reference's composition. Characters change clothing
 // and place so the LoRA learns only the person; scenes keep the reference's viewpoint, because views it does not show
 // are invented and teach a different room.
 const variants: Partial<Record<LoraKind, [ratio: string, scene: string][]>> = {
@@ -79,23 +80,54 @@ const variants: Partial<Record<LoraKind, [ratio: string, scene: string][]>> = {
   ],
 };
 
+// How long one Codex image request may take before it is asked again; under load a request sat silent for over 15 minutes.
+const codexTimeout = 20 * 60_000;
+const codexAttempts = 4;
+const codexConcurrency = 4;
+
+/**
+ * Draws the variants a small set lacks with Codex CLI's image_gen tool from the set's first image, four at a time: the
+ * user requires LoRA training pictures to come from Codex. Each picture is asked for again when Codex times out or saves
+ * nothing; a picture that never arrives fails the training instead of training on a smaller set.
+ */
 async function topUp(kind: LoraKind, reference: Uint8Array, count: number, signal?: AbortSignal) {
-  const image = { type: "binary" as const, data: reference, mimeType: "image/png" };
-  const scenes = (variants[kind] ?? []).slice(0, count);
-  const results = await Promise.all(scenes.map(([ratio, scene]) => runQwenImage({
-    prompt: `Recompose the subject from the image into the following single photograph. ${scene} ${rules[kind]} Preserve the subject's identity and natural surface texture.`, ratio, size: "1K", images: [image],
-  }, signal)));
-  return results.map(result => result.data);
+  const command = findCommand("codex", "Codex CLI not found. Install it and sign in with `codex login` to draw LoRA training pictures");
+  const directory = await mkdtemp(join(tmpdir(), "toonflow-codex-"));
+  try {
+    await writeFile(join(directory, "reference.png"), reference);
+    const scenes = (variants[kind] ?? []).slice(0, count);
+    const draw = async ([ratio, scene]: [string, string], index: number) => {
+      const file = `variant${String(index).padStart(2, "0")}.png`;
+      const prompt = `Use your built-in image generation tool (image_gen) to create ONE photorealistic ${ratio} photograph and save it as ${file} in the current directory. ${`${scene} ${rules[kind]}`.replaceAll("{{ref 1}}", "the attached image")} The person, if any, is an adult and fully clothed. Natural texture, sharp focus. Do not write any text in the image. After saving, reply with only the saved file path.`;
+      for (let attempt = 1; attempt <= codexAttempts; attempt++) {
+        signal?.throwIfAborted();
+        const child = Bun.spawn([command, "exec", "--skip-git-repo-check", "--ephemeral", "-s", "workspace-write", "-C", directory, "--image", join(directory, "reference.png"), "-"], {
+          stdin: new TextEncoder().encode(prompt), stdout: "ignore", stderr: "ignore", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(codexTimeout)]) : AbortSignal.timeout(codexTimeout),
+        });
+        await child.exited;
+        const data = await readFile(join(directory, file)).catch(() => undefined);
+        if (data?.length) return new Uint8Array(data);
+      }
+      throw new Error(`Codex did not draw LoRA training picture ${index + 1} after ${codexAttempts} attempts`);
+    };
+    const results: Uint8Array[] = [];
+    for (let start = 0; start < scenes.length; start += codexConcurrency) {
+      results.push(...await Promise.all(scenes.slice(start, start + codexConcurrency).map((scene, offset) => draw(scene, start + offset))));
+    }
+    return results;
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 // Trainings running in this process, by workspace, kind and name.
 const training = new Set<string>();
 
-// Trainings queue on the A100 lanes of the Colab pool, a running machine with the least queued work first: asking Colab
+// Trainings queue on the A100 lanes of the Colab pool outside the speech lane (2), whose disk holds H3 and Drama 3, a running machine with the least queued work first: asking Colab
 // for a machine of their own failed a film after an hour of refusals while the pool's A100s sat idle, and counting only
 // trainings put one on the image lane, where the next set's images then waited the whole training. A lane without a
 // machine opens one only when no lane has one.
-const gpuLanes = [1, 2, 3];
+const gpuLanes = [1, 3];
 const workers = new Map(gpuLanes.map(index => [index, createColabWorker("loraTraining", index)]));
 const laneTrainings = new Map<number, number>();
 function trainingLane() {
@@ -112,9 +144,9 @@ export const triggerWord = () => Array.from(crypto.getRandomValues(new Uint8Arra
 /**
  * Trains a LoRA for each model family on an A100 of the Colab pool at the same time and saves each with its record in the
  * workspace's `loras/` folder. Sulphur 2 (LTX-2.3) LoRAs learn from images and clips and serve video nodes; Qwen-Image
- * 2.1 LoRAs learn from images and serve image nodes. The job writes the captions, leaving out what the LoRA
+ * 2.1 LoRAs learn from images and serve image nodes; Krea 2 LoRAs learn from images and lock people in LUSTIFY v10 stills. The job writes the captions, leaving out what the LoRA
  * learns, and crops faces for characters; a character or scene set under `minImages` images is first topped up once
- * with Qwen-Image variants of its first image, shared by every family.
+ * with Codex CLI variants of its first image, shared by every family.
  */
 export async function trainLora(cwd: string, input: LoraInput, signal?: AbortSignal): Promise<LoraRecord[]> {
   // Training outlives the page, so a reopened page could start the same paid training again.
@@ -155,6 +187,9 @@ async function trainFamily(cwd: string, input: LoraInput, family: LoraFamily, it
     return [{ name: `${name}.${extension}`, data }, ...caption ? [{ name: `${name}.txt`, data: caption.replaceAll("{trigger}", trigger) }] : []];
   });
   const job = { trigger, family, kind: input.kind, ...input.slider ? { slider: input.slider } : {} };
+  // A lane whose machine is still being taken back after a restart looked empty, and a training then asked Colab for a
+  // new A100, which the account refused while that machine sat idle.
+  await colabPoolRestored();
   const index = trainingLane();
   const physical = colabLane(index);
   laneTrainings.set(physical, (laneTrainings.get(physical) ?? 0) + 1);

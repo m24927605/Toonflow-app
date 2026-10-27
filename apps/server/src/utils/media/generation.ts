@@ -4,6 +4,8 @@ import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
 import qwenImageSource from "@toonflow/providers/media/qwenImage" with { type: "text" };
 import sulphurSource from "@toonflow/providers/media/sulphur" with { type: "text" };
+import minimaxH3Source from "@toonflow/providers/media/minimaxH3" with { type: "text" };
+import lustifySource from "@toonflow/providers/media/lustify" with { type: "text" };
 import drama3Source from "@toonflow/providers/media/drama3" with { type: "text" };
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
@@ -15,13 +17,19 @@ import { reserveGeneration } from "@/utils/media/usage";
 const maxMediaSize = 100 * 1024 * 1024;
 // Bun loads these as source text; TypeScript resolves their provider object exports.
 const productionModels = {
-  image: { provider: "qwenImage", models: ["qwen_image_2_1", "qwen_image_2_1_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
-  video: { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base", "sulphur_2_10eros"], source: sulphurSource as unknown as string },
-  audio: { provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string },
+  image: [
+    { provider: "qwenImage", models: ["qwen_image_2_1", "qwen_image_2_1_depth", "qwen_image_2_1_pose"], source: qwenImageSource as unknown as string },
+    { provider: "lustify", models: ["lustify_v10_krea2"], source: lustifySource as unknown as string },
+  ],
+  video: [
+    { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base", "tenstrip_10eros_v5"], source: sulphurSource as unknown as string },
+    { provider: "minimaxH3", models: ["minimax_h3_i2va", "minimax_h3_ref2va"], source: minimaxH3Source as unknown as string },
+  ],
+  audio: [{ provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string }],
 };
 
 function productionModel(type: "image" | "video" | "audio", provider: string, model: string) {
-  return productionModels[type].provider === provider && productionModels[type].models.some(id => id === model);
+  return productionModels[type].find(item => item.provider === provider && item.models.some(id => id === model));
 }
 export const mediaExtensions: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif",
@@ -171,7 +179,7 @@ export async function generateMedia(
   const directory = await realpath(cwd);
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
-  const providerInfo = { ...(mediaProviders as readonly Provider[]).find(item => item.id === request.providerId)!, source: productionModels[mediaType].source };
+  const providerInfo = { ...(mediaProviders as readonly Provider[]).find(item => item.id === request.providerId)!, source: productionModel(mediaType, request.providerId, request.modelId)!.source };
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("The selected media model does not exist or the type does not match, please select again.");
   const hasPrevisReference = request.previsVideo && request.videos?.some(video => video.path === request.previsVideo!.path && video.mimeType === request.previsVideo!.mimeType);
@@ -195,6 +203,7 @@ export async function generateMedia(
   const firstFrame = request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined;
   const lastFrame = request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined;
   const initImage = request.initImage ? await readReference(directory, request.initImage, "image", signal) : undefined;
+  const mask = request.mask ? await readReference(directory, request.mask, "image", signal) : undefined;
   signal?.throwIfAborted();
   await reserveGeneration(providerInfo.id);
   const assets = mediaType === "audio"
@@ -205,7 +214,7 @@ export async function generateMedia(
     : mediaType === "image"
     ? await provider.generateImage!({
       model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size, characterId: request.characterId, loras, seed: request.seed,
-      initImage, denoise: request.denoise,
+      initImage, denoise: request.denoise, mask,
     })
     : await provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,

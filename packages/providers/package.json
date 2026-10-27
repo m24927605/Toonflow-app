@@ -16,6 +16,8 @@
     "./media/metaso": "./src/media/metaso.ts",
     "./media/sulphur": "./src/media/sulphur.ts",
     "./media/qwenImage": "./src/media/qwenImage.ts",
+    "./media/minimaxH3": "./src/media/minimaxH3.ts",
+    "./media/lustify": "./src/media/lustify.ts",
     "./media/suno": "./src/media/suno.ts"
   }
 }

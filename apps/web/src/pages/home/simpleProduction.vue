@@ -140,9 +140,9 @@ const stageLabels: Record<string, string> = {
   references: "安排參考素材", startupPlan: "準備製作資源", startupText: "準備製作資源", startupMedia: "準備畫面與聲音模型",
   direction: "規劃影片", script: "撰寫劇本", scriptRevision: "調整劇本與製作規格", shotList: "安排分鏡", cast: "設計角色與場景", contractPlan: "檢查製作規格",
   dialogueTimingRepair: "協調配音與分鏡時間", executionPlan: "安排製作流程", plan: "安排鏡頭", designs: "製作角色與場景圖片",
-  previsRender: "製作鏡頭引導", poses: "調整人物姿勢", dub: "製作配音", texts: "準備影片描述",
+  previsRender: "製作鏡頭引導", poses: "調整人物姿勢", dub: "製作配音", keyframes: "繪製起始畫面", texts: "準備影片描述",
   ambience: "製作環境音", music: "製作背景音樂",
-  promptTiming: "對齊畫面與聲音", clips: "生成影片", roughCut: "剪輯影片", film: "完成後製",
+  promptTiming: "對齊畫面與聲音", clips: "生成影片", clipChecks: "檢查影片", roughCut: "剪輯影片", film: "完成後製",
   deliveryValidation: "檢查成片", report: "準備交付",
 };
 

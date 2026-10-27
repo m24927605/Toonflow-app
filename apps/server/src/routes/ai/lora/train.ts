@@ -10,7 +10,7 @@ const slider = z.strictObject({ base: z.string().trim().min(1).max(500).regex(/^
 export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),
   kind: z.enum(u.lora.loraKinds),
-  families: z.array(z.enum(["ltx", "qwen"])).min(1).max(2).refine(list => new Set(list).size === list.length, "Each model family trains once"),
+  families: z.array(z.enum(["ltx", "qwen", "krea2"])).min(1).max(3).refine(list => new Set(list).size === list.length, "Each model family trains once"),
   name: z.string().trim().min(1).max(64),
   items: z.array(z.strictObject({ path: z.string().min(1).max(4096), caption: z.string().trim().min(1).max(2000).optional() })).max(200),
   slider: slider.optional(),

@@ -18,6 +18,12 @@ process = None
 modelKey = None
 
 
+def gpuModelProcesses():
+    # NVIDIA's MPS server keeps a context for its clients; it is not a model and stays after cleanup.
+    rows = subprocess.check_output(["nvidia-smi", "--query-compute-apps=pid,process_name", "--format=csv,noheader,nounits"], text=True).splitlines()
+    return [row.split(",")[0].strip() for row in rows if row.strip() and "nvidia-cuda-mps" not in row]
+
+
 def settleJob(job):
     Path(f"/content/toonflowSettled{job}.json").write_text('{"settled":true}')
 
@@ -48,7 +54,7 @@ def terminateModel():
     process.wait(timeout=10)
     process.stdin.close()
     deadline = time.monotonic() + 10
-    while subprocess.check_output(["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader,nounits"], text=True).strip():
+    while gpuModelProcesses():
         if time.monotonic() >= deadline:
             raise RuntimeError("TOONFLOW_MODEL_UNSAFE: GPU processes remain after model cleanup")
         time.sleep(0.2)

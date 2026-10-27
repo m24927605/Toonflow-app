@@ -68,7 +68,8 @@ export class ColabScriptError extends Error {
 export class ColabConnectionError extends Error {}
 
 /** The VM was released or reclaimed; this does not establish whether its last job ran. */
-class ColabSessionGoneError extends Error {}
+export class ColabSessionGoneError extends Error {}
+
 
 /**
  * The Colab CLI always writes a DEBUG log to ~/.config/colab-cli/colab.log, which records the Google OAuth tokens in
@@ -89,8 +90,11 @@ async function guardColabLog() {
 
 // The hourly rate of each session this process has running, which the compute unit meter adds up.
 const sessionRates = new Map<string, number>();
-/** Machines that started but could not be taken into use; they keep running until the user stops the machines. */
-export const strayColabSessions = new Set<string>();
+/**
+ * Machines that started or were running but could not be taken into use, by name with their GPU; they keep running
+ * until the user stops the machines, and a lane that needs a machine of that GPU takes one back first.
+ */
+export const strayColabSessions = new Map<string, ColabMachine["gpu"]>();
 // How often the meter is written while sessions run.
 const meterTick = 60_000;
 let meterTimer: ReturnType<typeof setInterval> | undefined;
@@ -121,7 +125,8 @@ const idempotent = new Set(["upload", "download", "sessions", "usage"]);
 // Includes the proxy's 502, 503 and 504, which it answers for a moment while the VM is busy or briefly unreachable.
 const transient = /ReadTimeout|ConnectTimeout|ConnectionError|Connection aborted|RemoteDisconnected|Connection was lost|unable to open database file|database is locked|50[234] Server Error/;
 // The CLI's answer, on stdout, for a session Colab no longer has: its VM was released or reclaimed.
-const sessionGone = /Session '[^']+' not found/;
+// Matched by the session's own name: the CLI also reports other, stale sessions it prunes from its local list.
+const sessionGone = (name: string) => new RegExp(`Session '${name}' not found`);
 
 async function colab(command: string, args: string[], signal?: AbortSignal, timeout?: number) {
   const session = args.includes("--session") ? args[args.indexOf("--session") + 1] : undefined;
@@ -151,12 +156,33 @@ async function colab(command: string, args: string[], signal?: AbortSignal, time
       await scheduler.wait(attempt * 10_000, { signal });
       continue;
     }
-    if (sessionGone.test(`${stdout}${stderr}`)) throw new ColabSessionGoneError(tail(`${stdout}\n${stderr}`, 500));
+    if (session && sessionGone(session).test(`${stdout}${stderr}`)) throw new ColabSessionGoneError(tail(`${stdout}\n${stderr}`, 500));
     throw new Error(tail(`${stdout}\n${stderr}`, 2000) || `Colab CLI exited with code ${child.exitCode}`);
   }
 }
 
 const heartbeatPath = "/content/.toonflowHeartbeat";
+
+/**
+ * Run in a fresh kernel after a reset: a model server started by the old kernel lives on as an orphan and keeps its GPU
+ * memory, so every GPU process but NVIDIA's MPS server is killed before the next model loads.
+ */
+const resetScript = `import os, signal, subprocess, time
+def models():
+    rows = subprocess.check_output(["nvidia-smi", "--query-compute-apps=pid,process_name", "--format=csv,noheader,nounits"], text=True).splitlines()
+    return [int(row.split(",")[0]) for row in rows if row.strip() and "nvidia-cuda-mps" not in row]
+for pid in models():
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+deadline = time.monotonic() + 30
+while models():
+    if time.monotonic() > deadline:
+        raise RuntimeError("GPU processes survived the reset")
+    time.sleep(0.5)
+print("COLAB_DONE")
+`;
 
 /**
  * Started once per session. `colab status` only reports the CLI's local bookkeeping (it shows IDLE before an exec
@@ -278,8 +304,8 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   if (retainedName && !/^toonflow-[0-9a-f]{8}$/.test(retainedName)) throw new Error("Invalid retained Colab session name");
   const name = retainedName ?? `toonflow-${crypto.randomUUID().slice(0, 8)}`;
   // The user's Hugging Face token (HF_TOKEN in the environment or ~/.env), which the weight downloads send to the Hub so
-  // many machines starting at once are not throttled. It reaches the VM only as a kernel environment variable through
-  // `colab exec --env`, never inside a script, an upload or a log, and the scripts pass it to Hugging Face alone.
+  // many machines starting at once are not throttled. It reaches the VM only as an uploaded file that the scripts read
+  // and pass to Hugging Face alone: `colab exec --env` writes its values into the code the CLI records in its history.
   const hubToken = await resolveEnvReference("env:HF_TOKEN").then(value => typeof value === "string" && /^hf_\w+$/.test(value.trim()) ? value.trim() : undefined, () => undefined);
   let startedAt = 0;
   let hourlyRate = machineRates[gpu];
@@ -305,13 +331,17 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
   /** Restarts the kernel, dropping every loaded model, and keeps the machine, so the next job starts clean. */
   async function reset(signal?: AbortSignal) {
     await colab(command, ["restart-kernel", "--session", name], signal);
+    const path = join(directory, `reset${files++}.py`);
+    await writeFile(path, resetScript);
+    const output = await colab(command, ["exec", "--session", name, "--timeout", "120", "--file", path], signal, 180_000);
+    if (!output.includes("COLAB_DONE")) throw new Error(`The reset of ${name} could not clear its GPU: ${tail(output, 1000)}`);
     await startHeartbeat(signal);
   }
 
   async function spawnExec(path: string, env: ColabJob["env"], signal: AbortSignal) {
     const child = Bun.spawn([
       command, "exec", "--session", name, "--timeout", String(execTimeout),
-      ...Object.entries({ ...env, ...hubToken ? { HF_TOKEN: hubToken } : {} }).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
+      ...Object.entries(env).flatMap(([key, value]) => ["--env", `${key}=${value}`]),
       "--file", path,
     ], { stdin: "ignore", stdout: "pipe", stderr: "pipe", signal });
     const output = Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text()]);
@@ -338,6 +368,11 @@ export async function openColabSession(provider: string, { gpu, highMem }: Colab
    * machine's proxy comes up, so it is retried; the script starts nothing twice.
    */
   async function startHeartbeat(signal?: AbortSignal) {
+    if (hubToken) {
+      const local = join(directory, "hubToken");
+      await writeFile(local, hubToken, { mode: 0o600 });
+      await colab(command, ["upload", "--session", name, local, "/content/.toonflowHubToken"], signal).finally(() => rm(local, { force: true }));
+    }
     const path = join(directory, "heartbeat.py");
     await writeFile(path, heartbeatScript);
     for (let attempt = 1; ; attempt++) {
@@ -372,7 +407,7 @@ else:
       signal?.throwIfAborted();
       let lost = watcher.signal.reason as ExecLost;
       if (!watcher.signal.aborted) {
-        if (result.exitCode !== 0 && sessionGone.test(`${result.stdout}${result.stderr}`)) throw new ColabSessionGoneError(`Colab session ${name} lost its VM`);
+        if (result.exitCode !== 0 && sessionGone(name).test(`${result.stdout}${result.stderr}`)) throw new ColabSessionGoneError(`Colab session ${name} lost its VM`);
         if (result.stderr.includes(stateLost)) return checkOutput(result);
         if (result.exitCode === 0 && result.stdout.includes("COLAB_DONE")) return checkOutput(result);
         // The CLI lost its connection to the VM mid-exec, which tells nothing of the job: the kernel's heartbeat says
@@ -425,7 +460,8 @@ else:
    * execs, so a job of hours, such as LoRA training, survives the host losing its network for a while.
    */
   async function runDetached(prelude: string, script: string, env: ColabJob["env"], signal?: AbortSignal) {
-    const id = `toonflowJob${files++}`;
+    // A random name: the counter restarts with the server, and a new job then read the exit file of an old one.
+    const id = `toonflowJob${crypto.randomUUID().replaceAll("-", "")}`;
     const local = join(directory, `upload${files++}`);
     await writeFile(local, script);
     await colab(command, ["upload", "--session", name, local, `/content/${id}.py`], signal);
@@ -744,6 +780,16 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
     await rm(directory, { recursive: true, force: true });
   }
 
+  /** Colab already took the VM back: records its compute units and lets the session go without a stop. */
+  async function forget() {
+    if (stopped) return;
+    stopped = true;
+    sessionRates.delete(name);
+    meterSessions();
+    if (billedAt) await recordColabUnits(provider, (Date.now() - billedAt) / 3_600_000 * hourlyRate);
+    await rm(directory, { recursive: true, force: true });
+  }
+
   try {
     // Toonflow sets no machine count of its own: Colab decides. It refuses a new session while the account's sessions
     // are taken and answers 503 while it is short of machines, so such a start waits and retries instead of failing a
@@ -779,13 +825,23 @@ if all(path.resolve().is_relative_to('/content') and path.is_file() for path in 
     // Only the user stops machines: one that started is left running and stopped with the others.
     if (!startedAt) await close(error);
     else {
-      strayColabSessions.add(name);
+      strayColabSessions.set(name, gpu);
       await rm(directory, { recursive: true, force: true });
       throw new Error(`${error instanceof Error ? error.message : error}; machine ${name} was left running until the machines are stopped`, { cause: error });
     }
     throw error;
   }
-  return { name, job, readOutput, writeInput, close, reset, attribute, keepAlive };
+  return { name, job, readOutput, writeInput, close, forget, reset, attribute, keepAlive };
+}
+
+/**
+ * Ends this computer's Colab CLI calls still attached to a machine, such as those of a server process that was killed:
+ * they keep the kernel busy and made a restarted server fail to take the machine back.
+ * ACT: matched by the session name in their command line, so it assumes one Toonflow server per computer.
+ */
+export async function endLocalColabCalls(name: string) {
+  if (!/^toonflow-[0-9a-f]{8}$/.test(name)) throw new Error("Invalid Colab session name");
+  await Bun.spawn(["pkill", "-f", "--", `--session ${name}`], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).exited;
 }
 
 /** Stops a Toonflow machine this process holds no session for, such as one left over from before a restart. */
@@ -807,9 +863,11 @@ export async function readColabSessionStatus(name: string) {
     await guardColabLog();
     directory = await mkdtemp(join(tmpdir(), "toonflowStatus"));
     const local = join(directory, "heartbeat.json");
-    await colab(command, ["download", "--session", name, heartbeatPath, local], AbortSignal.timeout(8000));
+    // A slow Colab CLI took more than 8 s at times and dropped healthy machines from the pool after a restart.
+    await colab(command, ["download", "--session", name, heartbeatPath, local], AbortSignal.timeout(30_000));
     const beat = beatSchema.parse(JSON.parse(await readFile(local, "utf8")));
-    if (Math.abs(Date.now() - beat.beat * 1000) > 90_000) return { state: "unknown" as const, checkedAt };
+    // The machine answered but its heartbeat stopped, as after its kernel was restarted or died: it is there, its state is not.
+    if (Math.abs(Date.now() - beat.beat * 1000) > 90_000) return { state: "unknown" as const, stale: true, checkedAt };
     return { state: beat.active !== null || beat.current !== beat.finished ? "working" as const : "idle" as const, checkedAt: new Date().toISOString() };
   } catch (error) {
     return { state: error instanceof ColabSessionGoneError ? "off" as const : "unknown" as const, checkedAt };

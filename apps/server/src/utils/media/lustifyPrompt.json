@@ -1,0 +1,217 @@
+{
+ "29": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "filename_prefix": "lustify",
+   "images": [
+    "30:8",
+    0
+   ]
+  }
+ },
+ "30:6": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": [
+    "30:28",
+    0
+   ],
+   "clip": [
+    "30:11",
+    0
+   ]
+  }
+ },
+ "30:5": {
+  "class_type": "EmptyLatentImage",
+  "inputs": {
+   "width": [
+    "49",
+    0
+   ],
+   "height": [
+    "49",
+    1
+   ],
+   "batch_size": 1
+  }
+ },
+ "30:3": {
+  "class_type": "KSampler",
+  "inputs": {
+   "seed": 0,
+   "steps": 8,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "beta",
+   "denoise": 1,
+   "model": [
+    "30:22",
+    0
+   ],
+   "positive": [
+    "30:6",
+    0
+   ],
+   "negative": [
+    "30:13",
+    0
+   ],
+   "latent_image": [
+    "30:5",
+    0
+   ]
+  }
+ },
+ "30:8": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "30:3",
+    0
+   ],
+   "vae": [
+    "30:12",
+    0
+   ]
+  }
+ },
+ "30:10": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "lustifyNSFWCheckpoint_v10Krea2.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "30:11": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+   "type": "krea2",
+   "device": "default"
+  }
+ },
+ "30:12": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  }
+ },
+ "30:13": {
+  "class_type": "ConditioningZeroOut",
+  "inputs": {
+   "conditioning": [
+    "30:6",
+    0
+   ]
+  }
+ },
+ "30:15": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "lora_name": "krea2_darkbrush.safetensors",
+   "strength_model": 0.8,
+   "model": [
+    "30:10",
+    0
+   ]
+  }
+ },
+ "30:19": {
+  "class_type": "PrimitiveStringMultiline",
+  "inputs": {
+   "value": ""
+  }
+ },
+ "30:20": {
+  "class_type": "PreviewAny",
+  "inputs": {
+   "source": [
+    "30:21",
+    0
+   ]
+  }
+ },
+ "30:21": {
+  "class_type": "ComfySwitchNode",
+  "inputs": {
+   "switch": [
+    "30:24",
+    0
+   ],
+   "on_false": [
+    "30:19",
+    0
+   ],
+   "on_true": [
+    "30:19",
+    0
+   ]
+  }
+ },
+ "30:22": {
+  "class_type": "ComfySwitchNode",
+  "inputs": {
+   "switch": [
+    "30:23",
+    0
+   ],
+   "on_false": [
+    "30:10",
+    0
+   ],
+   "on_true": [
+    "30:15",
+    0
+   ]
+  }
+ },
+ "30:23": {
+  "class_type": "PrimitiveBoolean",
+  "inputs": {
+   "value": false
+  }
+ },
+ "30:24": {
+  "class_type": "PrimitiveBoolean",
+  "inputs": {
+   "value": false
+  }
+ },
+ "30:27": {
+  "class_type": "StringConcatenate",
+  "inputs": {
+   "string_a": [
+    "30:20",
+    0
+   ],
+   "string_b": "muted minimalist sketch style",
+   "delimiter": ", "
+  }
+ },
+ "30:28": {
+  "class_type": "ComfySwitchNode",
+  "inputs": {
+   "switch": [
+    "30:23",
+    0
+   ],
+   "on_false": [
+    "30:20",
+    0
+   ],
+   "on_true": [
+    "30:27",
+    0
+   ]
+  }
+ },
+ "49": {
+  "class_type": "ResolutionSelector",
+  "inputs": {
+   "aspect_ratio": "16:9 (Widescreen)",
+   "megapixels": 1.032,
+   "multiple": 8
+  }
+ }
+}

@@ -103,6 +103,8 @@ export function readPlan(reply: string, script: string, shotList: string, assets
       const person = assets.characters.find(person => person.name === actor.name);
       if (!person?.outfits?.some(outfit => outfit.name === actor.outfit)) throw new Error(`Shot ${shot.shot}: unknown character or outfit for ${actor.name}`);
     }
+    // A turn that holds only a parenthetical, such as "Mika: (gasps)", is no line, as the shot list reads it.
+    shot.lines = shot.lines.filter(line => parseDialogue(line.words).length);
     const dialogue = shotDialogue(span);
     if (dialogue.length !== shot.lines.length || dialogue.some((line, i) => line.speaker !== shot.lines[i]!.speaker || line.words !== shot.lines[i]!.words)) throw new Error(`Shot ${shot.shot}: contract changed dialogue or its speaker/order`);
     for (const [i, line] of shot.lines.entries()) {

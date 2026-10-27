@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { access, readdir, readFile } from "@toonflow/file";
-import { trainLora, triggerWord, type LoraRecord } from "@/utils/media/lora";
+import { trainLora, triggerWord, type LoraFamily, type LoraRecord } from "@/utils/media/lora";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { holdQwenImage } from "@/utils/media/qwenImage";
@@ -10,7 +10,7 @@ import { productionDirectory, readProduction, type Production, type ProductionAs
 const castSchema = z.object({
   characters: z.array(z.object({
     name: z.string().trim().min(1), look: z.string().trim().min(1),
-    outfits: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })).min(1),
+    outfits: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1), nude: z.boolean() })).min(1),
   })),
   places: z.array(z.object({ name: z.string().trim().min(1), look: z.string().trim().min(1) })),
 });
@@ -26,8 +26,8 @@ export const castJsonSchema = z.toJSONSchema(castSchema) as Record<string, unkno
 export function castPrompt(script: string, shotList: string) {
   return [
     "List every character and every place of the screenplay below as JSON, exactly in this shape:",
-    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\"}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
-    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of the fixed details that identify it from any camera angle (the walls and their colour, the floor, the main furniture with its shape and colour, lamps, windows and curtains) and its light, and only the static props resting there at the opening; actor-held props belong to actor state and are excluded from the empty set. Do not use quotation marks inside the sentences.",
+    "{\"characters\":[{\"name\":\"...\",\"look\":\"...\",\"outfits\":[{\"name\":\"...\",\"look\":\"...\",\"nude\":false}]}],\"places\":[{\"name\":\"...\",\"look\":\"...\"}]}",
+    "name: exactly as the screenplay writes it, without any reading or translation in brackets. A person's look: one English sentence of their apparent age, ethnicity, build, face and hair (fitting where the story is set), without clothing. outfits: every set of clothes the person wears in the story, in order, each with the short name the screenplay uses (or a short one in its language) and one English sentence describing it; a person who is unclothed in a scene has an outfit for that too. nude: true when the outfit leaves the breasts or genitals bare, such as being naked; false otherwise. The shot list after the screenplay gives what each person wears in each shot in its State column: every different set of clothes a State cell gives a person is one of their outfits, named exactly as that cell writes the clothes, and a change such as a jacket taken off or put on is an outfit of its own, described with that garment gone or added. A place's look: one English sentence of the fixed details that identify it from any camera angle (the walls and their colour, the floor, the main furniture with its shape and colour, lamps, windows and curtains) and its light, and only the static props resting there at the opening; actor-held props belong to actor state and are excluded from the empty set. Do not use quotation marks inside the sentences.",
     "A place is an EMPTY environment: no person, body part, hand holding a prop, reflection of a person or human silhouette. Its look includes only architecture, furniture, light and static props actually resting in the environment at the opening. A prop already held or worn by an actor belongs to that actor's opening state: exclude it from the empty environment rather than placing a duplicate on a table. Never put a character's pose or action in a place description.",
     "Include static furniture required by the actions, even when only the action mentions it: a person seated at a desk needs both the desk and a chair. EMPTY removes people, not the furniture supporting them.",
     "Frame and cropping instructions describe the camera composition. Include a physical picture frame only when the story explicitly names one as a set prop.",
@@ -56,7 +56,7 @@ export function parseCast(text: string, photos: Production["input"]["photos"]) {
   }));
   // Someone with a photo but no part in the script keeps the clothes of the photo.
   for (const photo of photos) {
-    if (!characters.some(item => item.name === photo.name)) characters.push({ name: photo.name, look: "the person in the photo", photo: photo.path, outfits: [{ name: "photo", look: "exactly the clothes shown in the photo" }] });
+    if (!characters.some(item => item.name === photo.name)) characters.push({ name: photo.name, look: "the person in the photo", photo: photo.path, outfits: [{ name: "photo", look: "exactly the clothes shown in the photo", nude: false }] });
   }
   return { recipe: "b3" as const, characters, places: cast.places.map(bare) };
 }
@@ -83,7 +83,7 @@ const placeViews = [
   "Show a closer view of the left side of the environment.",
 ];
 
-async function draw(cwd: string, id: string, prompt: string, ratio: string, references: string[], signal: AbortSignal, modelId = qwen.modelId, size = "1K", folder = "assets") {
+export async function draw(cwd: string, id: string, prompt: string, ratio: string, references: string[], signal: AbortSignal, modelId = qwen.modelId, size = "1K", folder = "assets") {
   const [image] = await generateMedia(cwd, "image", {
     ...qwen, modelId, prompt, ratio, size, outputDirectory: `${productionDirectory(id)}/${folder}`,
     images: references.map(path => ({ path, mimeType: /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.webp$/i.test(path) ? "image/webp" : "image/png" })),
@@ -93,11 +93,13 @@ async function draw(cwd: string, id: string, prompt: string, ratio: string, refe
 
 /**
  * Takes matching designs from completed films from the workspace's latest earlier production for the same person, outfit or place, so a new film
- * of the same people neither waits for them nor draws them differently: a person by name and photo (and look, when
- * drawn without a photo), an outfit of theirs by name, a place by name and look. Only designs whose files are all
- * still there are taken. Outfit descriptions must match, so a reused name cannot silently keep older clothes.
+ * of the same people neither waits for them nor draws them differently: a person by name and photo, an outfit of theirs
+ * by name, a place by name. Only designs whose files are all still there are taken. The text model words a look anew
+ * for every film, so looks are not compared, and each keeps this film's wording, which its contract was planned on. A
+ * reused person keeps the earlier trigger words, so the LoRAs trained on that design are used instead of trained again.
+ * Outfit descriptions must match, so a reused name cannot silently keep older clothes.
  */
-async function reuseDesigns(cwd: string, production: Production) {
+export async function reuseDesigns(cwd: string, production: Production) {
   if (production.execution!.reuseDesigns.mode === "new") return;
   const folder = (await resolveWorkspacePath(cwd, productionDirectory(""), true)).path;
   const ids = (await readdir(folder).catch(() => [] as string[])).filter(id => id !== production.id);
@@ -108,23 +110,23 @@ async function reuseDesigns(cwd: string, production: Production) {
     resolveWorkspacePath(cwd, path).then(({ path }) => access(path)).then(() => true, () => false)))).every(Boolean);
   for (const item of production.assets!.characters) {
     for (const other of designs) {
-      const match = other.characters.find(person => person.name === item.name && person.photo === item.photo && (item.photo || person.look === item.look));
+      const match = other.characters.find(person => person.name === item.name && person.photo === item.photo);
       if (!match?.outfits?.length) continue;
       if (item.photo) {
         const current = await readFile((await resolveWorkspacePath(cwd, item.photo)).path);
         if (!match.photoSha256 || createHash("sha256").update(current).digest("hex") !== match.photoSha256) continue;
       }
-      if (!item.base && match.base && match.views && await present([match.base, ...match.views])) Object.assign(item, { base: match.base, views: match.views, photoSha256: match.photoSha256 });
+      if (!item.base && match.base && match.views && await present([match.base, ...match.views])) Object.assign(item, { base: match.base, views: match.views, photoSha256: match.photoSha256, ...match.triggers ? { triggers: match.triggers } : {} });
       for (const outfit of item.outfits ?? []) {
         const views = match.outfits?.find(other => other.name === outfit.name && other.look === outfit.look)?.views;
         const planned = production.execution!.characters.find(person => person.name === item.name)!;
         const count = { front: 1, frontAndQuarter: 2, full: 3 }[planned.views];
-        if (!outfit.views && views?.length === count && await present(views)) outfit.views = views;
+        if (!outfit.nude && !outfit.views && views?.length === count && await present(views)) outfit.views = views;
       }
     }
   }
   for (const item of production.assets!.places) {
-    const match = designs.flatMap(other => other.places).find(place => place.name === item.name && place.look === item.look && place.base && place.views);
+    const match = designs.flatMap(other => other.places).find(place => place.name === item.name && place.base && place.views);
     if (!item.base && match && await present([match.base!, ...match.views!])) Object.assign(item, { base: match.base, views: match.views });
   }
 }
@@ -143,7 +145,9 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
     const results = await Promise.allSettled([
       ...assets.characters.map(async item => {
         if (!item.base) {
-          const outfit = item.outfits![0]!;
+          // The image model draws no nudity, so a person's base design wears their first clothes.
+          // ACT: someone naked throughout is drawn in plain underwear; a story that needs them otherwise names an outfit.
+          const outfit = item.outfits!.find(outfit => !outfit.nude) ?? { name: "underwear", look: "plain fitted underwear", nude: false };
           if (item.photo) {
             item.photoSha256 = createHash("sha256").update(await readFile((await resolveWorkspacePath(cwd, item.photo)).path)).digest("hex");
             item.base = item.photo;
@@ -162,7 +166,8 @@ export async function drawAssets(cwd: string, production: Production, ratio: str
             item.views = await Promise.all(faceViews.slice(0, planned.views === "front" ? 1 : 2).map(([viewRatio, view]) => draw(cwd, production.id, `${view} ${rule} ${finish}`, viewRatio, [item.base!], signal)));
             await save();
           })() : undefined,
-          ...(item.outfits ?? []).filter(outfit => {
+          // Naked bodies are left to the video model: Qwen-Image drew wrong genitals however they were described.
+          ...(item.outfits ?? []).filter(outfit => !outfit.nude).filter(outfit => {
             const planned = production.execution!.characters.find(person => person.name === item.name)!;
             return outfit.views?.length !== { front: 1, frontAndQuarter: 2, full: 3 }[planned.views];
           }).map(async outfit => {
@@ -214,18 +219,21 @@ const unitsPerFamily = 6.77 * 1.3 * 1.25 / 2;
 const unitsPerTopUp = 6.77 / 6 * 1.3 * 31 / 11;
 
 /**
- * The LoRA each person gets, trained from this production's matching source designs: clips start from no picture of
- * them, so their LoRA is all that keeps them the same, even in a single shot. Places get none: a scene LoRA learns its
- * designs' single framing with the room and pulled every shot back to that wide, still view, so the clip prompt
- * describes the place instead. A name alone cannot prove another production's training identity. Each trigger is fixed when
- * planned and kept on the asset, so texts can name it
- * while it trains. `units` is what the training will cost.
+ * The LoRA each person gets, trained from this production's matching source designs: a clip starts from its keyframe,
+ * and the LoRA keeps the person the same as they move away from it. Places get none: a scene LoRA learns its designs'
+ * single framing with the room and pulled every shot back to that wide, still view, so each keyframe draws the place
+ * from its design instead. A person reused from an earlier film brings its trigger words, so its LoRAs are kept
+ * rather than trained again. Each trigger is fixed when planned and kept on the asset, so texts can name it while it
+ * trains. `units` is what the training will cost.
  */
 export async function planAssetLoras(cwd: string, production: Production) {
   const assets = production.assets!;
   const existing = await workspaceLoras(cwd);
-  // Only the video model takes LoRAs; Qwen-Image only draws the designs they are trained from.
-  const families: ("ltx" | "qwen")[] = ["ltx"];
+  // Sulphur 2 clips take LTX LoRAs; a film with explicit shots also trains Krea 2 LoRAs, which lock faces in their
+  // LUSTIFY start frames. Qwen-Image only draws the designs they are trained from.
+  const nude = (name: string, outfit: string) => !!assets.characters.find(person => person.name === name)?.outfits?.find(item => item.name === outfit)?.nude;
+  const explicit = production.execution?.shots?.some(shot => shot.explicit) || production.plan?.shots.some(shot => shot.actors.some(actor => nude(actor.name, actor.outfit)));
+  const families: LoraFamily[] = explicit ? ["ltx", "krea2"] : ["ltx"];
   const jobs = assets.characters.map(item => ({ item, kind: "character" as const })).filter(job => !job.item.loras).map(({ item, kind }) => {
     item.triggers ??= Object.fromEntries(families.map(family =>
       [family, triggerWord()]));
@@ -259,5 +267,5 @@ async function workspaceLoras(cwd: string) {
   return records.filter((record): record is LoraRecord => !!record).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** Every reference image of a person or place, across outfits, as a LoRA learns them. */
-export const assetViews = (item: ProductionAsset) => [...item.views ?? [], ...(item.outfits ?? []).flatMap(outfit => outfit.views ?? [])];
+/** Every reference image of a person or place, across clothed outfits, as a LoRA learns them: a LoRA keeps the face only. */
+export const assetViews = (item: ProductionAsset) => [...item.views ?? [], ...(item.outfits ?? []).filter(outfit => !outfit.nude).flatMap(outfit => outfit.views ?? [])];

@@ -3,6 +3,7 @@ import { mkdir, readFile, realpath, writeAtomic } from "@toonflow/file";
 import type { MessageDescriptor } from "@toonflow/i18n";
 import conf from "@/utils/conf";
 import { translateMessage } from "@/lib/i18n";
+import type { LoraFamily } from "@/utils/media/lora";
 import type { ProductionAmbience } from "./ambience";
 import type { ProductionDub } from "./dub";
 import type { ProductionPrevis } from "./previs";
@@ -125,12 +126,13 @@ export type Production = {
 export type ProductionAsset = {
   name: string; look: string; photo?: string; photoSha256?: string; base?: string; views?: string[];
   generationPrompt?: { text: string };
-  outfits?: { name: string; look: string; views?: string[] }[];
-  loras?: { family: "ltx" | "qwen"; path: string; trigger: string }[];
-  triggers?: Partial<Record<"ltx" | "qwen", string>>;
+  /** `nude` outfits leave the breasts or genitals bare: no image model draws them, the video model does. */
+  outfits?: { name: string; look: string; nude?: boolean; views?: string[] }[];
+  loras?: { family: LoraFamily; path: string; trigger: string }[];
+  triggers?: Partial<Record<LoraFamily, string>>;
 };
 
-export const assetDrawn = (item: ProductionAsset) => !!item.views?.length && (item.outfits ?? []).every(outfit => !!outfit.views?.length);
+export const assetDrawn = (item: ProductionAsset) => !!item.views?.length && (item.outfits ?? []).every(outfit => outfit.nude || !!outfit.views?.length);
 
 export const productionDirectory = (id: string) => `productions/${id}`;
 
@@ -164,14 +166,14 @@ export function productionProgress(production: Production, active: boolean) {
   const phaseSteps: Record<string, string[]> = {
     preparation: ["startupPlan", "startupText", "startupMedia"], story: ["direction", "script", "scriptRevision", "shotList", "cast", "references", "contractPlan"],
     visuals: ["previsPlan", "designs", "previsRender", "loras"], speech: ["dub", "dialogueTimingRepair", "ambience", "music"],
-    video: ["texts", "clips"], finishing: ["roughCut", "film", "deliveryValidation", "report"], cleanup: [],
+    video: ["keyframes", "texts", "clips", "clipChecks"], finishing: ["roughCut", "film", "deliveryValidation", "report"], cleanup: [],
   };
   const phases = [
     { id: "preparation", done: !!production.runtime?.readyAt, running: active && !production.runtime?.readyAt },
     { id: "story", done: !!production.shotList && !!production.plan, running: ["direction", "script", "scriptRevision", "shotList", "cast", "contractPlan"].some(step => pending.has(step)) },
     { id: "visuals", done: !!assets && assets.every(item => assetDrawn(item)) && !!production.assets?.characters.every(item => !!item.loras) && !!production.previs?.every(shot => !!shot.video), running: ["previsPlan", "previsRender", "designs", "loras"].some(step => pending.has(step)) },
     { id: "speech", done: !!production.dub?.shots.every(shot => shot.lines.every(line => !!line.path) && (!shot.lines.length || !!shot.track)) && !!production.ambience?.every(item => !!item.bed?.videoSha256) && (!production.input.music || !!production.music), running: ["dub", "dialogueTimingRepair", "ambience", "music"].some(step => pending.has(step)) },
-    { id: "video", done: totalShots > 0 && completedShots === totalShots, running: pending.has("clips") },
+    { id: "video", done: totalShots > 0 && completedShots === totalShots, running: ["keyframes", "clips", "clipChecks"].some(step => pending.has(step)) },
     { id: "finishing", done: production.status === "done" && !!production.film, running: ["film", "roughCut", "deliveryValidation"].some(step => pending.has(step)) },
     { id: "cleanup", done: production.cleanup?.status === "done", running: production.cleanup?.status === "running" },
   ];

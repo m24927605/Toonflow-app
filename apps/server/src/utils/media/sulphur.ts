@@ -1,5 +1,5 @@
 import { validateVideoPrompt } from "@toonflow/node-shared/videoPrompt";
-import { createColabWorker, currentColabAllocation, waitForColabPreparation, type ColabPreparation } from "./colabPool";
+import { colabLane, colabPoolRestored, colabSessionName, createColabWorker, currentColabAllocation, waitForColabPreparation, type ColabPreparation } from "./colabPool";
 import { createHash } from "node:crypto";
 import type { ProviderTools } from "@toonflow/providers";
 import { inputBytes, inputExtension, randomSeed, type ColabSession } from "@/utils/media/colab";
@@ -104,7 +104,7 @@ export function warmSulphur(resolution: string, ratio: string, machines: number,
 }
 
 /** Renders one Sulphur 2 video on Colab and returns the MP4 bytes; clips requested together run one after another on one machine. */
-export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed(), workflow = "distilled", checkpoint = "sulphur" }: SulphurRequest, signal?: AbortSignal) {
+export async function runSulphur({ prompt, parts, firstFrame, lastFrame, controlVideo, soundtrack, loras = [], duration, resolution, ratio, audio, seed = randomSeed(), workflow = "distilled" }: SulphurRequest, signal?: AbortSignal) {
   for (const value of parts ?? [prompt]) validateVideoPrompt(value);
   if (soundtrack && !audio) throw new Error("A locked soundtrack requires audio output to be enabled");
   const plan = longTakeParts(duration, parts?.length);
@@ -128,8 +128,11 @@ export async function runSulphur({ prompt, parts, firstFrame, lastFrame, control
   signal?.throwIfAborted();
   const allocation = currentColabAllocation();
   const limit = allocation ? allocation.renderLimit ?? allocation.renderWorkers : productionLimits.size ? Math.min(...productionLimits.values()) : sulphurMachines;
-  const available = waiting.slice(0, limit);
-  const index = available.indexOf(Math.min(...available));
+  // A lane with a running machine comes first: the least queued lane was often one without a machine, and asking
+  // Colab for another A100 was refused while the pool's machines could take the clip.
+  await colabPoolRestored();
+  const rank = (index: number) => (colabSessionName(colabLane(index + 1)) ? 0 : 100) + waiting[index]!;
+  const index = Array.from({ length: limit }, (_, index) => index).reduce((best, index) => rank(index) < rank(best) ? index : best);
   waiting[index]!++;
   const video = await workers[index]!.run(async (session, sessionSignal) => {
     const sent = sentLoras.get(session) ?? new Set<string>();
@@ -148,7 +151,7 @@ export async function runSulphur({ prompt, parts, firstFrame, lastFrame, control
         ...characterLoras.length ? [{ name: name("loras.json"), data: JSON.stringify(characterLoras.map(({ name, strength }) => ({ name, strength }))) }] : [],
       ],
       env: {
-        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0, SULPHUR_WORKFLOW: workflow, SULPHUR_CHECKPOINT: checkpoint,
+        SULPHUR_JOB: job, SULPHUR_SEED: seed, SULPHUR_RESOLUTION: resolution, SULPHUR_RATIO: ratio, SULPHUR_DURATION: duration, SULPHUR_AUDIO: audio ? 1 : 0, SULPHUR_WORKFLOW: workflow,
         SULPHUR_SEGMENTS: parts?.length ?? 1, SULPHUR_SEGMENT_FRAMES: plan.frames,
         ...postprocess ? { PRODUCTION_FINISH_JOB: job, PRODUCTION_FINISH_FUSED: 1 } : {},
       },

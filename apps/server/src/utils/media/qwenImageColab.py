@@ -2,7 +2,7 @@
 # Input: /content/qwin_job.json (a list of {prompt, ratio, size, seed, refs, control, init, denoise, recipe}) and the
 # files it names; control is an optional depth map applied through the Qwen-Image 2.1 Fun ControlNet Union patch, and
 # init an optional picture redrawn from the noise level denoise instead of drawing from pure noise. Every image is drawn
-# by the base model (not Turbo) with the Genitalia Anatomy Fix LoRA, which the production always applies.
+# by the base model (not Turbo); genitals come from the prompt's description, as LoRAs only keep trained characters.
 # Output: /content/qwout/<QWEN_JOB>/image_<n>.png, atomically published as each image finishes.
 # The model loads once and the items are drawn one by one, always at the requested ratio and size; references reach
 # the model through the text encoder's conditioning, so the output canvas does not have to share their aspect.
@@ -60,11 +60,7 @@ if any(item.get("control") for item in items):
 from modelPreparation import downloadWeights, installComfy, installationIdentity
 # The pose LoRA comes from the recipes of the Apache-2.0 qwen21-nsfw-pose-skill (github.com/Arekejoker/qwen21-nsfw-pose-skill).
 poseLora = "VNCCS_QI2_PoseStudioV1.1.safetensors"
-# Adult female and male anatomy for Qwen-Image 2.1 (non-commercial licence), at the strength its author renders with.
-anatomyLora = "Genitalia-Anatomy-2.1-v1.safetensors"
-anatomyStrength = 1.0
 entries = [("Comfy-Org/Qwen-Image-2.1", weightRevision, remote, str(comfy / "models" / folder / Path(remote).name)) for remote, folder in weights]
-entries.append(("perpetual3x/Qwen-Image-Genitalia-Anatomy-Fix-NSFW-LoRA-v1", "e5ae1a51766dc868a1b085694064e925ee22186a", anatomyLora, str(comfy / "models/loras" / anatomyLora)))
 if any(item.get("recipe") == "pose" for item in items):
     entries.append(("MIUProject/VNCCS_PoseStudio_QI2.1", "9857b8a256655da446772a3f1f2b033e33181a6d", poseLora, str(comfy / "models/loras" / poseLora)))
 if os.environ.get("TOONFLOW_PREFETCH_ONLY") == "1":
@@ -134,8 +130,7 @@ def build(item):
     for index, name in enumerate(refs):
         graph[f"ref{index}"] = {"class_type": "LoadImage", "inputs": {"image": name}}
     # LoRAs sit between the model and its cache, so every sampler and the ControlNet patch see them.
-    graph["anatomyLora"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["1", 0], "lora_name": anatomyLora, "strength_model": anatomyStrength}}
-    model = ["anatomyLora", 0]
+    model = ["1", 0]
     if item.get("recipe") == "pose":
         graph["poseLora"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": model, "lora_name": poseLora, "strength_model": 1.0}}
         model = ["poseLora", 0]

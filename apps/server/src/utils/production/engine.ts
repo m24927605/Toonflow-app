@@ -2,7 +2,7 @@ import { translate } from "@toonflow/i18n";
 import { z } from "zod";
 import { checkScript } from "@toonflow/node-shared/scriptCheck";
 import { castNames, replaceShotCells, shotSpans } from "@toonflow/node-shared/shotList";
-import { shotListFixPrompt, shotListInstructions, storyScopeInstructions, uncensoredTextModelId } from "@toonflow/node-shared/shotListPrompt";
+import { shotListFixPrompt, shotListInstructions, storyScopeInstructions, uncensoredTextModelId, visualTextModelId } from "@toonflow/node-shared/shotListPrompt";
 import { t, getLocale, runWithLocale, translateMessage } from "@/lib/i18n";
 import { getConfiguredModel, holdColab, listAiModels, streamAi, colabModelPreparation } from "@/utils/ai";
 import { readColabBalance } from "@/utils/media/colab";
@@ -15,13 +15,15 @@ import { preparationKey, prepareModels, registerModelCaches, saveModelCaches } f
 import { applySpeakerLabels, missingSpeakerLabels, speakerLabelsJsonSchema, planJsonSchema, planPrompt, readPlan, requireCurrentPlan } from "./plan";
 import { executionAllocation, executionSource, planExecution, planStartup, startupAllocation } from "./execution";
 import { requireJevKey } from "@/utils/ai/jev";
-import { castPrompt, drawAssets, parseCast, planAssetLoras, trainAssetLora, castJsonSchema, emptyEnvironmentRule } from "./assets";
+import { castPrompt, drawAssets, parseCast, planAssetLoras, reuseDesigns, trainAssetLora, castJsonSchema, emptyEnvironmentRule } from "./assets";
 import { applyDialogueTiming, clipSeconds, DialogueTimingError, dialogueTimingSchema, fitDialogueTiming, planDub, recordDub } from "./dub";
 import { planPrevis, renderPrevis, cameraMeasurements, previsCastIssues } from "./previs";
 import { ReplyCutError, replyJson } from "./review";
 import { ambiencePrompt, generateAmbience } from "./ambience";
-import { continuedFrom, finishFilm, joinRoughCut, renderClips, prepareClipInputs, takeStartFrame, validateFilm, scoreFilm, writeClipPrompts } from "./video";
+import { continuedFrom, finishFilm, joinRoughCut, renderClips, prepareClipInputs, takeStartFrame, validateFilm, scoreFilm, writeClipPrompts, type ProductionClip } from "./video";
 import { costRatio, estimateProduction, recordProductionCost } from "./estimate";
+import { checkImages, clipCheckPrompt, majorProblems, readCheck } from "./checks";
+import { drawKeyframe } from "./keyframes";
 import { planShots, shotReferences } from "./shots";
 import { readConversation, updateConversation } from "./conversation";
 import { validateReferenceAttachments, planReferences, applyAudioReferences, type ReferenceAttachment } from "./references";
@@ -68,6 +70,7 @@ async function releaseRuntime(key: string, preserveCache = false) {
 async function prepareRuntime(cwd: string, production: Production, signal: AbortSignal) {
   const runtime = runtimeOwners.get(runnerKey(cwd, production.id))!;
   configuredModel(uncensoredTextModelId);
+  configuredModel(visualTextModelId);
   const path = `${productionDirectory(production.id)}/runtimePreparation.json`;
   if (!runtime.preparation) {
     const controller = new AbortController();
@@ -95,6 +98,9 @@ async function prepareRuntime(cwd: string, production: Production, signal: Abort
     add(0, colabModelPreparation(uncensoredTextModelId));
     add(1, sulphurPreparation(production.input.quality, production.input.ratio));
     add(1, qwenImagePreparation([]));
+    // The vision model that checks keyframes and clips is only downloaded here; it loads at its first check, after the
+    // lines are recorded on the same A100.
+    add(3, { ...colabModelPreparation(visualTextModelId), deferLoad: true });
     const pendingSpeech = production.dub ? production.dub.shots.some(shot => shot.lines.some(line => !line.path)) : production.startupPlan!.speech;
     if (pendingSpeech) {
       add(2, drama3Preparation());
@@ -189,6 +195,39 @@ async function complete(systemPrompt: string, prompt: string, signal: AbortSigna
     throw new ReplyCutError("The text model's reply was cut off at its length limit twice");
   }
   return message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
+}
+
+/**
+ * Asks the vision model about images (PNG bytes as base64), which it reads after the prompt; the text model misread
+ * frames (a dark jacket taken for a white shirt). A reply cut off twice fails like a text reply.
+ */
+async function see(systemPrompt: string, prompt: string, images: string[], signal: AbortSignal, tries = 2): Promise<string> {
+  const model = configuredModel(visualTextModelId);
+  const content = [{ type: "text" as const, text: prompt }, ...images.map(data => ({ type: "image" as const, data, mimeType: "image/png" }))];
+  const stream = await streamAi(getConfiguredModel(model.providerId, model.modelId), { systemPrompt, messages: [{ role: "user", content, timestamp: Date.now() }] }, signal);
+  const message = await stream.result();
+  if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "Model request failed");
+  if (message.stopReason === "length") {
+    if (tries > 1) return see(systemPrompt, prompt, images, signal, tries - 1);
+    throw new ReplyCutError("The vision model's reply was cut off at its length limit twice");
+  }
+  return message.content.flatMap(part => part.type === "text" ? [part.text] : []).join("").trim();
+}
+const checker = "You check AI-generated film frames for a film editor.";
+// How many times a clip whose check fails is written and rendered again.
+const clipCorrections = 2;
+
+/** The vision model's check of a rendered clip against its row, its keyframe and the designs of its people and place. */
+async function checkClip(cwd: string, production: Production, item: ProductionClip, look: (prompt: string, images: string[]) => Promise<string>, signal: AbortSignal) {
+  const shot = production.shots!.find(other => other.shot === item.shot)!;
+  const previs = production.previs!.find(other => other.shot === item.shot)!;
+  const { people, place } = shotReferences(shot, production.assets!, previs.framed);
+  const references = [place.place.base!, ...people.map(({ person }) => person.outfits?.find(outfit => outfit.name === shot.outfits[person.name])?.views?.[0] ?? person.base!)];
+  const seconds = production.dub!.shots.find(other => other.shot === item.shot)!.seconds;
+  const images = await checkImages(cwd, production, `shot${item.shot}Take${(item.attempts?.length ?? 0) + 1}`, references, { video: item.video!, seconds }, signal);
+  const ask = async () => readCheck(await look(clipCheckPrompt(shot.row ?? "", item.prompt ?? "", references.length), images));
+  const check = await ask();
+  return check.unreadable ? ask() : check;
 }
 
 export async function createSimpleProduction(cwd: string, id: string, outline: string, fromConversation: boolean, references: ReferenceAttachment[] = [], referenceNotes: string[] = []) {
@@ -363,6 +402,8 @@ async function writeImagePrompt(brief: string, ratio: string, signal: AbortSigna
 }
 
 const screenwriter = "You write screenplays for short films made with AI image and video models.";
+// How long people take to play common actions at a natural pace, for planning beats and checking shots against them.
+const beatPacing = "a look, a reaction or a short line takes 2–4 s, a walk across a room or taking off one garment 4–6 s, a kiss or a sexual position with its rhythm 5–10 s";
 
 // Characters only one of the two Chinese scripts uses; this model drifts to English or Simplified Chinese unless the
 // language is named outright. ACT: A small character sample; it misjudges outlines that avoid all of them.
@@ -386,6 +427,7 @@ function scriptPrompt(input: ProductionInput) {
     "Keep the outline's people, places and events, and add only what the story needs to play out. Call every person and place exactly by the name the outline uses; never rename or translate a name or add a reading or translation after it.",
     "Preserve every explicitly required object, its relationship to the actors, timing and exclusions in the outline. Include required static furniture in the place descriptions as well as the scene action.",
     `The film lasts ${input.seconds} seconds: every line is spoken aloud, so all dialogue together must take at most half of that time.`,
+    `Plan the film as visible beats that together take its ${input.seconds} seconds. A beat is one action people can play in full at a natural pace: ${beatPacing}. Keep only the events that fit, and never stack several actions into one moment. Give each event the share of the film its weight in the outline asks for: when the outline centres on sex, the sex acts take most of the film, each position held long enough to show its rhythm.`,
     `Start with a section listing the characters: each person's fixed name, their look (age, build, face, hair), intended audible voice (presentation, apparent age, timbre, language/dialect and delivery), and every outfit they wear in the story, each with a short name such as "home clothes" and a description; then a section listing the places, each with a fixed name and its empty environment look; then the scenes: a heading, the action in present tense naming the outfit when someone changes, and dialogue as "Name: line". Title the sections in ${language}.`,
     ...named.length ? [`These characters have photos, so use exactly these names for them: ${named.join(", ")}.`] : [],
     `Write section titles, scene headings and action in ${language}. Explicit spoken-language requests override that default for dialogue. Output only the screenplay.`,
@@ -512,6 +554,25 @@ function shotListPrompt(script: string, names: string[], input: ProductionInput)
     "Script:",
     script,
   ].join("\n");
+}
+
+const pacingSchema = z.strictObject({ shots: z.array(z.strictObject({ shot: z.number().int().positive(), problem: z.string().trim().min(1).max(1000) })).max(100) });
+
+/**
+ * Asks the text model which shots cannot be played as written: an action too long for its time, several actions in one
+ * take, or a shot size or camera that cannot show its action. A model's judgement, so code only passes its findings on.
+ */
+async function reviewPacing(script: string, shotList: string, signal: AbortSignal) {
+  const prompt = [
+    "You review a shot list for an AI video film before anything is drawn or rendered. Each row is one continuous take that a video model renders from its Action cell alone.",
+    `Find every shot whose people cannot play its whole Action at a natural pace within the shot's time (${beatPacing}), that stacks several actions into one take, or whose Shot size or Camera cannot show its action, such as a walk across a room in a close-up or a sex act framed away from the act.`,
+    "For each such shot say what is wrong and how to fix it: give an action its own shot, take time from a shot that needs less, or drop a beat the story can do without. The film's total length must stay the same. Leave out shots that work.",
+    'Reply with JSON only: {"shots": [{"shot": 1, "problem": "..."}]}, with an empty list when every shot works.',
+    "",
+    "Script:", script, "", "Shot list:", shotList,
+  ].join("\n");
+  const { shots } = pacingSchema.parse(replyJson(await complete(shotListWriter, prompt, signal, { schema: z.toJSONSchema(pacingSchema) }), "shots"));
+  return shots.map(item => `Shot ${item.shot}: ${item.problem}`);
 }
 
 /** Stops for a person: a review, or anything else they must decide; `message` is a code the page words. */
@@ -653,10 +714,18 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
       const names = production.input.photos.map(photo => photo.name);
       const prompt = shotListPrompt(script, names, production.input);
       let shotList = await complete(shotListWriter, prompt, signal);
-      // As "Generate shot list" does, a list failing the timing check (here also against the film's length) is
-      // rewritten once with the problems found.
-      const problems = checkScript(shotList, production.input.seconds).issues;
-      if (problems.length) shotList = await complete(shotListWriter, shotListFixPrompt(prompt, shotList, english(problems)), signal);
+      // A list failing the timing check (here also against the film's length) or the pacing review is rewritten with the
+      // problems found, twice at most. ACT: pacing problems left after that only reach the log, as the review is a model's
+      // judgement and the film can still be made.
+      for (let round = 0; round < 3; round++) {
+        const timing = english(checkScript(shotList, production.input.seconds).issues);
+        const pacing = timing.length ? [] : await reviewPacing(script, shotList, signal);
+        if (!timing.length && !pacing.length) break;
+        if (round === 2) { console.warn("[production] Shot list pacing problems remain:", pacing); break; }
+        // Where the film cannot hold every event of the script at a natural pace, beats are dropped rather than rushed.
+        const cut = pacing.length ? ["Where the film is too short for every event of the script at a natural pace, leave out the least important beats; this overrides covering the whole script."] : [];
+        shotList = await complete(shotListWriter, shotListFixPrompt(prompt, shotList, [...timing, ...pacing, ...cut]), signal);
+      }
       const check = checkScript(shotList, production.input.seconds);
       if (check.issues.length || !check.shots.length || check.shots.some(shot => !Number.isFinite(shot.duration) || shot.duration <= 0 || (shot.start !== undefined && (!Number.isFinite(shot.start) || shot.start < 0)))) {
         throw new Error("The shot list has no usable shots; correct it before production continues");
@@ -748,6 +817,8 @@ async function step(cwd: string, id: string, signal: AbortSignal): Promise<boole
 async function produceClips(cwd: string, production: Production, signal: AbortSignal) {
   const [script, shotList] = await Promise.all([readProductionText(cwd, production.script!), readProductionText(cwd, production.shotList!)]);
   const assets = [...production.assets!.characters, ...production.assets!.places];
+  // Reused people bring their trigger words, so they are taken before the LoRA plan fixes new triggers.
+  await reuseDesigns(cwd, production);
   const plan = await planAssetLoras(cwd, production);
   production.videos ??= production.shots!.map(({ shot }) => ({ shot }));
   const videos = production.videos;
@@ -788,6 +859,8 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
     if (!preparedForVideo || warming || !open.some(item => !item.video)) return;
     warming = true;
     releaseVideo();
+    // ACT: one video renderer: the second A100 checks keyframes and clips, and rendering there as well would unload the
+    // vision model for every clip. Renders would go twice as fast on two A100s with a fourth machine for the checks.
     const workers = production.execution!.machines.renderWorkers;
     releaseVideo = holdSulphur(workers);
     releaseWarm = warmSulphur(production.input.quality, production.input.ratio, workers, 20 * 60_000, workSignal);
@@ -806,19 +879,27 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
     const materials = new Map(production.previs!.map(previs => {
       const shot = production.shots!.find(item => item.shot === previs.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
-      // A clip starts from no picture: it waits for its previs and for the LoRAs of its people.
-      const ready = track(Promise.all([previsReady.get(shot.shot)!.promise, ...references.people.map(({ person }) => training.get(person)!)]));
-      return [shot.shot, { ready }] as const;
+      // A shot that does not continue the clip before it gets a keyframe, once its previs and the designs of its people
+      // and place are drawn; a clip waits for that and for the LoRAs of its people.
+      const keyframe = track((async () => {
+        await Promise.all([previsReady.get(shot.shot)!.promise, assetReady.get(references.place.place)!.promise, ...references.people.map(({ person }) => assetReady.get(person)!.promise)]);
+        if (!videos.find(item => item.shot === shot.shot)?.video && continuedFrom(production, shot.shot) === undefined) await timed(cwd, production, "keyframes", () => drawKeyframe(cwd, production, shot.shot, script, shotList, prompt => complete(keyframeWriter, prompt, workSignal), (prompt, images) => dubbed.then(() => see(checker, prompt, images, workSignal)), workSignal, save));
+      })());
+      const ready = track(Promise.all([keyframe, ...references.people.map(({ person }) => training.get(person)!)]));
+      return [shot.shot, { ready, keyframe }] as const;
     }));
-    const drawn = track(drawing.finally(releaseQwen));
+    // Qwen-Image stays loaded until the last keyframe is drawn.
+    const drawn = track(Promise.all([drawing, ...[...materials.values()].map(item => item.keyframe)]).finally(releaseQwen));
     const prepared = track(Promise.all([drawn, blocked, ...training.values()]).then(() => {
       workSignal.throwIfAborted();
     }));
     track(prepared.then(() => { preparedForVideo = true; warmVideo(); }));
     const prompts = new Map(videos.map(item => [item.shot, track((async () => {
       const shot = production.dub!.shots.find(shot => shot.shot === item.shot)!;
-      // A long take's parts follow the recorded lines' times, so its prompts wait for the dub.
+      // A long take's parts follow the recorded lines' times, so its prompts wait for the dub; every prompt opens on
+      // its keyframe's description.
       if (clipSeconds(shot.seconds) > maxClipSeconds) await dubReady.get(item.shot)!.promise;
+      await materials.get(item.shot)!.keyframe;
       await timed(cwd, production, "texts", () => writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, workSignal), save, [item.shot]));
     })())]));
     track(prepareSound(cwd, production, dubbed, prepared, workSignal));
@@ -834,10 +915,31 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
           await rendering.get(previous);
           await takeStartFrame(cwd, production, item.shot, workSignal, save);
         }
-        workSignal.throwIfAborted();
-        await prepareClipInputs(cwd, production, item, workSignal, save);
-        warmVideo();
-        if (!item.video) await timed(cwd, production, "clips", () => renderClips(cwd, production, [item], production.input.quality, "clips", workSignal, save));
+        // Each render is checked by the vision model; one that fails is written again knowing what went wrong and
+        // rendered again, never the same prompt with a new seed, and after the last correction the render with the
+        // fewest major problems is kept.
+        for (;;) {
+          workSignal.throwIfAborted();
+          if (!item.prompt) await timed(cwd, production, "texts", () => writeClipPrompts(production, script, shotList, prompt => complete(videoWriter, prompt, workSignal), save, [item.shot]));
+          await prepareClipInputs(cwd, production, item, workSignal, save);
+          warmVideo();
+          if (!item.video) await timed(cwd, production, "clips", () => renderClips(cwd, production, [item], production.input.quality, "clips", workSignal, save));
+          if (item.check) break;
+          item.check = await timed(cwd, production, "clipChecks", () => checkClip(cwd, production, item, (prompt, images) => see(checker, prompt, images, workSignal), workSignal));
+          if (item.check.passed || (item.attempts?.length ?? 0) >= clipCorrections) {
+            const { attempts = [], ...current } = item;
+            const best = [...attempts, current].reduce((kept, other) => majorProblems(other.check!).length < majorProblems(kept.check!).length ? other : kept);
+            if (best !== current) Object.assign(item, { prompt: undefined, parts: undefined, ...best, attempts });
+            if (!item.check!.passed) console.warn(`[production] Shot ${item.shot}: clip kept with problems`, majorProblems(item.check!));
+            await save();
+            break;
+          }
+          const { attempts = [], ...failed } = item;
+          item.attempts = [...attempts, failed];
+          item.feedback = majorProblems(item.check);
+          for (const field of ["prompt", "parts", "video", "remote", "inputSnapshot", "check"] as const) delete item[field];
+          await save();
+        }
       })()));
     }
     track((async () => {
@@ -869,6 +971,7 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
 }
 
 const videoWriter = "You write prompts for the Sulphur 2 (LTX-2.3) video model.";
+const keyframeWriter = "You describe the opening frame of a film shot for an image model.";
 const composer = "You describe film scores for a music generation model.";
 const soundEditor = "You describe continuous environmental sounds for independent ambience generation.";
 /** Whether a clip prompt, music style or environment sound description is missing. */
@@ -970,7 +1073,7 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     `- ${t`Script, shot list and prompts: ${uncensoredTextModelId} on Colab`}`,
     "- Written and image quality reviews: not performed.",
     "- Speech and pronunciation reviews: not performed.",
-    `- ${t`Designs: Qwen-Image 2.1 with the anatomy LoRA on Colab`}`,
+    `- ${t`Designs: Qwen-Image 2.1 on Colab`}`,
     `- ${t`Video: Sulphur 2 (LTX-2.3) on Colab with the LoRAs of each shot's people, starting from the previous clip's last frame only when a shot keeps its camera setup, following its previs depth video when someone walks or the camera moves, lip-synced to the dubbed lines`}`,
   ];
   const path = `${productionDirectory(production.id)}/report.md`;
