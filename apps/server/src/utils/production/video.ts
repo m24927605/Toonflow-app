@@ -11,7 +11,7 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { generateMedia } from "@/utils/media/generation";
 import { snapshotMedia, inputSnapshotSchema } from "@/utils/media/snapshot";
 import { longTakeParts, takeClipArtifact, withClipPostprocess, clipArtifactSchema, type ClipArtifact } from "@/utils/media/sulphur";
-import { maxErosV5Seconds } from "@/utils/media/erosV5";
+import { maxWanRemixSeconds } from "@/utils/media/wanRemix";
 import { colabSessionName, useExistingColabSession } from "@/utils/media/colabPool";
 import postprocess from "./postprocessColab.py" with { type: "text" };
 import { ReplyCutError, replyJson } from "./review";
@@ -32,9 +32,9 @@ export type ProductionClip = {
 };
 
 const sulphur = { providerId: "sulphur", modelId: "sulphur_2" };
-// Explicit shots render on TenStrip's 10Eros V5 from their LUSTIFY start frame, without LoRAs: on V5, character LoRAs
-// made the acting stiff, and a V5 clip cannot be longer than one render.
-const tenStrip = { providerId: "sulphur", modelId: "tenstrip_10eros_v5" };
+// Explicit shots render on Wan 2.2 Remix V3 from their LUSTIFY start frame, without LoRAs (the user's choice over TenStrip
+// V5 on 2026-10-28); a Remix clip lasts at most fifteen seconds, chained past five with SVI 2.0 Pro.
+const remix = { providerId: "wanRemix", modelId: "wan22_remix_v3" };
 /**
  * How long a shot plays in the film: its time in the shot list, or longer when its lines need it. Sulphur 2 renders
  * whole seconds, so the film cuts each clip to this.
@@ -45,7 +45,7 @@ const mimeOf = (path: string) => /\.jpe?g$/i.test(path) ? "image/jpeg" : /\.mp4$
  * Whether a shot's clip follows its previs depth video: one where someone walks or the camera moves. Otherwise the
  * previs has no movement to give, and its columns would only fight the poses the clip's prompt describes. Its people
  * are upright columns, so a shot where anyone lies, sits or kneels, or changes clothes (the column hides the arms and
- * garments that move), never follows it: the clip draws them as pillars. An explicit shot renders on TenStrip V5, which
+ * garments that move), never follows it: the clip draws them as pillars. An explicit shot renders on Wan Remix, which
  * takes no control video.
  */
 const controlled = (production: Production, shot: number) => {
@@ -170,9 +170,9 @@ export async function writeClipPrompts(production: Production, script: string, s
       return valid(await complete(instructions));
     };
     if (explicitShot(production, span.shot)) {
-      if (clip > maxErosV5Seconds) throw new Error(`Shot ${span.shot} is explicit and lasts ${clip} seconds; TenStrip V5 renders at most ${maxErosV5Seconds} seconds, so split it into shorter shots`);
-      // V5 does not move lips to words, so a line in an explicit shot would be heard without anyone saying it.
-      if (lines.length) throw new Error(`Shot ${span.shot} is explicit and has dialogue; TenStrip V5 does not lip-sync, so move its lines to a shot without sex`);
+      if (clip > maxWanRemixSeconds) throw new Error(`Shot ${span.shot} is explicit and lasts ${clip} seconds; Wan Remix renders at most ${maxWanRemixSeconds} seconds, so split it into shorter shots`);
+      // Remix renders no sound and does not move lips to words, so a line in an explicit shot would be heard without anyone saying it.
+      if (lines.length) throw new Error(`Shot ${span.shot} is explicit and has dialogue; Wan Remix does not lip-sync, so move its lines to a shot without sex`);
       video.prompt = await writeExplicitPrompt(span.row ?? "", shot.keyframe?.description, fixes, complete);
       await save();
       return;
@@ -224,7 +224,7 @@ export async function writeClipPrompts(production: Production, script: string, s
 }
 
 /**
- * Writes the TenStrip V5 prompt of an explicit shot strictly to the formula its prompts are written in (the user's
+ * Writes the Wan Remix prompt of an explicit shot strictly to the formula its prompts are written in (the user's
  * highest constraint, 2026-10-27): one line of short comma-joined phrases, subject and action, then camera, then
  * lighting, then style, the act in blunt colloquial words. In 〈雨夜〉 that wording alone decided the clip: "fast sloppy
  * blowjob" moved the head twice as far as "sucks hard and fast", "slow, deep thrusts" never reached the root while
@@ -233,14 +233,14 @@ export async function writeClipPrompts(production: Production, script: string, s
  */
 async function writeExplicitPrompt(row: string, opening: string | undefined, fixes: string | undefined, complete: (prompt: string) => Promise<string>) {
   const instructions = [
-    "Write the prompt of an explicit adult image-to-video clip for TenStrip 10Eros V5, an uncensored video model, from the shot-list row below and the first frame the clip starts from.",
+    "Write the prompt of an explicit adult image-to-video clip for Wan 2.2 Remix, an uncensored video model, from the shot-list row below and the first frame the clip starts from.",
     `The shot-list row (shot size, camera, action, cast, state): ${row}`,
     ...opening ? [`The first frame shows: ${opening}`] : [],
     "Follow this formula exactly: one line of short phrases joined by commas, 50 to 100 words, in this order:",
     "1. Subject and action: who is where as in the first frame, called the man and the woman (never by name), and the sex act in the bluntest, crudest everyday porn words, short, simple, rough and direct (fucks her pussy hard and fast, fast sloppy blowjob, pounding his cock balls-deep into her on every thrust, his hips slapping flush against hers, bobbing her head all the way down his cock and back to the tip, jerking his cock fast up and down the whole shaft). Every movement goes fast and to its full range. Then each hand exactly where the first frame has it, where they look, and their sounds in a few words; a moan is written with her lips slightly parted, never with her mouth open or loud, which draws a screaming mouth.",
     "2. Camera: static, the shot size and the camera height from the row, for example static medium shot at bed level.",
     "3. Lighting: the light source and its colour as the first frame shows it, and one detail of the place, for example warm bedside lamp light, rain on the window.",
-    "4. Style: end with exactly: photorealistic, preserve face identity",
+    "4. Style: end with exactly: photorealistic",
     "No full sentences, names, dialogue, quotation marks, timestamps, line breaks, Markdown or anything else. Output only the prompt.",
     ...fixes ? [fixes] : [],
   ].join("\n");
@@ -250,7 +250,7 @@ async function writeExplicitPrompt(row: string, opening: string | undefined, fix
     const words = prompt.split(" ").length;
     if (words < 40 || words > 130) throw new Error(`The prompt has ${words} words; write 50 to 100`);
     if (/["“”]/.test(prompt)) throw new Error("Write no quotation marks or dialogue");
-    if (!prompt.endsWith("photorealistic, preserve face identity")) throw new Error('End with exactly "photorealistic, preserve face identity"');
+    if (!prompt.endsWith("photorealistic")) throw new Error('End with exactly "photorealistic"');
     if (/mouth (wide )?open|open[- ]mouthed|moans? loudly/i.test(prompt)) throw new Error("Write her moaning with her lips slightly parted, never with her mouth open or loud");
     return prompt;
   };
@@ -355,9 +355,9 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
     const explicit = explicitShot(production, item.shot);
     const control = controlled(production, item.shot);
     const generate = () => explicit ? generateMedia(cwd, "video", {
-      ...tenStrip, mode: "singleImage", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
-      generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`, firstFrame: { path: frozenInput(shot.startFrame!), mimeType: mimeOf(shot.startFrame!) }, skipPrevis: true, seed: item.seed,
-    }, clipSignal) : generateMedia(cwd, "video", {
+      ...remix, mode: "singleImage", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution: "720p", ratio: production.input.ratio,
+      outputDirectory: `${productionDirectory(production.id)}/${folder}`, firstFrame: { path: frozenInput(shot.startFrame!), mimeType: mimeOf(shot.startFrame!) }, skipPrevis: true, seed: item.seed,
+    }, clipSignal).then(async ([video]) => [{ ...video!, path: await conformClip(cwd, video!.path, resolution, production.input.ratio, clipSignal) }]) : generateMedia(cwd, "video", {
       ...sulphur, mode: control ? "videoControl" : shot.startFrame ? "startFrameOptional" : "text", prompt: item.prompt!, duration: production.clips!.find(clip => clip.shot === item.shot)!.clip, resolution, ratio: production.input.ratio,
       generateAudio: true, outputDirectory: `${productionDirectory(production.id)}/${folder}`,
       ...shot.startFrame ? { firstFrame: { path: frozenInput(shot.startFrame), mimeType: mimeOf(shot.startFrame) } } : {},
@@ -385,7 +385,7 @@ export async function renderClips(cwd: string, production: Production, clips: Pr
       throw error;
     });
     item.video = video!.path;
-    // Only Sulphur renders leave a receipt of the clip kept on their machine; a V5 clip is finished from the workspace.
+    // Only Sulphur renders leave a receipt of the clip kept on their machine; a Remix clip is finished from the workspace.
     item.remote = explicit ? undefined : takeClipArtifact(await readFile((await resolveWorkspacePath(cwd, item.video)).path));
     item.seed = video!.seed;
     if (finishedFiles) {
@@ -482,6 +482,26 @@ export async function validateFilm(cwd: string, production: Production, signal: 
 const finished = (command: FfmpegCommand) => new Promise<void>((resolve, reject) => command.on("end", () => resolve()).on("error", reject).run());
 
 /** Each clip as an input cut to its shot's length. */
+/**
+ * Re-encodes a Remix clip (silent, 16 fps, 720p) to the size and 24 fps Sulphur renders this film at, with a silent
+ * stereo track, so it joins the other clips: the cuts concatenate every clip's picture and sound as they are.
+ * ACT: 16 fps becomes 24 by repeating frames, which keeps every drawn frame but moves a little unevenly; frame
+ * interpolation (RIFE, as Wan workflows often add) would be smoother, at the cost of another model on the machine.
+ */
+async function conformClip(cwd: string, path: string, resolution: "480p" | "720p" | "1080p", ratio: string, signal: AbortSignal) {
+  const [ratioWidth, ratioHeight] = ratio.split(":").map(Number) as [number, number];
+  const short = Number(resolution.replace("p", ""));
+  const long = Math.round(short * Math.max(ratioWidth, ratioHeight) / Math.min(ratioWidth, ratioHeight) / 2) * 2;
+  const [width, height] = ratioWidth >= ratioHeight ? [long, short] : [short, long];
+  const output = path.replace(/\.mp4$/, "Conformed.mp4");
+  const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+  await finished(ffmpeg((await resolveWorkspacePath(cwd, path)).path)
+    .complexFilter([`[0:v]scale=${width}:${height}:flags=lanczos,fps=24,setsar=1[v]`, "anullsrc=r=48000:cl=stereo[a]"], ["v", "a"])
+    .outputOptions(["-shortest", "-c:v libx264", "-crf 18", "-pix_fmt yuv420p", "-c:a aac", "-b:a 192k", "-movflags +faststart"])
+    .output((await resolveWorkspacePath(cwd, output, true)).path));
+  return output;
+}
+
 const cutClips = (command: FfmpegCommand, production: Production, clips: ProductionClip[]) =>
   clips.reduce((current, clip) => current.input(clip.video!).inputOptions("-t", shotSeconds(production, clip.shot).toFixed(3)), command);
 
@@ -628,7 +648,7 @@ export async function finishFilm(cwd: string, production: Production, signal: Ab
   }
   const { filters, soundInputs } = filmFilters(production, clips, lengths, subtitles);
   const output = `${folder}/film.mp4`;
-  // Every clip must still be on a machine for the film to be cut there; a V5 clip never is, so such films are cut here.
+  // Every clip must still be on a machine for the film to be cut there; a Remix clip never is, so such films are cut here.
   const resident = subtitles || clips.some(clip => !clip.remote) ? [] : clips.map(clip => clipArtifactSchema.parse(clip.remote));
   // The film is cut on a machine that still holds a clip; once none is left in the pool, it is cut here.
   const target = resident.findLast(artifact => colabSessionName(artifact.lane) === artifact.session);

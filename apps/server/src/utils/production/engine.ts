@@ -10,6 +10,7 @@ import { holdColabPool, inspectColabPool, colabModelPrepared, markColabModelPrep
 import { meteredColabUnits } from "@/utils/media/usage";
 import { holdSulphur, limitSulphur, maxClipSeconds, maxTakeSeconds, warmSulphur, sulphurPreparation } from "@/utils/media/sulphur";
 import { holdQwenImage, qwenImagePreparation } from "@/utils/media/qwenImage";
+import { maxWanRemixSeconds } from "@/utils/media/wanRemix";
 import { holdDrama3, drama3Preparation } from "@/utils/media/drama3";
 import { preparationKey, prepareModels, registerModelCaches, saveModelCaches } from "@/utils/media/preparation";
 import { applySpeakerLabels, missingSpeakerLabels, speakerLabelsJsonSchema, planJsonSchema, planPrompt, readPlan, requireCurrentPlan } from "./plan";
@@ -548,6 +549,7 @@ function shotListPrompt(script: string, names: string[], input: ProductionInput)
     `The film lasts ${input.seconds} seconds: the time ranges must end at ${input.seconds} s. Write every cell in ${language}.`,
     "In State, name each person's outfit by the short name the script's character section gives it.",
     "Preserve the creator's explicit camera-take and shot-count requirements, even when the screenplay omits them.",
+    explicitShotRule,
     "Creator's request:",
     input.outline,
     "",
@@ -556,6 +558,8 @@ function shotListPrompt(script: string, names: string[], input: ProductionInput)
   ].join("\n");
 }
 
+// The explicit video model renders clips of at most fifteen seconds, so the shot list keeps such shots that short.
+const explicitShotRule = `A shot that shows a sex act or exposed genitals lasts at most ${maxWanRemixSeconds} seconds: split a longer act into several such shots, each with one action of its own.`;
 const pacingSchema = z.strictObject({ shots: z.array(z.strictObject({ shot: z.number().int().positive(), problem: z.string().trim().min(1).max(1000) })).max(100) });
 
 /**
@@ -566,6 +570,7 @@ async function reviewPacing(script: string, shotList: string, signal: AbortSigna
   const prompt = [
     "You review a shot list for an AI video film before anything is drawn or rendered. Each row is one continuous take that a video model renders from its Action cell alone.",
     `Find every shot whose people cannot play its whole Action at a natural pace within the shot's time (${beatPacing}), that stacks several actions into one take, or whose Shot size or Camera cannot show its action, such as a walk across a room in a close-up or a sex act framed away from the act.`,
+    `Find too every shot that breaks this rule: ${explicitShotRule}`,
     "For each such shot say what is wrong and how to fix it: give an action its own shot, take time from a shot that needs less, or drop a beat the story can do without. The film's total length must stay the same. Leave out shots that work.",
     'Reply with JSON only: {"shots": [{"shot": 1, "problem": "..."}]}, with an empty list when every shot works.',
     "",

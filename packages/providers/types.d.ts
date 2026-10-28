@@ -235,15 +235,15 @@ interface ProviderTools {
     /** Seed to draw with; a random one when left out. */
     seed?: number;
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
-  /** Renders one silent 720p, 16 fps Wan 2.2 Remix V3 clip from a start image. */
+  /** Renders one silent 720p, 16 fps Wan 2.2 Remix V3 clip from a start image; past 5 seconds SVI 2.0 Pro chains renders. */
   wanRemix(request: {
     /** The positive prompt, used verbatim. */
     prompt: string;
     /** The start image the clip opens on. */
     firstFrame: MediaInput;
-    /** An image the clip ends on. */
+    /** An image the clip ends on; only for clips of up to 5 seconds. */
     lastFrame?: MediaInput;
-    /** Whole seconds, 1–5. */
+    /** Whole seconds, 1–15. */
     duration: number;
     /** Aspect ratio such as 16:9 or 9:16. */
     ratio: string;

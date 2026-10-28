@@ -7,9 +7,11 @@ import template from "./wanRemixPrompt.json";
 
 export type WanRemixRequest = Parameters<ProviderTools["wanRemix"]>[0];
 
-// Wan 2.2 renders 16 fps clips of 4n+1 frames; five seconds is the 81 frames it was trained on and tested at.
+// Wan 2.2 renders 16 fps clips of 4n+1 frames; five seconds is the 81 frames of one render, and a longer clip chains
+// renders with SVI 2.0 Pro, tested and approved up to 15 seconds.
 const fps = 16;
-const maxWanRemixSeconds = 5;
+const renderSeconds = 5;
+export const maxWanRemixSeconds = 15;
 // 720p, the size the approved clips were rendered at (1280x720 for 16:9), on Wan's 16-pixel grid.
 const shortSide = 720;
 // The A100 lanes outside the speech lane, preferring one with a running machine, as 10Eros V5 picks them.
@@ -24,10 +26,14 @@ function wanRemixSize(ratio: string) {
   return ratioWidth >= ratioHeight ? { width: long, height: shortSide } : { width: shortSide, height: long };
 }
 
-/** Renders one Wan 2.2 Remix V3 clip on Colab from a start image, and an end image if given; returns the MP4 bytes. */
+/**
+ * Renders one Wan 2.2 Remix V3 clip on Colab from a start image, and an end image if given (one render only); a clip
+ * longer than one render is chained with SVI 2.0 Pro. Returns the MP4 bytes.
+ */
 export async function runWanRemix({ prompt, firstFrame, lastFrame, duration, ratio, revealPenis, seed = randomSeed() }: WanRemixRequest, signal?: AbortSignal) {
   if (!prompt.trim()) throw new Error("The Wan Remix prompt cannot be empty");
   if (!Number.isInteger(duration) || duration < 1 || duration > maxWanRemixSeconds) throw new Error(`Wan Remix renders whole seconds from 1 to ${maxWanRemixSeconds}`);
+  if (lastFrame && duration > renderSeconds) throw new Error(`An end frame pins one Wan Remix render of at most ${renderSeconds} seconds`);
   if (!/^[1-9]\d?:[1-9]\d?$/.test(ratio)) throw new Error("Invalid Wan Remix aspect ratio");
   if (!Number.isSafeInteger(seed) || seed < 0) throw new Error("Invalid Wan Remix seed");
   const { width, height } = wanRemixSize(ratio);
