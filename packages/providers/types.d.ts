@@ -235,6 +235,23 @@ interface ProviderTools {
     /** Seed to draw with; a random one when left out. */
     seed?: number;
   }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
+  /** Renders one silent 720p, 16 fps Wan 2.2 Remix V3 clip from a start image. */
+  wanRemix(request: {
+    /** The positive prompt, used verbatim. */
+    prompt: string;
+    /** The start image the clip opens on. */
+    firstFrame: MediaInput;
+    /** An image the clip ends on. */
+    lastFrame?: MediaInput;
+    /** Whole seconds, 1–5. */
+    duration: number;
+    /** Aspect ratio such as 16:9 or 9:16. */
+    ratio: string;
+    /** Loads TenStrip's Reveal Penis LoRA pair on both experts. */
+    revealPenis: boolean;
+    /** Seed to draw with; a random one when left out. */
+    seed?: number;
+  }): Promise<{ data: Uint8Array; mimeType: "video/mp4"; seed: number }>;
   /**
    * Draws one Qwen-Image 2.1 image (base model) on a Google Colab A100
    * through the Colab CLI installed and signed in on the

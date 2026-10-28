@@ -6,6 +6,7 @@ import qwenImageSource from "@toonflow/providers/media/qwenImage" with { type: "
 import sulphurSource from "@toonflow/providers/media/sulphur" with { type: "text" };
 import minimaxH3Source from "@toonflow/providers/media/minimaxH3" with { type: "text" };
 import lustifySource from "@toonflow/providers/media/lustify" with { type: "text" };
+import wanRemixSource from "@toonflow/providers/media/wanRemix" with { type: "text" };
 import drama3Source from "@toonflow/providers/media/drama3" with { type: "text" };
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import { findOnScreenText } from "@toonflow/tools-scaffold/onScreenText";
@@ -24,6 +25,7 @@ const productionModels = {
   video: [
     { provider: "sulphur", models: ["sulphur_2", "sulphur_2_base", "tenstrip_10eros_v5"], source: sulphurSource as unknown as string },
     { provider: "minimaxH3", models: ["minimax_h3_i2va", "minimax_h3_ref2va"], source: minimaxH3Source as unknown as string },
+    { provider: "wanRemix", models: ["wan22_remix_v3", "wan22_remix_v3_reveal_penis"], source: wanRemixSource as unknown as string },
   ],
   audio: [{ provider: "drama3", models: ["fishaudio/drama-3"], source: drama3Source as unknown as string }],
 };

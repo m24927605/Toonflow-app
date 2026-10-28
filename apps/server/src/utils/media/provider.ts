@@ -16,6 +16,7 @@ import { runSulphur } from "@/utils/media/sulphur";
 import { runErosV5 } from "@/utils/media/erosV5";
 import { runMinimaxH3 } from "@/utils/media/minimaxH3";
 import { runLustify } from "@/utils/media/lustify";
+import { runWanRemix } from "@/utils/media/wanRemix";
 import { runQwenImage } from "@/utils/media/qwenImage";
 import { runDrama3 } from "@/utils/media/drama3";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -418,6 +419,7 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       higgsfield: request => runHiggsfield(request, signal),
       sulphur: request => runSulphur(request, signal),
       erosV5: request => runErosV5(request, signal),
+      wanRemix: request => runWanRemix(request, signal),
       minimaxH3: request => runMinimaxH3(request, signal),
       lustify: request => runLustify(request, signal),
       qwenImage: request => runQwenImage(request, signal),

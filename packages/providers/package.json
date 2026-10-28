@@ -18,6 +18,7 @@
     "./media/qwenImage": "./src/media/qwenImage.ts",
     "./media/minimaxH3": "./src/media/minimaxH3.ts",
     "./media/lustify": "./src/media/lustify.ts",
+    "./media/wanRemix": "./src/media/wanRemix.ts",
     "./media/suno": "./src/media/suno.ts"
   }
 }

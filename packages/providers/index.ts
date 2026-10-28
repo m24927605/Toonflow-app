@@ -13,6 +13,7 @@ import sulphur from "./src/media/sulphur";
 import qwenImage from "./src/media/qwenImage";
 import minimaxH3 from "./src/media/minimaxH3";
 import lustify from "./src/media/lustify";
+import wanRemix from "./src/media/wanRemix";
 import suno from "./src/media/suno";
 
 export type Provider = ProviderDefinition;
@@ -21,4 +22,4 @@ export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [openaiCodex, claudeCode, deepSeek, colab] as const;
-export const mediaProviders = [openai, higgsfield, gemini, drama3, metaso, sulphur, minimaxH3, lustify, qwenImage, suno] as const;
+export const mediaProviders = [openai, higgsfield, gemini, drama3, metaso, sulphur, minimaxH3, wanRemix, lustify, qwenImage, suno] as const;
