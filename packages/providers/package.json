@@ -12,7 +12,7 @@
     "./media/openai": "./src/media/openai.ts",
     "./media/higgsfield": "./src/media/higgsfield.ts",
     "./media/gemini": "./src/media/gemini.ts",
-    "./media/drama3": "./src/media/drama3.ts",
+    "./media/fishAudio": "./src/media/fishAudio.ts",
     "./media/metaso": "./src/media/metaso.ts",
     "./media/sulphur": "./src/media/sulphur.ts",
     "./media/qwenImage": "./src/media/qwenImage.ts",

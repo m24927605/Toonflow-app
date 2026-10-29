@@ -60,7 +60,7 @@ export async function planReferences(production: Production, script: string, sho
     if (item.use !== "voice" && item.transcript) throw new Error("Only voice references accept a transcript");
     if (["character", "voice"].includes(item.use) && !production.assets!.characters.some(person => person.name === item.target)) throw new Error("Reference target must be an existing character");
     if (item.use === "environment" && !production.assets!.places.some(place => place.name === item.target)) throw new Error("Reference target must be an existing place");
-    if (item.use === "voice" && !item.transcript.trim()) throw new Error("聲線參考需要提供音訊的逐字稿，才能交給 Drama-3 使用。");
+    if (item.use === "voice" && !item.transcript.trim()) throw new Error("聲線參考需要提供音訊的逐字稿，才能交給 Fish Audio 使用。");
     if (item.use === "voice" && !production.input.referenceNotes?.some(note => note.includes(item.transcript.trim()))) throw new Error("聲線參考的逐字稿必須取自你的說明，AI 不能自行編造。請補充音訊的逐字稿。");
     return { ...source, ...item };
   });

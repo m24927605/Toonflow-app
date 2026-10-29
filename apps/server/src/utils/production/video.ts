@@ -551,7 +551,7 @@ function srtTime(seconds: number) {
 
 /**
  * Finishes the film from the final clips, or the rough cut's at 480p: joins them in shot order, each cut to its shot's
- * length, takes speech from the original Drama-3 tracks and lays the music and each ambience bed underneath,
+ * length, takes speech from the original dialogue tracks and lays the music and each ambience bed underneath,
  * ducks the music while people speak as the soundtrack mix node does, and burns in each dubbed line as a subtitle while it
  * is spoken and long enough to read. A bed runs on from shot to shot of its place, so a cut inside a scene does not
  * restart it.

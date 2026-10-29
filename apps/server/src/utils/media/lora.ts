@@ -123,7 +123,7 @@ async function topUp(kind: LoraKind, reference: Uint8Array, count: number, signa
 // Trainings running in this process, by workspace, kind and name.
 const training = new Set<string>();
 
-// Trainings queue on the A100 lanes of the Colab pool outside the speech lane (2), whose disk holds H3 and Drama 3, a running machine with the least queued work first: asking Colab
+// Trainings queue on the A100 lanes of the Colab pool outside lane 2, whose disk holds H3, a running machine with the least queued work first: asking Colab
 // for a machine of their own failed a film after an hour of refusals while the pool's A100s sat idle, and counting only
 // trainings put one on the image lane, where the next set's images then waited the whole training. A lane without a
 // machine opens one only when no lane has one.

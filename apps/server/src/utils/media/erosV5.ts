@@ -12,7 +12,7 @@ export type ErosV5Request = Parameters<ProviderTools["erosV5"]>[0];
 const shortSides: Record<string, number> = { "480p": 512, "720p": 768, "1080p": 1088 };
 /** The longest clip, the workflow's own default length of 360 frames. */
 export const maxErosV5Seconds = 15;
-// The A100 lanes outside the speech lane, preferring one with a running machine; H3 and Drama 3 keep lane 2's disk.
+// The A100 lanes other than lane 2, preferring one with a running machine; H3 keeps lane 2's disk.
 const lanes = [1, 3];
 const workers = lanes.map(lane => createColabWorker("erosV5", lane));
 const waiting = workers.map(() => 0);

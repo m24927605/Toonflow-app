@@ -11,7 +11,6 @@ import { meteredColabUnits } from "@/utils/media/usage";
 import { holdSulphur, limitSulphur, maxClipSeconds, maxTakeSeconds, warmSulphur, sulphurPreparation } from "@/utils/media/sulphur";
 import { holdQwenImage, qwenImagePreparation } from "@/utils/media/qwenImage";
 import { maxWanRemixSeconds } from "@/utils/media/wanRemix";
-import { holdDrama3, drama3Preparation } from "@/utils/media/drama3";
 import { preparationKey, prepareModels, registerModelCaches, saveModelCaches } from "@/utils/media/preparation";
 import { applySpeakerLabels, missingSpeakerLabels, speakerLabelsJsonSchema, planJsonSchema, planPrompt, readPlan, requireCurrentPlan } from "./plan";
 import { executionAllocation, executionSource, planExecution, planStartup, startupAllocation } from "./execution";
@@ -102,10 +101,6 @@ async function prepareRuntime(cwd: string, production: Production, signal: Abort
     // The vision model that checks keyframes and clips is only downloaded here; it loads at its first check, after the
     // lines are recorded on the same A100.
     add(3, { ...colabModelPreparation(visualTextModelId), deferLoad: true });
-    const pendingSpeech = production.dub ? production.dub.shots.some(shot => shot.lines.some(line => !line.path)) : production.startupPlan!.speech;
-    if (pendingSpeech) {
-      add(2, drama3Preparation());
-    }
     for (const items of groups.values()) for (const item of items) {
       const role = Promise.withResolvers<void>();
       void role.promise.catch(() => {});
@@ -140,28 +135,9 @@ async function prepareRuntime(cwd: string, production: Production, signal: Abort
   }
   if (!production.execution || preparing.extrasStarted) return;
   preparing.extrasStarted = true;
-  const extraReady = (async () => {
-    const pendingSpeech = production.dub!.shots.some(shot => shot.lines.some(line => !line.path));
-    const extra = pendingSpeech && !preparing.roles.has("drama3") ? [drama3Preparation()] : [];
-    await Promise.all(extra.map(async item => {
-      const lane = item.name === "drama3" ? 2 : 1;
-      const ready = Promise.withResolvers<void>();
-      preparing.roles.set(item.name, ready.promise);
-      void ready.promise.catch(() => {});
-      try {
-        await preparing.groups.get(colabLane(lane));
-        if (!colabModelPrepared(colabLane(lane), preparationKey(item))) await prepareModels(lane, [item], signal, async timing => {
-          preparing.state.models.push(timing);
-          if (timing.name === item.name && timing.passed) await markColabModelPrepared(colabLane(lane), preparationKey(item));
-          await writeProductionText(cwd, path, JSON.stringify(preparing.state));
-        });
-        ready.resolve();
-      } catch (error) { ready.reject(error); throw error; }
-    }));
-  })();
   const initialReady = preparing.allReady;
   const start = new Date().toISOString(), began = performance.now();
-  preparing.allReady = Promise.all([initialReady, extraReady]).then(() => {
+  preparing.allReady = initialReady.then(() => {
     preparing.state.readyAt = new Date().toISOString();
   }).finally(async () => {
     (preparing.state.timings ??= []).push({ step: "startupMedia", start, end: new Date().toISOString(), seconds: (performance.now() - began) / 1000 });
@@ -879,8 +855,7 @@ async function produceClips(cwd: string, production: Production, signal: AbortSi
       if (job) await timed(cwd, production, "loras", () => trainAssetLora(cwd, job, workSignal, save));
     })())]));
     const blocked = track(timed(cwd, production, "previsRender", () => renderPrevis(cwd, production, shotList, workSignal, save, shot => previsReady.get(shot)!.resolve())).catch(error => rejectWaiting(previsReady.values(), error)));
-    const releaseDrama = holdDrama3();
-    const dubbed = track(timed(cwd, production, "dub", () => recordDub(cwd, production, workSignal, save, shot => dubReady.get(shot)!.resolve()).finally(releaseDrama)).catch(error => rejectWaiting(dubReady.values(), error)));
+    const dubbed = track(timed(cwd, production, "dub", () => recordDub(cwd, production, workSignal, save, shot => dubReady.get(shot)!.resolve())).catch(error => rejectWaiting(dubReady.values(), error)));
     const materials = new Map(production.previs!.map(previs => {
       const shot = production.shots!.find(item => item.shot === previs.shot)!;
       const references = shotReferences(shot, production.assets!, previs.framed);
@@ -1042,7 +1017,7 @@ async function deliveryReport(cwd: string, production: Production, signal: Abort
     "",
     t`Film: ${production.film}, ${production.input.quality}, ${clips.length} shots.`,
     t`Colab compute units: ${spent} spent (estimate ${production.estimate}).`,
-    t`Dialogue: Fish Audio Drama 3 on Colab, with newly generated character voices.`,
+    t`Dialogue: Fish Audio Drama 3 through its API, with newly designed character voices.`,
     "Video content review: not performed. Delivery validation checks file encoding, dimensions, duration and audio-track presence only.",
     ...production.music ? [t`Music: Suno V6, billed by the sunoapi.org account.`] : [],
     ...production.ambience?.flatMap(item => item.bed ? [`Ambience of ${item.place}: Sulphur 2; source video ${item.bed.video}; prompt ${item.bed.prompt}; SHA-256 ${item.bed.videoSha256}.`] : []) ?? [],
@@ -1106,7 +1081,7 @@ export function runProduction(cwd: string, id: string) {
       if (planning.assets && planning.assets.recipe !== "b3") throw new Error(translateMessage("這個舊任務的素材無法確認為 B3，請新建製作；原始檔案仍保留。"));
       // Pending revisions invalidate dispatch before startup can inspect the old execution plan.
       if (planning.review?.gate === "script" && planning.review.notes) delete planning.execution;
-      planning.startupPlan = await timed(cwd, planning, "startupPlan", () => planStartup(planning, controller.signal));
+      planning.startupPlan = await timed(cwd, planning, "startupPlan", () => planStartup(planning));
       if (planning.execution && planning.execution.source !== executionSource(planning)) {
         delete planning.execution;
         resetShotInputs(planning, planning.plan!.shots.map(shot => shot.shot));

@@ -7,7 +7,7 @@ import colab from "./src/language/colab";
 import openai from "./src/media/openai";
 import higgsfield from "./src/media/higgsfield";
 import gemini from "./src/media/gemini";
-import drama3 from "./src/media/drama3";
+import fishAudio from "./src/media/fishAudio";
 import metaso from "./src/media/metaso";
 import sulphur from "./src/media/sulphur";
 import qwenImage from "./src/media/qwenImage";
@@ -22,4 +22,4 @@ export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [openaiCodex, claudeCode, deepSeek, colab] as const;
-export const mediaProviders = [openai, higgsfield, gemini, drama3, metaso, sulphur, minimaxH3, wanRemix, lustify, qwenImage, suno] as const;
+export const mediaProviders = [openai, higgsfield, gemini, fishAudio, metaso, sulphur, minimaxH3, wanRemix, lustify, qwenImage, suno] as const;

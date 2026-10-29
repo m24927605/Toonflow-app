@@ -10,7 +10,7 @@ export type MinimaxH3Request = Parameters<ProviderTools["minimaxH3"]>[0];
 
 // The aspect ratios the templates' Resolution Selector offers.
 const aspects = new Set(["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "3:2", "2:3"]);
-// The speech lane: H3 shares its machine with Drama 3, apart from the image and explicit video models.
+// Lane 2: H3 keeps its own machine, apart from the image and explicit video models.
 const worker = createColabWorker("minimaxH3", 2);
 
 /** Renders one MiniMax H3 clip on Colab through the official ComfyUI template for its mode and returns the MP4 bytes. */

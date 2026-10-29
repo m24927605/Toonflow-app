@@ -178,7 +178,8 @@ async function startGeneration() {
     prompt: generationPrompt.value,
     language: data.value.language,
     voice: data.value.voice || undefined,
-    emotion: data.value.emotion.trim() || undefined,
+    // A voice description only designs a new voice; a reference already carries the voice.
+    emotion: refList.value.some(item => item.dataType === "AUDIO") ? undefined : data.value.emotion.trim() || undefined,
     sampleRate: data.value.sampleRate,
     format: data.value.format,
     outputDirectory: `assets/${id}`,

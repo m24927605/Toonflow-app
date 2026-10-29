@@ -19,6 +19,7 @@
     "@breezystack/lamejs": "^1.2.7",
     "@earendil-works/pi-ai": "1.1.0",
     "@earendil-works/pi-coding-agent": "1.1.0",
+    "@msgpack/msgpack": "^3.1.3",
     "@toonflow/ffmpeg": "workspace:*",
     "@toonflow/file": "workspace:*",
     "@toonflow/i18n": "workspace:*",

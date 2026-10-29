@@ -93,8 +93,6 @@ interface FfmpegRequiredError extends Error {
 }
 
 interface ProviderTools {
-  /** Runs the pinned Fish Audio Drama 3 checkpoint on a private Colab GPU with at least 48 GiB VRAM. */
-  drama3(request: { text: string; direction?: string; reference?: { audio: MediaInput; text: string } }): Promise<{ data: Uint8Array; mimeType: "audio/wav" }>;
   fetch: typeof globalThis.fetch;
   /** Extracts a readable reason from a provider error body, hiding configured keys and URL query parameters. */
   errorMessage(value: unknown): string;
@@ -114,6 +112,10 @@ interface ProviderTools {
    */
   audio: {
     convert(input: Uint8Array, options: AudioConvertOptions): Promise<{ data: Uint8Array; mimeType: string }>;
+  };
+  /** MessagePack encoding for APIs that take binary request bodies; byte arrays become MessagePack bin values. */
+  msgpack: {
+    encode(value: unknown): Uint8Array<ArrayBuffer>;
   };
   /**
    * Gets the native @renmu/fluent-ffmpeg factory bound to the current workspace,

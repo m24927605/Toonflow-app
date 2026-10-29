@@ -10,7 +10,7 @@ import initializePlugins, { syncEditablePlugins } from "@/utils/plugins/initiali
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 
-const autoInstallProviders = ["openai.ts", "higgsfield.ts", "gemini.ts", "drama3.ts", "metaso.ts", "sulphur.ts", "qwenImage.ts", "suno.ts"];
+const autoInstallProviders = ["openai.ts", "higgsfield.ts", "gemini.ts", "fishAudio.ts", "metaso.ts", "sulphur.ts", "qwenImage.ts", "suno.ts"];
 
 /** Hashes the given files so built-in plugins sync once per build, including upgrades that keep the data directory. */
 async function contentRevision(files: string[]) {

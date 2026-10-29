@@ -6,7 +6,7 @@ import { z } from "zod";
 import { castNames, shotSpans } from "@toonflow/node-shared/shotList";
 import { parseDialogue } from "@toonflow/node-shared/videoPrompt";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
-import { runDrama3Sequence } from "@/utils/media/drama3";
+import { generateMedia } from "@/utils/media/generation";
 import { maxTakeSeconds } from "@/utils/media/sulphur";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { readPlan, type ProductionPlan } from "./plan";
@@ -16,6 +16,8 @@ import { productionDirectory, readProduction, type Production } from "./state";
 // its shot's length.
 export const clipSeconds = (seconds: number) => Math.min(maxTakeSeconds, Math.max(1, Math.ceil(seconds)));
 // Trim boundary silence so pauses and subtitles follow the spoken words; -50 dB preserves soft word endings.
+// Fish Audio's hosted Drama 3 reads every line; Toonflow keeps no speech model of its own.
+const speech = { providerId: "fishAudio", modelId: "drama-3" };
 const trimSilence = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse";
 export const dialogueLoudness = "loudnorm=I=-16:TP=-1.5:LRA=11";
 
@@ -32,7 +34,7 @@ function lineLimit(words: string, filmSeconds: number) {
 type AudioAttempt = { path: string; seconds: number; reason: string; at: string };
 export type ProductionDub = {
   /** A generated reference anchors later lines; sound quality is not AI-reviewed. */
-  voices: Record<string, { presentation: "feminine" | "masculine" | "androgynous"; description: string; language: string; sample: string; candidate?: string; attempts?: AudioAttempt[]; reference?: { path: string; text: string } }>;
+  voices: Record<string, { presentation: "feminine" | "masculine" | "androgynous"; description: string; language: string; sample: string; reference?: { path: string; text: string } }>;
   /** `start` is when a line begins in its shot's track, which the film's subtitles follow. */
   shots: { shot: number; seconds: number; lines: { speaker: string; words: string; path?: string; seconds?: number; start?: number; attempts?: AudioAttempt[] }[]; track?: string }[];
 };
@@ -126,12 +128,12 @@ export async function reuseVoices(cwd: string, production: Production) {
     const prior = production.previousDub?.voices[name];
     const person = production.assets!.characters.find(item => item.name === name);
     const original = production.previousAssets?.characters.find(item => item.name === name);
-    if (voice.reference || voice.candidate || !prior?.reference || !person || !original || person.look !== original.look || person.photo !== original.photo || prior.presentation !== voice.presentation || prior.description !== voice.description || prior.language !== voice.language) continue;
+    if (voice.reference || !prior?.reference || !person || !original || person.look !== original.look || person.photo !== original.photo || prior.presentation !== voice.presentation || prior.description !== voice.description || prior.language !== voice.language) continue;
     if (person.photo && createHash("sha256").update(await readFile((await resolveWorkspacePath(cwd, person.photo)).path)).digest("hex") !== original.photoSha256) continue;
     const present = await resolveWorkspacePath(cwd, prior.reference.path).then(file => readFile(file.path)).then(() => true, () => false);
     if (present) voice.reference = { ...prior.reference };
   }
-  const voices = Object.entries(production.dub!.voices).filter(([name, voice]) => !voice.reference && !voice.candidate && production.assets!.characters.some(item => item.name === name && item.photo));
+  const voices = Object.entries(production.dub!.voices).filter(([name, voice]) => !voice.reference && production.assets!.characters.some(item => item.name === name && item.photo));
   if (!voices.length) return;
   const folder = (await resolveWorkspacePath(cwd, productionDirectory(""), true)).path;
   const ids = (await readdir(folder)).filter(id => id !== production.id);
@@ -166,6 +168,19 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
   const folder = `${productionDirectory(production.id)}/dub`;
   const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
   await mkdir((await resolveWorkspacePath(cwd, folder, true)).path, { recursive: true });
+  const duration = (path: string) => new Promise<number>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(Number(data.format.duration) || 0)));
+  /** Trims boundary silence and levels a recording into a mono 48 kHz WAV beside it, cut at `limit` seconds with a fade. */
+  const normalize = async (source: string, limit?: number) => {
+    const path = `${folder}/speech${crypto.randomUUID()}.wav`;
+    const output = (await resolveWorkspacePath(cwd, path, true)).path;
+    await finished(ffmpeg((await resolveWorkspacePath(cwd, source)).path).audioFilters([trimSilence, dialogueLoudness]).audioFrequency(48000).audioChannels(1).audioCodec("pcm_s16le").output(output));
+    const seconds = await duration(output);
+    if (limit === undefined || seconds <= limit) return { path, seconds };
+    const cut = `${folder}/speech${crypto.randomUUID()}.wav`;
+    const cutOutput = (await resolveWorkspacePath(cwd, cut, true)).path;
+    await finished(ffmpeg(output).duration(limit).audioFilters(`afade=t=out:st=${Math.max(0, limit - 0.2).toFixed(3)}:d=0.2`).audioCodec("pcm_s16le").output(cutOutput));
+    return { path: cut, seconds: await duration(cutOutput) };
+  };
   production.clips ??= [];
   const mixing = Array.from({ length: 3 }, () => Promise.resolve());
   let nextMix = 0;
@@ -183,31 +198,28 @@ export async function recordDub(cwd: string, production: Production, signal: Abo
         const voice = dub.voices[line.speaker]!;
         if (!voice?.presentation || !voice.description?.trim() || !voice.language?.trim() || !voice.sample?.trim()) throw new Error(`Missing voice design for ${line.speaker}; rebuild the production contract`);
         const limit = lineLimit(line.words, production.input.seconds);
-        const recorded = line.attempts?.find(attempt => attempt.seconds > 0 && attempt.seconds <= limit);
-        if (recorded && voice.reference) {
-          Object.assign(line, { path: recorded.path, seconds: recorded.seconds });
+        if (!voice.reference) {
+          // A new voice is designed from its description, speaking its audition; that recording anchors every later line.
+          const [sample] = await generateMedia(cwd, "audio", { ...speech, prompt: voice.sample, emotion: `${voice.presentation} voice. ${voice.description}`, language: voice.language, outputDirectory: folder }, signal);
+          const reference = await normalize(sample!.path);
+          if (reference.seconds <= 0) throw new Error(`No usable voice audition was returned for ${line.speaker}`);
+          voice.reference = { path: reference.path, text: voice.sample };
           await save();
-          return;
         }
-        const direction = `${voice.presentation} voice. ${voice.description} Speak in ${voice.language}.`;
-        const reference = voice.reference ? { audio: { type: "binary" as const, data: new Uint8Array(await readFile((await resolveWorkspacePath(cwd, voice.reference.path)).path)), mimeType: "audio/wav" }, text: voice.reference.text } : undefined;
-        const sequence = await runDrama3Sequence({ voiceText: voice.sample, voiceTranscript: voice.sample, lineText: line.words, direction, filters: [trimSilence, dialogueLoudness], referenceAttempts: Math.max(0, 2 - (voice.attempts?.length ?? 0)), lineAttempts: Math.max(0, 2 - (line.attempts?.length ?? 0)), maximumLineSeconds: limit, reference }, signal);
-        const paths = new Map<string, string>();
-        for (const artifact of sequence.result.artifacts) {
-          const name = artifact.file[0]!.toUpperCase() + artifact.file.slice(1);
-          const target = `${folder}/${sequence.job}${name}`;
-          await writeAtomic((await resolveWorkspacePath(cwd, target, true)).path, sequence.files[artifact.file]!, { exclusive: true });
-          paths.set(artifact.file, target);
+        while ((line.attempts?.length ?? 0) < 2) {
+          const [take] = await generateMedia(cwd, "audio", { ...speech, prompt: line.words, audios: [{ path: voice.reference.path, mimeType: "audio/wav", text: voice.reference.text }], outputDirectory: folder }, signal);
+          // Drama 3 sometimes keeps voicing a short line long after its words; the words come first, so the recording is
+          // cut at the line's limit with a short fade instead of failing the line.
+          const recording = await normalize(take!.path, limit);
+          if (recording.seconds > 0) {
+            Object.assign(line, { path: recording.path, seconds: recording.seconds });
+            await save();
+            return;
+          }
+          (line.attempts ??= []).push({ path: recording.path, seconds: recording.seconds, reason: "Spoken audio is empty", at: new Date().toISOString() });
+          await save();
         }
-        for (const attempt of sequence.result.attempts) {
-          const record = { path: paths.get(attempt.file)!, seconds: attempt.seconds, reason: attempt.reason, at: new Date().toISOString() };
-          if (attempt.kind === "reference") (voice.attempts ??= []).push(record);
-          else (line.attempts ??= []).push(record);
-        }
-        if (!voice.reference && sequence.result.reference) voice.reference = { path: paths.get(sequence.result.reference.file)!, text: sequence.result.reference.text };
-        if (sequence.result.line) Object.assign(line, { path: paths.get(sequence.result.line.file)!, seconds: sequence.result.line.seconds });
-        await save();
-        if (!line.path) throw new Error(sequence.result.error || `Shot ${shot.shot}: no valid dialogue recording returned`);
+        throw new Error(`Shot ${shot.shot}: no valid dialogue recording returned`);
       });
       speaking.set(line.speaker, next);
       return next;

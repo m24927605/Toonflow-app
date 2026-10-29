@@ -12,10 +12,9 @@ import { checkColabBudget, meterColab, recordColabUnits } from "@/utils/media/us
 import runtimeSource from "./colabRuntime.py" with { type: "text" };
 import preparationSource from "./modelPreparation.py" with { type: "text" };
 import pythonDependencies from "./pythonDependencies.json";
-import startupSource from "./dramaStartup.py" with { type: "text" };
 import { recordColabTiming } from "./timings";
 
-const runtimeSourceId = createHash("sha256").update(JSON.stringify([runtimeSource, preparationSource, pythonDependencies, startupSource])).digest("hex");
+const runtimeSourceId = createHash("sha256").update(JSON.stringify([runtimeSource, preparationSource, pythonDependencies])).digest("hex");
 
 // Compute units per hour of each machine as Toonflow opens it, the A100 with high RAM (colab usage, 2026-10-15), for a
 // session whose own rate the account's cannot show.
@@ -552,7 +551,7 @@ print("COLAB_DONE")
       if (detached) await exec("if 'toonflowRuntime' in globals():\n    toonflowRuntime.stopModel()\nprint('COLAB_DONE')\n", {}, signal);
       if (!runtimeUploaded) {
         const local = join(directory, "runtime.py");
-        const files = [["modelPreparation.py", preparationSource], ["pythonDependencies.json", JSON.stringify(pythonDependencies)], ["dramaStartup.py", startupSource]].map(([name, source]) => [name, Buffer.from(source!).toString("base64")]);
+        const files = [["modelPreparation.py", preparationSource], ["pythonDependencies.json", JSON.stringify(pythonDependencies)]].map(([name, source]) => [name, Buffer.from(source!).toString("base64")]);
         await writeFile(local, `import base64\nfrom pathlib import Path\nfor name, data in ${JSON.stringify(files)}:\n    path = Path('/content') / name\n    temporary = path.with_suffix('.bootstrap')\n    temporary.write_bytes(base64.b64decode(data))\n    temporary.replace(path)\n${runtimeSource}`);
         await colab(command, ["upload", "--session", name, local, "/content/toonflowRuntime.py"], signal);
         runtimeUploaded = true;

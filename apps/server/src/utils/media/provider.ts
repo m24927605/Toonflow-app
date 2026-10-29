@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
 import { parse, parseExpression } from "@babel/parser";
+import { encode } from "@msgpack/msgpack";
 import { z } from "zod";
 import conf from "@/utils/conf";
 import { resolveEnvReference } from "@/utils/conf/env";
@@ -18,7 +19,6 @@ import { runMinimaxH3 } from "@/utils/media/minimaxH3";
 import { runLustify } from "@/utils/media/lustify";
 import { runWanRemix } from "@/utils/media/wanRemix";
 import { runQwenImage } from "@/utils/media/qwenImage";
-import { runDrama3 } from "@/utils/media/drama3";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
 
 type Expression = Extract<ReturnType<typeof parseExpression>, { type: "ParenthesizedExpression" }>["expression"];
@@ -412,6 +412,8 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       image: Bun.Image,
       media: createMediaTools(fetchRequest),
       audio: { convert: (input: Uint8Array, options: AudioConvertOptions) => convertAudio(input, options, signal) },
+      // A copy owns its ArrayBuffer, as fetch bodies require.
+      msgpack: { encode: value => new Uint8Array(encode(value)) },
       ffmpeg: async () => {
         if (!cwd) throw new Error("The current operation does not have a working directory and cannot use FFmpeg.");
         return createWorkspaceFfmpeg(cwd, signal);
@@ -423,7 +425,6 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       minimaxH3: request => runMinimaxH3(request, signal),
       lustify: request => runLustify(request, signal),
       qwenImage: request => runQwenImage(request, signal),
-      drama3: request => runDrama3(request, signal),
     } satisfies ProviderTools,
   };
   for (const [name, generate] of [

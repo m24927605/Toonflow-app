@@ -31,7 +31,7 @@ def environment():
     code = "import json,sys,importlib.metadata as m; names={d.metadata['Name'].lower().replace('_','-').replace('.','-') for d in m.distributions()}; versions={n:m.version(n) for n in names}; import torch; print(json.dumps({'python':sys.version,'torchVersion':torch.__version__,'torchCuda':torch.version.cuda,'packages':versions},sort_keys=True))"
     for runtime in spec["runtimes"]:
         directory = "model" + hashlib.sha256(runtime.encode()).hexdigest()[:16]
-        python = Path("/content/drama3SglangRuntime/venv/bin/python") if runtime == "drama3Sglang" else Path("/content/drama3Runtime/venv/bin/python") if runtime.startswith("drama3") else Path("/content/toonflowRuntimes") / directory / "venv/bin/python"
+        python = Path("/content/toonflowRuntimes") / directory / "venv/bin/python"
         result[runtime] = json.loads(subprocess.check_output([str(python), "-c", code], text=True).strip().splitlines()[-1])
     return result
 
@@ -46,7 +46,7 @@ elif action == "save":
     installs = []
     for source in spec["installSources"]:
         family, revision = source.split("/", 1)
-        installs.append(Path("/content") / ("llama-" + revision) if family == "gguf" else Path("/content/toonflowInstall") / (("omni" if family == "drama3" else "sglang" if family == "sglang" else "comfy") + revision))
+        installs.append(Path("/content") / ("llama-" + revision) if family == "gguf" else Path("/content/toonflowInstall") / ("comfy" + revision))
     compilers = [Path("/root/.cache/vllm"), Path("/root/.cache/torch"), Path("/root/.cache/torch_extensions"), Path("/tmp/torchinductor_root"), Path("/root/.cache/flashinfer"), Path("/root/.triton/cache")]
     budget = 512 * 1024 * 1024
     size = 0

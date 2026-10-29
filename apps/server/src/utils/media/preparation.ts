@@ -8,7 +8,6 @@ import { colabLane, colabSessionName, createColabWorker, rememberColabCapacity, 
 import cacheScript from "./runtimeCache.py" with { type: "text" };
 import pythonDependencies from "./pythonDependencies.json";
 import installerSource from "./modelPreparation.py" with { type: "text" };
-import startupSource from "./dramaStartup.py" with { type: "text" };
 import { machineCapacitySchema, modelPreparationTimingSchema, recordColabTiming } from "./timings";
 
 const cacheDirectory = () => join(dirname(conf.path), "colabCache");
@@ -39,7 +38,7 @@ export async function registerModelCaches(lane: number, items: ColabPreparation[
 }
 
 const nativeRoot = "/content/toonflowCache";
-export const preparationKey = (item: ColabPreparation) => `${item.name}:${createHash("sha256").update(JSON.stringify([item, pythonDependencies, installerSource, startupSource])).digest("hex").slice(0, 16)}`;
+export const preparationKey = (item: ColabPreparation) => `${item.name}:${createHash("sha256").update(JSON.stringify([item, pythonDependencies, installerSource])).digest("hex").slice(0, 16)}`;
 // Scheduling hints do not change installed artifacts or compiler compatibility.
 export const preparationCacheSpec = (items: ColabPreparation[]) => JSON.stringify({
   installSource: createHash("sha256").update(JSON.stringify([1, [...new Set(items.map(item => item.installSource))].sort(), pythonDependencies])).digest("hex"),
@@ -122,7 +121,7 @@ export async function prepareModels(lane: number, preparations: ColabPreparation
         if (status.state !== "ready") continue;
         const timing = modelPreparationTimingSchema.parse(status.result);
         if (timing.name !== name || !timing.passed || !timing.capacity) throw new Error(`Incomplete preparation result for ${name}`);
-        await recordColabTiming({ role: item.name === "drama3" ? item.runtime : item.name, phase: "download", gpu: lane === 0 ? "L4" : "A100", seconds: timing.seconds, passed: true });
+        await recordColabTiming({ role: item.name, phase: "download", gpu: lane === 0 ? "L4" : "A100", seconds: timing.seconds, passed: true });
         await completed({ ...timing, name: name + "Download" });
         if (timing.capacity) await rememberColabCapacity(colabLane(lane), session.name, timing.capacity);
         const start = new Date().toISOString(), began = performance.now();
@@ -143,7 +142,7 @@ export async function prepareModels(lane: number, preparations: ColabPreparation
             passed = true;
           } finally {
             const seconds = (performance.now() - began) / 1000;
-            await recordColabTiming({ role: item.name === "drama3" ? item.runtime : item.name, phase: "load", gpu: lane === 0 ? "L4" : "A100", seconds, passed });
+            await recordColabTiming({ role: item.name, phase: "load", gpu: lane === 0 ? "L4" : "A100", seconds, passed });
             await completed({ name, start, end: new Date().toISOString(), seconds, passed, details, capacity });
           }
         }

@@ -67,29 +67,6 @@ def installComfy(destination, revision, family="comfy"):
     installPackages(sys.executable, family, ["-r", str(destination / "requirements.txt"), "huggingface_hub", "hf_xet", "requests"], locks[family]["packages"]["torch"].split("+")[1])
 
 
-def installOmni(python, revision, family="drama3"):
-    sglang = family == "sglang"
-    directory = root / (("sglang" if sglang else "omni") + revision)
-    package = "sglang_omni" if sglang else "vllm_omni"
-    manifest = directory / "wheel.json"
-    if not manifest.exists():
-        requirement = "sglang-omni[fishaudio] @ git+https://github.com/sgl-project/sglang-omni.git@" + revision if sglang else "git+https://github.com/vllm-project/vllm-omni.git@" + revision
-        installPackages(python, family, [requirement])
-        candidates = [path for path in Path("/root/.cache/uv").rglob(package + "-*.whl") if revision[:16] in path.parts]
-        if len(candidates) != 1:
-            raise RuntimeError("The pinned Omni build did not publish one reusable wheel")
-        directory.mkdir(exist_ok=True)
-        wheel = directory / candidates[0].name
-        shutil.copyfile(candidates[0], wheel)
-        manifest.write_text(json.dumps({"revision": revision, "file": wheel.name, "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()}))
-    else:
-        saved = json.loads(manifest.read_text())
-        wheel = directory / saved["file"]
-        if wheel.parent != directory or saved["revision"] != revision or hashlib.sha256(wheel.read_bytes()).hexdigest() != saved["sha256"]:
-            raise ValueError("Pinned Omni wheel identity or digest mismatch")
-        installPackages(python, family, [str(wheel) + ("[fishaudio]" if sglang else "")])
-
-
 @contextmanager
 def downloadSlots(count=1):
     slots = []

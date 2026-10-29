@@ -2,7 +2,7 @@
 # executed on a Colab GPU session by erosV5.ts, node for node: the workflow file is converted to a ComfyUI API prompt and
 # only the inputs it leaves to its user change, namely the start image, the positive prompt, the seed, the width,
 # height and length sliders and saving the final video. Its negative prompt, models, samplers, sigmas and the crf 24
-# output stay as shipped. The one addition, made at the user's request so a character keeps their Drama 3 voice, is a
+# output stay as shipped. The one addition, made at the user's request so a character keeps their dubbed voice, is a
 # locked soundtrack: a dubbed track is encoded with the workflow's own audio VAE nodes and held by a zero noise mask
 # from its own SolidMask in both passes, and the clip keeps the original file.
 # Inputs, named erosin_<EROS_JOB>_*: prompt.txt, first.<ext>, an optional audio.<ext> soundtrack and the workflow file,

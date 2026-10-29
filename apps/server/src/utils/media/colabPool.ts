@@ -7,7 +7,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { scheduler } from "node:timers/promises";
 import { machineCapacitySchema, recordColabTiming } from "./timings";
 
-export type ColabAllocation = { speechLane: 1 | 2; reviewLane: 1 | 2 | 3; speechMode?: "eager" | "compiled"; speechRuntime?: "vllm" | "sglang"; renderWorkers: 1 | 2; renderLimit?: number; lanes: number[]; ready?: (model: string) => Promise<void> };
+export type ColabAllocation = { reviewLane: 1 | 2 | 3; renderWorkers: 1 | 2; renderLimit?: number; lanes: number[]; ready?: (model: string) => Promise<void> };
 const allocation = new AsyncLocalStorage<ColabAllocation>();
 export const withColabAllocation = <T>(value: ColabAllocation, work: () => T) => allocation.run({ ...value }, work);
 export const currentColabAllocation = () => allocation.getStore();
@@ -29,12 +29,12 @@ export async function waitForColabPreparation(model: string, signal?: AbortSigna
   finally { void recordColabTiming({ role: model, phase: "readiness", gpu: model === "text" ? "L4" : "A100", seconds: (performance.now() - began) / 1000, passed }); }
 }
 // Requests outside a production use two A100s (the user's choice on 2026-10-27, as one disk could not hold every model):
-// lane 2 holds MiniMax H3 and Drama 3, the dialogue shots, and lane 1 every other model. A production's allocation
-// still spreads its speech and review over the lanes it planned.
+// lane 2 holds MiniMax H3 and lane 1 every other model. A production's allocation still spreads its review over the
+// lanes it planned.
 export const colabLane = (index: number) => {
   const planned = allocation.getStore();
   if (!planned) return index === 0 ? 0 : index === 2 ? 2 : 1;
-  return index === 2 ? planned.speechLane : index === 3 ? planned.reviewLane : index;
+  return index === 3 ? planned.reviewLane : index;
 };
 export type ColabPreparation = { name: string; runtime: string; installSource: string; prefetch?: boolean; deferLoad?: boolean; timingOutput?: string; job: Omit<ColabJob, "provider"> };
 
@@ -141,7 +141,7 @@ async function laneSession(lane: (typeof lanes)[number], provider: string, signa
 
 // ACT: an A100 lane without a machine runs its job on another A100 lane's running machine instead of opening one: a
 // new machine reinstalls its models for minutes and bills beside the idle one (2026-10-27, the user's choice). That disk
-// holds LUSTIFY, V5 and Drama 3 (about 137 GB of 236 GB, measured 2026-10-27); H3 (40 GB) on top leaves little room, so
+// held LUSTIFY, V5 and the former Drama 3 (about 137 GB of 236 GB, measured 2026-10-27); H3 (40 GB) on top leaves little room, so
 // bring back a machine of its own here when H3 returns to the pipeline.
 class BorrowLane extends Error {
   constructor(readonly host: number) { super(`Borrow lane ${host}`); }
@@ -380,7 +380,7 @@ export function createColabWorker(provider: string, index: number) {
         throw error;
       } finally {
         const now = performance.now();
-        const role = provider === "colab" ? index === 0 ? "text" : "visualReview" : provider === "drama3" ? allocation.getStore()?.speechRuntime === "sglang" ? "drama3Sglang" : allocation.getStore()?.speechMode === "compiled" ? "drama3Compiled" : "drama3Eager" : provider;
+        const role = provider === "colab" ? index === 0 ? "text" : "visualReview" : provider;
         const observation = { role, gpu: lane.machine.gpu, passed };
         if (!reused) void recordColabTiming({ ...observation, passed: readyAt !== undefined, phase: "allocation", seconds: ((readyAt ?? now) - enteredAt) / 1000 });
         void recordColabTiming({ ...observation, phase: "queue", seconds: (enteredAt - queuedAt) / 1000 });

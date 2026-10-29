@@ -14,7 +14,8 @@ const planSchema = z.strictObject({
     language: z.string().min(2).max(64).refine(value => {
       try { return Intl.getCanonicalLocales(value).length === 1; } catch { return false; }
     }, "Use a BCP 47 spoken language tag, for example zh-TW or ja-JP"),
-    sample: text.min(35),
+    // Fish Audio designs a new voice speaking at most 150 characters.
+    sample: text.min(35).max(150),
   })),
   shots: z.array(z.strictObject({
     shot: z.number().int().positive(),
@@ -71,7 +72,7 @@ export function applySpeakerLabels(reply: string, shotList: string, known: Reado
 export const planSource = (script: string, shotList: string, assets: Production["assets"]) =>
   createHash("sha256").update(JSON.stringify([script, shotList, assets?.characters.map(({ name, look, photo, outfits }) => ({ name, look, photo, outfits: outfits?.map(({ name, look }) => ({ name, look })) })), assets?.places.map(({ name, look }) => ({ name, look }))])).digest("hex");
 
-const voiceAuditionInstructions = "sample is a natural 8–12 second audition of two complete sentences in the selected spoken language, at least 35 characters, without stage directions. Leave margin above the measured 5-second minimum: a 20-character Chinese sentence can finish too quickly. Expand a short film line into a separate complete audition; never use a two-word line as the whole audition. This sample is for casting, never added to the film. Independent neutral audition text is allowed: it need not repeat film dialogue, events or duration. Written audition words do not prove audible gender, age, timbre, accent or performance quality.";
+const voiceAuditionInstructions = "sample is a natural 8–12 second audition of two complete sentences in the selected spoken language, 35–150 characters, without stage directions; a 20-character Chinese sentence finishes too quickly. Expand a short film line into a separate complete audition; never use a two-word line as the whole audition. This sample is for casting, never added to the film. Independent neutral audition text is allowed: it need not repeat film dialogue, events or duration. Written audition words do not prove audible gender, age, timbre, accent or performance quality.";
 
 export function planPrompt(script: string, shotList: string, assets: Production["assets"]) {
   return [
